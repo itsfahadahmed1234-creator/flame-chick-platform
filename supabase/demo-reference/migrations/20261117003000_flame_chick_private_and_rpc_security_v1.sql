@@ -1,0 +1,13 @@
+alter table private.rider_push_config enable row level security;
+alter table private.delivery_dispatch_settings enable row level security;
+revoke all on table private.rider_push_config, private.delivery_dispatch_settings from anon, authenticated;
+grant all on table private.rider_push_config, private.delivery_dispatch_settings to service_role;
+revoke execute on all functions in schema public from public, anon, authenticated;
+grant execute on all functions in schema public to service_role;
+revoke execute on all functions in schema private from public, anon, authenticated;
+grant execute on all functions in schema private to postgres, service_role;
+grant execute on function private.has_staff_role(uuid,text[]) to authenticated;
+grant execute on function private.can_access_order(uuid) to authenticated;
+grant execute on function private.can_access_delivery_task(uuid) to authenticated;
+grant execute on function private.is_current_rider_for_order(uuid) to authenticated;
+grant execute on function private.is_current_rider_for_task(uuid) to authenticated;
