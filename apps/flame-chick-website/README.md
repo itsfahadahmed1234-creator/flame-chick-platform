@@ -6,7 +6,7 @@ Static customer storefront for Flame Chick.
 - CSS: `css/styles.css`
 - Browser modules: `js/`
 - Brand assets: `assets/`
-- Product and hero media: `media/` (asset transfer in progress)
+- Media: `media/f/` (59-frame scroll sequence), `media/products/` (11 product images), `media/hero.jpg`, and `media/hero.mp4`
 - Supabase: Production project `adkrxfnawdiljhjaavnj`, Mumbai `ap-south-1`
 - Checkout and catalog APIs: `flame-chick-catalog`, `flame-chick-order-api`
 
