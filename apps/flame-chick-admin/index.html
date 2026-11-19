@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#171717">
+  <title>Flame Chick | Admin</title>
+  <link rel="icon" type="image/svg+xml" href="assets/flame-chick-mark.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <section id="authView" class="auth-view">
+    <div class="auth-art">
+      <div class="auth-brand"><img src="assets/flame-chick-mark.svg" alt=""><span>Flame Chick</span></div>
+      <div class="auth-message">
+        <span class="eyebrow">RESTAURANT CONTROL ROOM</span>
+        <h1>Everything<br>under control.</h1>
+        <p>One place to manage your menu, offers, operations and performance.</p>
+      </div>
+      <div class="auth-foot">FLAME CHICK · PRIVATE ADMINISTRATION</div>
+    </div>
+    <div class="auth-panel">
+      <form id="loginForm" class="login-card">
+        <div class="mobile-brand"><img src="assets/flame-chick-mark.svg" alt=""><strong>Flame Chick</strong></div>
+        <span class="eyebrow">WELCOME BACK</span>
+        <h2>Sign in to continue</h2>
+        <p class="muted">Use your Flame Chick owner or manager account.</p>
+        <label>Email address<input id="email" name="email" type="email" autocomplete="username" required placeholder="you@example.com"></label>
+        <label>Password<input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Your password"></label>
+        <div id="loginError" class="error-text" role="alert"></div>
+        <button class="btn btn-primary btn-wide" type="submit" id="loginButton">Sign in <span>→</span></button>
+        <p class="login-note"><span class="lock-dot"></span> Secure sign-in · Owner, admin or manager access only</p>
+      </form>
+    </div>
+  </section>
+
+  <div id="appView" class="app-view" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="Flame Chick Admin">
+        <img src="assets/flame-chick-mark.svg" alt="">
+        <span><b>Flame Chick</b><small>ADMIN PANEL</small></span>
+      </a>
+      <div class="nav-label">WORKSPACE</div>
+      <nav class="side-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-page="dashboard"><span class="nav-icon">◫</span>Dashboard</button>
+        <button class="nav-item" data-page="orders"><span class="nav-icon">▣</span>Orders</button>
+        <button class="nav-item" data-page="menu"><span class="nav-icon">▤</span>Menu & products</button>
+        <button class="nav-item" data-page="categories"><span class="nav-icon">▦</span>Categories</button>
+        <button class="nav-item" data-page="deals"><span class="nav-icon">✳</span>Deals & offers</button>
+        <button class="nav-item" data-page="delivery"><span class="nav-icon">⌁</span>Delivery areas</button>
+        <button class="nav-item" data-page="staff"><span class="nav-icon">♙</span>Staff & riders</button>
+        <button class="nav-item" data-page="media"><span class="nav-icon">▧</span>Website images</button>
+        <button class="nav-item" data-page="settings"><span class="nav-icon">⚙</span>Website settings</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="backend-state"><span class="state-dot"></span><div><b>Database connected</b><small>Supabase · secured session</small></div></div>
+        <div class="sidebar-user"><div class="avatar" id="userAvatar">PB</div><div class="sidebar-user-copy"><b id="userName">Restaurant Owner</b><small id="userRole">Owner</small></div><button class="icon-btn" id="logoutButton" title="Sign out" aria-label="Sign out">↗</button></div>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="topbar-heading"><span class="topbar-kicker">FLAME CHICK / <span id="crumb">OVERVIEW</span></span><h1 id="pageTitle">Dashboard</h1></div>
+        <div class="topbar-actions">
+          <span class="live-pill"><span></span> LIVE DATA</span>
+          <button class="btn btn-outline" id="refreshButton"><span class="refresh-icon">↻</span> Refresh</button>
+          <button class="avatar avatar-top" id="profileBadge" title="Signed in account">PB</button>
+        </div>
+      </header>
+
+      <section class="page" id="page-dashboard">
+        <div class="dashboard-welcome"><div><span class="eyebrow">BRANCH PERFORMANCE</span><h2 id="greeting">Today at Flame Chick</h2><p class="muted" id="todayLabel">Live order data for this branch</p></div><div class="dashboard-updated"><span class="live-pill"><span></span> LIVE DATA</span><small id="dashboardUpdated">Updating…</small></div></div>
+        <div class="dashboard-section-head"><div><h3>Today summary</h3><p class="muted">Orders placed today · Pakistan time</p></div></div>
+        <div class="metric-grid dashboard-metric-grid">
+          <article class="metric-card"><div class="metric-top"><span>ORDERS</span><span class="metric-icon red">▤</span></div><div class="metric-value" id="todayOrders">—</div><div class="metric-foot" id="todayOrdersCaption">Orders today</div></article>
+          <article class="metric-card"><div class="metric-top"><span>ORDER VALUE</span><span class="metric-icon gold">₨</span></div><div class="metric-value" id="todaySales">—</div><div class="metric-foot">Excludes cancelled and rejected orders</div></article>
+          <article class="metric-card"><div class="metric-top"><span>DELIVERY</span><span class="metric-icon blue">⌁</span></div><div class="metric-value" id="todayDelivery">—</div><div class="metric-foot" id="todayDeliveryCaption">Delivery orders</div></article>
+          <article class="metric-card"><div class="metric-top"><span>TAKEAWAY</span><span class="metric-icon green">↗</span></div><div class="metric-value" id="todayTakeaway">—</div><div class="metric-foot" id="todayTakeawayCaption">Takeaway orders</div></article>
+          <article class="metric-card"><div class="metric-top"><span>DINE-IN</span><span class="metric-icon purple">▦</span></div><div class="metric-value" id="todayDineIn">—</div><div class="metric-foot" id="todayDineInCaption">Dine-in orders</div></article>
+        </div>
+        <div class="dashboard-grid dashboard-top-grid">
+          <article class="surface status-card"><div class="surface-head"><div><h3>Order status</h3><p class="muted" id="statusCaption">Today's order progress</p></div><span class="small-label" id="statusTotal">— ORDERS</span></div><div id="statusBreakdown" class="status-breakdown"><div class="empty-state">Loading live statuses…</div></div></article>
+          <article class="surface"><div class="surface-head"><div><h3>Order mix</h3><p class="muted">Today's fulfilment types</p></div></div><div class="mix-list" id="todayMix"><div class="empty-state">Loading order mix…</div></div></article>
+        </div>
+        <div class="surface sales-overview-card">
+          <div class="sales-overview-head"><div><span class="eyebrow">SALES OVERVIEW</span><h3>Order value performance</h3><p class="muted" id="salesRangeCaption">Last 7 days</p></div>
+            <div class="range-switch dashboard-range-switch" id="rangeSwitch"><button data-range="today">Today</button><button data-range="7" class="selected">7 Days</button><button data-range="14">14 Days</button><button data-range="30">30 Days</button><button data-range="this_month">This Month</button><button data-range="previous_month">Previous Month</button><button data-range="month">Month</button><input type="month" id="dashboardMonth" aria-label="Select dashboard month" hidden></div>
+          </div>
+          <div class="sales-kpis"><div><small>Period total</small><b id="periodSales">—</b></div><div><small>Orders</small><b id="periodOrders">—</b></div><div><small>Daily average</small><b id="periodAverage">—</b></div><div><small>Best day</small><b id="periodBestDay">—</b></div></div>
+          <div class="sales-chart-legend"><span><i></i> Daily order value</span><span id="periodComparison">vs previous period</span></div><div id="trendChart" class="trend-chart dashboard-sales-chart"><div class="empty-state">Loading sales…</div></div>
+        </div>
+        <div class="surface rush-card">
+          <div class="rush-head"><div><span class="eyebrow">RUSH HOURS</span><h3>Hourly activity</h3><p class="muted" id="rushCaption">Orders by hour · 11 AM → 12 AM</p></div>
+            <div class="range-switch rush-range-switch" id="rushRangeSwitch"><button data-rush="today" class="selected">Today</button><button data-rush="yesterday">Yesterday</button><button data-rush="7">Last 7 Days</button><button data-rush="this_month">This Month</button><button data-rush="previous_month">Previous Month</button><button data-rush="month">Month</button><input type="month" id="rushMonth" aria-label="Select rush-hour month" hidden></div>
+          </div>
+          <div class="rush-summary" id="rushSummary"><div class="empty-state">Loading hourly activity…</div></div><div class="rush-chart" id="rushChart"><div class="empty-state">Loading hourly activity…</div></div><div class="rush-foot" id="rushFoot">Hourly activity is calculated from actual placed orders.</div>
+        </div>
+        <div class="dashboard-section-head weekly-section-head"><div><h3>Weekly performance</h3><p class="muted" id="weekCaption">Current week</p></div></div>
+        <div class="metric-grid weekly-metric-grid">
+          <article class="metric-card"><div class="metric-top"><span>TOTAL ORDERS</span><span class="metric-icon red">▤</span></div><div class="metric-value" id="weekOrders">—</div><div class="metric-foot">This week</div></article>
+          <article class="metric-card"><div class="metric-top"><span>TOTAL SALES</span><span class="metric-icon gold">₨</span></div><div class="metric-value" id="weekSales">—</div><div class="metric-foot">Valid order value</div></article>
+          <article class="metric-card"><div class="metric-top"><span>AVG ORDER VALUE</span><span class="metric-icon green">↗</span></div><div class="metric-value" id="weekAov">—</div><div class="metric-foot">This week</div></article>
+          <article class="metric-card"><div class="metric-top"><span>DELIVERY ORDERS</span><span class="metric-icon blue">⌁</span></div><div class="metric-value" id="weekDelivery">—</div><div class="metric-foot" id="weekDeliveryCaption">Delivery orders</div></article>
+          <article class="metric-card"><div class="metric-top"><span>TAKEAWAY ORDERS</span><span class="metric-icon green">↗</span></div><div class="metric-value" id="weekTakeaway">—</div><div class="metric-foot" id="weekTakeawayCaption">Takeaway orders</div></article>
+          <article class="metric-card"><div class="metric-top"><span>DINE-IN ORDERS</span><span class="metric-icon purple">▦</span></div><div class="metric-value" id="weekDineIn">—</div><div class="metric-foot" id="weekDineInCaption">Dine-in orders</div></article>
+        </div>
+        <div class="dashboard-grid dashboard-bottom-grid">
+          <article class="surface comparison-card"><div class="surface-head"><div><h3>This week vs last week</h3><p class="muted">Like-for-like weekly comparison</p></div></div><div id="weekComparison" class="comparison-list"><div class="empty-state">Loading weekly comparison…</div></div></article>
+          <article class="surface watch-card"><div class="surface-head"><div><h3>Operational watch</h3><p class="muted">Latest order and delayed orders</p></div><span class="watch-count" id="watchCount">0</span></div><div id="latestOrder" class="latest-order"><div class="empty-state">Loading latest order…</div></div><div class="attention-title">Needs attention <span id="attentionCount">0</span></div><div id="watchList" class="watch-list"><div class="empty-state">Checking delayed orders…</div></div></article>
+        </div>
+        <article class="surface recent-card dashboard-recent-card"><div class="surface-head"><div><h3>Recent orders</h3><p class="muted">Newest first · latest 8</p></div><span class="small-label">LIVE BRANCH DATA</span></div><div class="table-wrap"><table><thead><tr><th>ORDER ID</th><th>CUSTOMER</th><th>FULFILMENT</th><th>TOTAL</th><th>STATUS</th><th>TIME</th></tr></thead><tbody id="recentOrders"><tr><td colspan="6" class="empty-cell">Loading recent orders…</td></tr></tbody></table></div></article>
+        <p class="data-note">Figures are calculated from actual branch orders. Order value excludes cancelled/rejected orders and is not a payment-settlement report.</p>
+      </section>
+      <section class="page" id="page-orders" hidden>
+        <div class="page-intro"><div><h2>Orders</h2><p class="muted">Review customer orders and their current operational status.</p></div></div>
+        <div class="toolbar"><input id="orderSearch" class="search-input" type="search" placeholder="Search order number or customer…"><select id="orderStatusFilter"><option value="">All statuses</option><option value="new">New</option><option value="accepted">Accepted</option><option value="preparing">Preparing</option><option value="ready">Ready</option><option value="out_for_delivery">On delivery</option><option value="delivered">Delivered</option><option value="collected">Collected</option><option value="served">Served</option><option value="completed">Completed</option><option value="rejected">Rejected</option><option value="cancelled">Cancelled</option></select></div>
+        <div class="surface"><div class="table-wrap"><table><thead><tr><th>ORDER</th><th>PLACED</th><th>FULFILMENT</th><th>SOURCE</th><th>STATUS</th><th>PAYMENT</th><th class="right">TOTAL</th></tr></thead><tbody id="ordersTable"><tr><td colspan="7" class="empty-cell">Loading orders…</td></tr></tbody></table></div></div>
+        <p class="data-note">Order status changes remain in the POS workflow for now. This admin view is read-only and does not bypass the secured order API.</p>
+      </section>
+
+      <section class="page" id="page-menu" hidden>
+        <div class="page-intro"><div><h2>Menu & products</h2><p class="muted">Manage the products and variant prices customers see on the website.</p></div><button class="btn btn-primary" id="addProductButton">＋ Add product</button></div>
+        <div class="toolbar"><input id="productSearch" class="search-input" type="search" placeholder="Search products…"><select id="productCategoryFilter"><option value="">All categories</option></select><select id="productStateFilter"><option value="all">All products</option><option value="active">Active</option><option value="hidden">Hidden</option><option value="unavailable">Unavailable</option></select></div>
+        <div class="surface"><div class="table-wrap"><table><thead><tr><th>PRODUCT</th><th>CATEGORY</th><th>PRICE / OPTIONS</th><th>WEBSITE</th><th></th></tr></thead><tbody id="productsTable"><tr><td colspan="5" class="empty-cell">Loading menu…</td></tr></tbody></table></div></div>
+        <p class="data-note">Product and variant changes save directly to Supabase. Images upload to Supabase Storage. Each item retains only its current image and one previous backup.</p>
+      </section>
+
+      <section class="page" id="page-categories" hidden>
+        <div class="page-intro"><div><h2>Categories</h2><p class="muted">Manage parent menu categories and their child filters.</p></div><button class="btn btn-primary" id="addCategoryButton">＋ Add category</button></div>
+        <div id="categoryGrid" class="category-grid"><div class="surface empty-state">Loading categories…</div></div>
+        <div class="subcat-admin-head"><div><h3>Subcategories</h3><p class="muted">Each subcategory belongs to one parent category and appears as a clickable filter in the POS.</p></div><button class="btn btn-outline" id="addSubcategoryButton">＋ Add subcategory</button></div>
+        <div id="subcategoryGrid" class="category-grid"><div class="surface empty-state">Loading subcategories…</div></div>
+      </section>
+
+      <section class="page" id="page-deals" hidden>
+        <div class="page-intro"><div><h2>Deals & offers</h2><p class="muted">Create Super Deals, Meal Deals and Normal Deals with configurable bundle components.</p></div><button class="btn btn-primary" id="addDealButton">＋ Create deal</button></div>
+        <div id="dealsList" class="deal-list"><div class="surface empty-state">Loading deals…</div></div>
+        <p class="data-note">New deals use the existing deal groups and component structure. A new deal remains hidden until all its components have been saved successfully.</p>
+      </section>
+
+      <section class="page" id="page-delivery" hidden>
+        <div class="page-intro"><div><h2>Delivery areas</h2><p class="muted">Manage delivery coverage and fees used at checkout.</p></div><button class="btn btn-primary" id="addAreaButton">＋ Add area</button></div>
+        <div id="areasList" class="area-list"><div class="surface empty-state">Loading delivery areas…</div></div>
+      </section>
+
+      <section class="page" id="page-staff" hidden>
+        <div class="page-intro">
+          <div><h2>Staff & riders</h2><p class="muted">Invite Flame Chick team members and manage their branch roles. Passwords are set by each person from their invitation email.</p></div>
+          <button class="btn btn-primary" id="inviteStaffButton">＋ Invite team member</button>
+        </div>
+        <div id="staffPageNote" class="data-note">Role changes are audited. Deactivation preserves the Auth account and all historical orders. Riders with active deliveries cannot be deactivated or changed to another role.</div>
+        <div class="surface">
+          <div class="table-wrap">
+            <table><thead><tr><th>TEAM MEMBER</th><th>ROLE</th><th>ACCOUNT</th><th>RIDER STATUS</th><th></th></tr></thead>
+              <tbody id="staffTable"><tr><td colspan="5" class="empty-cell">Open this page to load team members…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="staff-audit-wrap">
+          <div class="section-head"><div><h3>Recent staff activity</h3><p class="muted">Latest invitation and role changes for this branch.</p></div></div>
+          <div id="staffAudit" class="staff-audit-list"><div class="empty-state">No staff activity loaded.</div></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-settings" hidden>
+        <div class="page-intro"><div><h2>Website settings</h2><p class="muted">Update the public Flame Chick contact information and footer details.</p></div></div>
+        <form id="settingsForm" class="surface settings-form">
+          <div class="surface-head"><div><h3>Restaurant information</h3><p class="muted">These details are published on the public website.</p></div></div>
+          <div class="form-grid">
+            <label>Restaurant name<input id="settingRestaurantName" name="restaurant_name" maxlength="120" required></label>
+            <label>WhatsApp display number<input id="settingPhoneDisplay" name="wa_phone_display" maxlength="50"></label>
+            <label>WhatsApp number<input id="settingPhone" name="wa_phone" inputmode="numeric" maxlength="20"></label>
+            <label class="full-field">Restaurant address<input id="settingAddress" name="address" maxlength="250"></label>
+            <label class="full-field">Footer text<input id="settingFooter" name="footer_text_en" maxlength="250"></label>
+          </div>
+          <div class="dialog-actions"><button type="submit" class="btn btn-primary">Save website settings</button></div>
+          <p class="data-note">Website settings are saved to Supabase and are applied when the public website refreshes its catalog.</p>
+        </form>
+      </section>
+
+      <section class="page" id="page-media" hidden>
+        <div class="page-intro"><div><h2>Website images</h2><p class="muted">Manage pictures on the public Flame Chick website. Changes publish through the existing catalog settings.</p></div></div>
+        <div class="media-guidance"><b>Image guidelines</b><span>JPG, PNG or WebP · maximum 5 MB. Use wide images for hero and slider positions. Current and previous images are retained so a change can be restored.</span></div>
+        <div class="media-section-head"><div><h3>Landing page & About images</h3><p class="muted">Replace the landing hero, fulfilment gate, About gallery and menu hero fallback.</p></div></div>
+        <div id="siteMediaGrid" class="site-media-grid"><div class="surface empty-state">Loading website image settings…</div></div>
+        <div class="media-section-head slider-section-head"><div><h3>Menu hero slider</h3><p class="muted">Add, replace, reorder, enable or remove promotional banners above the menu.</p></div><label class="btn btn-primary media-add-label">＋ Add slider image<input type="file" id="addSliderImage" accept="image/jpeg,image/png,image/webp" hidden></label></div>
+        <div id="sliderManager" class="slider-manager"><div class="surface empty-state">Loading slider settings…</div></div>
+        <p class="data-note">Uploads use the secured Flame Chick Storage library. The website reads these published image settings from Supabase.</p>
+      </section>
+      <footer class="app-footer"><span>Flame Chick Admin</span><span>Protected by Supabase Auth & database policies</span></footer>
+    </main>
+  </div>
+
+  <dialog id="editorDialog" class="editor-dialog">
+    <form id="editorForm" method="dialog">
+      <div class="dialog-head"><div><span class="eyebrow" id="editorEyebrow">EDIT ITEM</span><h2 id="editorTitle">Edit product</h2></div><button type="button" class="close-btn" id="closeEditor" aria-label="Close">×</button></div>
+      <div id="editorBody" class="dialog-body"></div>
+      <div class="dialog-actions"><button type="button" class="btn btn-outline" id="cancelEditor">Cancel</button><button type="submit" class="btn btn-primary" id="saveEditor">Save changes</button></div>
+    </form>
+  </dialog>
+  <dialog id="staffDialog" class="editor-dialog staff-dialog">
+    <form id="staffForm" method="dialog">
+      <div class="dialog-head"><div><span class="eyebrow">TEAM ACCESS</span><h2 id="staffDialogTitle">Invite team member</h2></div><button type="button" class="close-btn" id="staffDialogClose" aria-label="Close">×</button></div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <label>Full name<input id="staffFullName" name="full_name" required maxlength="120"></label>
+          <label>Work email<input id="staffEmail" name="email" type="email" required maxlength="254"></label>
+          <label>Phone (optional)<input id="staffPhone" name="phone" type="tel" maxlength="40"></label>
+          <label>Branch<select id="staffBranch" name="branch_id" required></select></label>
+          <label class="full-field">Role<select id="staffRoleSelect" name="role" required>
+            <option value="cashier">Cashier</option><option value="kitchen">Kitchen</option><option value="rider">Rider</option>
+            <option value="manager">Manager</option><option value="admin">Admin</option><option value="owner">Owner</option>
+          </select></label>
+        </div>
+        <p class="data-note">New team members receive an email invitation and choose their own password. Existing Supabase accounts are linked instead of creating a duplicate. The invitation/setup link opens the public account-setup screen; staff then sign in through the POS.</p>
+        <div id="staffFormError" class="error-text" role="alert"></div>
+      </div>
+      <div class="dialog-actions"><button type="button" class="btn btn-outline" id="staffDialogCancel">Cancel</button><button type="submit" class="btn btn-primary" id="staffDialogSave">Send invitation</button></div>
+    </form>
+  </dialog>
+  <div id="toastRoot" class="toast-root" aria-live="polite"></div>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

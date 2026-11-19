@@ -1,0 +1,19 @@
+# Environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local / editor / Vercel
+.vercel/
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+
+# Supabase local state and generated files
+supabase/.temp/
+supabase/.branches/

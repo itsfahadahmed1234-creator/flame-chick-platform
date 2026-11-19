@@ -1,0 +1,846 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#152d27">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Flame Chick Rider">
+<title>Flame Chick · Rider</title>
+<style>
+:root{--bg:#f4f6f5;--card:#fff;--ink:#16241f;--muted:#68766f;--line:#e3e9e5;--brand:#D80008;--brand-dark:#900000;--soft:#eaf5ef;--warn:#946200;--warn-bg:#fff5d9;--danger:#a72d28;--danger-bg:#fff0ee;--shadow:0 12px 34px rgba(21,45,39,.08);--r:18px}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Inter,Segoe UI,Arial,sans-serif}button,input{font:inherit}button{cursor:pointer}.top{height:68px;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(18px,calc((100% - 940px)/2));position:sticky;top:0;z-index:5}.brand{display:flex;gap:11px;align-items:center}.mark{height:40px;width:40px;border-radius:13px;background:var(--soft);display:grid;place-items:center;color:var(--brand);font-size:20px;font-weight:900}.brand strong{display:block;font-size:16px}.brand small{color:var(--muted);font-size:12px}.top-right{display:flex;gap:9px;align-items:center}.connection{font-size:12px;color:var(--muted)}.dot{display:inline-block;height:8px;width:8px;border-radius:50%;background:#9aa79f;margin-right:6px}.dot.online{background:#22945d}.wrap{max-width:940px;margin:24px auto;padding:0 16px 40px}.welcome{display:flex;justify-content:space-between;gap:14px;align-items:flex-end;margin-bottom:18px}.welcome h1{font-size:26px;margin:0 0 3px}.welcome p{margin:0;color:var(--muted)}.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:11px;padding:10px 14px;font-weight:700}.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}.btn.primary:hover{background:var(--brand-dark)}.btn.danger{background:var(--danger-bg);border-color:#f2d2cf;color:var(--danger)}.btn:disabled{opacity:.55;cursor:not-allowed}.login{max-width:420px;margin:9vh auto;background:var(--card);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:26px}.login h1{margin:0 0 5px}.login p{margin:0 0 20px;color:var(--muted)}.field{display:grid;gap:6px;margin:13px 0}.field label{font-size:13px;font-weight:700}.field input{width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--ink)}.field input:focus{outline:2px solid #b9deca;border-color:var(--brand)}.login .btn{width:100%;margin-top:7px}.error{color:var(--danger);font-size:13px;min-height:18px;margin-top:8px}.hidden{display:none!important}.profile-strip{display:flex;align-items:center;gap:10px;background:var(--soft);color:#24563e;padding:11px 14px;border-radius:13px;margin-bottom:17px;font-size:13px}.profile-strip strong{font-size:14px}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:17px}.summary>div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px}.summary small{display:block;color:var(--muted);font-size:12px}.summary strong{font-size:21px}.job-list{display:grid;gap:14px}.job{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}.job-head{display:flex;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line)}.order-no{font-size:17px;font-weight:900}.job-time{font-size:12px;color:var(--muted);margin-top:3px}.status{display:inline-flex;align-items:center;white-space:nowrap;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:800;background:var(--warn-bg);color:var(--warn);height:max-content}.status.out_for_delivery,.status.picked_up{background:var(--soft);color:var(--brand)}.job-body{padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:18px}.section-label{font-size:11px;letter-spacing:.08em;font-weight:900;color:var(--muted);margin-bottom:7px}.customer{font-weight:800;font-size:16px}.muted{color:var(--muted);font-size:13px}.address{margin-top:7px;white-space:pre-wrap}.contact{display:inline-block;margin-top:8px;color:var(--brand);font-weight:800;text-decoration:none}.instruction{margin-top:9px;padding:9px 11px;background:#f7f9f8;border-radius:10px;font-size:13px}.items{display:grid;gap:8px}.item{display:flex;justify-content:space-between;gap:12px;font-size:13px}.item strong{white-space:nowrap}.modifiers{font-size:12px;color:var(--muted);margin-top:2px}.money{padding-top:10px;margin-top:10px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-size:14px}.job-foot{padding:13px 18px 16px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap}.job-foot .btn{flex:1;min-width:130px}.empty{background:var(--card);border:1px dashed #cfd9d2;border-radius:18px;text-align:center;padding:42px 18px;color:var(--muted)}.empty strong{display:block;color:var(--ink);font-size:17px;margin-bottom:4px}.toast{position:fixed;bottom:18px;left:50%;transform:translate(-50%,20px);background:#172b23;color:#fff;padding:11px 16px;border-radius:12px;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.2s;z-index:20;max-width:calc(100% - 24px);text-align:center}.toast.show{opacity:1;transform:translate(-50%,0)}.hint{font-size:12px;color:var(--muted);margin-top:14px;text-align:center}
+@media(max-width:640px){.wrap{margin:17px auto;padding:0 11px 28px}.welcome{align-items:flex-start}.welcome h1{font-size:23px}.welcome p{font-size:13px}.summary{gap:7px}.summary>div{padding:10px}.summary strong{font-size:18px}.job-body{grid-template-columns:1fr;gap:14px}.job-head{padding:14px}.job-body{padding:14px}.job-foot{padding:12px 14px}.job-foot .btn{min-width:calc(50% - 6px)}.connection{display:none}}
+
+.offer-section,.assigned-section{margin-top:22px}
+.section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.section-heading h2{font-size:18px;margin:0}
+.offer-count{display:inline-grid;place-items:center;min-width:27px;height:27px;padding:0 8px;border-radius:99px;background:#176a4b;color:#fff;font-weight:900;font-size:13px}
+.offer-list{display:grid;gap:12px;margin-top:12px}
+.offer-card{background:#fff;border:2px solid #b9deca;border-radius:18px;padding:15px;box-shadow:var(--shadow)}
+.offer-card-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.offer-order{font-size:18px}
+.offer-countdown{background:#fff5d9;color:#946200;padding:7px 10px;border-radius:99px;font-weight:900;font-variant-numeric:tabular-nums;white-space:nowrap}
+.offer-countdown.expired{background:#f1f3f2;color:#68766f}
+.offer-facts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0 8px}
+.offer-facts>div{background:#f4f8f5;border-radius:12px;padding:12px}
+.offer-facts small{display:block;color:var(--muted);font-size:12px;margin-bottom:3px}
+.offer-facts strong{font-size:16px}
+.offer-actions{display:flex;gap:8px;margin-top:14px}
+.offer-actions .btn{flex:1;min-height:48px}
+.offer-card .muted{margin:8px 0 0}
+#enableNotificationsBtn{border-color:#b9deca;color:var(--brand)}
+body{padding-bottom:env(safe-area-inset-bottom)}
+.top{padding-top:env(safe-area-inset-top)}
+@media(max-width:640px){
+ .top{height:auto;min-height:64px;padding-left:12px;padding-right:12px}
+ .brand small{font-size:11px}
+ .top-right{gap:6px}
+ .top-right .btn{padding:8px 9px;font-size:12px}
+ .welcome{display:grid;grid-template-columns:1fr;align-items:start}
+ .welcome>div:last-child{width:100%}
+ .welcome>div:last-child .btn{flex:1;min-width:0}
+ .offer-card{padding:13px}
+ .offer-facts strong{font-size:15px}
+ .offer-actions .btn{padding:11px 8px;min-width:0;font-size:13px}
+}
+
+/* Compact Rider workspace: job details and next action share one screen. */
+body.rider-active{min-height:100dvh;overflow-x:hidden}
+body.rider-active .top{height:56px;min-height:56px;padding-left:12px;padding-right:12px}
+body.rider-active .brand{gap:8px}
+body.rider-active .mark{width:34px;height:34px;border-radius:10px;font-size:17px}
+body.rider-active .brand strong{font-size:14px}
+body.rider-active .brand small{display:none}
+body.rider-active .top-right{gap:6px}
+body.rider-active .top-right .btn{padding:7px 9px;font-size:11px}
+body.rider-active .connection{font-size:0}
+body.rider-active .connection .dot{margin:0}
+body.rider-active .wrap{width:min(100%,700px);max-width:700px;margin:8px auto 0;padding:0 10px calc(12px + env(safe-area-inset-bottom))}
+.rider-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:42px;margin-bottom:7px}
+.rider-identity{display:flex;flex-direction:column;min-width:0;gap:1px}
+.rider-identity strong{font-size:14px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rider-identity span{font-size:11px;color:var(--muted);line-height:1.2}
+.availability-btn{flex:0 0 auto;padding:8px 12px;min-height:34px;font-size:12px;background:#fff}
+.rider-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px}
+.rider-title-row h1{font-size:18px;line-height:1.2;margin:0;font-weight:850}
+.rider-tools{display:flex;gap:6px}
+.utility-btn{padding:6px 9px;min-height:30px;border-radius:9px;font-size:11px}
+body.rider-active .summary{display:none!important}
+.work-panel{display:grid;gap:9px}
+body.rider-active .offer-section,body.rider-active .assigned-section{margin:0}
+body.rider-active .section-heading{margin:0 0 6px;min-height:24px}
+body.rider-active .section-heading h2{font-size:13px;letter-spacing:.01em}
+body.rider-active .offer-count{min-width:22px;height:22px;font-size:11px}
+body.rider-active .offer-list{gap:7px;margin:0}
+body.rider-active .offer-card{padding:10px 11px;border-width:1px;border-radius:13px;box-shadow:none}
+body.rider-active .offer-card-head{gap:8px}
+body.rider-active .offer-order{font-size:14px}
+body.rider-active .offer-countdown{padding:5px 8px;font-size:12px}
+body.rider-active .offer-facts{gap:7px;margin:8px 0}
+body.rider-active .offer-facts>div{padding:7px 9px;border-radius:9px}
+body.rider-active .offer-facts small{font-size:10px;margin-bottom:1px}
+body.rider-active .offer-facts strong{font-size:13px}
+body.rider-active .offer-actions{gap:7px;margin-top:8px}
+body.rider-active .offer-actions .btn{min-height:40px;padding:8px 10px;font-size:13px}
+body.rider-active .job-list{gap:7px}
+body.rider-active .job{border-radius:15px;box-shadow:0 5px 18px rgba(21,45,39,.06)}
+body.rider-active .job-head{padding:10px 12px;align-items:center}
+body.rider-active .order-no{font-size:15px}
+body.rider-active .job-time{font-size:10px;margin-top:1px}
+body.rider-active .status{padding:5px 8px;font-size:11px}
+body.rider-active .acceptance-countdown{display:inline-flex;align-items:center;margin-left:4px;padding:2px 5px;border-radius:7px;background:#fff1c7;color:#795400;font-size:11px;font-weight:900;font-variant-numeric:tabular-nums}
+body.rider-active .job-body{padding:10px 12px;display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+body.rider-active .job-customer-row{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+body.rider-active .job-customer-copy{min-width:0}
+body.rider-active .customer{font-size:15px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.rider-active .job-customer-copy .muted{font-size:11px;margin-top:2px}
+body.rider-active .call-button{flex:0 0 auto;margin:0;min-width:62px;min-height:34px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #b9deca;border-radius:9px;padding:6px 10px;background:var(--soft);font-size:12px}
+body.rider-active .job-dropoff{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fafcfb}
+body.rider-active .job-dropoff .section-label{display:block;margin:0 0 2px;font-size:9px;letter-spacing:.06em}
+body.rider-active .address{margin:0;font-size:13px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+body.rider-active .job-instruction{padding:6px 9px;border-radius:9px;background:#fff8e8;color:#765410;font-size:11px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+body.rider-active .job-instruction strong{margin-right:4px}
+body.rider-active .job-items{border:1px solid var(--line);border-radius:9px;padding:0 9px;background:#fff}
+body.rider-active .job-items summary{min-height:31px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;list-style:none;font-size:11px;font-weight:800;color:#44534b}
+body.rider-active .job-items summary::-webkit-details-marker{display:none}
+body.rider-active .job-items summary span{color:var(--muted);font-weight:700}
+body.rider-active .job-items .items{padding:0 0 8px;gap:5px}
+body.rider-active .job-items .item{font-size:11px;line-height:1.25}
+body.rider-active .job-items .modifiers{font-size:10px}
+body.rider-active .job-foot{padding:9px 12px 11px;display:grid;gap:7px;background:#fbfdfc}
+body.rider-active .job-issue{display:grid;gap:2px;padding:7px 9px;border:1px solid #f0d1cd;border-radius:9px;background:var(--danger-bg);color:#842821;font-size:11px;line-height:1.25}
+body.rider-active .job-issue strong{font-size:12px}
+body.rider-active .job-issue small{font-size:10px;color:#8e433e}
+body.rider-active .job-actions{display:flex;gap:7px}
+body.rider-active .job-actions .btn{flex:1;min-width:0;min-height:43px;padding:8px 9px;font-size:13px;line-height:1.15;border-radius:10px}
+body.rider-active .empty{padding:25px 12px;border-radius:14px;font-size:12px}
+body.rider-active .empty strong{font-size:15px;margin-bottom:2px}
+body.rider-active .toast{bottom:calc(10px + env(safe-area-inset-bottom));font-size:12px}
+@media(min-width:560px){
+  body.rider-active .job-body{grid-template-columns:minmax(0,1fr) minmax(190px,.72fr);align-items:start}
+  body.rider-active .job-customer-row,body.rider-active .job-dropoff,body.rider-active .job-instruction,body.rider-active .job-items{grid-column:1}
+  body.rider-active .job-dropoff{grid-row:2}
+  body.rider-active .job-instruction{grid-row:3}
+  body.rider-active .job-items{grid-column:2;grid-row:1 / span 3}
+}
+@media(max-width:420px){
+  body.rider-active .top{padding-left:9px;padding-right:9px}
+  body.rider-active .brand strong{font-size:13px}
+  body.rider-active .top-right .btn{padding:6px 7px;font-size:10px}
+  body.rider-active .rider-toolbar{min-height:38px}
+  body.rider-active .rider-title-row h1{font-size:17px}
+  body.rider-active .job-head{padding:9px 10px}
+  body.rider-active .job-body{padding:9px 10px;gap:7px}
+  body.rider-active .job-foot{padding:8px 10px 10px}
+  body.rider-active .job-actions .btn{font-size:12px}
+}
+@media(max-height:740px) and (max-width:640px){
+  body.rider-active .wrap{margin-top:5px}
+  body.rider-active .rider-toolbar{min-height:34px;margin-bottom:4px}
+  body.rider-active .rider-title-row{margin-bottom:5px}
+  body.rider-active .job-body{gap:6px}
+  body.rider-active .job-foot{padding-top:7px;padding-bottom:8px}
+  body.rider-active .job-actions .btn{min-height:39px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><div class="mark">P</div><div><strong>Flame Chick</strong><small>Rider delivery portal</small></div></div>
+  <div class="top-right"><button id="installAppBtn" class="btn" type="button">Install app</button><span class="connection" id="connection"><i class="dot"></i>Connecting</span><button id="signOutBtn" class="btn hidden" type="button">Sign out</button></div>
+</header>
+<main class="wrap">
+  <section id="loginView" class="login">
+    <h1>Flame Chick team sign in</h1><p>Use the work account provided by your manager.</p>
+    <form id="loginForm">
+      <div class="field"><label for="email">Work email</label><input id="email" type="email" autocomplete="username" required></div>
+      <div class="field"><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required></div>
+      <button id="loginBtn" class="btn primary" type="submit">Sign in</button>
+      <button id="resetPasswordBtn" class="btn" type="button">Set / reset password</button>
+      <div id="loginError" class="error" role="alert"></div>
+    </form>
+    <div class="hint">Access is restricted to active Flame Chick team roles.</div>
+  </section>
+  <section id="passwordView" class="login hidden">
+    <h1 id="passwordTitle">Finish setting up your Flame Chick account</h1>
+    <p id="passwordHelp">Choose a private password for your Flame Chick work account.</p>
+    <form id="passwordForm">
+      <div class="field"><label for="newPassword">New password</label><input id="newPassword" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div class="field"><label for="confirmPassword">Confirm new password</label><input id="confirmPassword" type="password" autocomplete="new-password" minlength="8" required></div>
+      <button id="savePasswordBtn" class="btn primary" type="submit">Save password</button>
+      <div id="passwordError" class="error" role="alert"></div>
+    </form>
+    <div class="hint">Use at least 8 characters. Do not share your password with anyone.</div>
+  </section>
+  <section id="appView" class="hidden">
+    <div class="rider-toolbar">
+      <div class="rider-identity"><strong id="riderName">Flame Chick Rider</strong><span id="riderMeta">Offline</span></div>
+      <button class="btn availability-btn" id="availabilityBtn" type="button" hidden>Go offline</button>
+    </div>
+    <div class="rider-title-row">
+      <h1 id="helloName">Deliveries</h1>
+      <div class="rider-tools">
+        <button class="btn utility-btn" id="enableNotificationsBtn" type="button">Alerts</button>
+        <button class="btn utility-btn" id="refreshBtn" type="button">Refresh</button>
+      </div>
+    </div>
+    <div class="summary hidden" aria-hidden="true"><div><small>Active jobs</small><strong id="activeCount">0</strong></div><div><small>Awaiting pickup</small><strong id="pickupCount">0</strong></div><div><small>On the way</small><strong id="onWayCount">0</strong></div></div>
+    <section class="work-panel" aria-label="Rider work">
+      <section id="offerSection" class="offer-section hidden"><div class="section-heading"><h2>New offers</h2><span id="offerCount" class="offer-count">0</span></div><div id="offerList" class="offer-list"></div></section>
+      <section class="assigned-section"><div class="section-heading"><h2>Current delivery</h2></div><div id="jobList" class="job-list"><div class="empty"><strong>Loading…</strong></div></div></section>
+    </section>
+  </section>
+</main>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+<script>
+'use strict';
+const SUPABASE_URL='https://adkrxfnawdiljhjaavnj.supabase.co';
+const PUBLISHABLE_KEY='sb_publishable_89MQIj_drF15IrF05ZLt0w_txUjPMxy';
+const DELIVERY_API=SUPABASE_URL+'/functions/v1/flame-chick-delivery-api';
+const AUTH_URL=SUPABASE_URL+'/auth/v1';
+const REST_URL=SUPABASE_URL+'/rest/v1';
+const SESSION_KEY='flame_chick_rider_session_v1';
+let session=null,user=null,rider=null,jobs=[],offers=[],busy=false,pendingAuthSession=null,pendingAuthType='invite',riderPresenceTimer=null,riderPresenceSending=false,riderWantsOnline=true,offerExpiryTimer=null;
+const expiredAcceptanceRefreshes=new Set();
+let deferredInstallPrompt=null;
+let riderRealtimeClient=null,riderRealtimeChannel=null,riderRealtimeConnected=false,riderRealtimeRefreshTimer=null,riderRealtimeRefreshDebounce=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>(Number(n)||0).toLocaleString('en-PK',{maximumFractionDigits:0});
+function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').classList.remove('show'),2600)}
+function riderAppInstalled(){
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+function refreshRiderInstallButton(){
+  const button=$('installAppBtn');
+  if(button)button.hidden=riderAppInstalled();
+}
+function initRiderPwa(){
+  refreshRiderInstallButton();
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js',{scope:'./'})
+      .catch(error=>console.warn('Flame Chick Rider service worker could not be registered.',error));
+  }
+  window.addEventListener('beforeinstallprompt',event=>{
+    event.preventDefault();
+    deferredInstallPrompt=event;
+    refreshRiderInstallButton();
+  });
+  window.addEventListener('appinstalled',()=>{
+    deferredInstallPrompt=null;
+    refreshRiderInstallButton();
+    toast('Flame Chick Rider has been installed.');
+  });
+}
+async function promptRiderAppInstall(){
+  if(riderAppInstalled()){refreshRiderInstallButton();return;}
+  if(deferredInstallPrompt){
+    deferredInstallPrompt.prompt();
+    try{await deferredInstallPrompt.userChoice;}catch(error){}
+    deferredInstallPrompt=null;
+    refreshRiderInstallButton();
+    return;
+  }
+  const ua=navigator.userAgent||'';
+  if(/iphone|ipad|ipod/i.test(ua)){
+    alert('Install Flame Chick Rider:\n1. Tap the Share button in Safari.\n2. Choose “Add to Home Screen”.\n3. Tap Add.\n\nOpen the new Flame Chick Rider icon from your Home Screen.');
+  }else if(/android/i.test(ua)){
+    alert('Install Flame Chick Rider:\n1. Open the browser menu (⋮).\n2. Choose “Install app” or “Add to Home screen”.\n3. Confirm the installation.');
+  }else{
+    alert('Use your browser menu or the install icon in the address bar to install Flame Chick Rider.');
+  }
+}
+function setConnection(ok,label){$('connection').innerHTML='<i class="dot '+(ok?'online':'')+'"></i>'+esc(label)}
+function saveSession(value){session=value;if(value)localStorage.setItem(SESSION_KEY,JSON.stringify(value));else localStorage.removeItem(SESSION_KEY)}
+function authHeaders(token=session?.access_token){return {'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+String(token||''),'Content-Type':'application/json'}}
+async function parseResponse(r){const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.msg||data.message||data.error_description||data.error?.message||('Request failed ('+r.status+').'));return data}
+async function getUser(token){const r=await fetch(AUTH_URL+'/user',{headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+token,'Accept':'application/json'},cache:'no-store'});return parseResponse(r)}
+async function refreshSessionIfNeeded(current){if(!current?.access_token)return null;const expires=Number(current.expires_at||0);if(expires*1000>Date.now()+60000){try{await getUser(current.access_token);return current}catch(e){}}if(!current.refresh_token)return null;const r=await fetch(AUTH_URL+'/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:current.refresh_token}),cache:'no-store'});const next=await parseResponse(r);if(!next.expires_at&&next.expires_in)next.expires_at=Math.floor(Date.now()/1000)+Number(next.expires_in);return next}
+async function getRiderProfile(userId,token){
+  const roleUrl=REST_URL+'/user_roles?select=role,branch_id,is_active&user_id=eq.'+encodeURIComponent(userId)+'&is_active=eq.true&role=eq.rider';
+  const roleRes=await fetch(roleUrl,{headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+token,'Accept':'application/json'},cache:'no-store'});
+  const roles=await parseResponse(roleRes);
+  const active=Array.isArray(roles)?roles.find(x=>x.role==='rider'&&x.is_active===true&&x.branch_id):null;
+  if(!active)throw new Error('This account does not have an active Flame Chick rider role. Ask the manager to set up your rider account.');
+  const profileUrl=REST_URL+'/rider_profiles?select=user_id,branch_id,rider_code,display_name,phone,availability_status,accepting_jobs,last_seen_at,is_active&user_id=eq.'+encodeURIComponent(userId)+'&branch_id=eq.'+encodeURIComponent(active.branch_id)+'&is_active=eq.true';
+  const profileRes=await fetch(profileUrl,{headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+token,'Accept':'application/json'},cache:'no-store'});
+  const profiles=await parseResponse(profileRes);
+  const found=Array.isArray(profiles)?profiles[0]:null;
+  if(!found)throw new Error('Your rider profile is missing or inactive. Ask the Flame Chick manager to complete rider setup.');
+  return found;
+}
+async function deliveryRequest(method,query,body,options={}){
+  if(!session?.access_token)throw new Error('Please sign in again.');
+  const url=DELIVERY_API+(method==='GET'?'?'+new URLSearchParams(query||{}).toString():'');
+  const r=await fetch(url,{method,headers:authHeaders(),body:method==='GET'?undefined:JSON.stringify(body||{}),cache:'no-store',...(options.keepalive?{keepalive:true}:{})});
+  const data=await r.json().catch(()=>({}));
+  if(r.status===401){signOut('Your session expired. Please sign in again.');throw new Error('Your session expired. Please sign in again.');}
+  if(!r.ok||data.ok===false)throw new Error(data.error?.message||'Delivery request failed.');
+  return data;
+}
+function renderRiderAvailability(){
+  if(!rider)return;
+  const status=String(rider.availability_status||'offline').toLowerCase();
+  const pending=jobs.some(item=>{
+    const row=normalizeTask(item);
+    return row.task.status==='assigned'&&row.assignment.status==='assigned'&&!row.assignment.accepted_at;
+  });
+  const effectiveStatus=pending?'busy':status;
+  const label=pending?'Assignment pending':effectiveStatus==='busy'?'On active delivery':effectiveStatus==='available'?'Available for delivery':effectiveStatus==='suspended'?'Suspended':'Offline';
+  $('riderMeta').textContent=(rider.rider_code?rider.rider_code+' · ':'')+label;
+  const btn=$('availabilityBtn');
+  if(!btn)return;
+  btn.hidden=false;
+  btn.disabled=effectiveStatus==='busy'||effectiveStatus==='suspended';
+  btn.textContent=pending?'Assignment pending':effectiveStatus==='busy'?'On active delivery':effectiveStatus==='suspended'?'Account suspended':effectiveStatus==='available'?'Go offline':'Go available';
+  btn.classList.toggle('danger',effectiveStatus==='available');
+}
+async function updateRiderPresence(online=true,keepalive=false,updatePreference=false){
+  if(!session?.access_token||!user?.id||!rider?.branch_id)return null;
+  // Presence updates go through the authenticated Flame Chick delivery API.
+  const data=await deliveryRequest('POST',null,{action:'presence',online,update_preference:updatePreference},{keepalive});
+  rider.availability_status=data.availability_status||'offline';
+  if(typeof data.accepting_jobs==='boolean')rider.accepting_jobs=data.accepting_jobs;
+  rider.last_seen_at=data.last_seen_at||new Date().toISOString();
+  renderRiderAvailability();
+  return data;
+}
+function stopRiderPresence(){
+  if(riderPresenceTimer){clearInterval(riderPresenceTimer);riderPresenceTimer=null;}
+  riderPresenceSending=false;
+}
+function startRiderPresence(){
+  stopRiderPresence();
+  if(!riderWantsOnline)return;
+  const beat=async()=>{
+    if(riderPresenceSending||!session?.access_token||!navigator.onLine||!riderWantsOnline)return;
+    riderPresenceSending=true;
+    try{await updateRiderPresence(true);}
+    catch(error){console.warn('Flame Chick rider presence heartbeat failed.',error.message);}
+    finally{riderPresenceSending=false;}
+  };
+  beat();
+  riderPresenceTimer=setInterval(beat,120000);
+}
+function markRiderOfflineBestEffort(){
+  if(!session?.access_token||!user?.id||!rider?.branch_id)return;
+  fetch(DELIVERY_API,{
+    method:'POST',
+    headers:authHeaders(),
+    body:JSON.stringify({action:'presence',online:false,update_preference:false}),
+    cache:'no-store',
+    keepalive:true
+  }).catch(()=>{});
+}
+async function riderDirectRead(resource,query){
+  if(!session?.access_token)throw new Error('Please sign in again.');
+  const url=REST_URL+'/'+resource+'?'+new URLSearchParams(query||{}).toString();
+  const response=await fetch(url,{method:'GET',headers:{...authHeaders(),'Accept':'application/json'},cache:'no-store'});
+  const data=await response.json().catch(()=>[]);
+  if(response.status===401){signOut('Your session expired. Please sign in again.');throw new Error('Your session expired. Please sign in again.');}
+  if(response.status===403)throw new Error('Your rider account is not allowed to read this delivery.');
+  if(!response.ok)throw new Error(data.message||'Could not refresh your delivery ('+response.status+').');
+  return data;
+}
+
+
+function stopRiderRealtime(){
+  clearTimeout(riderRealtimeRefreshTimer);
+  clearTimeout(riderRealtimeRefreshDebounce);
+  riderRealtimeRefreshTimer=null;riderRealtimeRefreshDebounce=null;
+  const client=riderRealtimeClient,channel=riderRealtimeChannel;
+  riderRealtimeClient=null;riderRealtimeChannel=null;riderRealtimeConnected=false;
+  if(client){
+    if(channel){try{client.removeChannel(channel).catch(()=>{});}catch(e){}}
+    // Explicitly close the WebSocket; removeChannel alone may leave an idle socket briefly.
+    try{client.realtime.disconnect();}catch(e){}
+  }
+}
+function scheduleRiderRealtimeTokenRefresh(){
+  clearTimeout(riderRealtimeRefreshTimer);
+  const expiresAt=Number(session?.expires_at||0);
+  if(!expiresAt||!session?.refresh_token)return;
+  const delay=Math.max(1000,expiresAt*1000-Date.now()-120000);
+  riderRealtimeRefreshTimer=setTimeout(refreshRiderRealtimeToken,delay);
+}
+async function refreshRiderRealtimeToken(){
+  const current=session;
+  if(!current?.refresh_token)return;
+  try{
+    const r=await fetch(AUTH_URL+"/token?grant_type=refresh_token",{
+      method:"POST",
+      headers:{"apikey":PUBLISHABLE_KEY,"Content-Type":"application/json"},
+      body:JSON.stringify({refresh_token:current.refresh_token}),
+      cache:"no-store"
+    });
+    const next=await parseResponse(r);
+    if(!next.access_token)throw new Error("Could not refresh the rider Realtime session.");
+    if(!next.expires_at&&next.expires_in)next.expires_at=Math.floor(Date.now()/1000)+Number(next.expires_in);
+    if(session!==current)return;
+    saveSession(next);
+    if(riderRealtimeClient)await riderRealtimeClient.realtime.setAuth(next.access_token);
+    scheduleRiderRealtimeTokenRefresh();
+  }catch(e){
+    console.warn("Flame Chick rider Realtime token refresh failed.",e);
+    riderRealtimeRefreshTimer=setTimeout(refreshRiderRealtimeToken,30000);
+    setConnection(true,"Realtime reconnecting · use Refresh jobs if needed");
+    ;
+  }
+}
+function scheduleRiderJobsRefresh(){
+  if(!session?.access_token)return;
+  clearTimeout(riderRealtimeRefreshDebounce);
+  riderRealtimeRefreshDebounce=setTimeout(()=>{
+    if(busy){
+      riderRealtimeRefreshDebounce=setTimeout(scheduleRiderJobsRefresh,500);
+      return;
+    }
+    loadJobs(false);
+  },350);
+}
+async function startRiderRealtime(){
+  stopRiderRealtime();
+  // Hold one Realtime socket only while the signed-in rider is accepting jobs.
+  if(!session?.access_token||!user?.id||!rider?.branch_id||!riderWantsOnline)return;
+  if(!window.supabase?.createClient){
+    setConnection(true,"Realtime unavailable · use Refresh jobs");
+    ;
+    return;
+  }
+  try{
+    const client=window.supabase.createClient(SUPABASE_URL,PUBLISHABLE_KEY,{
+      auth:{autoRefreshToken:false,persistSession:false,detectSessionInUrl:false},
+      realtime:{params:{eventsPerSecond:3}}
+    });
+    riderRealtimeClient=client;
+    await client.realtime.setAuth(session.access_token);
+    const riderId=String(user.id);
+    const channel=client.channel("hfp-rider-ops-"+riderId);
+    // Rider-specific subscriptions only: branch-wide task subscriptions multiply
+    // every delivery update by every connected rider in the branch.
+    channel
+      .on("postgres_changes",{event:"*",schema:"public",table:"delivery_task_offers",filter:"rider_user_id=eq."+riderId},scheduleRiderJobsRefresh)
+      .on("postgres_changes",{event:"*",schema:"public",table:"delivery_assignments",filter:"rider_user_id=eq."+riderId},scheduleRiderJobsRefresh);
+    riderRealtimeChannel=channel;
+    channel.subscribe(status=>{
+      if(client!==riderRealtimeClient)return;
+      if(status==="SUBSCRIBED"){
+        riderRealtimeConnected=true;
+        
+        setConnection(true,"Live updates");
+        scheduleRiderJobsRefresh();
+      }else if(["CHANNEL_ERROR","TIMED_OUT","CLOSED"].includes(status)){
+        riderRealtimeConnected=false;
+        setConnection(true,"Realtime disconnected · use Refresh jobs");
+        ;
+      }
+    });
+    scheduleRiderRealtimeTokenRefresh();
+  }catch(e){
+    console.warn("Flame Chick rider Realtime could not start; direct database recovery remains active.",e);
+    riderRealtimeConnected=false;
+    setConnection(true,"Realtime unavailable · direct refresh backup");
+    ;
+  }
+}
+
+function normalizeTask(task){
+  const order=Array.isArray(task.orders)?task.orders[0]||{}:(task.orders||{});
+  const assignments=Array.isArray(task.delivery_assignments)?task.delivery_assignments:[];
+  const assignment=assignments.find(x=>x.is_current===true)||assignments[0]||{};
+  const items=Array.isArray(order.order_items)?order.order_items:[];
+  return {task,order,assignment,items};
+}
+function statusLabel(value){return ({assigned:'Assigned to you',accepted:'Accepted',arrived_at_restaurant:'At restaurant',picked_up:'Picked up',out_for_delivery:'On the way',delivered:'Delivered',failed:'Delivery issue — return pending'})[value]||value||'Assigned'}
+function renderItem(it){
+  const name=it.product_name_snapshot||it.deal_title_snapshot||'Order item';
+  const variant=it.variant_label_snapshot?' · '+it.variant_label_snapshot:'';
+  const mods=(it.order_item_modifiers||[]).map(m=>m.modifier_name_snapshot).filter(Boolean);
+  return '<div class="item"><div><div>'+esc(name+variant)+'</div>'+(mods.length?'<div class="modifiers">'+esc(mods.join(', '))+'</div>':'')+'</div><strong>× '+(Number(it.quantity)||1)+'</strong></div>';
+}
+function actionButtons(row){
+  const s=row.task.status;
+  if(s==='assigned'){
+    const a=row.assignment||{};
+    const deadline=Date.parse(a.assigned_at||row.task.assigned_at||'')+60000;
+    if(a.status==='assigned'&&!a.accepted_at&&Number.isFinite(deadline)&&Date.now()>=deadline){
+      return '<span class="status">Time expired · finding next rider</span>';
+    }
+    return '<button class="btn primary" data-action="accept">Accept</button><button class="btn danger" data-action="reject">Decline</button>';
+  }
+  if(s==='accepted')return '<button class="btn primary" data-action="arrive">At restaurant</button><button class="btn danger" data-action="reject">Cannot complete</button>';
+  if(s==='arrived_at_restaurant')return '<button class="btn primary" data-action="picked_up">Picked up</button><button class="btn danger" data-action="reject">Cannot complete</button>';
+  if(s==='out_for_delivery'||s==='picked_up')return '<button class="btn primary" data-action="delivered">Delivered</button><button class="btn danger" data-action="failed">Report issue</button>';
+  if(s==='failed'&&!row.task.return_reported_at)return '<button class="btn primary" data-action="return_reported">Returned to restaurant</button>';
+  if(s==='failed'&&row.task.return_reported_at)return '<span class="status">Return reported · awaiting confirmation</span>';
+  return '';
+}
+function renderJob(row){
+  const t=row.task,o=row.order,a=row.assignment;
+  const pendingAcceptance=t.status==='assigned'&&a.status==='assigned'&&!a.accepted_at;
+  const deadlineMs=Date.parse(a.assigned_at||t.assigned_at||'')+60000;
+  const countdown=pendingAcceptance&&Number.isFinite(deadlineMs)
+    ? '<span class="acceptance-countdown" data-assignment-id="'+esc(a.id)+'" data-acceptance-deadline="'+esc(new Date(deadlineMs).toISOString())+'">60s</span>'
+    : '';
+  const customer=t.recipient_name_snapshot||o.customer_name||'Customer';
+  const phone=t.recipient_phone_snapshot||o.customer_phone||'';
+  const address=t.address_snapshot||o.delivery_address||'';
+  const instructions=t.delivery_instructions_snapshot||o.delivery_instructions||'';
+  const area=t.area_name_snapshot||'';
+  const created=t.dispatch_started_at||t.created_at||'';
+  const items=row.items.map(renderItem).join('');
+  const issue=t.status==='failed'
+    ?'<div class="job-issue"><strong>Delivery issue</strong><span>'+esc(t.failure_reason||'Return the order to the restaurant.')+'</span><small>'+(t.return_reported_at?'Return reported · waiting for manager confirmation':'Return the order, then confirm it below.')+'</small></div>'
+    :'';
+  const itemPanel='<details class="job-items"><summary>Order items <span>'+(row.items.length||0)+'</span></summary><div class="items">'+(items||'<div class="muted">No item details</div>')+'</div></details>';
+  return '<article class="job" data-task-id="'+esc(t.id)+'">'+
+    '<div class="job-head"><div><div class="order-no">'+esc(o.order_number||'Delivery')+'</div><div class="job-time">'+(created?new Date(created).toLocaleTimeString('en-PK',{hour:'2-digit',minute:'2-digit'}):'')+'</div></div><span class="status '+esc(t.status)+'">'+(pendingAcceptance?'Awaiting response · '+countdown:esc(statusLabel(t.status)))+'</span></div>'+
+    '<div class="job-body">'+
+      '<div class="job-customer-row"><div class="job-customer-copy"><div class="customer">'+esc(customer)+'</div>'+(area?'<div class="muted">'+esc(area)+'</div>':'')+'</div>'+(phone?'<a class="contact call-button" href="tel:'+esc(phone)+'">Call</a>':'')+'</div>'+
+      '<div class="job-dropoff"><span class="section-label">DROP-OFF</span><div class="address">'+esc(address||'Address not provided')+'</div></div>'+
+      (instructions?'<div class="job-instruction"><strong>Note</strong> '+esc(instructions)+'</div>':'')+
+      itemPanel+
+    '</div>'+
+    '<div class="job-foot">'+issue+'<div class="job-actions">'+actionButtons(row)+'</div></div></article>';
+}
+function renderJobs(){
+  const rows=jobs.map(normalizeTask);
+  $('activeCount').textContent=String(rows.length);
+  $('pickupCount').textContent=String(rows.filter(x=>['assigned','accepted','arrived_at_restaurant'].includes(x.task.status)).length);
+  $('onWayCount').textContent=String(rows.filter(x=>['out_for_delivery','picked_up'].includes(x.task.status)).length);
+  $('jobList').innerHTML=rows.length?rows.map(renderJob).join(''):'<div class="empty"><strong>No active delivery</strong>You are all caught up.</div>';
+}
+async function riderJobsRequest(){
+  if(!session?.access_token)throw new Error('Please sign in again.');
+  // The Edge Function validates the active rider role/profile, then reads jobs and offers with its service key.
+  const data=await deliveryRequest('GET',{view:'rider'});
+  if(!data||data.ok!==true||!Array.isArray(data.data)||!Array.isArray(data.offers))throw new Error('The rider jobs response was not valid.');
+  return data;
+}
+async function loadJobs(showLoading=false){
+  if(busy)return;busy=true;
+  if(showLoading)$('jobList').innerHTML='<div class="empty"><strong>Refreshing…</strong></div>';
+  try{
+    // One authenticated Postgres RPC returns current jobs and current offers together.
+    const previousTaskIds=new Set(jobs.map(item=>String(normalizeTask(item).task.id)));
+    const data=await riderJobsRequest();
+    const nextTaskIds=new Set(data.data.map(item=>String(normalizeTask(item).task.id)));
+    const releasedTask=[...previousTaskIds].some(id=>!nextTaskIds.has(id));
+    jobs=data.data;
+    offers=data.offers;
+
+    // Delivery completion, rider rejection, or manager-confirmed return removes
+    // the active task from this RPC. Reconcile the rider's availability using
+    // the existing authenticated presence RPC so the Go offline/Go available
+    // control changes without requiring sign-out or a new login.
+    if(releasedTask&&session?.access_token&&rider){
+      try{
+        // Force a fresh availability calculation even if the last heartbeat
+        // was less than 90 seconds ago. Reapply the rider's existing preference
+        // (not a new choice) so the presence RPC bypasses its heartbeat throttle.
+        await updateRiderPresence(riderWantsOnline,false,true);
+      }catch(presenceError){
+        console.warn('Rider availability refresh after delivery release failed.',presenceError.message);
+        renderRiderAvailability();
+      }
+    }
+    renderJobs();
+    renderOffers();
+    setConnection(true,riderRealtimeConnected?'Live updates':'Manual refresh available');
+  }catch(e){setConnection(false,'Connection issue');if(showLoading)$('jobList').innerHTML='<div class="empty"><strong>Could not load deliveries</strong>'+esc(e.message)+'</div>';else toast(e.message);}
+  finally{busy=false;}
+  const pendingIds=new Set(jobs.map(item=>{
+    const row=normalizeTask(item);
+    return row.task.status==='assigned'&&row.assignment.status==='assigned'&&!row.assignment.accepted_at?String(row.assignment.id):null;
+  }).filter(Boolean));
+  for(const id of expiredAcceptanceRefreshes)if(!pendingIds.has(id))expiredAcceptanceRefreshes.delete(id);
+  renderRiderAvailability();
+}
+async function performAction(taskId,action){
+  const row=jobs.map(normalizeTask).find(x=>String(x.task.id)===String(taskId));if(!row)return;
+  let reason=null;
+  if(action==='reject'||action==='failed'){
+    reason=prompt(action==='reject'?'Why can you not take this delivery?':'Describe the delivery problem (for example: customer not answering):');
+    reason=String(reason||'').trim();if(!reason)return;
+  }
+  if(action==='delivered'&&!confirm('Confirm that you handed this order to the customer?'))return;
+  if(action==='return_reported'&&!confirm('Confirm that you have physically returned the food to Flame Chick and handed it to the restaurant staff? The manager will still need to confirm the handover.'))return;
+  const card=document.querySelector('[data-task-id="'+CSS.escape(taskId)+'"]');
+  const buttons=card?[...card.querySelectorAll('button')]:[];buttons.forEach(b=>b.disabled=true);
+  try{await deliveryRequest('POST',null,{action,delivery_task_id:taskId,...(reason?{reason}:{})});toast(action==='picked_up'?'Pickup confirmed. The order is now out for delivery.':action==='delivered'?'Delivery completed. Thank you!':action==='failed'?'Delivery issue saved. Keep the order and return it to the restaurant.':action==='return_reported'?'Return reported. Wait for manager confirmation.':'Delivery updated.');await loadJobs(true);}
+  catch(e){toast(e.message);buttons.forEach(b=>b.disabled=false);}
+}
+
+function updateRiderExpiryTicker(){
+  if(offerExpiryTimer)clearInterval(offerExpiryTimer);
+  const tick=()=>{
+    document.querySelectorAll('[data-expiry]').forEach(el=>{
+      const expiry=Date.parse(el.dataset.expiry||'');
+      const left=Number.isFinite(expiry)?Math.max(0,Math.ceil((expiry-Date.now())/1000)):0;
+      el.textContent=left>0?left+'s':'Checking';
+      if(left===0)el.classList.add('expired');
+    });
+    document.querySelectorAll('[data-acceptance-deadline]').forEach(el=>{
+      const deadline=Date.parse(el.dataset.acceptanceDeadline||'');
+      const left=Number.isFinite(deadline)?Math.max(0,Math.ceil((deadline-Date.now())/1000)):0;
+      el.textContent=left>0?left+'s':'Expired · syncing';
+      const assignmentId=String(el.dataset.assignmentId||'');
+      if(left===0&&assignmentId&&!expiredAcceptanceRefreshes.has(assignmentId)){
+        expiredAcceptanceRefreshes.add(assignmentId);
+        const card=el.closest('.job');
+        if(card)card.querySelectorAll('[data-action="accept"],[data-action="reject"]').forEach(button=>button.disabled=true);
+        setTimeout(()=>loadJobs(false),1200);
+      }
+    });
+  };
+  tick();
+  if(document.querySelector('[data-expiry], [data-acceptance-deadline]'))offerExpiryTimer=setInterval(tick,500);
+}
+function renderOffers(){
+  const wrap=$('offerSection'),list=$('offerList');
+  if(!wrap||!list)return;
+  $('offerCount').textContent=String(offers.length);
+  wrap.classList.toggle('hidden',offers.length===0);
+  list.innerHTML=offers.map(offer=>{
+    const task=Array.isArray(offer.delivery_tasks)?offer.delivery_tasks[0]||{}:(offer.delivery_tasks||{});
+    const order=Array.isArray(task.orders)?task.orders[0]||{}:(task.orders||{});
+    const expires=Date.parse(offer.expires_at||'');
+    const seconds=Number.isFinite(expires)?Math.max(0,Math.ceil((expires-Date.now())/1000)):0;
+    return '<article class="offer-card" data-offer-id="'+esc(offer.id)+'">'+
+      '<div class="offer-card-head"><strong class="offer-order">Order '+esc(order.order_number||'New delivery')+'</strong><span class="offer-countdown" data-expiry="'+esc(offer.expires_at||'')+'">'+seconds+'s</span></div>'+
+      '<div class="offer-facts"><div><small>Area</small><strong>'+esc(task.area_name_snapshot||'Not listed')+'</strong></div><div><small>Fee</small><strong>Rs. '+money(task.delivery_fee_snapshot)+'</strong></div></div>'+
+      '<div class="offer-actions"><button class="btn primary" type="button" data-offer-action="accept">Accept</button><button class="btn danger" type="button" data-offer-action="decline">Decline</button></div>'+
+    '</article>';
+  }).join('');
+  updateRiderExpiryTicker();
+}
+async function respondToOffer(offerId,action,button){
+  if(button)button.disabled=true;
+  const card=document.querySelector('[data-offer-id="'+CSS.escape(offerId)+'"]');
+  if(card)card.querySelectorAll('button').forEach(b=>b.disabled=true);
+  try{
+    if(action==='accept'){
+      const result=await deliveryRequest('POST',null,{action:'accept_offer',offer_id:offerId});
+      toast('You got order '+(result.order_number||'delivery')+'. Please proceed to the restaurant.');
+    }else{
+      await deliveryRequest('POST',null,{action:'decline_offer',offer_id:offerId,reason:'Rider declined'});
+      toast('Delivery offer declined.');
+    }
+    await loadJobs(true);
+  }catch(error){
+    toast(error.message||'This offer is no longer available.');
+    await loadJobs(false);
+  }
+}
+function urlBase64ToUint8Array(value){
+  const padding='='.repeat((4-value.length%4)%4);
+  const base64=(value+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(base64),output=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++)output[i]=raw.charCodeAt(i);
+  return output;
+}
+async function enableRiderNotifications(){
+  const button=$('enableNotificationsBtn');
+  if(!('serviceWorker'in navigator)||!('PushManager'in window)||!('Notification'in window)){
+    toast('This browser does not support app notifications. Keep the Rider app open and use Refresh jobs.');
+    return;
+  }
+  if(!riderAppInstalled()&&/iphone|ipad|ipod/i.test(navigator.userAgent||'')){
+    alert('On iPhone, first install Flame Chick Rider: Safari Share → Add to Home Screen. Then open the installed app and enable notifications.');
+    return;
+  }
+  if(Notification.permission==='denied'){
+    alert('Notifications are blocked for Flame Chick Rider. Enable them in your browser or device settings.');
+    return;
+  }
+  button.disabled=true;
+  try{
+    const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
+    if(permission!=='granted'){toast('Notification permission was not granted.');return;}
+    const cfg=await deliveryRequest('GET',{view:'push-config'});
+    if(!cfg.vapid_public_key)throw new Error('Notifications are not configured yet.');
+    const registration=await navigator.serviceWorker.ready;
+    const existing=await registration.pushManager.getSubscription();
+    const subscription=existing||await registration.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(cfg.vapid_public_key)
+    });
+    await deliveryRequest('POST',null,{action:'push_subscribe',subscription:subscription.toJSON(),user_agent:navigator.userAgent});
+    button.textContent='Alerts on';
+    toast('Delivery notifications are enabled on this device.');
+  }catch(error){toast(error.message||'Could not enable notifications.');}
+  finally{button.disabled=false;}
+}
+
+function showApp(){ document.body.classList.add('rider-active');$('loginView').classList.add('hidden');$('passwordView').classList.add('hidden');$('appView').classList.remove('hidden');$('signOutBtn').classList.remove('hidden'); }
+function showLogin(message=''){ document.body.classList.remove('rider-active');$('appView').classList.add('hidden');$('passwordView').classList.add('hidden');$('loginView').classList.remove('hidden');$('signOutBtn').classList.add('hidden');$('loginError').textContent=message; }
+function showPasswordSetup(type,next){
+  pendingAuthType=type||'invite';pendingAuthSession=next||null;
+  document.body.classList.remove('rider-active');$('loginView').classList.add('hidden');$('appView').classList.add('hidden');$('passwordView').classList.remove('hidden');$('signOutBtn').classList.add('hidden');
+  $('passwordTitle').textContent=type==='recovery'?'Reset your Flame Chick password':'Finish setting up your Flame Chick account';
+  $('passwordHelp').textContent=type==='recovery'?'Choose a new password for your Flame Chick work account.':'Your invitation has been verified. Choose a private password to activate your account.';
+  $('passwordError').textContent='';
+  if(next?.user?.email)$('email').value=next.user.email;
+}
+function readAuthCallback(){
+  const hash=new URLSearchParams(window.location.hash.replace(/^#/,''));
+  const query=new URLSearchParams(window.location.search);
+  const type=hash.get('type')||query.get('type')||'';
+  const accessToken=hash.get('access_token')||query.get('access_token')||'';
+  const refreshToken=hash.get('refresh_token')||query.get('refresh_token')||'';
+  const errorText=hash.get('error_description')||query.get('error_description')||hash.get('error')||query.get('error')||'';
+  if(errorText)return {error:decodeURIComponent(errorText.replace(/\+/g,' '))};
+  if(!accessToken||!['invite','recovery'].includes(type))return null;
+  const expiresIn=Number(hash.get('expires_in')||query.get('expires_in')||3600);
+  const next={access_token:accessToken,refresh_token:refreshToken,token_type:hash.get('token_type')||'bearer',expires_in:expiresIn,expires_at:Number(hash.get('expires_at')||query.get('expires_at')||0)||Math.floor(Date.now()/1000)+expiresIn};
+  return {type,session:next};
+}
+async function getActiveAccountRoles(userId,token){
+  const url=REST_URL+'/user_roles?select=role,branch_id,is_active&user_id=eq.'+encodeURIComponent(userId)+'&is_active=eq.true';
+  const response=await fetch(url,{headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+token,'Accept':'application/json'},cache:'no-store'});
+  const rows=await parseResponse(response);
+  return Array.isArray(rows)?rows.filter(x=>x&&x.is_active===true&&typeof x.role==='string'):[];
+}
+async function signOut(message=''){
+  const token=session?.access_token;
+  markRiderOfflineBestEffort();
+  stopRiderPresence();
+  stopRiderRealtime();
+  if(token){
+    try{
+      await fetch(AUTH_URL+'/logout?scope=local',{
+        method:'POST',
+        headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+        cache:'no-store',
+        keepalive:true
+      });
+    }catch(error){console.warn('Flame Chick rider Auth sign-out could not reach the server.',error.message);}
+  }
+  saveSession(null);user=null;rider=null;jobs=[];pendingAuthSession=null;
+  $('availabilityBtn').hidden=true;
+  showLogin(message);setConnection(false,'Signed out');
+}
+async function activateSession(next){
+  saveSession(next);
+  if(window.location.hash||window.location.search)history.replaceState(null,document.title,window.location.pathname);
+  user=await getUser(next.access_token);
+  rider=await getRiderProfile(user.id,next.access_token);
+  riderWantsOnline=rider.accepting_jobs!==false;
+  $('helloName').textContent='Deliveries';
+  $('riderName').textContent=rider.display_name||rider.rider_code||'Flame Chick Rider';
+  renderRiderAvailability();
+  showApp();
+  startRiderPresence();
+  await startRiderRealtime();
+  await loadJobs(true);
+  ;
+}
+$('loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();$('loginError').textContent='';$('loginBtn').disabled=true;$('loginBtn').textContent='Signing in…';
+  try{const r=await fetch(AUTH_URL+'/token?grant_type=password',{method:'POST',headers:{'apikey':PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value.trim(),password:$('password').value}),cache:'no-store'});const next=await parseResponse(r);if(!next.expires_at&&next.expires_in)next.expires_at=Math.floor(Date.now()/1000)+Number(next.expires_in);$('password').value='';await activateSession(next);}
+  catch(err){saveSession(null);showLogin(err.message||'Sign in failed.');}
+  finally{$('loginBtn').disabled=false;$('loginBtn').textContent='Sign in';}
+});
+$('resetPasswordBtn').addEventListener('click',async()=>{
+  const email=$('email').value.trim();$('loginError').textContent='';
+  if(!email){$('loginError').textContent='Enter your work email first.';$('email').focus();return;}
+  const button=$('resetPasswordBtn');button.disabled=true;button.textContent='Sending email…';
+  try{
+    const redirectTo=window.location.origin+window.location.pathname;
+    const url=AUTH_URL+'/recover?redirect_to='+encodeURIComponent(redirectTo);
+    const r=await fetch(url,{method:'POST',headers:{'apikey':PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({email}),cache:'no-store'});
+    await parseResponse(r);
+    $('loginError').textContent='Password setup email sent. Open the newest email and follow its link on this device.';
+  }catch(err){$('loginError').textContent=err.message||'Could not send password setup email.';}
+  finally{button.disabled=false;button.textContent='Set / reset password';}
+});
+$('passwordForm').addEventListener('submit',async e=>{
+  e.preventDefault();$('passwordError').textContent='';
+  const password=$('newPassword').value,confirmPassword=$('confirmPassword').value;
+  if(password.length<8){$('passwordError').textContent='Use at least 8 characters.';return;}
+  if(password!==confirmPassword){$('passwordError').textContent='The passwords do not match.';return;}
+  if(!pendingAuthSession?.access_token){$('passwordError').textContent='This password link is no longer valid. Request a new password setup email.';return;}
+  const button=$('savePasswordBtn');button.disabled=true;button.textContent='Saving password…';
+  try{
+    const r=await fetch(AUTH_URL+'/user',{method:'PUT',headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+pendingAuthSession.access_token,'Content-Type':'application/json'},body:JSON.stringify({password}),cache:'no-store'});
+    await parseResponse(r);
+    $('newPassword').value='';$('confirmPassword').value='';
+    const next=pendingAuthSession;pendingAuthSession=null;
+    const invitedUser=await getUser(next.access_token);
+    const roleRows=await getActiveAccountRoles(invitedUser.id,next.access_token);
+    const assigned=roleRows.find(x=>['owner','admin','manager','cashier','kitchen','rider'].includes(x.role));
+    if(!assigned){
+      saveSession(null);user=null;rider=null;jobs=[];
+      showLogin('Your password is set, but an active Flame Chick role is not yet assigned. Please ask the owner or manager to finish your account setup.');
+    }else if(assigned.role==='rider'){
+      await activateSession(next);
+      toast('Password saved. Your rider account is ready.');
+    }else{
+      saveSession(null);user=null;rider=null;jobs=[];
+      showLogin('Your password is set. Your Flame Chick role is '+assigned.role+'. Sign in to the POS at https://flame-chick-pos.vercel.app/ to use your staff access.');
+    }
+  }catch(err){$('passwordError').textContent=err.message||'Password could not be saved. Request a new link and try again.';}
+  finally{button.disabled=false;button.textContent='Save password';}
+});
+$('signOutBtn').addEventListener('click',()=>signOut());
+$('availabilityBtn').addEventListener('click',async()=>{
+  if(!rider||rider.availability_status==='busy'||rider.availability_status==='suspended')return;
+  const nextOnline=rider.availability_status!=='available';
+  const previousPreference=riderWantsOnline;
+  const btn=$('availabilityBtn');btn.disabled=true;
+  try{
+    if(!nextOnline){
+      await updateRiderPresence(false,false,true);
+      riderWantsOnline=false;
+      stopRiderPresence();
+      stopRiderRealtime();
+    }else{
+      await updateRiderPresence(true,false,true);
+      riderWantsOnline=true;
+      startRiderPresence();
+      await startRiderRealtime();
+    }
+    toast(nextOnline?'You are now available for deliveries.':'You are now offline.');
+  }catch(error){
+    riderWantsOnline=previousPreference;
+    if(previousPreference)startRiderPresence();
+    toast(error.message);
+    await loadJobs(false);
+  }finally{renderRiderAvailability();}
+});
+$('refreshBtn').addEventListener('click',()=>loadJobs(true));
+$('enableNotificationsBtn').addEventListener('click',enableRiderNotifications);
+$('offerList').addEventListener('click',e=>{
+  const button=e.target.closest('[data-offer-action]');
+  const card=button?.closest('[data-offer-id]');
+  if(button&&card)respondToOffer(card.dataset.offerId,button.dataset.offerAction,button);
+});
+$('jobList').addEventListener('click',e=>{const btn=e.target.closest('[data-action]');if(!btn)return;const card=btn.closest('[data-task-id]');if(card)performAction(card.dataset.taskId,btn.dataset.action);});
+$('connection').addEventListener('click',()=>{});
+(async()=>{
+  initRiderPwa();
+  $('installAppBtn').addEventListener('click',promptRiderAppInstall);
+  setConnection(navigator.onLine,'Connecting');
+  window.addEventListener('online',()=>{setConnection(true,riderRealtimeConnected?'Live updates':'Reconnecting live updates');if(session){if(riderWantsOnline)startRiderPresence();startRiderRealtime();loadJobs(true);}});
+  window.addEventListener('offline',()=>setConnection(false,'Offline'));
+  window.addEventListener('pagehide',()=>markRiderOfflineBestEffort());
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&session&&riderWantsOnline){updateRiderPresence(true).catch(e=>console.warn('Rider presence resume failed.',e.message));}});
+  const authCallback=readAuthCallback();
+  if(authCallback?.error){showLogin('The email link could not be completed. '+authCallback.error+' Use Set / reset password to request a fresh link.');return;}
+  if(authCallback?.session){
+    try{await getUser(authCallback.session.access_token);showPasswordSetup(authCallback.type,authCallback.session);return;}
+    catch(e){showLogin('This email link has expired or was already used. Use Set / reset password to request a fresh link.');return;}
+  }
+  try{const raw=localStorage.getItem(SESSION_KEY);if(raw){const saved=JSON.parse(raw);const next=await refreshSessionIfNeeded(saved);if(next){await activateSession(next);return;}saveSession(null);}}
+  catch(e){saveSession(null);}
+  showLogin();
+})();
+</script>
+</body>
+</html>
