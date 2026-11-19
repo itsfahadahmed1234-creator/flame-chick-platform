@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Pizza Bite">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff4d6"/><stop offset="1" stop-color="#ffe1dc"/></linearGradient></defs>
+<rect width="600" height="400" fill="url(#bg)"/><circle cx="300" cy="175" r="88" fill="#E52323" opacity=".10"/><path d="M240 115 375 155 310 285Q302 302 290 282Z" fill="#F6C348" stroke="#fff" stroke-width="10"/><circle cx="290" cy="185" r="13" fill="#C62828"/><circle cx="325" cy="205" r="13" fill="#C62828"/><circle cx="296" cy="240" r="11" fill="#C62828"/><text x="300" y="345" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="34" font-weight="900" fill="#E52323">PIZZA BITE</text>
+</svg>
