@@ -1175,8 +1175,8 @@ html,body{background:var(--bg);overflow:hidden}
     <section class="order-section"><div class="section-label">Customer</div><div id="customerFields" class="customer-mini">
       <div class="field"><label>Customer Name</label><input id="customerName" placeholder="Customer name" autocomplete="off"></div>
       <div class="field"><label>Phone</label><input id="phone" inputmode="tel" placeholder="03XXXXXXXXX" autocomplete="off"></div>
-      <div class="field full" id="addressField"><label>Full Delivery Address</label><input id="address" placeholder="House, street, area / mohalla, landmark" autocomplete="off"><small style="font-size:11px;color:var(--muted)">Demo delivery fee: Rs 0. Include the full locality in this address.</small></div>
-      <div class="field" id="areaField" style="display:none"><label>Area</label><input id="area" placeholder="Area / Mohalla" autocomplete="off"></div>
+      <div class="field full" id="addressField"><label>Full Delivery Address</label><input id="address" placeholder="House, street, area / mohalla, landmark" autocomplete="off"><small style="font-size:11px;color:var(--muted)">Enter the complete delivery address. Delivery fee is based on the selected area.</small></div>
+      <div class="field" id="areaField" style="display:none"><label>Area / Mohalla</label><input id="area" placeholder="Enter a listed area or Not Listed" autocomplete="off"></div>
       <div class="field" id="tableField" style="display:none"><label>Table</label><input id="tableNumber" placeholder="Table #" inputmode="numeric"></div>
     </div></section>
     <section class="order-section"><div class="section-label">Order items</div><div id="cartList" class="order-items"><div class="empty">Add items from the menu.</div></div></section>
@@ -2426,7 +2426,7 @@ function setPOSPaymentMethod(method){
 
 function updateOrderFieldsByType(){
  const t=$('orderType').value; const delivery=t==='Delivery'; const dine=t==='Dine-in';
- $('addressField').style.display=(delivery?'grid':'none'); $('areaField').style.display='none'; $('tableField').style.display='none'; $('dineTableSection').style.display=dine?'block':'none';
+ $('addressField').style.display=(delivery?'grid':'none'); $('areaField').style.display=(delivery?'grid':'none'); $('tableField').style.display='none'; $('dineTableSection').style.display=dine?'block':'none';
  $('preorderSection').style.display=dine?'block':'none';
  $('orderHint').textContent=dine?'Table service':delivery?'Delivery order':'Fast counter entry';
  const cod=$('paymentButtons')?.querySelector('.cod-btn');
@@ -2697,7 +2697,8 @@ function normalizeLookupText(value){return String(value??'').trim().toLowerCase(
 function firstField(row,names){for(const name of names){if(Object.prototype.hasOwnProperty.call(row,name)&&row[name]!==''&&row[name]!==null&&row[name]!==undefined)return row[name]}return ''}
 function deliveryAreaName(row){return String(firstField(row,['AreaName','Area','area','Name','name','DeliveryArea','deliveryArea','Mohalla','mohalla'])||'').trim()}
 function deliveryAreaFee(row){const raw=firstField(row,['DeliveryFee','Delivery Fee','deliveryFee','delivery fee','Fee','fee','Price','price','Amount','amount']);const n=Number(raw);return Number.isFinite(n)&&n>=0?n:0}
-function getDeliveryFeeForArea(area){const key=normalizeLookupText(area);if(!key)return 0;const row=deliveryAreas.find(x=>normalizeLookupText(deliveryAreaName(x))===key);return row?deliveryAreaFee(row):0}
+function getDefaultDeliveryFee(){const raw=catalogSnapshot?.settings?.DefaultDeliveryFee;if(raw===null||raw===undefined||raw==='')return null;const n=Number(raw);return Number.isFinite(n)&&n>=0?n:null}
+function getDeliveryFeeForArea(area){const key=normalizeLookupText(area);if(key==='not listed')return getDefaultDeliveryFee();if(!key)return null;const row=deliveryAreas.find(x=>normalizeLookupText(deliveryAreaName(x))===key);return row?deliveryAreaFee(row):null}
 async function refreshDeliveryAreas(){if(!catalogSnapshot)return;const rows=catalogSnapshot.deliveryAreas||[];await clearStore(STORES.deliveryAreas);for(const row of rows)await put(STORES.deliveryAreas,row);deliveryAreas=await all(STORES.deliveryAreas)}
 async function ensureDeliveryAreas(){deliveryAreas=await all(STORES.deliveryAreas);if(!deliveryAreas.length&&navigator.onLine)await refreshDeliveryAreas()}
 
@@ -3211,9 +3212,10 @@ function renderCart(options={}){
   }
   const subtotal=cart.reduce((a,x)=>a+x.price*x.quantity,0);
   const fee=$('orderType').value==='Delivery'?getDeliveryFeeForArea($('area').value):0;
+  const feeKnown=fee!==null;
   $('subtotal').textContent='Rs. '+money(subtotal);
-  $('deliveryFee').textContent='Rs. '+money(fee);
-  $('total').textContent='Rs. '+money(subtotal+fee);
+  $('deliveryFee').textContent=feeKnown?'Rs. '+money(fee):'Not configured';
+  $('total').textContent=feeKnown?'Rs. '+money(subtotal+fee):'Not configured';
   updateSyncBox();
 }
 function changeQty(i,op){if(!cart[i])return;if(op==='+')cart[i].quantity++;else if(op==='-')cart[i].quantity--;else cart[i].quantity=0;if(cart[i].quantity<=0)cart.splice(i,1);renderCart()}
@@ -3549,6 +3551,7 @@ async function saveLocalOrder(){
   const type=$('orderType').value;
   const subtotal=cart.reduce((a,x)=>a+(Number(x.price)||0)*(Number(x.quantity)||1),0);
   const deliveryFee=type==='Delivery'?getDeliveryFeeForArea($('area').value):0;
+  if(type==='Delivery'&&deliveryFee===null){showToast('Choose a listed area or Not Listed. The default fee for Not Listed must be configured in Admin.');$('area').focus();return}
   const customerName=$('customerName').value.trim();
   const phone=$('phone').value.trim();
   if(!customerName){showToast(type==='Dine-in'?'Customer name is required for dine-in':'Customer name is required');$('customerName').focus();return}
@@ -4103,9 +4106,19 @@ function hfpBuildPosDeliveryOrderPayload(order){
   const cachedAreaRows=Array.isArray(deliveryAreas)?deliveryAreas:[];
   const catalogAreaRows=Array.isArray(catalogSnapshot?.deliveryAreas)?catalogSnapshot.deliveryAreas:[];
   const areaRows=cachedAreaRows.length?cachedAreaRows:catalogAreaRows;
-  const selectedArea=areaRows.find(row=>normalizeLookupText(deliveryAreaName(row))===normalizeLookupText(order.area));
-  const areaId=String(selectedArea?.ID??selectedArea?.AreaID??selectedArea?.id??'').trim();
-  if(String(order.area||'').trim()&&!areaId)throw new Error('The selected delivery area is not in the current Flame Chick catalog. Refresh the menu and select the area again.');
+  const areaChoice=normalizeLookupText(order.area);
+  const selectedArea=areaRows.find(row=>normalizeLookupText(deliveryAreaName(row))===areaChoice);
+  let areaId=String(selectedArea?.ID??selectedArea?.AreaID??selectedArea?.id??'').trim();
+  let areaName='';
+  if(areaChoice==='not listed'){
+    areaId='';
+    areaName='Not Listed';
+    if(getDefaultDeliveryFee()===null)throw new Error('The Not Listed default delivery fee has not been configured in Admin.');
+  }else if(selectedArea){
+    areaName=deliveryAreaName(selectedArea);
+  }else{
+    throw new Error('Choose a listed delivery area or enter Not Listed.');
+  }
 
   const localItems=Array.isArray(order.items)?order.items:[];
   if(!localItems.length||localItems.length>40)throw new Error('A delivery order must contain between 1 and 40 items.');
@@ -4141,7 +4154,7 @@ function hfpBuildPosDeliveryOrderPayload(order){
     customer:{name:customerName,phone:customerPhone},
     payment_method:payment,
     notes:String(order.notes||''),
-    delivery:{address,area_id:areaId||null,instructions:''},
+    delivery:{address,area_id:areaId||null,area_name:areaName,instructions:''},
     items
   };
 }

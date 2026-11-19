@@ -140,7 +140,18 @@
       </section>
 
       <section class="page" id="page-delivery" hidden>
-        <div class="page-intro"><div><h2>Delivery areas</h2><p class="muted">Manage delivery coverage and fees used at checkout.</p></div><button class="btn btn-primary" id="addAreaButton">＋ Add area</button></div>
+        <div class="page-intro"><div><h2>Delivery areas</h2><p class="muted">Manage listed delivery coverage and per-area fees used at checkout.</p></div><button class="btn btn-primary" id="addAreaButton">＋ Add area</button></div>
+        <div class="surface" style="padding:16px;margin:14px 0;border:1px solid var(--line);border-radius:14px">
+          <h3 style="margin:0 0 6px">Default fee for Not Listed addresses</h3>
+          <p class="muted" style="margin:0 0 12px">Used when a customer selects Not Listed instead of a saved delivery area. Leave blank until the owner configures this fee. Not Listed is a checkout choice only, not a delivery-area record.</p>
+          <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+            <label style="display:grid;gap:5px;min-width:220px">Default delivery fee (PKR)
+              <input id="defaultDeliveryFeeInput" type="number" min="0" step="1" placeholder="Not configured" style="padding:10px;border:1px solid var(--line);border-radius:10px">
+            </label>
+            <button class="btn btn-primary" id="saveDefaultDeliveryFeeButton" type="button">Save default fee</button>
+          </div>
+          <small id="defaultDeliveryFeeStatus" class="muted" style="display:block;margin-top:9px">Not configured.</small>
+        </div>
         <div id="areasList" class="area-list"><div class="surface empty-state">Loading delivery areas…</div></div>
       </section>
 

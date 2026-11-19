@@ -366,10 +366,38 @@ function renderDeals(){
  $("dealsList").querySelectorAll("[data-delete-deal]").forEach(b=>b.onclick=()=>{const d=S.deals.find(x=>x.id===b.dataset.deleteDeal);if(d)namedDelete("deal",d.title,()=>deleteDealSafely(d),()=>db("deals?id=eq."+d.id,{method:"PATCH",body:{is_active:false,is_available:false},prefer:"return=minimal"})).catch(e=>toast(e.message,true));});
 }
 
+function renderDefaultDeliveryFee(){
+ const input=$("defaultDeliveryFeeInput"),status=$("defaultDeliveryFeeStatus");
+ if(!input)return;
+ const row=setting("DefaultDeliveryFee"),value=row?row.value_json:null;
+ input.value=value===null||value===undefined||value===""?"":String(value);
+ if(status)status.textContent=input.value===""?"Not configured. Not Listed delivery orders will be blocked until a fee is saved.":"Current default fee for Not Listed: "+cash(Number(value));
+}
+async function saveDefaultDeliveryFee(){
+ const input=$("defaultDeliveryFeeInput"),button=$("saveDefaultDeliveryFeeButton");
+ if(!input)return;
+ const raw=input.value.trim();
+ let value=null;
+ if(raw!==""){value=Number(raw);if(!Number.isFinite(value)||value<0)throw Error("Enter a valid non-negative default delivery fee, or leave it blank to keep it unset.");}
+ if(button){button.disabled=true;button.textContent="Saving…";}
+ try{
+  const row=setting("DefaultDeliveryFee");
+  const payload={value_json:value,is_public:true,description:"Default delivery fee used only when the customer selects Not Listed.",updated_by:S.user.id,updated_at:new Date().toISOString()};
+  if(row){
+   await db("restaurant_settings?id=eq."+row.id,{method:"PATCH",body:payload,prefer:"return=minimal"});
+  }else{
+   await db("restaurant_settings",{method:"POST",body:Object.assign({},payload,{restaurant_id:S.restaurant.id,branch_id:null,setting_key:"DefaultDeliveryFee"}),prefer:"return=minimal"});
+  }
+  await loadAll();
+  toast(value===null?"Default fee left unset. Not Listed delivery remains unavailable.":"Default delivery fee saved.");
+ }finally{if(button){button.disabled=false;button.textContent="Save default fee";}}
+}
+
 function renderAreas(){
  $("areasList").innerHTML=S.areas.map(a=>'<div class="area-row"><div class="deal-mark">⌁</div><div class="area-copy"><b>'+esc(a.name)+'</b><small>'+esc(a.legacy_id||"")+' · Order '+a.sort_order+'</small></div><div class="area-fee">'+cash(a.delivery_fee)+'</div><span class="state-text '+(a.is_active?"good":"bad")+'">'+(a.is_active?"Active":"Paused")+'</span><button class="action-link" data-edit-area="'+a.id+'">Edit</button>'+(canDelete()?'<button class="action-link danger-link" data-delete-area="'+a.id+'">Delete</button>':'')+'</div>').join("")||'<div class="surface empty-state">No delivery areas configured.</div>';
  $("areasList").querySelectorAll("[data-edit-area]").forEach(b=>b.onclick=()=>editArea(b.dataset.editArea));
  $("areasList").querySelectorAll("[data-delete-area]").forEach(b=>b.onclick=()=>{const a=S.areas.find(x=>x.id===b.dataset.deleteArea);if(a)namedDelete("delivery area",a.name,()=>deleteAreaSafely(a),()=>activeArchive("delivery_areas",a.id)).catch(e=>toast(e.message,true));});
+ renderDefaultDeliveryFee();
 }
 
 
@@ -735,6 +763,7 @@ function wire(){
   $("rushMonth").onchange=()=>{S.rushMonth=$("rushMonth").value||S.rushMonth;loadDashboard().catch(()=>{});};
  $("orderSearch").oninput=renderOrders;$("orderStatusFilter").onchange=renderOrders;$("productSearch").oninput=renderProducts;$("productCategoryFilter").onchange=renderProducts;$("productStateFilter").onchange=renderProducts;
  $("addProductButton").onclick=()=>editProduct(null);$("addCategoryButton").onclick=()=>editCategory(null);$("addSubcategoryButton").onclick=()=>editSubcategory(null);$("addDealButton").onclick=()=>editDeal(null);$("addAreaButton").onclick=()=>editArea(null);
+ $("saveDefaultDeliveryFeeButton").onclick=()=>saveDefaultDeliveryFee().catch(err=>toast(err.message,true));
  $("inviteStaffButton").onclick=()=>openStaffDialog(null);
  $("staffForm").onsubmit=e=>saveStaffForm(e);
  $("staffDialogClose").onclick=()=>$("staffDialog").close();

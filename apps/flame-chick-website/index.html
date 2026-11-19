@@ -838,10 +838,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
   var isOpen = false, lastFocus = null, toastTimer = 0;
   var catalogReady = false, catalogError = '', orderSending = false;
   var deliveryAreas = [], savedAreaId = '';
+  var defaultDeliveryFee = null;
   var productModalOpen = false, productModalFocus = null, currentProductId = '';
 
   function selectedDeliveryArea() {
     var id = f.area ? String(f.area.value || '') : '';
+    if (id === '__not_listed__') {
+      return { id: '', name: 'Not Listed', fee: defaultDeliveryFee, isNotListed: true };
+    }
     return deliveryAreas.find(function (area) { return area.id === id; }) || null;
   }
 
@@ -857,24 +861,19 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
       };
     }).filter(function (area) { return area.name.length > 0; });
 
-    if (!deliveryAreas.length) {
-      f.area.innerHTML = '<option value="">No delivery areas configured</option>';
-      f.area.disabled = true;
-    } else {
-      f.area.disabled = false;
-      f.area.innerHTML = '<option value="">Choose your delivery area</option>' +
-        deliveryAreas.map(function (area) {
-          return '<option value="' + esc(area.id) + '">' + esc(area.name) + ' · ' + esc(C.money(area.fee)) + '</option>';
-        }).join('');
-      if (keepId && deliveryAreas.some(function (area) { return area.id === String(keepId); })) {
-        f.area.value = String(keepId);
-      }
+    var options = '<option value="">Choose a delivery area</option>' +
+      deliveryAreas.map(function (area) {
+        return '<option value="' + esc(area.id) + '">' + esc(area.name) + ' · ' + esc(C.money(area.fee)) + '</option>';
+      }).join('') +
+      '<option value="__not_listed__">Not Listed</option>';
+    f.area.disabled = false;
+    f.area.innerHTML = options;
+    if (keepId === '__not_listed__' || deliveryAreas.some(function (area) { return area.id === String(keepId); })) {
+      f.area.value = String(keepId);
     }
     savedAreaId = '';
     var help = $('#deliveryAreaHelp');
-    if (help) help.textContent = deliveryAreas.length
-      ? 'Select your area. The delivery fee is added to your total.'
-      : 'Delivery areas have not been set up yet. Please choose Takeaway or contact Flame Chick.';
+    if (help) help.textContent = 'Choose a listed area, or select Not Listed to use the default delivery fee set by Flame Chick.';
   }
 
   function syncProductModal(id) {
@@ -986,11 +985,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
   function renderCart() {
     var t = C.totals(cart), ls = C.lines(cart);
     var activeArea = selectedDeliveryArea();
-    var deliveryFee = mode() === 'Takeaway' || !activeArea ? 0 : activeArea.fee;
+    var isTakeaway = mode() === 'Takeaway';
+    var feeKnown = isTakeaway || (!!activeArea && Number.isFinite(Number(activeArea.fee)));
+    var deliveryFee = isTakeaway ? 0 : (feeKnown ? Number(activeArea.fee) : 0);
     var grandTotal = t.sub + deliveryFee;
+    var feeLabel = feeKnown ? C.money(deliveryFee) : 'Not configured';
     el.badge.textContent = t.count;
     el.cbCount.textContent = t.count + (t.count === 1 ? ' item' : ' items');
-    el.cbTotal.textContent = C.money(grandTotal);
+    el.cbTotal.textContent = feeKnown ? C.money(grandTotal) : 'Fee not set';
     el.bar.classList.toggle('show', t.count > 0 && !isOpen);
     el.empty.hidden = t.count > 0;
     el.full.hidden = t.count === 0;
@@ -1002,24 +1004,28 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
         '<button class="rm" type="button" data-act="remove" data-id="' + id + '" aria-label="Remove ' + nm + ' from your order">Remove</button></li>';
     }).join('');
     var h = '<dt>Subtotal</dt><dd>' + C.money(t.sub) + '</dd>';
-    h += '<dt>' + (mode() === 'Takeaway' ? 'Collection fee' : 'Delivery fee') + '</dt><dd>' + C.money(deliveryFee) + '</dd>';
-    h += '<dt class="grand">Total</dt><dd class="grand">' + C.money(grandTotal) + '</dd>';
+    h += '<dt>' + (isTakeaway ? 'Collection fee' : 'Delivery fee') + '</dt><dd>' + feeLabel + '</dd>';
+    h += '<dt class="grand">Total</dt><dd class="grand">' + (feeKnown ? C.money(grandTotal) : 'Not configured') + '</dd>';
     el.tot.innerHTML = h;
     var gn = $('#gstNote');
     if (gn) {
-      if (mode() === 'Takeaway') gn.textContent = 'Payment: Cash on collection.';
-      else if (activeArea) gn.textContent = 'Delivery to ' + activeArea.name + ' · fee ' + C.money(deliveryFee) + ' · Cash on Delivery.';
-      else if (!deliveryAreas.length) gn.textContent = 'Delivery is unavailable until delivery areas are added in the Admin Panel.';
-      else gn.textContent = 'Select your delivery area to calculate the delivery fee.';
+      if (isTakeaway) gn.textContent = 'Payment: Cash on collection.';
+      else if (!activeArea) gn.textContent = 'Choose a listed delivery area or Not Listed.';
+      else if (!feeKnown) gn.textContent = 'The Not Listed default delivery fee has not been configured in Admin yet.';
+      else gn.textContent = 'Delivery to ' + activeArea.name + ' · fee ' + C.money(deliveryFee) + ' · Cash on Delivery.';
     }
     var help = $('#deliveryAreaHelp');
     if (help && mode() !== 'Takeaway') {
-      help.textContent = activeArea
-        ? 'Delivery fee for ' + activeArea.name + ': ' + C.money(activeArea.fee) + '.'
-        : (deliveryAreas.length ? 'Select your area. The delivery fee is added to your total.' : 'Delivery areas have not been set up yet. Please choose Takeaway or contact Flame Chick.');
+      help.textContent = !activeArea
+        ? 'Choose a listed area, or select Not Listed.'
+        : (!feeKnown
+          ? 'The default fee for Not Listed addresses has not been configured yet. Please contact Flame Chick.'
+          : (activeArea.isNotListed
+            ? 'Not Listed · default delivery fee: ' + C.money(deliveryFee) + '.'
+            : 'Delivery fee for ' + activeArea.name + ': ' + C.money(deliveryFee) + '.'));
     }
     if (!orderSending && catalogReady) {
-      el.send.disabled = t.count === 0 || (mode() !== 'Takeaway' && !activeArea);
+      el.send.disabled = t.count === 0 || (!isTakeaway && (!activeArea || !feeKnown));
     }
   }
 
@@ -1042,6 +1048,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
         throw new Error((result && result.error && result.error.message) || 'The live menu is unavailable.');
       }
       var snap = result.snapshot;
+      var settings = snap.settings && typeof snap.settings === 'object' ? snap.settings : {};
+      var rawDefaultFee = settings.DefaultDeliveryFee;
+      defaultDeliveryFee = rawDefaultFee === null || rawDefaultFee === undefined || rawDefaultFee === ''
+        ? null : Number(rawDefaultFee);
+      if (!Number.isFinite(defaultDeliveryFee) || defaultDeliveryFee < 0) defaultDeliveryFee = null;
       var products = Array.isArray(snap.products) ? snap.products : [];
       var variants = Array.isArray(snap.productVariants) ? snap.productVariants : [];
       var deals = Array.isArray(snap.deals) ? snap.deals : [];
@@ -1192,8 +1203,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
       name: f.name.value.trim(),
       phone: f.phone.value.trim(),
       address: f.addr.value.trim(),
-      areaId: area ? area.id : '',
+      areaId: area && !area.isNotListed ? area.id : '',
       areaName: area ? area.name : '',
+      areaChoice: f.area ? String(f.area.value || '') : '',
       notes: f.notes.value.trim(),
       mode: mode()
     };
@@ -1203,11 +1215,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
     el.areaField.hidden = m === 'Takeaway';
     el.addrField.hidden = m === 'Takeaway';
     f.area.required = m !== 'Takeaway';
+    var activeArea = selectedDeliveryArea();
     el.modeHint.textContent = m === 'Takeaway'
       ? CONFIG.takeawayNote
-      : (selectedDeliveryArea()
-        ? 'Delivery fee: ' + C.money(selectedDeliveryArea().fee) + '. Payment is Cash on Delivery.'
-        : CONFIG.deliveryNote);
+      : (!activeArea
+        ? CONFIG.deliveryNote
+        : (activeArea.isNotListed && defaultDeliveryFee === null
+          ? 'The default fee for Not Listed addresses has not been configured in Admin yet.'
+          : 'Delivery fee: ' + C.money(activeArea.fee) + '. Payment is Cash on Delivery.'));
     var paymentText = $('#paymentMethodText');
     if (paymentText) paymentText.textContent = m === 'Takeaway' ? 'Cash on collection' : 'Cash on Delivery';
   }
@@ -1264,10 +1279,10 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
 
     var c = readForm();
     var errs = C.validate(c) || {};
-    if (c.mode !== 'Takeaway' && !c.areaId) {
-      errs.area = deliveryAreas.length
-        ? 'Please choose your delivery area.'
-        : 'Delivery areas have not been configured yet. Please choose Takeaway or contact Flame Chick.';
+    if (c.mode !== 'Takeaway' && !c.areaChoice) {
+      errs.area = 'Choose a listed delivery area or select Not Listed.';
+    } else if (c.mode !== 'Takeaway' && c.areaChoice === '__not_listed__' && defaultDeliveryFee === null) {
+      errs.area = 'The Not Listed default delivery fee has not been configured yet. Please contact Flame Chick.';
     }
     setErr('name', errs.name);
     setErr('phone', errs.phone);
@@ -1317,7 +1332,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
       orderSending = false;
       el.drawer.inert = false;
       setSendLabel('Place order');
-      el.send.disabled = !catalogReady || C.totals(cart).count === 0;
+      var activeAreaAfterSubmit = selectedDeliveryArea();
+      var feeKnownAfterSubmit = mode() === 'Takeaway' ||
+        (!!activeAreaAfterSubmit && Number.isFinite(Number(activeAreaAfterSubmit.fee)));
+      el.send.disabled = !catalogReady || C.totals(cart).count === 0 ||
+        (mode() !== 'Takeaway' && (!activeAreaAfterSubmit || !feeKnownAfterSubmit));
     }
   });
 
