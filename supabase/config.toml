@@ -1,0 +1,15 @@
+project_id = "adkrxfnawdiljhjaavnj"
+
+# Each endpoint validates its own publishable API key and, for staff/rider
+# actions, the signed-in user's access token and Flame Chick role.
+[functions.flame-chick-catalog]
+verify_jwt = false
+
+[functions.flame-chick-order-api]
+verify_jwt = false
+
+[functions.flame-chick-delivery-api]
+verify_jwt = false
+
+[functions.flame-chick-staff-admin]
+verify_jwt = false
