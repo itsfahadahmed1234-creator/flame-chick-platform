@@ -986,7 +986,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
     var t = C.totals(cart), ls = C.lines(cart);
     var activeArea = selectedDeliveryArea();
     var isTakeaway = mode() === 'Takeaway';
-    var feeKnown = isTakeaway || (!!activeArea && Number.isFinite(Number(activeArea.fee)));
+    var feeKnown = isTakeaway || (!!activeArea && activeArea.fee !== null && activeArea.fee !== undefined && activeArea.fee !== '' && Number.isFinite(Number(activeArea.fee)));
     var deliveryFee = isTakeaway ? 0 : (feeKnown ? Number(activeArea.fee) : 0);
     var grandTotal = t.sub + deliveryFee;
     var feeLabel = feeKnown ? C.money(deliveryFee) : 'Not configured';
@@ -1334,7 +1334,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
       setSendLabel('Place order');
       var activeAreaAfterSubmit = selectedDeliveryArea();
       var feeKnownAfterSubmit = mode() === 'Takeaway' ||
-        (!!activeAreaAfterSubmit && Number.isFinite(Number(activeAreaAfterSubmit.fee)));
+        (!!activeAreaAfterSubmit && activeAreaAfterSubmit.fee !== null && activeAreaAfterSubmit.fee !== undefined && activeAreaAfterSubmit.fee !== '' && Number.isFinite(Number(activeAreaAfterSubmit.fee)));
       el.send.disabled = !catalogReady || C.totals(cart).count === 0 ||
         (mode() !== 'Takeaway' && (!activeAreaAfterSubmit || !feeKnownAfterSubmit));
     }
