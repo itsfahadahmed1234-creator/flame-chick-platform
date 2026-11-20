@@ -51,3 +51,12 @@ After rollback:
 ## Conclusion
 
 The database-side Batch 1 privilege boundary passes the disposable acceptance probe. The API exposed-schema setting cannot be proven from SQL-only access and remains a manual configuration verification gate. No persistent migration has been applied. Batch 1 is **not yet approved for persistent deployment** until the exposed-schema setting is manually verified, final SQL reviewed, and the migration has a clean recovery/backup plan.
+
+
+## Production Batch 1 deployment and post-apply tests (2026-11-20)
+
+Applied migration `20261120154413_batch1_private_schema_bootstrap` after explicit user approval. Verified app_private owner postgres; PUBLIC/anon/authenticated/service_role schema USAGE false; no relations/functions/enums created; no Realtime membership; no global postgres default ACL entries. Security, Performance and Health Advisors each returned zero lints.
+
+A second disposable transaction inside app_private created a test table, sequence, function and enum type. Table RLS was enabled; explicit per-object PUBLIC/client revokes were applied to function/type. Effective-privilege assertions for anon/authenticated/service_role passed for table SELECT, sequence USAGE, function EXECUTE and type USAGE. The transaction rolled back and a follow-up query confirmed no probe objects remained.
+
+User-confirmed exposed schemas: `graph_ql`, `public`; app_private absent. No PostgREST negative request was performed. No external encrypted dump was created; user explicitly approved proceeding without it because Production was empty.
