@@ -1,8 +1,32 @@
+
+
+## 2026-11-20 — Batch 1 deployment completed
+
+**Status: APPLIED and verified.** User explicitly approved proceeding without an external encrypted schema dump because Production was empty. Do not represent a backup as having been created.
+
+Applied migration:
+- Version: `20261120154413`
+- Name: `batch1_private_schema_bootstrap`
+- Canonical file: `supabase/migrations/20261120154413_batch1_private_schema_bootstrap.sql`
+
+Post-apply read-only verification:
+- app_private owner = postgres.
+- PUBLIC, anon, authenticated and service_role have no app_private USAGE.
+- No app_private relations/functions/types were created by the bootstrap.
+- No app_private Realtime publication membership.
+- No global postgres default ACL changes.
+- Security, Performance and Health Advisors: zero lints each.
+
+A disposable transaction created a test table/sequence/function/enum in app_private, enabled table RLS, applied explicit PUBLIC/client revokes for function/type, and asserted effective privileges. All assertions passed. Transaction rolled back; no probe objects remained.
+
+User confirmed exposed schemas are `graph_ql` and `public`, with app_private absent. API settings were not changed. PostgREST negative request behavior remains an unperformed follow-up test.
+
+If reversal is ever needed, use a new reviewed forward migration with guarded `DROP SCHEMA app_private RESTRICT` only after proving it is empty. Never edit migration history or use CASCADE.
 # Flame Chick Batch 1 — Recovery and backup plan
 
 **Date:** 2026-11-20  
 **Target:** Flame Chick Production `adkrxfnawdiljhjaavnj`, Free plan, PostgreSQL 17.12  
-**Status:** Pre-deployment procedure. No persistent Batch 1 schema has been applied.
+**Status:** Batch 1 applied and verified on 2026-11-20. The sections below retain the pre-deployment recovery procedure for audit history; do not treat them as current deployment status.
 
 ## Scope and risk
 
