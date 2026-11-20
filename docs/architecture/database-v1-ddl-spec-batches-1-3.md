@@ -47,10 +47,13 @@ Create `app_private` owned by `postgres`, with no client role access:
 
 ### 3.2 Default privileges for postgres-created private objects
 
-For objects created by `postgres` in `app_private`:
-- Revoke default ALL on tables and sequences from PUBLIC, anon, authenticated, service_role.
-- Revoke default EXECUTE on functions from PUBLIC, anon, authenticated, service_role.
-- Revoke default USAGE on types where applicable from PUBLIC/client roles.
+For objects created by `postgres`:
+- PostgreSQL's implicit default EXECUTE on new functions and USAGE on new types is granted to `PUBLIC`. A schema-specific REVOKE does **not** remove a privilege granted globally to PUBLIC; this was confirmed with a rollback-only probe against the connected PostgreSQL 17.12 database.
+- Therefore revoke the implicit defaults globally for the `postgres` creator:
+  - `ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;`
+  - `ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE USAGE ON TYPES FROM PUBLIC;`
+- In `app_private`, additionally revoke default ALL on tables and sequences from PUBLIC, anon, authenticated, service_role; revoke default EXECUTE on functions from anon, authenticated, service_role; and revoke default USAGE on types from anon, authenticated, service_role.
+- The global function/type revokes affect future objects created by `postgres` in every schema, not just `app_private`. Any intended public RPC must receive an explicit, reviewed EXECUTE grant; future custom types must receive explicit grants only where genuinely required.
 - Explicitly grant only owner/maintenance permissions and exact function execution when a later migration requires it.
 - Do not rely on these defaults to control objects created by `supabase_admin`; that internal-role default ACL remains a separate known limitation.
 
