@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 and Stage 2 complete; Stage 3 schema/security design in progress. Menu requirements, V1 ERD, application contract map, delivery pricing contract, role access matrix and Free-plan performance/operations review are documented. GST deliberately deferred; offline stale-order confirmation approved; main role boundaries now owner-confirmed. Manager POS scope and a few workflow details remain to confirm before field-level migration specification  
+**Current stage:** Stage 1 and Stage 2 complete; Stage 3 schema/security design in progress. Menu requirements, V1 ERD, application contract map, delivery pricing contract, role access matrix and Free-plan performance/operations review are documented. GST deliberately deferred; offline stale-order confirmation approved; main role boundaries now owner-confirmed. Manager restricted POS scope is owner-confirmed; cashier rejection boundary and remaining rider/deal/scheduling details still require finalization before field-level migration specification  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -659,3 +659,36 @@ Stage 1 and Stage 2 are complete. Stage 3 (schema design/security review) is cur
 Next work: first confirm whether Manager has restricted POS access, then settle Cashier cancellation boundary and Rider completion/return lifecycle. After that finalize the field-level table/column/index/constraint specification and resolve deal component choices, schedule recurrence/scope, branch/channel menu differences and Not Listed locality field. Prepare migrations and an isolated validation plan only after these decisions. The offline stale-catalog policy is resolved. No Production SQL, seeds, secrets, buckets, Functions or app deployments until the exact changes are reviewed and approved.
 
 **New-chat instruction:** Read this file first, then read `production-erd-v1.md`, `production-schema-blueprint.md`, `delivery-pricing-contract.md`, `database-application-contract-map.md`, `security-access-matrix-v1.md`, `performance-security-operations-plan.md`, `menu-management-design.md`, and `current-menu-baseline.md`. Continue from Stage 3. Enforce owner-confirmed role boundaries: Admin and Owner full business access; Manager no Admin panel/no deletion; Cashier POS only with rider assignment and order rejection/no deletion; Rider portal only with own-offer/assignment isolation. Offline stale-catalog orders require explicit cashier/manager confirmation. Do not repeat the original repository/source audit or Production account/migration check unless the repo/project identity changes. Always update this handoff after meaningful work. Keep `main`, the original source repo and all live deployments unchanged until separate approvals.
+
+
+### Owner decision — Manager restricted POS access confirmed — 2026-11-20
+
+The user approved restricted Manager access to the POS application. This supersedes all earlier pending/awaiting-confirmation notes about whether Manager may enter POS.
+
+**Manager may:**
+- Sign into the POS application only; no Admin panel access.
+- View and supervise branch operational orders and preparation/status.
+- Oversee dispatch and assign/reassign riders.
+- Confirm physical returned deliveries and record the return outcome/reason.
+- View only the operational fields and branch-scoped history needed for these duties.
+
+**Manager may not:**
+- Access the Admin panel or its administration APIs.
+- Manage categories, products, variants, modifiers, deals, menu publication or prices.
+- Manage staff accounts/roles or invitations.
+- Change delivery areas, listed fees, Not Listed default fee, or sensitive settings.
+- Delete orders or records.
+- Reject/cancel orders unless that authority is separately approved; deny by default for now.
+- Access full payment reconciliation or unrelated rider/customer records.
+
+**Other confirmed role boundaries remain:**
+- Admin (the user) and Owner: equivalent full Flame Chick business access, with distinct identities and audit attribution.
+- Cashier: POS only; process orders, assign/reassign riders, and reject newly received/unaccepted orders with an audit reason. Cannot delete orders. Cancellation of accepted/in-progress orders remains unapproved and denied by default.
+- Rider: Rider portal only; may accept/reject only their own offers and update only their own assigned delivery. Must not view another rider's offers/assignments.
+- No role, including Admin/Owner, physically deletes orders through normal business applications. Rejections, cancellations, corrections and returns are state transitions with append-only audit events.
+
+**Return confirmation security contract:** Rider can report failed delivery/physical return; Manager confirms physical return. The confirmation must be a transactional, server-authorized command recording order/task, previous and new state, authenticated actor derived from verified JWT, actor role, server timestamp, reason/outcome and request/correlation ID. No client-supplied actor ID is trusted.
+
+**Implementation implications:** POS route guards must admit Manager but expose only approved operational capabilities; Admin routes/APIs must reject Manager independently of UI; SQL grants, RLS, Edge Functions/RPCs and Realtime subscriptions must enforce branch scope and the same capability set. Add adversarial tests for Manager direct API/RPC calls, attempted catalog/staff/settings access, order deletion, cross-branch reads and unauthorized rejection/cancellation.
+
+**Current Stage 3 next action:** update the field-level permission specification and test matrix to reflect Manager POS approval; then finish remaining order rejection/cancellation, Rider return lifecycle, deal/schedule, and Not Listed locality decisions. No Production SQL or live app deployment is authorized by this decision.
