@@ -166,3 +166,15 @@ It is not a final SQL schema. All identifiers and API request fields must be che
 
 POS is the reassignment control point after rejection/expiry. A later offer is a new attempt; never overwrite earlier attempts. Realtime events should update the POS dispatch queue and only the addressed Rider portal. Keep POS polling fallback and normal-fetch Order History behavior. A missed timeout event must not make an expired offer acceptable.
 
+## Free-plan invocation and rate-limiting contract (2026-11-20)
+
+See [production-field-level-schema-v1.md](./production-field-level-schema-v1.md) for the full budget and rate-limiting design. Application consequences:
+
+- Keep four domain Edge Functions (catalog, order, delivery, staff-admin); route approved actions through them rather than creating one Function per CRUD operation.
+- Keep frequent POS polling (15 seconds) and Rider own-job fetches on RLS-protected Data API reads where safe. Do not route each poll through Edge Functions.
+- Use targeted Realtime for operational events; do not add it to Order History or reports.
+- Combine catalog health/version and published snapshot requests into one response when the catalog contract can be upgraded safely. Preserve the POS's last-known-good IndexedDB catalog during refresh.
+- High-risk guest order creation, dispatch and staff mutations may use atomic Postgres-backed rate-limit buckets. Auth endpoints keep Supabase Auth's native limits. Rate-limit 429s still count as Edge Function invocations, so this protects database/business operations rather than the invocation quota itself.
+- Never trust browser-provided actor, role, branch, IP or phone identifiers. Hash rate-limit subjects with an HMAC secret in Edge Functions; do not persist raw IP/phone data in the limiter table.
+- No Redis, continuously running worker or additional Edge Function is required for V1. Optional Turnstile/upstream WAF is a later response to measured abuse and needs a separate cost/security decision.
+
