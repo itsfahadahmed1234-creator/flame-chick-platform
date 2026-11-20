@@ -441,3 +441,23 @@ CREATE TRIGGER staff_invitation_branch_targets_no_truncate
  BEFORE TRUNCATE ON app_private.staff_invitation_branch_targets
  FOR EACH STATEMENT EXECUTE FUNCTION app_private.reject_staff_truncate();
 
+
+
+DO $final_verify$
+DECLARE v_count integer;
+BEGIN
+ IF pg_catalog.pg_get_userbyid((SELECT proowner FROM pg_catalog.pg_proc WHERE oid='app_private.reject_staff_truncate()'::regprocedure))<>'postgres'
+  OR NOT (SELECT prosecdef FROM pg_catalog.pg_proc WHERE oid='app_private.reject_staff_truncate()'::regprocedure)
+  OR pg_catalog.has_function_privilege('anon','app_private.reject_staff_truncate()','EXECUTE')
+  OR pg_catalog.has_function_privilege('authenticated','app_private.reject_staff_truncate()','EXECUTE')
+  OR pg_catalog.has_function_privilege('service_role','app_private.reject_staff_truncate()','EXECUTE') THEN
+  RAISE EXCEPTION 'Batch 3 truncate guard function security check failed';
+ END IF;
+ SELECT count(*) INTO v_count FROM pg_catalog.pg_trigger tg
+ JOIN pg_catalog.pg_class c ON c.oid=tg.tgrelid
+ JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+ WHERE NOT tg.tgisinternal
+  AND tg.tgname IN ('user_profiles_no_truncate','user_roles_no_truncate','staff_invitation_requests_no_truncate','staff_invitation_branch_targets_no_truncate');
+ IF v_count<>4 THEN RAISE EXCEPTION 'Batch 3 expected four added truncate guards, got %',v_count; END IF;
+END
+$final_verify$;
