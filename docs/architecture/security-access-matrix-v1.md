@@ -83,8 +83,7 @@ The owner supplied the following role model on 2026-11-20. These rules replace t
 
 ### Existing Admin
 
-- Current Admin allows owner, admin and manager into the Admin panel and loads the selected branch.
-- Current menu/product/deal/delivery-area editing is available through the Admin UI to those roles.
+- Current source presently allows owner, admin and manager into the Admin panel and exposes menu/product/deal/delivery-area editing to those roles. This conflicts with the user's new Production policy that Manager must have no Admin panel access. Treat this as a known migration gap: update the Admin login/role guard and independently deny all manager Admin APIs/RPCs in the Production authorization layer before releasing the new role model. Do not assume the current UI already enforces the new policy.
 - Current permanent catalog delete controls are limited to owner/admin; referenced products/variants/deals are archived to preserve order history.
 - The current Admin branch resolver selects the first active branch rather than providing a full branch switcher. Production should make branch context explicit if multiple branches are enabled and never combine branch data.
 - Current Admin calls PostgREST directly using publishable key + user JWT. Production should move compound writes and sensitive configuration changes to transactional server-side commands; any direct reads left in browser must have narrow grants/RLS.
@@ -153,17 +152,20 @@ Test each attempt with anon, authenticated non-staff, every staff role and anoth
 11. Attempt to publish or roll back an invalid draft, bypass unpriced validation, or replace a published snapshot.
 12. Attempt concurrent price/menu updates and stale POS order confirmation as a different or unauthorized staff actor.
 
-## 8. Open owner decisions
+## 8. Outstanding decisions and conservative defaults
 
-Before final RLS/GRANT policy SQL is authored, confirm:
-- Whether Admin can publish and roll back, or only prepare drafts for Owner publication.
-- Whether Manager can edit prices or only item content/availability.
-- Whether Manager can change listed-area fees and the Not Listed default.
-- Whether Admin is allowed to invite/change staff roles, or those remain Owner-only.
-- Whether a cashier can view only their own shift/orders or the branch's full active order board.
-- Whether payment/reconciliation fields are visible to managers or only Owner/Admin.
-- Whether multi-branch operation is active at launch, and whether Owner/Admin need an explicit branch switcher.
+Owner has confirmed the main role boundaries. These remaining details still affect authorization policy and app behavior:
 
+1. **Manager POS access:** The user explicitly denies Manager Admin-panel access but has not yet confirmed whether Manager should be allowed into POS. Default recommendation: allow a restricted Manager POS session for branch supervision, order-status oversight and dispatch only; no catalog/staff/settings administration and no deletion. Confirm before final policy SQL.
+2. **Cashier rejection/cancellation boundary:** Cashier can reject orders. Distinguish rejecting a newly received order from cancelling an accepted/preparing/ready order. Default: Cashier may reject only a new/unaccepted order with a mandatory reason; cannot cancel an order after acceptance unless Owner approves that authority.
+3. **Rider lifecycle:** Recommended full rider workflow is accept/decline own offer, arrive at restaurant, confirm pickup, mark delivered, and report failed delivery/physical return. Rider reports return; Manager/Admin/Owner confirms the physical return and final order cancellation. Confirm that this existing lifecycle is retained.
+4. **Reason requirement:** Recommended mandatory rejection/cancellation reason (controlled reason code plus optional short note).
+5. **Kitchen:** The user has not yet confirmed whether a Kitchen-only role is required at launch. Do not grant the Kitchen role broad POS access by default.
+6. **Cashier order visibility:** Recommended branch active-order queue and dispatch details needed for POS, but no payment reconciliation, staff management, full audit or private settings.
+7. **Manager financial visibility:** Recommended no payment reconciliation or sensitive financial settings by default; only the operational fields needed for approved POS work.
+8. **Multi-branch:** Confirm whether one branch is the only branch at launch. All policies must still be branch-scoped even if one branch is initially seeded.
+
+Do not let these open items block implementation of already-confirmed boundaries: Admin/Owner full business access, Manager denied from Admin app and all deletion, Cashier POS only with rider assignment and order rejection, Rider portal only with own-offer/job isolation.
 ## 9. Safety status
 
 This is a proposed access-control design, not RLS SQL. No Production policies, grants, tables, functions, secrets, Storage or users have been changed.
