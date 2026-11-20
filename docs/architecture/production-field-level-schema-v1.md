@@ -149,6 +149,9 @@ V1 website-routing fields and rules:
 | address | text | Private operational address |
 | phone | text | Private operational phone |
 | is_active | boolean NOT NULL DEFAULT true | Only active branch is eligible |
+| website_ordering_enabled | boolean NOT NULL DEFAULT false | Explicit public website-order eligibility |
+| website_delivery_enabled | boolean NOT NULL DEFAULT false | Website delivery capability |
+| website_pickup_enabled | boolean NOT NULL DEFAULT false | Website pickup capability |
 | created_at, updated_at | timestamptz NOT NULL | Database-managed |
 
 Constraints: UNIQUE(id, restaurant_id); UNIQUE(restaurant_id, branch_code). All child records use a composite FK to (branch_id, restaurant_id).
@@ -187,11 +190,13 @@ Constraints:
 - CHECK role_key is in the approved V1 set.
 - CHECK owner/admin have branch_id NULL; manager/cashier/rider have branch_id NOT NULL.
 - Composite branch/tenant FK.
-- Partial unique indexes prevent duplicate active restaurant-wide role assignments and duplicate active branch role assignments.
+- Partial unique indexes: one active restaurant-wide assignment per (restaurant_id,user_id) where branch_id IS NULL; one active assignment per (restaurant_id,user_id,branch_id) where branch_id IS NOT NULL.
+- Operational roles may have multiple branch rows only when every active row for that (restaurant_id,user_id) has the same role_key. Admin/Owner have exactly one restaurant-wide row and no branch rows. Enforce the one-role-across-branches invariant inside the staff-admin transaction under a transaction-scoped lock keyed by (restaurant_id,user_id); add a database trigger/guard as defense in depth so a future server path cannot bypass it.
+- A role change closes all prior active assignments and creates the new role/branch set atomically with audit. Never allow simultaneous Admin+Owner or operational roles across branches.
 - Prevent self-escalation. Serialize role/branch changes and deactivation by locking a restaurant-level staff-authority guard row before checking the last-active-Owner invariant; concurrent Admin actions must not both remove or demote the final active Owner. Enforce this in the database command, not only the Edge Function.
 - Role assignment changes use an audited command. Admin and Owner may both invite staff, assign/change roles, change branch assignments and deactivate staff, subject to the same safeguards and immutable audit trail. This follows the owner-confirmed rule that Admin and Owner have equivalent full business authority with distinct audit identities. Manager, Cashier and Rider cannot administer staff or roles. Prevent self-escalation, enforce the last-active-Owner safeguard, and require a reason for privileged role/branch changes.
 
-No Kitchen role is created in V1 unless separately approved.
+No Kitchen role is created in V1. Current source code contains a Kitchen role read path; deny it until the role and exact fields/actions are explicitly approved and the source function is adapted.
 
 **Staff invitation is a cross-system workflow, not one ACID transaction.** Supabase Auth invitation and PostgreSQL role assignment cannot be assumed to commit atomically. Use a recoverable invitation state machine with a unique command key: record pending request, call Auth invite from the server, then bind/activate the role through an idempotent database command after the invited identity is verified. Record pending/sent/accepted/failed/expired outcomes without exposing invite tokens. If Auth succeeds but the role write fails, reconcile/retry the same invitation command rather than creating duplicate users or invitations. Never activate a role for an unverified or mismatched Auth identity.
 
@@ -209,7 +214,7 @@ Append-only staff identity/role history.
 | action | text NOT NULL | invited, activated, deactivated, role_changed, branch_changed |
 | actor_user_id | uuid NOT NULL | Derived from verified JWT |
 | actor_role | text NOT NULL | Role snapshot |
-| reason | text NULL | Optional bounded note |
+| reason | text NOT NULL | Mandatory bounded reason for role/branch/deactivation changes |
 | occurred_at | timestamptz NOT NULL | Server time |
 | request_id | uuid NULL | Correlation/idempotency |
 
@@ -374,12 +379,12 @@ Use typed FKs, never a generic table-name/string-ID reference. CHECKs ensure fix
 - restaurant_id uuid NOT NULL
 - component_id uuid NOT NULL
 - product_id uuid NOT NULL
-- product_variant_id uuid NULL
+- product_variant_id uuid NULL only when the product has exactly one active sellable variant
 - sort_order integer NOT NULL DEFAULT 0
 - is_active boolean NOT NULL DEFAULT true
-- surcharge numeric(12,2) NOT NULL DEFAULT 0 CHECK >= 0
+- surcharge numeric(12,2) NOT NULL CHECK >= 0 (explicit zero allowed)
 
-Composite FKs prevent cross-restaurant choices. Exact choice-pool behavior (curated/category pool/substitution rules) is still an owner decision; this table is the curated-choice baseline, not approval to implement every choice mode.
+V1 choice lists are curated only; category/subcategory pools and free-text substitutions are out of scope. Composite FKs prevent cross-restaurant choices. The order command requires the selected choice to be present and active in the published version, globally active, branch-available and within the component's min/max bounds. When product_variant_id is NULL, server resolution is allowed only if exactly one eligible variant exists; otherwise reject as ambiguous. The explicit surcharge is added to the bundle price; never infer a surcharge from standalone menu prices or accept it from the client.
 
 ### 7.4 deal_schedules and deal_schedule_days
 
@@ -414,7 +419,7 @@ One controlled draft revision per restaurant for the initial single-catalog mode
 - updated_by uuid NOT NULL
 - updated_at timestamptz NOT NULL
 
-Every successful Admin draft mutation increments revision transactionally. Admin sends expected revision; stale edits return a conflict instead of overwriting another user's work. If later confirmed branch/channel-specific drafts are required, extend scope through a reviewed migration.
+Every successful Admin draft mutation increments revision transactionally. Admin/Owner sends expected revision; stale edits return a conflict instead of overwriting another user's work. V1 base menu and prices are restaurant-wide; branch-specific availability is stored separately. Branch/channel-specific price overrides are out of scope.
 
 ### 8.2 menu_publications
 
