@@ -1,3 +1,26 @@
+## 2026-11-20 — Batch 2 applied to Flame Chick Production
+
+**Owner approval:** explicit approval received in chat before execution.
+**Production project:** `adkrxfnawdiljhjaavnj` — Flame Chick Production, org `ydlbinhyoutdqueilxnd`, Mumbai `ap-south-1`, PostgreSQL 17.12, Free plan, ACTIVE_HEALTHY.
+**Migration:** `20261120164125_batch2_restaurant_branch_foundation`.
+**Source candidate:** `docs/drafts/batch2_restaurant_branch_foundation_candidate.sql`.
+**Canonical migration added to repo:** `supabase/migrations/20261120164125_batch2_restaurant_branch_foundation.sql`.
+
+Apply API returned success. Supabase migration history now contains Batch 2 after Batch 1.
+
+Post-apply verification:
+- Both `public.restaurants` and `public.branches` exist.
+- Both are owned by postgres; RLS is enabled.
+- No SELECT or INSERT table privileges for anon, authenticated or service_role (same candidate revokes all table privileges from these roles and PUBLIC).
+- Both tables contain zero rows.
+- No policies exist; this is intentional deny-by-default because no application roles have any table grants. Supabase Security Advisor now reports two INFO-level `rls_enabled_no_policy` findings (one per table); not a high/critical finding. Do not add a permissive policy or grant merely to silence this informational lint. Reassess when a narrowly scoped server access path is designed.
+- No Realtime publication entries.
+- Performance Advisor zero lints; Health Advisor zero lints.
+- Candidate's post-apply verification confirmed owner/RLS/ACL/constraints/empty rows/no policies/no Realtime. A follow-up ACL query confirmed no SELECT/INSERT for all three application roles.
+- The verification multi-statement query returned the constraint listing; table metadata from Supabase showed zero rows and all expected columns/defaults/checks.
+
+No restaurant/branch seed rows were inserted. No POS or website code, UI, deployment, API keys, environment variables, Data API exposed-schema settings or website security audit were changed. POS Dine-in UI remains intentionally unfixed. Offline POS multi-mode sync remains a future design/implementation requirement.
+
 ## 2026-11-20 — Batch 2 candidate completed and rollback-tested
 
 **Status: candidate prepared and disposable validation passed; NOT applied to Production.** Production project identity was rechecked: `adkrxfnawdiljhjaavnj`, Flame Chick Production, org `ydlbinhyoutdqueilxnd`, PostgreSQL 17.12, Mumbai, Free plan. SQL identity: `current_user=postgres`, `session_user=postgres`.
@@ -116,7 +139,7 @@ External encrypted schema dump was not created; user explicitly accepted proceed
 Batch 1 is complete. Continue with remaining Stage 3 design/source consistency: resolve outstanding business/schema decisions, complete field-level table and API mapping, then separately review Batch 2/3 migration design. Do not start website security audit until immediately before attaching website to DB. No application deployment, Vercel changes, Auth/Storage/Edge Function work, or business table creation was performed in this Batch 1 action.
 # Flame Chick Platform — Project Handoff
 
-**Last updated:** 2026-11-20 (Batch 2 candidate prepared and rollback-tested; POS fulfilment/offline-sync source review recorded; Batch 1 applied and verified)  
+**Last updated:** 2026-11-20 (Batch 2 applied and verified in Production; POS fulfilment/offline-sync source review recorded; Batch 1 applied and verified)  
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
