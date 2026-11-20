@@ -184,6 +184,8 @@ Constraints:
 
 No Kitchen role is created in V1 unless separately approved.
 
+**Staff invitation is a cross-system workflow, not one ACID transaction.** Supabase Auth invitation and PostgreSQL role assignment cannot be assumed to commit atomically. Use a recoverable invitation state machine with a unique command key: record pending request, call Auth invite from the server, then bind/activate the role through an idempotent database command after the invited identity is verified. Record pending/sent/accepted/failed/expired outcomes without exposing invite tokens. If Auth succeeds but the role write fails, reconcile/retry the same invitation command rather than creating duplicate users or invitations. Never activate a role for an unverified or mismatched Auth identity.
+
 ### 5.5 staff_role_audit
 
 Append-only staff identity/role history.
