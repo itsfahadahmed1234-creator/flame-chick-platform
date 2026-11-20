@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security contract analysis in progress; catalog design awaits the new menu specification  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security and Admin-managed menu capability design in progress  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -359,9 +359,9 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 
 ### Menu information gate
 
-- The new launch menu specification has **not yet been supplied**.
+- The actual final launch menu has **not yet been supplied**. A reference image has been supplied to demonstrate required catalog capabilities, not content to publish.
 - Known historical Demo context (five categories, about 24 regular products/variants plus a Platter Deal) is not an authoritative specification for the new menu. Do not assume its categories, product set, modifier structure, deal logic, pricing, or media are unchanged.
-- Before finalizing catalog schema details, seed shape, modifier/deal modelling, import/migration, or catalog API contracts, ask the user to provide the latest menu file/export (spreadsheet, PDF, document, images, or unfinished draft). Accept partial/in-progress material and map uncertain fields explicitly rather than inventing values.
+- Do not block schema design waiting for the final menu. Design the catalog so future menu items and rules can be created in Admin. The reference image and user clarification are documented in `docs/architecture/menu-management-design.md`. Ask about unresolved business rules only where they change the schema; do not seed the reference image.
 - Continue independent platform/security analysis while waiting, but do not finalize catalog DDL or create menu seed data until the new menu is reviewed.
 
 ### Mandatory database/security/reliability design checklist
@@ -385,6 +385,20 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 - Ask for the latest new-menu material. After receiving it, inventory products/categories/variants/modifiers/deals/fees/availability/media/languages and flag unclear items for the user.
 - In parallel, continue documenting API-to-database contracts and security boundaries without changing Production.
 - The user expects this handoff to be updated after every meaningful project step. Update it with menu source/version, design decisions, migrations, commits, tests, risks, and precise next action.
+
+
+### Menu capability reference received — 2026-11-20
+
+- User supplied a menu image (WhatsApp image dated 2026-11-19). It is explicitly **not** the menu to publish and must not be seeded. Its purpose is to demonstrate the structures the new Admin-managed catalog must support.
+- User clarified the primary goal: design the schema so the owner/staff can add and manage the actual upcoming menu through the Admin panel without routine database changes.
+- Added design specification: `docs/architecture/menu-management-design.md` (commit `8b77c9d418e0a93494fc80d007dd94a6a863c9cc`). This is design documentation only, not DDL.
+- The reference demonstrates category/section variety; simple priced products; portion variants; flavor/style choices; beverage volumes; TBD/unpriced items; configurable bundles with multiple components; deal families; and time-window promotions (3 PM–5 PM shown). These examples do not determine final business rules.
+- Current Admin code audit: basic category/subcategory CRUD, product single/multiple variant pricing, product availability/images, deal creation with fixed product/variant, subcategory choice and included drink, and deal-level editing. Gaps include mandatory numeric product/deal prices (no unpriced draft), no schedule editor/API schedule output, no full modifier management UI despite modifier tables/catalog serialization, no full existing deal component editing, and multi-request browser-side writes that can leave partial state. Public catalog currently builds from source tables at request time, not a committed atomic published version.
+- Target design covers Admin-managed categories, products/variants, NULL/unpriced draft prices distinct from genuine zero, reusable modifier/option groups, flexible combo components and selection constraints, recurring/dated schedules in explicit timezone, media privacy, draft/preview/validate/publish/rollback, immutable order snapshots, audit history, and transactional server-side writes.
+- Do not hardcode category names, size labels, flavors, drink volumes, deal names or menu-specific logic. They must be data configured through Admin.
+- The design file records unresolved business choices; do not invent whether flavors are variants/modifiers/products, whether combo choices are fixed/curated, how substitutions/surcharges work, schedule recurrence/scope, channel availability, stock/tax/allergen needs, or who can publish.
+- Next: complete the API/schema contract map; review existing Demo publication tables only as reference; then draft a concrete Production ERD/migration sequence and Admin/API work plan. Keep Production read-only. No menu data or Production DDL was created.
+- Ask the user for clarification only on business rules that materially affect the model, not for the final menu itself. The final menu can later be entered through Admin if the designed capabilities cover it.
 
 ## 11. Implementation roadmap — continue in this order
 
@@ -432,4 +446,4 @@ Run full end-to-end tests, security checks, rollback rehearsal, and backup resto
 
 **Stage 2 is complete:** the Flamechic organization and exact Production project `adkrxfnawdiljhjaavnj` are visible and verified. The one applied migration was read from live migration history and its exact SQL has been added to the working branch as a historical migration file. It must not be reapplied. Production currently has no application schema, users, buckets, or Edge Functions. Continue with Stage 3 schema design/review; keep Production unchanged until the migration plan and each DDL batch are explicitly approved.
 
-**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, inspect the current branch head, and continue Stage 3 from the recorded API/database contract analysis and security/reliability quality bar. The user must provide the new menu specification before catalog schema/seed design is finalized. Continue non-menu security/contract analysis meanwhile. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
+**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md` and `docs/architecture/menu-management-design.md`, inspect the current branch head, and continue Stage 3 from the API/database contract analysis and menu capability requirements. The reference image is not content to publish. Design routine menu authoring in Admin so future menu changes do not require DDL. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
