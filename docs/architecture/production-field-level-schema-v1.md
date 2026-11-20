@@ -969,7 +969,7 @@ This is a planning snapshot, not a guarantee that quotas remain unchanged. Reche
 
 ### 14.6 Owner-confirmed customer order quota (2026-11-20)
 
-The owner explicitly approved these simultaneous rolling-window limits per normalized customer phone:
+The owner explicitly approved these simultaneous rolling-window limits per normalized customer phone for customer website submissions (source=website) only:
 
 | Window | Maximum newly committed order records |
 |---|---:|
@@ -987,8 +987,8 @@ Use database time and rolling windows, not calendar boundaries. The 1-minute rul
 1. For website `source=website` only, the Order Edge Function validates the public request, normalizes the phone using one shared documented rule and computes HMAC-SHA-256 with a server-only key (e.g. FLAME_CHICK_ORDER_RATE_HMAC_SECRET). The browser cannot supply or override the digest. For POS and other staff-authenticated sources, do not apply or require this website quota digest.
 2. It passes the website-only digest, key-version and (during rotation) previous-key digest to the service-role-only order-creation RPC. POS and staff order creation call the same order command but skip the website-only quota branch. Do not make a separate public preflight limiter RPC call.
 3. Inside the same DB transaction, first look up the existing order by branch/source/idempotency key. An exact matching replay returns the original order and consumes no quota; key reuse with a different request is a 409.
-4. Acquire a transaction-scoped advisory lock derived from the normalized phone digest. Count committed order events inside each rolling window. If any count is already at its maximum, reject with stable RATE_LIMITED and compute Retry-After as the maximum time until all exceeded windows admit another order.
-5. Validate canonical catalog prices, delivery area/default fee, order items and branch. Create order, line snapshots, status event and any required delivery task. Insert one rate event linked uniquely to the new order in this transaction. Any failure rolls back both the order and quota event.
+4. Only when source=website, acquire a transaction-scoped advisory lock derived from the normalized phone digest. Count committed website order events inside each rolling window. If any count is already at its maximum, reject with stable RATE_LIMITED and compute Retry-After as the maximum time until all exceeded windows admit another order. POS and staff sources skip this step.
+5. Validate canonical catalog prices, delivery area/default fee, order items and branch. Create order, line snapshots, status event and any required delivery task. Insert one website rate event linked uniquely to the new order only when source=website. POS and staff sources do not write quota events. Any failure rolls back the order and, for website, the quota event.
 6. On commit, one new order consumes exactly one slot. A later restaurant rejection/cancellation does not remove the event. Never manually delete a rate event as part of order cancellation.
 
 **Private event table:** app_private.website_order_rate_limit_events with order_id UUID PRIMARY KEY REFERENCES public.orders(id) ON DELETE RESTRICT, restaurant_id UUID NOT NULL, branch_id UUID NOT NULL, phone_subject_digest BYTEA NOT NULL, digest_key_version SMALLINT NOT NULL, occurred_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(). Insert rows only for `source=website`. Add an index on (phone_subject_digest, occurred_at DESC). The table is private, append-only and inaccessible to anon/authenticated. No raw phone, raw IP or request payload is stored. Retain 48 hours, then remove expired rows in bounded batches; the longest enforcement window is one hour.
