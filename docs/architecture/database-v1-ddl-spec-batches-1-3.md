@@ -357,6 +357,16 @@ For a server-verified Flame Chick tenant and requested fulfilment mode:
 5. On every catalog, quote and order command, revalidate the chosen branch ID against the same tenant, active state and requested mode. A browser branch ID is a selection hint, never authorization.
 6. Delivery address eligibility/fee is a separate check against the selected branch's areas and explicit Not Listed fee. No GPS routing or distance-derived price is implied.
 
+### 4.5 Batch 2 exact candidate DDL and validation status (2026-11-20)
+
+Candidate SQL: `docs/drafts/batch2_restaurant_branch_foundation_candidate.sql`. This is a review draft, not an applied migration.
+
+Only `public.restaurants` and `public.branches` are created. Both use UUID PKs, named constraints, RLS enabled, postgres ownership, and no direct privileges for PUBLIC/anon/authenticated/service_role. No policies, RPCs, views, functions, triggers, seed rows, Auth users or Realtime membership are created. The candidate requires postgres execution identity and checks Batch 1 app_private ownership plus absence of conflicting relation names.
+
+Fail-closed defaults: restaurant and branch inactive; website ordering and both website capabilities disabled. Currency and timezone are required; trusted provisioning must validate supported ISO-4217 code and IANA timezone. Branch address/phone are private; branch name is customer-facing. Branch code is lowercase ASCII letters/digits with single underscore/hyphen separators, 1–32 chars, unique per restaurant. Composite unique (branch id, restaurant id) supports future tenant-safe FKs.
+
+Rollback-only acceptance suite passed valid insert, fail-closed defaults, invalid slug/currency format/branch code, missing restaurant FK and duplicate branch code. The complete candidate transaction was rolled back. Post-rollback catalog verification: no Batch 2 tables, no Realtime entries, only Batch 1 migration history. All three Supabase advisors returned zero lints. Candidate is **not** approved/applied; separate explicit approval is required.
+
 ### 4.6 Initial tenant provisioning
 
 - No restaurant or branch rows are seeded by a schema migration.
