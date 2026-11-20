@@ -3,6 +3,7 @@ import { ApplicationServer, importVapidKeys, Urgency } from "jsr:@negrel/webpush
 // Separate function for Flame Chick rider dispatch and delivery lifecycle.
 // All writes go through service-role-only public.hfp_manage_delivery(jsonb).
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const RIDER_PORTAL_URL = (Deno.env.get("FLAME_CHICK_RIDER_PORTAL_URL") ?? "").trim();
 
 function readKeyMap(name: string): Record<string, string> {
   const raw = Deno.env.get(name);
@@ -336,7 +337,7 @@ async function sendOfferPushBatch(offerIdsInput: string[]) {
           title:"Flame Chick · New delivery offer",
           body:"Order " + job.orderNumber + " · " + job.areaName + " · Rs. " + job.deliveryFee + ". Open the Rider app to accept.",
           offer_id:job.offerId,
-          url:"https://flame-chick-rider.vercel.app/",
+          url:RIDER_PORTAL_URL || undefined,
         }), { urgency:Urgency.High, ttl:25, topic:job.offerId.replace(/-/g,"").slice(0,32) });
         sent++;
       } catch (error) {
@@ -360,7 +361,7 @@ async function sendOfferPushBatch(offerIdsInput: string[]) {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: CORS_HEADERS });
   if (!SUPABASE_URL || !SERVICE_KEY || PUBLIC_KEYS.length === 0) {
-    return response({ ok: false, error: { code: "CONFIG_MISSING", message: "The HFP delivery API is not configured." } }, 503);
+    return response({ ok: false, error: { code: "CONFIG_MISSING", message: "The Flame Chick delivery API is not configured." } }, 503);
   }
 
   // The database trigger calls this server-to-server hook using a random Vault-stored token.
