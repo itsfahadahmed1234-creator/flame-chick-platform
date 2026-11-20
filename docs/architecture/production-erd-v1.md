@@ -403,3 +403,8 @@ The following workflow is now a confirmed business contract and must be implemen
 - The 60-second deadline must be enforced synchronously by the accept command; background expiry processing exists to update POS visibility and emit events, not to define whether an offer is still acceptable.
 - No Production DDL or application implementation has been created by recording this decision.
 
+
+
+## Delivery lifecycle field specification
+
+The owner-confirmed delivery lifecycle is now specified in detail in [`delivery-lifecycle-contract.md`](./delivery-lifecycle-contract.md). Treat that document as the authoritative field-level proposal for delivery tasks, immutable offer attempts, assignments, append-only task events, state transitions, transactional command contracts, 60-second expiry and acceptance tests. This supplements the conceptual ERD above; it does not authorize SQL or Production DDL.
