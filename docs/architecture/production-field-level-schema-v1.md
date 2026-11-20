@@ -315,6 +315,12 @@ Both tenant and branch default inactive. Website ordering, delivery and pickup c
 
 Disposable rollback acceptance passed, including valid insert, fail-closed defaults, invalid slug/currency format/code, FK and duplicate code tests. Post-rollback catalog showed zero Batch 2 tables and zero Realtime entries. Security, Performance and Health Advisors returned zero lints. Separate explicit owner approval is required before applying.
 
+### Batch 2 Production application status (2026-11-20)
+
+Applied after explicit owner approval. Migration version `20261120164125`, name `batch2_restaurant_branch_foundation`. Canonical SQL: `supabase/migrations/20261120164125_batch2_restaurant_branch_foundation.sql`.
+
+Verified: both tables exist, owner postgres, RLS enabled, zero rows, no direct application-role table grants, no policies, no Realtime publication entries. Two INFO-level Security Advisor `rls_enabled_no_policy` findings are expected from intentional deny-by-default. Performance and Health Advisors report zero lints. Do not grant access or add permissive policies merely to remove this informational finding; wait for a specifically designed server access path.
+
 ## 6. Catalog authoring tables
 
 The Admin panel must support future menu changes through data, not schema edits. New category/product/variant/modifier/deal names and labels are not hardcoded in code or database enums.
