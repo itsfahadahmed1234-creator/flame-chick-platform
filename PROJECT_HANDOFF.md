@@ -1175,3 +1175,32 @@ The two key PostgreSQL default-privilege semantics are now experimentally valida
 2. An explicitly granted public SECURITY INVOKER wrapper can be callable by service_role while remaining unavailable to PUBLIC, anon and authenticated.
 
 No persistent DB changes were made. The project remains pre-launch and has no application tables. Next: complete the Batch 1 acceptance matrix with rollback-only probes for schema exposure, PostgREST exposure, Realtime publication absence, default ACL behavior for all object types, and exact ownership; review whether global function/type default revokes have any implications for Supabase-managed objects created by postgres before preparing the first persistent foundation migration. Do not proceed to Batch 2/3 until Batch 1 acceptance passes and the owner has reviewed the migration plan.
+
+
+## 2026-11-20 — Batch 1 acceptance probe
+
+### Disposable DB acceptance test
+A single rollback-only acceptance probe created a uniquely named temporary schema plus table, sequence, function and enum type; applied candidate schema-specific defaults and the tested global PUBLIC revokes; enabled RLS on the disposable table; and asserted effective permissions/ownership/Realtime membership.
+
+All assertions passed:
+- anon/authenticated/service_role have no schema USAGE, table SELECT/INSERT/UPDATE/DELETE, sequence USAGE/SELECT/UPDATE, function EXECUTE or custom type USAGE.
+- Schema and all objects owned by postgres.
+- RLS enabled on the disposable table.
+- No Realtime publication membership.
+- No PUBLIC EXECUTE on the test function or PUBLIC USAGE on the test type.
+- Intentional exception rolled back all DDL/default ACL changes. Read-only verification confirmed probe schema absent, zero probe relations, app_private absent, zero Realtime tables, and zero application relations in public/app_private.
+
+### Additional platform observations
+- Realtime publication is not set to publish all tables and currently contains zero published tables.
+- Existing postgres default ACL rows include public and storage. The global revokes remove implicit PUBLIC defaults; they do not remove existing explicit schema-specific storage grants to anon/authenticated/service_role. Supabase-managed storage ACLs are not to be modified as part of Batch 1.
+- Existing supabase_admin default ACLs remain broad across Supabase-managed schemas. Never create Flame Chick application objects as supabase_admin.
+- Supabase Data API exposed-schema configuration cannot be proven through available SQL catalog access. Supabase docs say custom schemas must be separately added in Project Settings → API → Exposed schemas. Manual gate: verify app_private is not exposed, and after its creation test negative PostgREST access.
+- Existing ensure_rls event trigger must not be assumed to cover app_private. DDL spec now explicitly requires RLS enabled on each app_private table as defense in depth.
+
+### Specification and report
+- Updated DDL spec with manual API exposure verification and explicit private-table RLS requirement.
+- Detailed report: `docs/architecture/batch1-acceptance-probe-2026-11-20.md`.
+- Advisors after rollback: Security 0, Performance 0, Health 0.
+
+### Decision
+Database-side Batch 1 rollback-only acceptance probe passes. This is not approval to persist the migration yet. Before persistent foundation DDL: manually verify Data API exposed schemas, review final migration SQL, and establish a suitable recovery/backup plan. Production schema remains empty; no persistent database changes, no Auth/Edge Functions/Storage/Realtime/Vercel/app code changes.
