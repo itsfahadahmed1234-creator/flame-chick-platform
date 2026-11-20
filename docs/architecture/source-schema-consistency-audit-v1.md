@@ -93,9 +93,9 @@ All three apply simultaneously. The 3-per-10-minute cap mathematically implies t
 
 ### Exact counting semantics
 
-Count successful, newly committed customer website orders, not failed attempts:
+Count successful, newly committed customer orders, not failed attempts:
 - A new order consumes one slot only when the order and its rate-limit event commit in the same database transaction.
-- Invalid JSON, invalid phone, invalid cart, unavailable product, failed price/area validation or any rolled-back order does not consume the successful-order quota.
+- Invalid JSON, invalid phone, invalid cart, unavailable product, failed price/area validation or any rolled-back order does not consume the customer-order quota.
 - A retry with the same idempotency key and the same canonical request returns the already-created order and does not count again.
 - Reusing an idempotency key with a different request returns a conflict and does not create another order.
 - A different idempotency key represents a new order and consumes a slot after successful commit.
@@ -251,7 +251,7 @@ No code currently proves the owner-confirmed stale POS price hold is implemented
 
 ## 11. Immediate consistency fixes before SQL authoring
 
-1. Replace the Demo-only attempt limiter with the owner's 3/1m, 3/10m and 15/1h successful-order caps, atomically in website order creation.
+1. Replace the Demo-only attempt limiter with the owner's 3/1m, 3/10m and 15/1h successful-order caps, atomically in the central customer order-creation transaction across server-registered customer order sources.
 2. Update the field-level schema names or add adapters for existing Admin/POS/Rider columns.
 3. Add explicit delivery selection_type to website/POS payloads and server DTO.
 4. Add catalog publication/version fields to website/POS requests; implement stale-catalog hold on POS.
