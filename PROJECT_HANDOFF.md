@@ -846,3 +846,14 @@ These are design and documentation updates only. The source audit was read-only;
 4. Finalize remaining menu/deal/schedule/branch/locality/return-payment decisions.
 5. Only after owner schema review, create isolated test migrations and test against local Supabase or a verified safe test project. Production requires explicit separate approval.
 
+## RLS, grants and Edge Function authorization matrix — 2026-11-20
+
+- Added [production-rls-grant-function-matrix-v1.md](docs/architecture/production-rls-grant-function-matrix-v1.md), initial commit 3d7b43707f80d26c7ba763a3a2eadd809863dd5a; Manager permission correction commit 589dd1273b3b5e3fb21b429e5173550165869888.
+- It maps public roles, all schema table groups, direct Data API grants, private service-only tables, four Edge Function action gates, RLS policy rules and adversarial verification.
+- It explicitly grants full Admin + Owner business authority, denies Manager Admin API and general cashier order-processing rights, allows Manager approved branch operational monitoring/dispatch/reassignment/return confirmation, and keeps Cashier order processing/new-order rejection/dispatch/return confirmation without deletion.
+- Website public order creation is the only phone-quota path. POS, including POS delivery, bypasses that quota but still uses universal order idempotency, verified staff/branch checks, server-side prices/fees and database transactions.
+- Source mismatches remain documented, including the current Admin UI Manager route guard, staff-admin Owner-only behavior that must align with Admin + Owner authority, source DTO field/status differences, direct Admin REST multi-request writes and Rider return wording. No source code was changed by the audit.
+
+### Next design/implementation gate
+
+Finish field/status compatibility and decide the remaining business details. Then prepare a migration-specific RLS/grant inventory and SQL only for an isolated test database. No Production SQL, RLS, grants, Edge Function changes or deployments are authorized yet.
