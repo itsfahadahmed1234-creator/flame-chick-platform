@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema design is next  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema contract analysis in progress  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -325,6 +325,33 @@ Historic HFP reference used five Realtime tables (`orders`, `delivery_tasks`, `d
 - All operations were read-only except the GitHub file creation. No Supabase SQL, migration, secret, user, bucket, function, or project setting was changed.
 - Stage 2 account verification and migration-history reconciliation are complete. Next: Stage 3 design the Production schema in small reviewed migrations. Before any DDL, inspect current source function contracts, reference Demo schema selectively, and document the proposed schema/migration plan. Do not mutate Production until the specific DDL batch is reviewed and approved.
 
+
+### Stage 3 initial contract analysis — 2026-11-20
+
+Read the four Production Edge Function source files on `work/production-source-audit` and inspected the Demo baseline migration as reference only. No Production database changes were made.
+
+**Observed API-to-database contract dependencies:**
+
+- Catalog API reads: `restaurants`, `categories`, `products`, `modifier_groups`, `deals`, `delivery_areas`, `restaurant_settings`, `drink_options`, `subcategories`, `product_variants`, `modifiers`, `modifier_group_assignments`, `deal_components`, and `modifier_price_rules`. It expects an active restaurant with slug `flame-chick` and requires at least one product and variant to publish a catalog.
+- Order API directly reads `user_roles` and `orders`; it calls `hfp_check_website_order_rate_limit`, `hfp_create_order`, and `hfp_update_order_status`. It requires the Production main branch UUID in `FLAME_CHICK_MAIN_BRANCH_ID` and validates staff roles server-side.
+- Delivery API directly reads/writes `delivery_tasks`, `rider_profiles`, `user_roles`, `delivery_task_offers`, and `rider_push_subscriptions`; it calls `hfp_manage_delivery`, `hfp_get_rider_push_config`, `hfp_verify_delivery_push_webhook`, `hfp_accept_delivery_offer`, and `hfp_decline_delivery_offer`. Rider scoping is branch-bound and role-bound.
+- Staff Admin directly reads `restaurants`, `user_roles`, `staff_role_audit`, `user_profiles`, `rider_profiles`; it calls `hfp_manage_staff_role`. It resolves the active restaurant using slug `flame-chick` and selects a branch.
+- These are only the direct HTTP/API references visible in function code. RPC bodies and triggers may depend on additional tables, columns, constraints, views, sequences, and helper routines; the migration design must include those transitive dependencies.
+
+**Demo baseline reference audit:**
+
+- The archived Demo baseline creates 45 tables: 42 in `public` and three in `private`.
+- It is useful for understanding the prior data model, but includes Demo-specific defaults and identifiers. In particular, its `delivery_areas.delivery_fee` and `delivery_tasks.delivery_fee_snapshot` definitions default to zero; do not copy those defaults into Production without a deliberate business decision. Production delivery fees must remain unknown/unset when not configured, not silently treated as zero.
+- The baseline includes `private.hfp_website_order_rate_limit_events`, `private.rider_push_config`, and `private.delivery_dispatch_settings`. Review whether each is still needed and how it should be provisioned before including it in Production.
+- The source API still calls several `hfp_*` RPC names. Keep these identifiers for compatibility unless a full caller/function dependency review justifies a coordinated rename.
+
+**Next Stage 3 work:**
+
+1. Map all API table/column reads and writes, RPC signatures and payload contracts, triggers, views, and RLS expectations to the Demo reference SQL and existing app calls.
+2. Identify missing/inconsistent columns and any Demo-only behaviors; explicitly design Production-safe defaults and tenant/branch scoping.
+3. Produce a reviewed schema/migration plan and migration dependency order in docs before any DDL is applied.
+4. Do not apply SQL, deploy functions, create users, seed menu data, or change Production settings until the design and the specific first migration batch are reviewed and explicitly approved.
+
 ## 11. Implementation roadmap — continue in this order
 
 ### Stage 1 — Source hygiene and durable handoff (current)
@@ -371,4 +398,4 @@ Run full end-to-end tests, security checks, rollback rehearsal, and backup resto
 
 **Stage 2 is complete:** the Flamechic organization and exact Production project `adkrxfnawdiljhjaavnj` are visible and verified. The one applied migration was read from live migration history and its exact SQL has been added to the working branch as a historical migration file. It must not be reapplied. Production currently has no application schema, users, buckets, or Edge Functions. Continue with Stage 3 schema design/review; keep Production unchanged until the migration plan and each DDL batch are explicitly approved.
 
-**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, inspect the current branch head, and continue Stage 3 by reviewing the existing four Edge Function contracts and the archived Demo schema as references. Do not repeat the initial audit or Stage 2 account check unless the project/account identity changes. Keep Production read-only until a concrete schema plan is reviewed and approved.
+**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, inspect the current branch head, and continue Stage 3 from the recorded API/database contract analysis. Complete the contract map and draft the Production schema/migration design. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
