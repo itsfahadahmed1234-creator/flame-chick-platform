@@ -408,3 +408,7 @@ The following workflow is now a confirmed business contract and must be implemen
 ## Delivery lifecycle field specification
 
 The owner-confirmed delivery lifecycle is now specified in detail in [`delivery-lifecycle-contract.md`](./delivery-lifecycle-contract.md). Treat that document as the authoritative field-level proposal for delivery tasks, immutable offer attempts, assignments, append-only task events, state transitions, transactional command contracts, 60-second expiry and acceptance tests. This supplements the conceptual ERD above; it does not authorize SQL or Production DDL.
+
+## Field-level schema and Free-plan implementation spec
+
+The draft field-level design is now maintained in [production-field-level-schema-v1.md](./production-field-level-schema-v1.md). It expands the conceptual entities above into candidate columns/types, tenant and branch constraints, indexes, RLS/grant strategy, Edge Function command boundaries, rate-limit storage and Free-plan usage budgets. This is still a design proposal; no SQL migrations or Production DDL are authorized. Use it together with delivery-lifecycle-contract.md, delivery-pricing-contract.md and security-access-matrix-v1.md.
