@@ -880,3 +880,11 @@ Important distinctions:
 - No live application, Production database, Supabase function/Storage policy/secret, Vercel setting, header, domain or deployment was changed. Work remains confined to documentation on \`work/production-source-audit\`.
 
 Next recommended work: perform a focused source-level review of the customer website and public Order API for XSS sinks, unsafe DOM rendering, third-party scripts, exposed config/secrets, PII leakage, CORS/input/body bounds and cache behavior; then inspect deployed response headers and build artifacts. Keep Production read-only and do not implement or deploy changes without explicit approval.
+
+## 2026-11-20 — Website security audit deferred until database integration
+
+The owner explicitly deferred the detailed customer-website audit. Do not spend the current work stage auditing or modifying website code. Continue the Production database design and validation work first: schema consistency, field/status/API mapping, RLS/grants/function authorization, transactional commands, idempotency, auditability, migration safety and adversarial/recovery tests.
+
+**Mandatory integration-stage gate:** When the project is ready to connect/attach the customer website to the database (or enable its live database-backed ordering path), remind the owner and stop before integration. Perform the full website security audit from `docs/architecture/website-security-threat-model-v1.md`, including website source, public Order API, deployed headers/build artifacts and end-to-end authorization/input/cache tests. Do not silently skip this gate, and do not claim website security based on the threat-model document alone. No website audit or code changes are authorized in the current database-focused stage.
+
+**Current next work:** continue the database-only consistency pass: reconcile actual application DTOs and status/field names with the proposed schema using versioned adapters; identify exact command boundaries and transaction invariants; then finish the RLS/grant/function matrix and executable adversarial test plan. Resolve only business choices that materially affect schema shape. After design review, prepare isolated test migrations; Production remains read-only and requires separate explicit approval.
