@@ -1090,3 +1090,33 @@ The owner agreed to the following mandatory rule for all Flame Chick application
 - Do not attempt unsupported changes to Supabase-managed internal `supabase_admin` defaults.
 
 This is an owner-confirmed safety gate, not an instruction to change Production. Production remains read-only unless separately approved.
+
+
+
+## 2026-11-20 — Isolated database test-environment assessment
+
+No database test environment has been created and no SQL has been executed.
+
+Execution environment inspection:
+- Linux x86_64, kernel 6.18.57.
+- glibc 2.41.
+- Node.js 22.16.0 and npm available.
+- Supabase CLI, Docker, Podman, psql and pg_isready are not installed.
+- Docker socket unavailable.
+- Approximately 5.8 GiB RAM and 30 GB free disk at inspection time.
+- Attempt to query the npm registry for the current Supabase CLI timed out; no CLI installation was performed.
+
+Current safe route:
+- Supabase documents an experimental native local runtime for Linux x86_64/arm64 that does not require Docker, provided the CLI version is at least 2.119.0 and experimental stack mode is enabled.
+- This execution environment meets the documented OS/architecture/glibc floor, but the runtime has not yet been installed or tested.
+- Hosted Preview Branching is not included in the Supabase Free plan and can incur compute/usage charges. Do not create a hosted branch or incur cost without explicit review and approval.
+- Prefer the no-cost local native runtime. If the CLI cannot be obtained or the runtime proves unsuitable, stop and present alternatives before using any cloud resources.
+
+Next action:
+1. Obtain the official current Supabase CLI without changing the application repository or Production.
+2. Verify CLI version and native-runtime support from official documentation.
+3. Initialize/use a local-only test stack in a disposable workspace, not the Production-linked project.
+4. Test Batch 1 before proceeding to Batches 2–3.
+5. Record test results and update this handoff after each meaningful milestone.
+
+Production remains read-only. No migration files were added to the deployable migrations directory, no test branch/project was created, and no application SQL was applied.
