@@ -1320,3 +1320,11 @@ This confirms the candidate can execute under the connected role and its schema/
 The exposed-schema gate is now satisfied. Exact candidate rollback rehearsal passed. Persistent Batch 1 remains unapplied pending explicit user authorization to create the empty private schema and its scoped default ACLs. External encrypted backup has not been produced: this environment does not provide Supabase CLI, Docker or pg_dump. Because the target is empty and Batch 1 is schema-only, this is a low-impact change, but user must explicitly accept proceeding without an external dump or arrange a dump first.
 
 No Auth, Storage, Realtime, API settings, Functions, secrets, Vercel or application code changed.
+
+
+## Batch 2 review artifacts
+
+- DDL spec review/tightening commit: `a1916ac74c20568a4a967e15d5e2b16f20021449`.
+- Field-level tenant/branch alignment commit: `f752603a1337be948e4734be04d96c992d2de9d7`.
+- Handoff Batch 2 review record commit: `0245fc66ae84f59fdb12951f7f1168ffdf644769`.
+- Batch 2 remains design-only. No SQL migration file has been created and no Production DDL has been executed.
