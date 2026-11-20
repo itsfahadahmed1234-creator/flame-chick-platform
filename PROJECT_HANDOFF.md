@@ -1120,3 +1120,37 @@ Next action:
 5. Record test results and update this handoff after each meaningful milestone.
 
 Production remains read-only. No migration files were added to the deployable migrations directory, no test branch/project was created, and no application SQL was applied.
+
+
+## 2026-11-20 — Batch 1 rollback-only privilege probe
+
+The owner approved proceeding carefully against the connected Flame Chick Supabase project because it is pre-launch, has no business data/application tables, and is on the Free plan. The connected project was used only for disposable, rollback-only SQL probes—not as a persistent application schema deployment.
+
+### Read-only preflight
+- Project `adkrxfnawdiljhjaavnj` ACTIVE_HEALTHY, PostgreSQL 17.12, Mumbai `ap-south-1`.
+- SQL execution identity verified as both `current_user=postgres` and `session_user=postgres`.
+- Existing migration remains exactly `20261119125153 flame_chick_postgres_default_privileges_hardening`; it was not reapplied.
+- No application relations exist in `public` or `app_private`; `app_private` absent.
+- Existing `ensure_rls` event trigger and `public.rls_auto_enable()` were inspected read-only; no trigger/function altered.
+- Existing broad `supabase_admin` default ACL caveat remains; application migrations must never run as `supabase_admin`.
+
+### Rollback-only probe results
+- Probe A used a uniquely named temporary schema, schema revokes and schema-specific default ACL revokes, created disposable table/sequence/function/type, then intentionally raised an exception.
+- Probe A showed client schema USAGE/table SELECT/sequence USAGE denied, but client function EXECUTE and type USAGE unexpectedly remained **true** due PostgreSQL's implicit global PUBLIC defaults.
+- Probe B repeated the test with global postgres-creator default revokes for function EXECUTE and type USAGE from PUBLIC, plus private-schema role-specific revokes. All tested client privileges were **false** and every disposable object owner was postgres.
+- Both probes intentionally rolled back. A follow-up read-only check confirmed the probe schema and relations do not exist and no probe default ACL changes remain. No persistent DB change was made.
+
+### Specification correction
+- Corrected `docs/architecture/database-v1-ddl-spec-batches-1-3.md`: Batch 1 now calls for global default revocation of implicit PUBLIC EXECUTE on future postgres-created functions and PUBLIC USAGE on future postgres-created types, plus private-schema-specific client role revokes.
+- Important scope: these global defaults affect all future objects created by postgres in every schema. Any intentionally callable public RPC must receive explicit reviewed EXECUTE grants.
+- Detailed report: `docs/architecture/batch1-rollback-privilege-probe-2026-11-20.md`.
+
+### Advisor results and boundaries
+- Supabase Security Advisor: zero lints.
+- Performance Advisor: zero lints.
+- Health Advisor: zero lints.
+- These checks do not replace custom privilege tests.
+- No migration applied, no persistent schema/default privilege change, no business data write, and no Auth, Edge Functions, Storage, Realtime, website, POS, Rider, Vercel or deployment changes.
+
+### Next
+Review the broader implications of the global function/type default revokes and test explicit public RPC grant behavior in another rollback-only probe. Then complete Batch 1 acceptance tests. Do not persist the foundation schema until the corrected specification and all test cases are reviewed. Production/live launch safeguards and the deferred website audit remain unchanged.
