@@ -210,6 +210,10 @@ The user confirmed the intended business rule on 2026-11-20:
 - Current catalog API returns DefaultDeliveryFee and area fee rows, but it reads all delivery areas for the restaurant without filtering to a specific branch. Once Production catalog is branch-aware, filter areas to the correct fulfilment branch or provide a safe branch-specific catalog.
 - Current catalog and browser adapters use Number(value) || 0 in places. Remove those zero fallbacks for required fees; validate missing values as an API/catalog error.
 - The archived Demo order function accepts a missing area ID and sets manual-address fee to zero. Never copy this Demo behaviour into Production.
+
+
+The detailed delivery business and API contract is maintained in `docs/architecture/delivery-pricing-contract.md`. Use that document as the source of truth for named-area versus Not Listed behavior, branch scoping, server fee resolution, immutable snapshots and acceptance tests. Do not re-infer or simplify this contract during implementation.
+
 ## 6. Security and access boundaries
 
 ### Data access model
