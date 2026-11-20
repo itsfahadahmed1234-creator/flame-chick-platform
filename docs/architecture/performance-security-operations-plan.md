@@ -25,7 +25,8 @@ Official Supabase documentation checked 2026-11-20 reports the following Free-pl
 | Cached egress | 5 GB | Keep cacheable public assets stable and cache-friendly |
 | Realtime peak connections | 200 | Count actual tabs/devices and reconnect overlap |
 | Realtime messages | 2 million/month; also 100 messages/second | Avoid broad/unfiltered subscriptions and message storms |
-| Realtime channel joins | 100/second; up to 100 channels/connection | Reconnect storms and excessive channel creation still matter even with few staff devices |\n| Edge Function invocations | 500,000/month | Current volume is not expected to approach this from ordinary order creation alone; measure catalog/health polling and retries |
+| Realtime channel joins | 100/second; up to 100 channels/connection | Reconnect storms and excessive channel creation still matter even with few staff devices |
+| Edge Function invocations | 500,000/month | Current volume is not expected to approach this from ordinary order creation alone; measure catalog/health polling and retries |
 | Logs retention | Not established in this review | Do not rely on Dashboard logs as long-term incident history; verify the current retention shown for the project before relying on it |
 | Automatic database backups | Not included | External encrypted backup and tested restore remain mandatory |
 | Project inactivity pause | Can pause after 1 week of inactivity | A real active restaurant should generate activity, but holiday/closure periods need a pause/recovery awareness process |
