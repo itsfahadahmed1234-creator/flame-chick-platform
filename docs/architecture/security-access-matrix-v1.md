@@ -184,3 +184,31 @@ The user approved the restricted Manager POS model. This supersedes all earlier 
 - All order deletion remains prohibited through normal business applications for every role, including Admin and Owner. Use audited status transitions, correction/void events and immutable order history instead.
 - Return confirmation must be a transactional, audited action: delivery task/order references, previous and resulting states, confirming actor from verified JWT, role, server timestamp, return reason/outcome, and correlation/request ID. The rider may report a failed delivery/return; Manager confirms the physical return. No client-supplied actor identity is trusted.
 - Update the authorization matrix, RLS/API tests, POS route guards, manager UI and database command policies to match this scope before release.
+
+## Owner decision — delivery lifecycle permissions (2026-11-20)
+
+The owner confirmed these permissions and workflow outcomes:
+
+- Rider rejection or 60-second non-response returns the delivery task to the POS dispatch queue; Cashier or Manager manually chooses and sends another rider offer. No automatic next-rider assignment.
+- Only the addressed rider may accept/reject an offer. An offer expires exactly 60 seconds after server-recorded offer creation. Expiry must be enforced by the accept command even if asynchronous cleanup is delayed.
+- Assigned Rider may record pickup, out-for-delivery, delivered, and failed-delivery/return intent only for their own active assignment.
+- Rider marking delivered completes the order immediately in the same transaction; no Cashier/Manager confirmation or delivery proof is required in V1.
+- Rider may report failed delivery and choose to return the order, but cannot confirm physical receipt at the restaurant.
+- **Cashier and Manager may both confirm physical receipt of a returned order.** This is an explicit narrow POS permission. It does not grant Cashier Admin access or general cancellation authority.
+- Return confirmation is permitted only after the Rider has placed the task into return-pending-confirmation. It must atomically close the task as returned and move the order to a distinct returned/failed terminal outcome, with immutable audit/history.
+- Every event derives actor and role from the verified JWT and uses server timestamps. Record previous/new state, order/task, reason/outcome and correlation ID. Duplicate/concurrent commands must not create conflicting transitions or duplicate effects.
+
+### Updated capability rows
+
+| Capability | Admin | Owner | Manager | Cashier | Rider |
+|---|---|---|---|---|---|
+| Create/send rider offer; reassign after rejection/expiry | Yes | Yes | Yes | Yes | No |
+| Accept/reject own pending offer | No | No | No | No | Yes |
+| Pickup / out-for-delivery on own assignment | No | No | No | No | Yes |
+| Mark own delivery delivered (completes order immediately) | No | No | No | No | Yes |
+| Report failed delivery and initiate return | No | No | No | No | Yes |
+| Confirm physical return at restaurant | Yes | Yes | Yes | Yes | **No** |
+| View/respond to another rider's private offer | Operational oversight only | Operational oversight only | Dispatch-only minimum | Dispatch-only minimum | **Never** |
+
+The broad Admin/Owner columns above reflect their full operational authority; the Cashier/Manager return confirmation is the only new narrow confirmation grant. Preserve the existing prohibition on hard deletion and on general Cashier cancellation of accepted/in-progress orders.
+
