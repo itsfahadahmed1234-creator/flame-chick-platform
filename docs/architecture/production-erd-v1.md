@@ -162,7 +162,7 @@ The ERD is conceptual. Exact cardinalities, optionality, unique constraints and 
 - Structured schedule records for one-off date ranges or recurring local-time windows.
 - Store IANA timezone and define valid-from/valid-until, local start/end time and recurrence days.
 - Use schedule type and constraints to prevent ambiguous rows.
-- The exact recurrence policy and whether offers are branch-specific remain open. Do not implement overlapping or branch-override semantics until confirmed.
+- The exact recurrence policy and whether deals are branch-specific remain open. Do not implement overlapping or branch-override semantics until confirmed.
 
 ### E. Catalog publication
 
