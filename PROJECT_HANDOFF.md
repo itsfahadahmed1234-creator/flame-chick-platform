@@ -1,10 +1,10 @@
 # Flame Chick Platform — Project Handoff
 
-**Last updated:** 2026-11-20 (Asia/Karachi; refreshed after the V1 ERD and roadmap consistency pass)  
+**Last updated:** 2026-11-20 (Asia/Karachi; updated with owner-confirmed role boundaries)  
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 and Stage 2 complete; Stage 3 schema/security design in progress. Menu requirements, V1 ERD, application contract map, delivery pricing contract, security access matrix and Free-plan performance/operations review are documented. GST deliberately deferred; offline stale-order confirmation policy approved. Remaining role/business decisions and field-level migration specification next  
+**Current stage:** Stage 1 and Stage 2 complete; Stage 3 schema/security design in progress. Menu requirements, V1 ERD, application contract map, delivery pricing contract, role access matrix and Free-plan performance/operations review are documented. GST deliberately deferred; offline stale-order confirmation approved; main role boundaries now owner-confirmed. Manager POS scope and a few workflow details remain to confirm before field-level migration specification  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -95,7 +95,7 @@ The root README currently contains an outdated illustrative `docs/legacy-demo/` 
 - Branch: `work/production-source-audit`
 - Created on 2026-11-20 from `main`.
 - All review/design changes belong here; `main` remains unchanged.
-- Latest verified comparison after the V1 ERD and handoff roadmap updates: `work/production-source-audit` is 44 commits ahead of `main`, 0 behind, with 15 changed paths. `main` remains unchanged; re-check before any PR/merge because subsequent commits change these counts.
+- Older branch comparison (`44` ahead / `15` changed paths) is superseded by later role/security commits; do not rely on this historical count.
 - Stage 1 commits on this branch include:
   - `0da616e0586213990bb43812855875c94d1fd1bd` — clean Pizza Bite catalog fallback labels/cache key.
   - `50096cf779dfd7b101a9445e42980b208c1f0067` — mark inactive legacy website `js/app.js` explicitly as legacy/inactive.
@@ -573,10 +573,24 @@ The user explicitly approved this policy:
 
 - Added `docs/architecture/security-access-matrix-v1.md` (commit `7dfece6b9f2770f340e2ff43a4390f04543c2f69`). It distinguishes public customer/guest, authenticated non-staff, owner, admin, manager, cashier, kitchen, rider and server-side service_role. It is a security design proposal, not RLS SQL.
 - Key boundary: a valid Supabase authenticated session is not automatically a Flame Chick staff role. Business authorization must use an active controlled user_roles assignment and branch scope; never user-editable metadata.
-- Proposed access minimum: guests get published catalog projection + rate-limited website-order command only; riders get only their own offers/assignments and the data necessary for those active jobs; kitchen gets minimum order/item data; cashier gets POS/dispatch scope; manager/admin/owner get branch-scoped operational access. Raw mutable catalog rows should not be public.
+- The owner subsequently confirmed the main role boundaries in a later section below: Admin and Owner full business access; Manager no Admin panel and no deletion rights; Cashier POS-only with rider assignment and order rejection; Rider portal-only with strict own-offer/assignment isolation. Do not use this earlier generic summary as the final matrix.
 - Current-source findings: Admin allows owner/admin/manager; permanent deletes are limited to owner/admin; staff invitations and role activation changes are owner-only in the staff-admin function; order API accepts owner/admin/manager/cashier for staff order creation; kitchen can advance permitted preparation statuses; rider function provides own-job access. Production must formalize these in RLS + grants + server commands, not rely on UI buttons.
-- Important owner decisions remain open: who can publish/rollback, who can change product prices and delivery fees, whether Admin can manage staff roles, cashier order visibility scope, manager financial visibility, and whether multiple branches are active at launch. The matrix marks these as proposals, not silently approved policies.
+- The role access matrix is now updated with owner-confirmed Admin/Owner/Manager/Cashier/Rider boundaries. Remaining workflow clarifications are listed in `security-access-matrix-v1.md`; do not assume unconfirmed Manager POS or Cashier cancellation powers.
 - The archived Demo SQL has RLS enabled across its application tables and 108 policies, but also has anonymous SELECT policies on raw public catalog tables. This is a source-level observation, not proof of a leak; Production should return an explicit public catalog projection and must not copy policies mechanically.
+
+### Owner-confirmed role and permission policy — 2026-11-20
+
+The user's role instructions are now the authoritative design requirements and have been incorporated into `docs/architecture/security-access-matrix-v1.md` (latest role matrix update commit `57ae617e35e3b65bc44a1089d6fc618c00a88ed8`). Do not revert to the older generic proposals above.
+
+- **Admin (user's role) and Owner:** both receive full Flame Chick business access, including Admin panel and POS, menu/catalog, pricing, publishing, delivery fee configuration, staff administration, orders, dispatch and reports. They must remain distinct accounts so audit history identifies the actual person. “Full access” does not mean browser access to service-role secrets or Supabase credentials.
+- **Manager:** must not enter the Admin panel and must have no deletion capability. Enforce this in application route guards, Edge Functions/RPC authorization, SQL privileges and RLS—not merely by hiding the Admin link. Whether Manager is allowed into POS for restricted operations remains the main open role question.
+- **Cashier:** POS only. May process orders, assign/reassign riders and reject orders. May not hard-delete any order or other business record. Do not grant Admin panel, catalog management, staff management or system-settings powers.
+- **Rider:** Rider portal only. May see/accept/decline only offers addressed to that rider and only their own active assignments. Must never see another rider's offers, assignments, customer details or private activity by changing a UUID or API request.
+- **Order preservation:** do not hard-delete orders through ordinary application workflows. Rejection/cancellation/state changes update the order transactionally and append an immutable audit event with order ID, prior/new status, action, authenticated actor ID, role-at-time, server timestamp, mandatory reason where applicable and request/correlation ID. Preserve associated items, payment references, delivery history and audit events.
+- **Cashier cancellation after order acceptance is not yet approved.** Until clarified, Cashier may reject a new/unaccepted incoming order but may not cancel an accepted/preparing/ready order. Admin and Owner retain full authority for audited rejection/cancellation.
+- **Current implementation mismatch:** source audit found current Admin login allows `owner`, `admin` and `manager` into the Admin panel. That current behavior conflicts with the new policy. It must be changed in the Admin UI and, critically, denied by server-side APIs/database before the revised role model is released. Current source has not yet been changed for this role policy.
+- **Rider lifecycle to confirm:** proposed retained flow is accept/decline offer, arrive at restaurant, confirm pickup, mark delivered, report failure/physical return; Manager/Admin/Owner confirms actual return and final cancellation. Rider cannot cancel an order.
+- **Kitchen role:** not yet confirmed for V1; do not automatically grant Kitchen broad POS access.
 
 ## 11. Implementation roadmap — continue in this order
 
@@ -642,6 +656,6 @@ Stage 1 and Stage 2 are complete. Stage 3 (schema design/security review) is cur
 - `docs/architecture/menu-management-design.md`
 - `docs/architecture/current-menu-baseline.md`
 
-Next work: refine the role/data-access matrix with the owner, finalize the field-level table/column/index/constraint specification, and resolve deal component choices, schedule recurrence/scope, branch/channel menu differences and Not Listed locality field. Then prepare migrations and an isolated validation plan. The offline stale-catalog policy is resolved. No Production SQL, seeds, secrets, buckets, Functions or app deployments until the exact changes are reviewed and approved.
+Next work: first confirm whether Manager has restricted POS access, then settle Cashier cancellation boundary and Rider completion/return lifecycle. After that finalize the field-level table/column/index/constraint specification and resolve deal component choices, schedule recurrence/scope, branch/channel menu differences and Not Listed locality field. Prepare migrations and an isolated validation plan only after these decisions. The offline stale-catalog policy is resolved. No Production SQL, seeds, secrets, buckets, Functions or app deployments until the exact changes are reviewed and approved.
 
-**New-chat instruction:** Read this file first, then read `production-erd-v1.md`, `production-schema-blueprint.md`, `delivery-pricing-contract.md`, `database-application-contract-map.md`, `security-access-matrix-v1.md`, `performance-security-operations-plan.md`, `menu-management-design.md`, and `current-menu-baseline.md`. Continue from Stage 3. Offline stale-catalog orders must require explicit cashier/manager confirmation (confirmed owner decision). Do not repeat the original repository/source audit or Production account/migration check unless the repo/project identity changes. Always update this handoff after meaningful work. Keep `main`, the original source repo and all live deployments unchanged until separate approvals.
+**New-chat instruction:** Read this file first, then read `production-erd-v1.md`, `production-schema-blueprint.md`, `delivery-pricing-contract.md`, `database-application-contract-map.md`, `security-access-matrix-v1.md`, `performance-security-operations-plan.md`, `menu-management-design.md`, and `current-menu-baseline.md`. Continue from Stage 3. Enforce owner-confirmed role boundaries: Admin and Owner full business access; Manager no Admin panel/no deletion; Cashier POS only with rider assignment and order rejection/no deletion; Rider portal only with own-offer/assignment isolation. Offline stale-catalog orders require explicit cashier/manager confirmation. Do not repeat the original repository/source audit or Production account/migration check unless the repo/project identity changes. Always update this handoff after meaningful work. Keep `main`, the original source repo and all live deployments unchanged until separate approvals.
