@@ -123,7 +123,7 @@ Draft edits must not change the current public menu. The public catalog API shou
 
 ### 4.9 Preserve historical order truth
 
-At checkout, store immutable snapshots of product, variant, selected modifiers, deal/component choices, names/labels, unit prices, quantities, discounts, taxes if used, bundle price, surcharges, line totals, delivery area and fee. Future menu changes must never rewrite old orders. Referenced catalog records should be archived, not hard-deleted.
+At checkout, store immutable snapshots of product, variant, selected modifiers, deal/component choices, names/labels, unit prices, quantities, discounts, bundle price, surcharges and line totals, delivery area and fee. Future menu changes must never rewrite old orders. Referenced catalog records should be archived, not hard-deleted.
 
 ## 5. Security and reliability guardrails
 
@@ -165,7 +165,7 @@ Do not invent these business rules:
 - Whether customers may customize, substitute or add extra items within bundles, and how surcharges work.
 - Whether scheduled deals recur daily, on selected weekdays, or only on dated campaigns.
 - Whether schedules apply restaurant-wide or per branch.
-- Whether stock/quantity limits, allergens, dietary labels, tax or discount handling are needed.
+- Whether stock/quantity limits, allergens, dietary labels or discount handling are needed. GST/tax is deferred from the initial schema by owner decision.
 - Whether items/deals are dine-in-only, delivery-only, takeaway-only or available across channels.
 - Who may draft, approve, publish, change prices and roll back.
 - Whether website and POS always share one published catalog or need branch/channel variations.
