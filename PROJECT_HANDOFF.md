@@ -1,10 +1,48 @@
+
+
+## 2026-11-20 — Batch 1 permanently applied and verified
+
+### Applied Production migration
+User explicitly approved applying Batch 1 without an external encrypted schema dump, acknowledging Production was empty. Applied successfully to the exact Flame Chick Production project `adkrxfnawdiljhjaavnj` (Mumbai, PostgreSQL 17.12, Free plan).
+
+- Migration version: `20261120154413`
+- Migration name: `batch1_private_schema_bootstrap`
+- Canonical repository migration: `supabase/migrations/20261120154413_batch1_private_schema_bootstrap.sql`
+- Migration file commit: `352be31da2f8cf76dfb22f492d0b07bc4e05ace5`
+- Supabase migration API returned success; migration history now contains the baseline plus this Batch 1 migration.
+
+### Post-apply verification
+Read-only queries confirmed:
+- `app_private` exists exactly once and is owned by `postgres`.
+- `anon`, `authenticated`, `service_role`, and `PUBLIC` have no schema USAGE on `app_private`.
+- No relations, functions or enum types were created in `app_private` by Batch 1.
+- No Realtime publication tables in `app_private`.
+- No global postgres default ACL entries were added.
+- No application business tables/data were created.
+- Security Advisor: 0 lints.
+- Performance Advisor: 0 lints.
+- Health Advisor: 0 lints.
+
+### Effective-privilege verification
+Ran a disposable transaction in `app_private` creating a test table, sequence, function and enum type. Enabled RLS on the test table and applied the documented immediate per-object PUBLIC/client revokes to the function and type. Assertions passed: anon/authenticated/service_role had no table SELECT, sequence USAGE, function EXECUTE or type USAGE. Transaction rolled back; follow-up query confirmed zero probe leftovers.
+
+### API exposure
+User confirmed the Production Dashboard Exposed schemas are exactly `graph_ql` and `public`; `app_private` is absent. No API settings changed. A PostgREST negative request test has not yet been run, so do not claim it was tested.
+
+### Important migration discipline
+The repository migration is the canonical record of the applied change. Do not reapply it manually. Any future rollback must be a new reviewed forward migration, guarded by emptiness checks and `DROP SCHEMA ... RESTRICT`; never edit applied migration history or use CASCADE.
+
+External encrypted schema dump was not created; user explicitly accepted proceeding without it because Production had no application tables/data. This must not be treated as a backup artifact.
+
+### Next work
+Batch 1 is complete. Continue with remaining Stage 3 design/source consistency: resolve outstanding business/schema decisions, complete field-level table and API mapping, then separately review Batch 2/3 migration design. Do not start website security audit until immediately before attaching website to DB. No application deployment, Vercel changes, Auth/Storage/Edge Function work, or business table creation was performed in this Batch 1 action.
 # Flame Chick Platform — Project Handoff
 
-**Last updated:** 2026-11-20 (Asia/Karachi; source/schema audit, website-only quota and universal idempotency/security controls added)  
+**Last updated:** 2026-11-20 (Batch 1 private schema bootstrap applied and verified)  
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 and Stage 2 complete; Stage 3 schema/source consistency and database security design in progress. The field-level schema, source audit, universal Website/POS order idempotency, website-only customer quota, delivery/pricing contracts, role matrix and Free-plan operations/security controls are documented on the review branch. GST deliberately deferred; offline stale-order confirmation and core role/delivery decisions are owner-confirmed. Remaining deal/schedule/branch/locality/return-payment decisions and schema/API mapping must be resolved before migrations  
+**Current stage:** Stage 1 and Stage 2 complete; Stage 3 schema/source consistency and database security design in progress. Batch 1 private schema bootstrap is now applied and verified; Batches 2–3 remain design-only. The field-level schema, source audit, universal Website/POS order idempotency, website-only customer quota, delivery/pricing contracts, role matrix and Free-plan operations/security controls are documented on the review branch. GST deliberately deferred; offline stale-order confirmation and core role/delivery decisions are owner-confirmed. Remaining deal/schedule/branch/locality/return-payment decisions and schema/API mapping must be resolved before migrations  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
