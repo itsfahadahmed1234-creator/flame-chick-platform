@@ -15,18 +15,18 @@ The target workload is modest in order count, but the system still needs good qu
 
 ## 2. Capacity context and current Free-plan quotas
 
-Official Supabase pages checked 2026-11-20 report the following Free-plan allowances:
+Official Supabase documentation checked 2026-11-20 reports the following Free-plan allowances. The documentation separately describes Free bandwidth as 5 GB cached plus 5 GB uncached (10 GB combined), and the plan table shows the separate 5 GB uncached egress allowance:
 
 | Resource | Current Free allowance | Design implication |
 |---|---:|---|
 | PostgreSQL database | 500 MB per project | Measure real usage including indexes, history and JSON snapshots; do not estimate from order count alone |
 | Storage | 1 GB | Menu/product images and other objects need size control and lifecycle management |
-| Egress | 5 GB | Avoid repeatedly sending full catalogs and oversized images |
+| Uncached egress | 5 GB | Measure database, Auth, Storage, Function and Realtime responses; total Free bandwidth also includes the separate cached quota |
 | Cached egress | 5 GB | Keep cacheable public assets stable and cache-friendly |
-| Realtime peak connections | 200 | Current expected operator/rider clients are far below the plan cap, but count actual browser tabs and devices |
-| Realtime messages | 2 million/month | Avoid broad/unfiltered subscriptions and message storms |
-| Edge Function invocations | 500,000/month | Current volume is not expected to approach this from ordinary order creation alone; measure catalog/health polling and retries |
-| Logs retention | 1 day | Do not rely on Dashboard logs as long-term incident history |
+| Realtime peak connections | 200 | Count actual tabs/devices and reconnect overlap |
+| Realtime messages | 2 million/month; also 100 messages/second | Avoid broad/unfiltered subscriptions and message storms |
+| Realtime channel joins | 100/second; up to 100 channels/connection | Reconnect storms and excessive channel creation still matter even with few staff devices |\n| Edge Function invocations | 500,000/month | Current volume is not expected to approach this from ordinary order creation alone; measure catalog/health polling and retries |
+| Logs retention | Not established in this review | Do not rely on Dashboard logs as long-term incident history; verify the current retention shown for the project before relying on it |
 | Automatic database backups | Not included | External encrypted backup and tested restore remain mandatory |
 | Project inactivity pause | Can pause after 1 week of inactivity | A real active restaurant should generate activity, but holiday/closure periods need a pause/recovery awareness process |
 
@@ -83,6 +83,17 @@ For every table, view, function, Storage bucket and policy, test as:
 Include negative tests for IDOR, cross-branch IDs, changing row ownership, reading other customers' addresses/phones, reading other riders' jobs, calling privileged RPCs directly, and changing price/status/fee fields from the browser.
 
 Do not describe Production as “RLS protected” until these tests pass on the actual Production schema.
+
+### Live Production security-state check (read-only, 2026-11-20)
+
+The actual connected Supabase organization/project was rechecked after reviewing the user's security claims:
+- Connected organization contains `Flame Chick Production` project ref `adkrxfnawdiljhjaavnj`, region `ap-south-1`, Free plan, `ACTIVE_HEALTHY`, PostgreSQL 17.12.
+- Production migration history still contains exactly one application migration: `20261119125153_flame_chick_postgres_default_privileges_hardening`.
+- A read-only listing of all non-system schemas returned no application tables in `public` or `private`. `auth.users` has zero rows, `storage.buckets` has zero rows, and no Production Edge Functions were present at the preceding function-list inspection.
+- Supabase Security, Performance and Health advisors returned zero lints.
+- **Interpretation:** zero advisor lints on an empty application schema is not proof that the future application is secure or performant. There are not yet Production application tables/policies/functions for those checks to validate. The applied hardening migration is a strong default-privilege foundation, but it does not automatically enable RLS or grant correct privileges to tables that will be created later.
+- Therefore, the user's statement that the existing applications have RLS/Auth/server-side pricing is useful context, but this project must not be described as Production-RLS-protected until the Production tables, grants, policies, RPCs and Storage rules exist and are tested.
+- No database, user, Storage, Edge Function, secret or project setting was changed during this read-only check.
 
 ## 4. Server-side order validation
 
@@ -271,3 +282,16 @@ A backup is not complete until an isolated restore proves it can recover both da
 This is an architecture/operations review only. No Production schema, settings, secrets, users, Storage, Edge Functions or live app deployments were changed.
 
 The performance numbers and plan quotas in this document are point-in-time official Supabase information checked on 2026-11-20. Re-check before launch because plan limits can change.
+
+
+## 14. Official references checked
+
+- Supabase Free plan quotas and free project limits: https://supabase.com/docs/guides/platform/billing-on-supabase
+- Realtime quotas (connections, messages/second, channel joins): https://supabase.com/docs/guides/realtime/limits
+- Egress and cached/uncached bandwidth: https://supabase.com/docs/guides/storage/serving/bandwidth
+- Free plan inactivity pause and restore window: https://supabase.com/docs/guides/platform/free-project-pausing
+- Database backup availability, Free-plan exports, and Storage-object exclusion from DB backups: https://supabase.com/docs/guides/platform/backups
+- Postgres connection modes: Data API for frontend, direct connection for admin/migrations, Supavisor transaction mode for short-lived direct Postgres clients: https://supabase.com/docs/guides/database/connecting-to-postgres
+- Supabase billing details, including database, Storage and Edge Function quotas: https://supabase.com/docs/guides/platform/billing-on-supabase
+
+Re-check these official limits at launch and before architecture changes. No fixed log-retention period is asserted in this plan.
