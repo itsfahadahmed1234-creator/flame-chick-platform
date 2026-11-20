@@ -848,7 +848,7 @@ These are design and documentation updates only. The source audit was read-only;
 
 ## RLS, grants and Edge Function authorization matrix — 2026-11-20
 
-- Added [production-rls-grant-function-matrix-v1.md](docs/architecture/production-rls-grant-function-matrix-v1.md), initial commit 3d7b43707f80d26c7ba763a3a2eadd809863dd5a; Manager permission correction commit 589dd1273b3b5e3fb21b429e5173550165869888.
+- Added [production-rls-grant-function-matrix-v1.md](docs/architecture/production-rls-grant-function-matrix-v1.md), initial commit 3d7b43707f80d26c7ba763a3a2eadd809863dd5a; Manager permission corrections commits 589dd1273b3b5e3fb21b429e5173550165869888 and final Cashier-only POS order-create boundary b67356f390c539d047b81756375384405e1952ae.
 - It maps public roles, all schema table groups, direct Data API grants, private service-only tables, four Edge Function action gates, RLS policy rules and adversarial verification.
 - It explicitly grants full Admin + Owner business authority, denies Manager Admin API and general cashier order-processing rights, allows Manager approved branch operational monitoring/dispatch/reassignment/return confirmation, and keeps Cashier order processing/new-order rejection/dispatch/return confirmation without deletion.
 - Website public order creation is the only phone-quota path. POS, including POS delivery, bypasses that quota but still uses universal order idempotency, verified staff/branch checks, server-side prices/fees and database transactions.
