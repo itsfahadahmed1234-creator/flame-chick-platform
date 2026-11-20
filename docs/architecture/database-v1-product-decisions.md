@@ -98,7 +98,27 @@
 - A COD order returned before collection receives a not-collected/closed-uncollected payment outcome, not a negative payment or refund row.
 - Preserve all existing payment records. Never hard-delete or overwrite the original amount/method/actor.
 
-## 6. Explicitly deferred
+
+
+## 6. Future customer drop-off pin (not live tracking)
+
+**Decision**
+- No Rider live GPS location will be collected.
+- No continuous customer GPS tracking or location streaming will be built.
+- A delivery customer may optionally share one fixed destination pin, either by a one-time device coordinate or by manually placing a map pin.
+- The written delivery address remains required; sharing a pin is optional and declining it never blocks checkout.
+- The assigned Rider and authorized branch POS staff can view the fixed pin and open a Google Maps directions link generated from the validated coordinates.
+- Store at most one current pin per delivery order in a private schema. Bind it to the server-resolved restaurant, branch, order and delivery task.
+- Rider access is limited to their own current active assignment; POS access follows active role and branch permissions. Reassignment immediately revokes the previous Rider's access.
+- Do not store arbitrary customer-supplied map URLs. Generate the Google Maps directions URL from validated latitude/longitude.
+- No location update stream, location session, background GPS, Rider GPS write, movement history, location polling or Realtime location channel.
+- Proposed retention: delete precise coordinates within 24 hours after terminal delivery outcome; confirm the retention window before implementation.
+- A pin is a navigation aid only; it does not automatically choose a branch or prove delivery coverage.
+
+**Implementation boundary**
+This is future-ready schema design only. It does not authorize location collection or app UI now. Build only after schema approval and the website security audit at the database-integration milestone.
+
+## 7. Explicitly deferred
 
 - Automatic branch routing from maps/geocoding or address polygons.
 - Branch-specific menu prices/deal prices and channel-specific prices.
@@ -107,7 +127,7 @@
 - GST/tax, which remains excluded from V1 as already decided.
 - Any change to current POS local-only takeaway/dine-in cloud-sync boundaries until separately confirmed.
 
-## 7. Acceptance tests
+## 8. Acceptance tests
 
 1. One eligible website branch is auto-resolved; zero eligible branches fail closed; multiple eligible branches require explicit selection.
 2. Forged/inactive/other-tenant/non-website-enabled branch ID is rejected.
@@ -126,6 +146,6 @@
 15. Refund amount cannot exceed the unrefunded collected amount; concurrent/duplicate refund requests cannot over-refund.
 16. Manager/Cashier/Rider cannot authorize or record a refund; Admin/Owner actions retain immutable actor/reason audit.
 
-## 8. Status
+## 9. Status
 
 These are the selected V1 design decisions for schema planning. Update the field-level schema, ERD, application/database contract map, integrity review and project handoff to match. They remain subject to isolated migration tests and do not authorize Production changes.
