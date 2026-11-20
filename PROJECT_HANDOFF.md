@@ -1154,3 +1154,24 @@ The owner approved proceeding carefully against the connected Flame Chick Supaba
 
 ### Next
 Review the broader implications of the global function/type default revokes and test explicit public RPC grant behavior in another rollback-only probe. Then complete Batch 1 acceptance tests. Do not persist the foundation schema until the corrected specification and all test cases are reviewed. Production/live launch safeguards and the deferred website audit remain unchanged.
+
+
+
+## 2026-11-20 — Explicit public RPC grant probe
+
+A second rollback-only test validated the public wrapper permission pattern:
+- Created a disposable SECURITY INVOKER function in `public` as `postgres`.
+- Explicitly revoked EXECUTE from PUBLIC, anon and authenticated.
+- Explicitly granted EXECUTE only to service_role.
+- Verified PUBLIC ACL entry absent; anon=false; authenticated=false; service_role=true; owner=postgres; SECURITY DEFINER=false.
+- All assertions passed. Intentional exception rolled back the function.
+- Follow-up read-only check confirmed the probe function does not exist.
+- Security, Performance and Health advisors each returned zero lints.
+- Detailed report: `docs/architecture/batch1-public-rpc-grant-probe-2026-11-20.md`.
+
+### Current Batch 1 status
+The two key PostgreSQL default-privilege semantics are now experimentally validated:
+1. Global default revokes are required to suppress implicit PUBLIC EXECUTE on future postgres-created functions and PUBLIC USAGE on future postgres-created types.
+2. An explicitly granted public SECURITY INVOKER wrapper can be callable by service_role while remaining unavailable to PUBLIC, anon and authenticated.
+
+No persistent DB changes were made. The project remains pre-launch and has no application tables. Next: complete the Batch 1 acceptance matrix with rollback-only probes for schema exposure, PostgREST exposure, Realtime publication absence, default ACL behavior for all object types, and exact ownership; review whether global function/type default revokes have any implications for Supabase-managed objects created by postgres before preparing the first persistent foundation migration. Do not proceed to Batch 2/3 until Batch 1 acceptance passes and the owner has reviewed the migration plan.
