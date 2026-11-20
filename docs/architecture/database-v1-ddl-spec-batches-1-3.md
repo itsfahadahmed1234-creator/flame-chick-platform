@@ -367,6 +367,12 @@ Fail-closed defaults: restaurant and branch inactive; website ordering and both 
 
 Rollback-only acceptance suite passed valid insert, fail-closed defaults, invalid slug/currency format/branch code, missing restaurant FK and duplicate branch code. The complete candidate transaction was rolled back. Post-rollback catalog verification: no Batch 2 tables, no Realtime entries, only Batch 1 migration history. All three Supabase advisors returned zero lints. Candidate is **not** approved/applied; separate explicit approval is required.
 
+### 4.5A Batch 2 application status — Production (2026-11-20)
+
+Owner explicitly approved the exact candidate before application. Applied migration `20261120164125_batch2_restaurant_branch_foundation` to Flame Chick Production project `adkrxfnawdiljhjaavnj`. Canonical SQL is committed at `supabase/migrations/20261120164125_batch2_restaurant_branch_foundation.sql`.
+
+Post-apply: restaurants and branches exist, postgres-owned, RLS enabled, zero rows, no application-role table grants, no policies, no Realtime membership. Security Advisor reports two INFO-level `rls_enabled_no_policy` findings because RLS is enabled with no policies; this is intentional deny-by-default and must not be “fixed” by adding broad access. Performance and Health Advisors zero lints. No application code or deployments changed. Detailed record is in the handoff.
+
 ### 4.6 Initial tenant provisioning
 
 - No restaurant or branch rows are seeded by a schema migration.
