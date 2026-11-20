@@ -899,3 +899,29 @@ The owner explicitly deferred the detailed customer-website audit. Do not spend 
 - No website audit/code change, application code change, SQL migration, Production DDL/data/settings change, Edge Function deployment, Storage change, Vercel deployment, `main` change or original-repository change was made.
 
 **Next database-only action:** continue targeted cross-document consistency review, starting with staff-role and tenant/branch constraints, then catalog publication/version integrity and order/delivery transaction boundaries. Record each correction in the canonical design docs and this handoff. Do not begin migrations until the schema and authorization contracts are internally consistent and reviewed; any test migration must be isolated from Production.
+
+## 2026-11-20 — Database integrity review progress
+
+Continued database-only review as requested. Re-read the canonical handoff, field-level schema, ERD, delivery lifecycle contract, application/database contract map and RLS/function matrix before making targeted edits. No broad source rescan and no website audit were performed.
+
+### Changes committed on `work/production-source-audit`
+- `d66a26236696a281a54443d763e58600296fb4df`: aligned the contract map's staff-admin target with Admin + Owner authority and explicitly recorded unresolved branch-specific catalog/pricing scope.
+- `7b97e79f96b208bfea2be38d78d5c28cccca068b`: strengthened field-level schema with Admin/Owner catalog publish authority, atomic publication pointer/revision requirements, trusted canonical snapshot checksum, strict listed-area/Not-Listed consistency, and bounded/versioned server-side idempotency fingerprint requirements.
+- `8fb9b2f643be497180f202a32c1fdfc9ace8d92b`: serialized last-active-Owner protection with a restaurant-level staff-authority lock to prevent concurrent demotion/deactivation races.
+- `db4410242ffe1d55d5caaa4aa49999788be0e234`: documented staff invitations as a recoverable idempotent workflow across Supabase Auth and PostgreSQL; no false claim of one cross-system ACID transaction.
+- `d6e93fc37d64a415de17ec97b56597c2e46c4010`: prevented anonymous website idempotency replay from becoming an order-data disclosure/lookup mechanism.
+- `84a1c2d74c27b6cfd9740e7a6ceb18f133a5b71c`: added `docs/architecture/database-integrity-review-v1.md` with tenant/branch invariants, catalog/order/delivery/staff transaction rules, adversarial tests and schema-freeze blockers.
+
+### Key findings / blockers before schema freeze
+1. Define how the public website resolves exactly one branch; never trust arbitrary browser branch IDs.
+2. Decide whether menu/prices/availability are restaurant-wide or branch/channel-specific; current proposal has restaurant-level publication pointer but branch-level delivery pricing.
+3. Confirm deal choice structure, Not Listed locality input, returned-order payment/notification behavior, arrival event, POS local-only order scope and staff role multiplicity.
+4. Validate that every composite FK, RLS predicate, grant, SECURITY DEFINER execution grant, command transaction and audit/outbox effect is represented in executable migration tests.
+
+### Next database work
+- Continue targeted contract review for role multiplicity, branch resolution and catalog publication scope.
+- Reconcile decisions that alter key structure before schema freeze.
+- Then create a clean migration plan and test only on a verified isolated database. Production remains read-only and requires separate explicit approval.
+
+### Safety / deferred website audit
+The customer website security audit remains deferred until the website is about to be attached to the database. At that milestone, stop and run the complete website threat-model audit before integration. No website source was audited or changed in this step. No SQL/migration, Production schema/data/Auth/settings, Edge Function deployment, Storage, Vercel, `main`, or original repository was changed.
