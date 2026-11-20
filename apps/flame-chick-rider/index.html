@@ -783,7 +783,7 @@ $('passwordForm').addEventListener('submit',async e=>{
       toast('Password saved. Your rider account is ready.');
     }else{
       saveSession(null);user=null;rider=null;jobs=[];
-      showLogin('Your password is set. Your Flame Chick role is '+assigned.role+'. Sign in to the POS at https://flame-chick-pos.vercel.app/ to use your staff access.');
+      showLogin('Your password is set. Your Flame Chick role is '+assigned.role+'. Contact your owner or manager for the current Flame Chick POS portal address, then sign in to use your staff access.');
     }
   }catch(err){$('passwordError').textContent=err.message||'Password could not be saved. Request a new link and try again.';}
   finally{button.disabled=false;button.textContent='Save password';}
