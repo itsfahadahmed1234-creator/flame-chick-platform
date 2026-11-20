@@ -25,7 +25,7 @@ The owner supplied the following role model on 2026-11-20. These rules replace t
 |---|---|---|
 | Admin (the owner-designated administrator) | Admin panel + POS + operational tools | Full Flame Chick business access, equivalent to Owner. Separate identity and audit actor. |
 | Owner | Admin panel + POS + operational tools | Full Flame Chick business access, equivalent to Admin. |
-| Manager | **No Admin panel access** | Restricted operational role; no deletion privileges. Exact POS access and approval powers are still to be clarified. |
+| Manager | **POS only; no Admin panel** | Restricted operational supervisor: view/monitor branch operations, monitor preparation/status, dispatch oversight and rider assignment/reassignment, confirm physical returned deliveries and record return outcomes. No menu/pricing, staff, settings, deletion or other Admin-panel powers. |
 | Cashier | POS only | Process POS work, assign/reassign riders and reject orders. Cannot delete orders or other records. Rejections/cancellations must be audited. |
 | Rider | Rider portal only | Can see and respond to their own offers and manage their own assigned deliveries. Cannot view another rider's offers, assignments or private delivery data. |
 | Public customer / guest | Customer website | Read the published catalog projection and submit an order through the rate-limited Order API. No general order/table reads. |
@@ -47,18 +47,18 @@ The owner supplied the following role model on 2026-11-20. These rules replace t
 | Capability | Admin | Owner | Manager | Cashier | Rider |
 |---|---|---|---|---|---|
 | Enter Admin panel | Yes | Yes | **No** | No | No |
-| Enter POS | Yes | Yes | Pending confirmation | Yes | No |
+| Enter POS | Yes | Yes | **Yes — restricted operational scope** | Yes | No |
 | Enter Rider portal | No business need | No business need | No | No | Yes |
 | Full menu/category/product editing | Yes | Yes | No (no Admin panel) | No | No |
 | Change product/variant/deal prices | Yes | Yes | No | No | No |
 | Publish or roll back menu | Yes | Yes | No | No | No |
-| Change listed delivery areas and Not Listed default fee | Yes | Yes | Pending confirmation; no Admin panel | No | No |
+| Change listed delivery areas and Not Listed default fee | Yes | Yes | No | No | No |
 | Manage staff roles/invitations | Yes | Yes | No | No | No |
-| View branch operational orders | Yes | Yes | Pending POS scope | POS scope | Only own active delivery orders |
-| Accept/process POS orders | Yes | Yes | Pending POS scope | Yes | No |
-| Reject incoming orders | Yes | Yes | Pending authority | Yes | No |
+| View branch operational orders | Yes | Yes | **Yes — operational fields only** | POS operational scope | Only own active delivery orders |
+| Accept/process POS orders | Yes | Yes | **Supervise/monitor; no cashier processing assumed** | Yes | No |
+| Reject incoming orders | Yes | Yes | Not confirmed; do not grant by default | Yes — newly received/unaccepted only, with reason | No |
 | Cancel accepted/in-progress orders | Yes | Yes | Pending authority | **Not yet approved** | No |
-| Assign/reassign riders | Yes | Yes | Pending authority | Yes | No |
+| Assign/reassign riders | Yes | Yes | **Yes — operational dispatch** | Yes | No |
 | Accept/reject a rider offer | No | No | No | No | Own offer only |
 | Pickup and delivery status actions | No | No | No | No | Own assigned delivery only |
 | View another rider's offers/assignments | Full operational oversight only | Full operational oversight only | Not yet specified | Dispatch-only minimum data | **Never** |
@@ -154,9 +154,8 @@ Test each attempt with anon, authenticated non-staff, every staff role and anoth
 
 ## 8. Outstanding decisions and conservative defaults
 
-Owner has confirmed the main role boundaries. These remaining details still affect authorization policy and app behavior:
+Owner has confirmed the main role boundaries and restricted Manager POS access. These remaining details still affect authorization policy and app behavior:
 
-1. **Manager POS access:** The user explicitly denies Manager Admin-panel access but has not yet confirmed whether Manager should be allowed into POS. Default recommendation: allow a restricted Manager POS session for branch supervision, order-status oversight and dispatch only; no catalog/staff/settings administration and no deletion. Confirm before final policy SQL.
 2. **Cashier rejection/cancellation boundary:** Cashier can reject orders. Distinguish rejecting a newly received order from cancelling an accepted/preparing/ready order. Default: Cashier may reject only a new/unaccepted order with a mandatory reason; cannot cancel an order after acceptance unless Owner approves that authority.
 3. **Rider lifecycle:** Recommended full rider workflow is accept/decline own offer, arrive at restaurant, confirm pickup, mark delivered, and report failed delivery/physical return. Rider reports return; Manager/Admin/Owner confirms the physical return and final order cancellation. Confirm that this existing lifecycle is retained.
 4. **Reason requirement:** Recommended mandatory rejection/cancellation reason (controlled reason code plus optional short note).
@@ -169,3 +168,19 @@ Do not let these open items block implementation of already-confirmed boundaries
 ## 9. Safety status
 
 This is a proposed access-control design, not RLS SQL. No Production policies, grants, tables, functions, secrets, Storage or users have been changed.
+
+
+## Owner decision — Manager restricted POS access confirmed (2026-11-20)
+
+The user approved the restricted Manager POS model. This supersedes all earlier "Manager POS access pending" wording.
+
+- Manager may log into the POS application, but must be denied access to the Admin panel at both UI and server/database authorization layers.
+- Manager may view and supervise branch operational orders and preparation/status, oversee dispatch, assign/reassign riders, and confirm physical returned deliveries with a recorded return outcome.
+- Manager may not manage menu/catalog/prices, publish/rollback menus, manage staff/roles, change delivery areas/default fees, edit sensitive settings, or delete orders/records.
+- Manager order rejection/cancellation authority is not granted by this decision; retain the conservative deny-by-default rule until explicitly approved.
+- Manager sees only the operational and branch-scoped fields needed for these duties, not full financial reconciliation or unrelated rider/customer records.
+- Cashier remains POS-only and may process orders, assign/reassign riders and reject newly received/unaccepted orders with an audit reason; cashier cannot delete orders. Do not silently extend cashier cancellation authority to accepted/in-progress orders.
+- Riders remain Rider-portal-only and may act only on offers/assignments addressed to their authenticated rider identity.
+- All order deletion remains prohibited through normal business applications for every role, including Admin and Owner. Use audited status transitions, correction/void events and immutable order history instead.
+- Return confirmation must be a transactional, audited action: delivery task/order references, previous and resulting states, confirming actor from verified JWT, role, server timestamp, return reason/outcome, and correlation/request ID. The rider may report a failed delivery/return; Manager confirms the physical return. No client-supplied actor identity is trusted.
+- Update the authorization matrix, RLS/API tests, POS route guards, manager UI and database command policies to match this scope before release.
