@@ -1028,3 +1028,43 @@ Idempotency is mandatory for all order sources, not only the customer website:
 - A network timeout after commit is an ambiguous outcome. The client must keep the key and retry/query by that key; never create a replacement key merely because it did not receive the response.
 - Other retryable mutations use unique command/request IDs stored with the business event (status, delivery, return, staff, catalog publish); notifications use a unique transactional outbox event key.
 
+## Future customer drop-off pin — field-level schema extension
+
+Authoritative detail: [Customer Drop-Off Pin ERD & Authorization Addendum V1](./customer-dropoff-pin-erd-authorization-addendum-v1.md).
+
+### `app_private.delivery_dropoff_locations`
+
+This private table stores at most one fixed destination pin per delivery order. It is not exposed through the Supabase Data API.
+
+| Field | Candidate type | Rule |
+|---|---|---|
+| id | uuid PK | Server-generated |
+| restaurant_id | uuid NOT NULL | Composite tenant FK |
+| branch_id | uuid NOT NULL | Composite branch FK |
+| order_id | uuid NOT NULL UNIQUE | One optional pin per order |
+| delivery_task_id | uuid NOT NULL UNIQUE | One optional pin per task |
+| latitude | numeric(9,6) NOT NULL | CHECK BETWEEN -90 AND 90 |
+| longitude | numeric(9,6) NOT NULL | CHECK BETWEEN -180 AND 180 |
+| accuracy_m | numeric(9,2) NULL | If supplied, non-negative |
+| location_source | text NOT NULL | CHECK in device_once, manual_map_pin |
+| customer_consented_at | timestamptz NOT NULL | Consent timestamp |
+| consent_notice_version | text NOT NULL | Notice version shown |
+| created_at | timestamptz NOT NULL | Database transaction time |
+
+Required:
+- Composite FKs bind `(order_id, restaurant_id, branch_id)` and `(delivery_task_id, restaurant_id, branch_id, order_id)` to the same order/task/tenant/branch. Add matching parent unique keys if absent; never weaken the tenant relation.
+- A database constraint/command invariant rejects non-delivery orders.
+- No cascading deletion of operational history. Purge precise coordinates explicitly after the approved retention period.
+- No row means the customer did not share a pin; written address remains required.
+- No public/browser table grants. The existing Order API validates and inserts an optional pin in the same transaction as order, order items, delivery task, status event, outbox and Website-only quota event. Rollback removes all writes together.
+- No location write RPC, location token, recurring update endpoint, GPS session, coordinate history or Realtime location channel.
+
+### Google Maps URL
+
+Do not persist a user-provided map URL. Generate the Rider/POS directions URL from the validated coordinates using a fixed Google Maps directions template. The generated link is not a credential and must not be logged. The Rider/POS client receives coordinates only through the narrow authorized delivery-detail DTO and constructs the URL.
+
+### Retention proposal
+
+Purge precise coordinates within 24 hours after a terminal delivery outcome, subject to confirming support/legal needs before implementation. Keep non-coordinate consent/access audit metadata under its separate retention schedule. Cleanup must not cascade-delete orders, tasks, payment events or audit history.
+
+No Production DDL or app feature is authorized by this design addition.
