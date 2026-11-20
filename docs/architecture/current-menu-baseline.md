@@ -84,9 +84,8 @@ The Production schema and Admin panel must comfortably support:
 - A future product with multiple portions/variants without hardcoded size enums.
 - A bundle (Platter) containing fixed component references and quantities; the exact component list needs confirmation against current catalog records and stock/availability policy.
 - Beverage products with no hardcoded beverage table/category assumptions.
-- Configurable tax settings/rules rather than hardcoding the GST rate into product prices.
 - Future TBD/unpriced drafts, modifiers, selectable deal components and time schedules as outlined in the menu-management design.
-- Immutable order-item/component/price/tax snapshots so future changes do not alter old orders.
+- Immutable order-item/component/price snapshots so future menu changes do not alter old orders.
 
 ## 4. Important source boundaries and open questions
 
