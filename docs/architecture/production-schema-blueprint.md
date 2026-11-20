@@ -171,14 +171,45 @@ The user explicitly decided on 2026-11-20 to leave GST for a later phase and avo
 - The current menu artwork says prices are exclusive of applicable GST. That statement is recorded as a business requirement to revisit before changing customer-facing checkout/accounting behaviour, but it does not authorize implementing a tax model now.
 - When the user is ready, GST can be added through a separately reviewed forward migration and coordinated API/website/POS changes without rebuilding the catalog schema.
 
-### Delivery fees
+### Delivery fee model: listed areas + Admin-configured Not Listed default
 
-- Delivery area fee must support unknown/unconfigured values distinctly from real zero.
-- Keep any Not Listed/default fee configuration separate from delivery-area records.
-- Snapshot selected area name and fee on the order and delivery task.
-- Checkout must block submission or require an explicit approved manual-quote flow when fee is unknown. Never fall back to zero.
-- Enforce area/branch/restaurant matching with composite constraints and server validation.
+The user confirmed the intended business rule on 2026-11-20:
 
+- Admin maintains an explicit list of delivery areas/localities. Each active listed area has its own delivery fee in PKR.
+- During checkout, the customer selects a matching listed area. The fee is the configured fee for that exact area.
+- If the customer's locality is not in the list, the customer can explicitly choose **Not Listed / Other**. The fee for this selection comes from one default delivery fee configured in the Admin panel.
+- The default fee is not a distance calculation, automatic geofence estimate, or client-entered amount. It is a controlled Admin setting.
+- The Not Listed default is distinct from every listed area's fee and is not copied into listed-area rows.
+- Both a listed-area fee and the default fee may intentionally be PKR 0, but zero is valid only when an Admin explicitly saves zero. Missing/unconfigured is not zero.
+
+**Admin workflow**
+- Add, edit, reorder, activate/pause and archive delivery areas; store a clear area name, optional Urdu name, explicit non-negative fee, sort order and branch scope.
+- Maintain a separate DefaultDeliveryFee setting for Not Listed / Other.
+- Show clear status when the default is not configured.
+- Allow clearing/unsetting the default. When it is unset, Not Listed checkout is blocked with a helpful message; listed areas continue to work.
+- A newly created area must require an explicit fee entry. Do not prefill a new area with zero; the Admin must deliberately enter 0 if delivery is free.
+
+**Checkout and server-side enforcement**
+- The browser may send a selected listed area ID, or an explicit Not Listed/Other selection plus a user-entered locality label where appropriate. It must never be authoritative for the fee.
+- For a listed area, the order command verifies that the area is active and belongs to the selected restaurant and fulfilment branch, then reads the fee from the database.
+- For Not Listed/Other, the order command explicitly recognizes that selection, loads the Admin-configured default fee from the correct restaurant/branch setting, and rejects the order if the value is unset or invalid. A missing area ID by itself must never imply Not Listed or zero fee.
+- Do not accept a client-submitted fee, even if it matches what the browser displayed. The server retrieves the canonical fee and calculates the order total transactionally.
+- Record which fee path was used (listed_area versus not_listed_default) and preserve the customer's locality/address separately from the fee class. A typed locality/mohalla for Other is recommended so the rider and manager can identify the destination; the full delivery address remains required.
+- Snapshot the selected area/Other label and exact fee on the order and delivery task. Later Admin fee changes apply to new orders only and never reprice an existing order.
+- A genuinely zero fee is allowed only when the Admin explicitly configured zero. Keep database NOT NULL/CHECK constraints for configured listed fees and non-negative defaults; represent an unset Not Listed default as NULL/unconfigured rather than DEFAULT 0.
+
+**Scope**
+- Delivery areas should be scoped to the restaurant and fulfilment branch. The default fee must use a deliberate scope aligned with the branch's area list. For the initial single main branch, one Admin-configured default can serve that branch. For future multiple branches, use a branch-specific default or an explicitly documented restaurant-wide fallback; do not let one branch's areas or fee leak into another branch's checkout/catalog.
+- The public catalog may expose the active area names and their prices, plus the Not Listed default, because these are checkout pricing facts. It must not expose staff-only settings or internal configuration.
+- Do not implement distance tiers, route/geofence pricing, minimum-distance or postal-code logic unless the owner later requests it.
+
+**Existing source observations to address**
+- Current Admin already has area CRUD and a separate DefaultDeliveryFee setting. It stores the default at restaurant scope (branch_id IS NULL) and areas against the selected branch. New-area fee input currently defaults to 0; change this to blank/required so a fee cannot accidentally become free.
+- Current website already displays listed area fees and a Not Listed option, and blocks checkout when the default is unconfigured. It reads the default from public catalog settings.
+- Current POS already resolves the typed exact area or the Not Listed default and blocks Not Listed when no default exists. However, its delivery-area fee adapter converts missing values to zero and it sends a null area ID with the display label. Production order RPC must use an explicit selection type, not infer Other solely from NULL area_id.
+- Current catalog API returns DefaultDeliveryFee and area fee rows, but it reads all delivery areas for the restaurant without filtering to a specific branch. Once Production catalog is branch-aware, filter areas to the correct fulfilment branch or provide a safe branch-specific catalog.
+- Current catalog and browser adapters use Number(value) || 0 in places. Remove those zero fallbacks for required fees; validate missing values as an API/catalog error.
+- The archived Demo order function accepts a missing area ID and sets manual-address fee to zero. Never copy this Demo behaviour into Production.
 ## 6. Security and access boundaries
 
 ### Data access model
