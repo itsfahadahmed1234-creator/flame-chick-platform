@@ -1,3 +1,21 @@
+## 2026-11-20 — Batch 2 candidate completed and rollback-tested
+
+**Status: candidate prepared and disposable validation passed; NOT applied to Production.** Production project identity was rechecked: `adkrxfnawdiljhjaavnj`, Flame Chick Production, org `ydlbinhyoutdqueilxnd`, PostgreSQL 17.12, Mumbai, Free plan. SQL identity: `current_user=postgres`, `session_user=postgres`.
+
+Candidate file: `docs/drafts/batch2_restaurant_branch_foundation_candidate.sql`.
+
+Scope is exactly two tables:
+- `public.restaurants`: UUID identity, canonical unique slug, trimmed name, required currency code and IANA timezone, inactive-by-default state, created/updated timestamps.
+- `public.branches`: UUID identity, restaurant FK with RESTRICT, unique (id, restaurant_id) for future composite tenant FKs, restaurant-scoped unique branch code, customer-facing name, private nullable operational address/phone, inactive-by-default state, website master ordering gate and delivery/pickup capability flags (all false by default).
+
+Security: explicit RLS on both public tables; no policies and no direct privileges to PUBLIC/anon/authenticated/service_role; owner postgres; no public RPC/view/function/trigger, no seed rows, no Auth objects and no Realtime membership. The website delivery/pickup flags do not control POS modes. Fulfilment mapping remains delivery/pickup/dine_in per source report. The current POS UI mismatch remains intentionally unfixed. Batch 2 does not add shared POS tables or offline sync tables.
+
+Safety refinements: restaurant currency/timezone are required rather than assumed; restaurant and branch start inactive; website ordering/capabilities start false. IANA timezone and supported ISO-4217 code are validated by trusted provisioning logic. `updated_at` is maintained by trusted server-side commands; browser roles cannot update rows.
+
+**Validation:** candidate executed in a disposable transaction, augmented with temporary valid/invalid test rows, and explicitly rolled back. Assertions covered owner/RLS/no-client-table-privileges/no-policies/no-Realtime/empty migration state, valid tenant+branch insert, fail-closed defaults, invalid slug, invalid currency format, invalid branch code, missing-parent FK and duplicate branch code. All acceptance assertions passed. A first test-harness attempt hit the intended capability CHECK before the FK test; test fixture was corrected and the complete suite then passed. Post-rollback read-only check confirmed zero Batch 2 tables, zero Realtime entries, and only the already-existing Batch 1 migration. Security, Performance and Health Advisors each returned zero lints.
+
+No persistent Batch 2 DDL or rows were created. No Production migration history change occurred. External encrypted backup remains absent as previously approved. Batch 2 SQL needs a separate explicit owner approval before permanent application.
+
 ## 2026-11-20 — POS fulfilment and offline-sync source review
 
 Reviewed the working-branch POS, active website entrypoint and order API for exact fulfilment contracts. Detailed report: [POS fulfilment and offline-sync contract review](docs/architecture/pos-fulfillment-and-offline-sync-contract-review.md).
@@ -98,7 +116,7 @@ External encrypted schema dump was not created; user explicitly accepted proceed
 Batch 1 is complete. Continue with remaining Stage 3 design/source consistency: resolve outstanding business/schema decisions, complete field-level table and API mapping, then separately review Batch 2/3 migration design. Do not start website security audit until immediately before attaching website to DB. No application deployment, Vercel changes, Auth/Storage/Edge Function work, or business table creation was performed in this Batch 1 action.
 # Flame Chick Platform — Project Handoff
 
-**Last updated:** 2026-11-20 (POS fulfilment/offline-sync source review recorded; Batch 2 owner decisions confirmed; Batch 1 applied and verified)  
+**Last updated:** 2026-11-20 (Batch 2 candidate prepared and rollback-tested; POS fulfilment/offline-sync source review recorded; Batch 1 applied and verified)  
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
