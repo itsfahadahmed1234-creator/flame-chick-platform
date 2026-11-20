@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 source hygiene complete; Stage 2 Production migration-history reconciliation is next, subject to verifying the correct Supabase account  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 is blocked pending connection to the separate Flame Chick Supabase Production account  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -297,6 +297,20 @@ Historic HFP reference used five Realtime tables (`orders`, `delivery_tasks`, `d
 - No automated test suite or app build was run in this documentation/source-only pass; record this as pending verification rather than treating it as tested.
 - No merge to `main` has occurred.
 
+
+### Stage 2 connection check on 2026-11-20
+
+- Read the installed Supabase skill before using Supabase tools.
+- Read-only `list_organizations` returned only organization `hfp supabase` (org id `xzdklhvmheiewpnnqgsa`).
+- Read-only `list_projects` returned only:
+  - HFP `ycwzmgvljaskjfatresh` (ACTIVE_HEALTHY)
+  - Pizza Bite `hrclruyrquzekjzyggpt` (INACTIVE)
+  - Flame Chick Demo `nthtslzeqglcforbsirz` (ACTIVE_HEALTHY)
+- The required Production ref `adkrxfnawdiljhjaavnj` is **not visible** to the currently connected Supabase account. The only connected organization is HFP. This confirms the existing connection warning.
+- No database tables, migrations, SQL, functions, secrets, auth users, storage, or project settings were queried or changed for a guessed project. No migration was applied.
+- Stage 2 is blocked. Ask the user to connect/authenticate the separate Flame Chick Supabase account/organization in ChatGPT, then re-run the read-only organization/project list. Proceed only when exact project ref `adkrxfnawdiljhjaavnj` is visible and its name/region/plan match the handoff.
+- Do not use HFP `ycwzmgvljaskjfatresh` or Demo `nthtslzeqglcforbsirz` as a substitute.
+
 ## 11. Implementation roadmap — continue in this order
 
 ### Stage 1 — Source hygiene and durable handoff (current)
@@ -341,12 +355,12 @@ Run full end-to-end tests, security checks, rollback rehearsal, and backup resto
 
 **Stage 1 source-hygiene review is complete on `work/production-source-audit`.** Do not repeat the same source scans. The remaining Stage 1 limitation is that automated build/type/runtime tests have not been run; add an appropriate CI/test harness later when the app tooling is established, or run checks in a controlled local workspace before merge.
 
-Proceed to Stage 2 only after checking whether the currently connected Supabase account can see the exact Production project:
+**Stage 2 is now blocked** because the connected Supabase account lists only the HFP organization and HFP, Pizza Bite, and Flame Chick Demo projects. The intended Production ref `adkrxfnawdiljhjaavnj` is not visible. Ask the user to connect/authenticate the separate Flame Chick Supabase account/organization in ChatGPT. After that, verify the exact Production ref, name, Mumbai region, and Free plan read-only. Never substitute HFP or Demo.
 
-1. Read the Supabase skill and inspect connected projects read-only.
-2. Confirm project ref `adkrxfnawdiljhjaavnj`, name Flame Chick Production, Mumbai `ap-south-1`, and Free plan. If it is not visible, stop and ask the user to connect the separate Flame Chick Supabase account. Never substitute HFP or Demo.
-3. If visible, inspect migration history read-only and recover the exact applied migration `20261119125153_flame_chick_postgres_default_privileges_hardening`; compare it byte-for-byte with the expected SQL before adding its matching file to `supabase/migrations/`.
-4. Do not apply/reapply SQL, migrate, deploy functions, create users, seed data, or change settings during this reconciliation stage without separate explicit approval.
-5. Update this handoff with the exact verified account/project, migration history, file/commit changes, and next step.
+Once the correct Production project is visible:
+
+1. Inspect migration history read-only and recover the exact applied migration `20261119125153_flame_chick_postgres_default_privileges_hardening`; compare it byte-for-byte with the expected SQL before adding its matching file to `supabase/migrations/`.
+2. Do not apply/reapply SQL, migrate, deploy functions, create users, seed data, or change settings during this reconciliation stage without separate explicit approval.
+3. Update this handoff with the exact verified account/project, migration history, file/commit changes, and next step.
 
 **New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, then inspect the current branch head and continue the immediate next action above. Do not repeat the entire initial audit. Ask the user only for a decision that genuinely requires their preference or approval.
