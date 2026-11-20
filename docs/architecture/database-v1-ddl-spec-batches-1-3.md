@@ -49,12 +49,15 @@ Create `app_private` owned by `postgres`, with no client role access:
 ### 3.2 Default privileges for postgres-created private objects
 
 For objects created by `postgres`:
-- PostgreSQL's implicit default EXECUTE on new functions and USAGE on new types is granted to `PUBLIC`. A schema-specific REVOKE does **not** remove a privilege granted globally to PUBLIC; this was confirmed with a rollback-only probe against the connected PostgreSQL 17.12 database.
-- Therefore revoke the implicit defaults globally for the `postgres` creator:
-  - `ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;`
-  - `ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE USAGE ON TYPES FROM PUBLIC;`
-- In `app_private`, additionally revoke default ALL on tables and sequences from PUBLIC, anon, authenticated, service_role; revoke default EXECUTE on functions from anon, authenticated, service_role; and revoke default USAGE on types from anon, authenticated, service_role.
-- The global function/type revokes affect future objects created by `postgres` in every schema, not just `app_private`. Any intended public RPC must receive an explicit, reviewed EXECUTE grant; future custom types must receive explicit grants only where genuinely required.
+- PostgreSQL implicitly grants EXECUTE on new functions and USAGE on new types to `PUBLIC`. A schema-specific default-privilege REVOKE does **not** subtract those global implicit defaults; rollback-only probes against the connected PostgreSQL 17.12 database confirmed this.
+- Do **not** change the global `postgres` function/type defaults as part of Batch 1. Such a global change affects every schema where `postgres` later creates functions or types, including areas outside Flame Chick's private application schema.
+- In `app_private`, set schema-specific defaults:
+  - Revoke default ALL on tables and sequences from PUBLIC, anon, authenticated and service_role.
+  - Revoke default EXECUTE on functions from anon, authenticated and service_role.
+  - Revoke default USAGE on types from anon, authenticated and service_role.
+- Because the per-schema function/type revokes cannot subtract the implicit PUBLIC grant, every future private function migration must explicitly execute `REVOKE EXECUTE ON FUNCTION app_private.<exact_signature> FROM PUBLIC, anon, authenticated, service_role;` immediately after creation. Every future custom type must explicitly execute `REVOKE USAGE ON TYPE app_private.<type_name> FROM PUBLIC, anon, authenticated, service_role;` immediately after creation. Include a corresponding assertion in that migration.
+- The schema itself remains inaccessible to PUBLIC, anon, authenticated and service_role. The API exposed-schema setting must also keep `app_private` out of PostgREST.
+- Any intentionally callable public RPC must revoke PUBLIC/anon/authenticated and receive an explicit grant only to its exact intended caller; the rollback-only service_role wrapper probe passed.
 - Explicitly grant only owner/maintenance permissions and exact function execution when a later migration requires it.
 - Do not rely on these defaults to control objects created by `supabase_admin`; that internal-role default ACL remains a separate known limitation.
 
