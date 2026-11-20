@@ -150,3 +150,19 @@ It is not a final SQL schema. All identifiers and API request fields must be che
 - The current production Supabase project was previously inspected read-only and had no application business schema, users, buckets or Edge Functions, apart from its already-applied security baseline migration.
 - No Production database, functions, secrets, Storage, Vercel configuration or live deployment has been changed while preparing this map.
 - Next: refine remaining role/publication/deal/schedule/branch-scope decisions, then prepare a field-level schema specification and isolated migration test plan. The stale-offline-price policy is already confirmed.
+
+## Owner-confirmed delivery lifecycle contract (2026-11-20)
+
+| Event | Initiator | Result | Required enforcement |
+|---|---|---|---|
+| Offer created | Cashier/Manager | One rider-targeted pending offer, expires in 60 seconds | Server records offered_at/expires_at; rider-only visibility |
+| Rider rejects | Addressed Rider | Offer rejected; task returns to POS awaiting manual reassignment | Immutable offer attempt; no automatic next rider |
+| No response | System at 60 seconds | Offer expired; task returns to POS awaiting manual reassignment | Accept command rejects at/after expiry; idempotent expiry worker/event |
+| Rider accepts | Addressed Rider | Offer accepted; one current assignment activated | Atomic compare/lock; prevent two riders accepting |
+| Pickup / out for delivery | Assigned Rider | Task advances through delivery | Rider/task ownership + valid transition |
+| Delivery succeeds | Assigned Rider | Rider marks delivered; order completes immediately | One transaction updates task/order and appends audit events |
+| Delivery fails / rider chooses return | Assigned Rider | Return pending physical confirmation | Rider can report failure/return intent, not receipt |
+| Returned order physically received | Cashier or Manager | Task closes as returned; order receives distinct returned/failed terminal state | Transactional confirmation, actor/role/time/reason/correlation audit |
+
+POS is the reassignment control point after rejection/expiry. A later offer is a new attempt; never overwrite earlier attempts. Realtime events should update the POS dispatch queue and only the addressed Rider portal. Keep POS polling fallback and normal-fetch Order History behavior. A missed timeout event must not make an expired offer acceptable.
+
