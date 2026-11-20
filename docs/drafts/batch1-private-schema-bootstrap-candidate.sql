@@ -1,9 +1,9 @@
--- Flame Chick Batch 1 — private schema bootstrap (CANDIDATE ONLY)
--- Status: reviewed draft; NOT a deployed migration and NOT yet approved for persistence.
+-- ARCHIVED DRAFT — Flame Chick Batch 1 private schema bootstrap
+-- Status: superseded by the applied migration at supabase/migrations/20261120154413_batch1_private_schema_bootstrap.sql.
 -- Target: Flame Chick Production PostgreSQL 17.12.
 -- Expected execution identity: current_user = postgres AND session_user = postgres.
 -- Precondition: Dashboard API settings have been manually checked and app_private is NOT in Exposed schemas.
--- Do not run this file until the migration is separately approved.
+-- Do not execute this archived draft; use the canonical migration history for reference.
 
 BEGIN;
 
