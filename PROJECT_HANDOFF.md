@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security, menu requirements, Production schema/reliability blueprint and delivery-area fee behavior documented; GST deliberately deferred; API/column contract mapping remains  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security, menu requirements, Production schema/reliability blueprint and detailed delivery pricing contract documented; GST deliberately deferred; API/column contract mapping remains  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -416,7 +416,7 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 
 ### Production schema/reliability blueprint drafted — 2026-11-20
 
-- Added `docs/architecture/production-schema-blueprint.md` (commit `d0e58a68cdda582b02d9bf198fdcc58c7cc43e71`). Design only; no SQL created/applied.
+- Added `docs/architecture/production-schema-blueprint.md`, `docs/architecture/delivery-pricing-contract.md` (commit `d0e58a68cdda582b02d9bf198fdcc58c7cc43e71`). Design only; no SQL created/applied.
 - Reviewed archived Demo baseline SQL and follow-on security, media, offer expiry, staff audit/index, helper-usage, Admin connection, and Demo-only manual-address/zero-fee migrations. Confirmed Demo baseline contains 45 tables (42 public, 3 private), 33 functions, 35 triggers, 108 RLS policies and 103 explicit indexes. Treat Demo as a reference, not a Production migration set.
 - Inspected current POS adapter and catalog refresh: schemaVersion 2, required arrays for categories/products/productVariants/subcategories/deals/dealComponents/modifierGroups/modifiers/modifierPriceRules/modifierGroupAssignments/deliveryAreas/drinkOptions; health then catalog fetch; IndexedDB cache. POS currently clears menu/category/delivery-area stores before repopulating them, so a failed cache update could lose the previous working cache. It converts missing variant prices and delivery fees to zero in the adapter. Blueprint requires version-staged cache writes, an atomic active-version pointer and no silent zero fallback.
 - POS offline delivery orders submit product/variant/deal IDs plus idempotency key; server prices using live mutable catalog values. Blueprint requires catalog publication version binding and an explicit stale-price policy before order DDL.
@@ -482,6 +482,20 @@ The user confirmed the Production delivery-fee behavior:
 10. Admin fee changed after an order was placed -> prior order and delivery-task snapshots unchanged; next new order uses new fee.
 11. Public catalog for a branch must not include other branch's restricted areas/default.
 12. Takeaway/pickup does not incur delivery fee and does not require an area selection.
+### Delivery pricing contract documented — 2026-11-20
+
+- Added `docs/architecture/delivery-pricing-contract.md` (commit `55b7e3350a5666f9eabf7cac31605c8446783899`). It is a detailed design/API contract; no Production SQL or live app code was changed.
+- Delivery areas are named, branch-scoped records with their own explicit non-negative fee. No automatic distance bands or geolocation pricing are implied by the user's '0 to 500' example.
+- Not Listed / Other is an explicit selection using a separate Admin-configured default. NULL/unset default blocks checkout; an explicitly saved zero is a legitimate zero fee.
+- The database, not the browser/POS, must resolve and calculate the fee. Do not accept client-supplied fee amounts. A null area ID without explicit `selection_type = not_listed` must be rejected.
+- Proposed typed configuration: `branch_delivery_settings` with one row per branch and nullable `not_listed_delivery_fee`, instead of a generic JSON setting. This is a recommendation in the design, not yet approved/applied SQL.
+- Orders and delivery tasks preserve immutable delivery selection, area label and exact fee snapshots. Later Admin fee changes apply only to new orders.
+- Current code audit: Admin already has area CRUD and a separate DefaultDeliveryFee setting, but the new-area form prefills zero. Website already has listed areas + Not Listed and blocks an unset default. POS already uses the default for explicit Not Listed but coerces missing area fees to zero and sends null area ID/display name rather than an explicit selection type. Catalog Edge Function queries areas without branch filtering and exposes DefaultDeliveryFee via general public settings allowlist. These are implementation gaps, not deployed Production changes.
+- Added required acceptance tests for listed area fee, explicit zero, unknown/inactive/cross-branch ID rejection, Not Listed positive/zero/unset default, fake client fee, fee changes after order, branch catalog isolation and takeaway.
+- Updated `docs/architecture/production-schema-blueprint.md` to link the detailed delivery contract (commit `add4f436214c1e1d529e790c75b16ffb0dbdeb9f`).
+- The only user decision still open on this delivery flow is whether Not Listed should collect a separate locality/mohalla field; the full delivery address is already required. If not collected separately, the address snapshot still carries the destination information.
+- Production remains read-only. No Supabase tables, rows, functions, settings, buckets, secrets or app deployments were changed.
+
 ## 11. Implementation roadmap — continue in this order
 
 ### Stage 1 — Source hygiene and durable handoff (current)
