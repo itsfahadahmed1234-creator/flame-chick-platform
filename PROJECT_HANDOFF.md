@@ -283,6 +283,8 @@ Historic HFP reference used five Realtime tables (`orders`, `delivery_tasks`, `d
 - No Supabase SQL, migration, function, secret, user, or data was changed.
 - No original repository or branch was modified.
 - No new backup repository was created.
+- Latest branch comparison against `main` showed the review branch is ahead by 5 commits, behind by 0, with exactly three changed paths: this handoff, the root README, and the catalog loader.
+- No automated test suite or app build was run in this documentation/source-only pass; record this as pending verification rather than treating it as tested.
 - No merge to `main` has occurred.
 
 ## 11. Implementation roadmap — continue in this order
@@ -331,7 +333,7 @@ Continue Stage 1 on `work/production-source-audit`:
 
 1. Review the diff for commit `0da616e...`.
 2. Check the actual references to `apps/flame-chick-website/js/app.js` (HTML, imports, loaders, tests, service worker, all four app roots). Do not remove it until this is proven safe.
-3. Inspect the delivery API's Rider portal link and Rider/POS links; document exact references and propose a safe configuration approach. Do not decide the final domain without user confirmation.
+3. Delivery API inspection confirmed a push-notification URL hardcoded to `https://flame-chick-rider.vercel.app/`, which does not match the currently observed Rider project domains. Inspect the Rider/POS links too, then propose a safe configuration approach. Do not decide the final domain without user confirmation.
 4. Completed: corrected the README directory-tree typo and added a prominent link to this handoff.
 5. Next: run available checks, review the branch diff, and update this handoff with results.
 
