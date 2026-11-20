@@ -983,3 +983,39 @@ Completed the next database-only step for the owner-approved one-time customer d
 No application source, SQL migration, Production schema/data/Auth/settings, Edge Function, Realtime publication, Storage, Vercel, main, or original source repository was changed. Production remains read-only.
 
 **Next database-only step:** complete a cross-document consistency check for the static pin design and then proceed with the wider migration-readiness/test plan. Do not implement continuous location tracking.
+
+
+
+## 2026-11-20 — Database V1 consistency and migration-readiness review
+
+Completed a database-only consistency pass across the canonical field-level schema, ERD, RLS/function matrix, product decisions, delivery lifecycle/pricing contracts, integrity review and existing handoff.
+
+### Resolved design now reflected in schema/ERD/RLS
+- Website branch resolution: one eligible branch auto-resolves; multiple eligible branches require customer choice; zero fail closed; branch ID is revalidated server-side.
+- Restaurant-wide products/deals/base prices with branch-specific variant/deal availability and delivery pricing. Orders bind publication version and branch availability revision. No branch price override in V1.
+- One role identity per user per restaurant. Manager/Cashier/Rider may hold same role in multiple branches; Admin/Owner is restaurant-wide and exclusive. Same-role-across-branches requires serialized command + database guard; partial unique index alone is insufficient. Last active Owner protected under restaurant lock.
+- Curated deal choices only, explicit non-negative surcharge, no category pools/free-text substitutions; ambiguous variant resolution rejected.
+- Returned order settlement: COD not collected -> closed-uncollected/no refund; actual collection immutable; refund is a separate append-only ledger entry only after payout, Admin/Owner only, idempotent and locked against over-refund.
+- Optional fixed customer drop-off pin only; no Rider GPS or continuous customer tracking.
+
+### Documents updated
+- `docs/architecture/production-field-level-schema-v1.md` — branch capabilities, role identity/consistency, branch availability overlays/revision, payment collection/refund ledger and remaining open holds. Latest commit `3c8c0e362da3b4a67d10d619dc926585b5e08590`.
+- `docs/architecture/production-erd-v1.md` — resolved decisions and remaining true open questions. Commit `3d85728c3731cf2cf00c6c3ca47408d97476ef60`.
+- `docs/architecture/production-rls-grant-function-matrix-v1.md` — role/branch invariants, branch availability and payment/drop-off access controls. Commit `74e27f33c98abd678d57c5f13a680a3bf1905ffd`.
+- `docs/architecture/database-integrity-review-v1.md` — reconciled resolved decisions, blockers and new concurrency/privacy tests. Commit `fe8df898cfb4bdca6dd164ece69d54673f5e2a65`.
+- New `docs/architecture/database-v1-migration-readiness-review.md` — consolidated security baseline, migration sequence, engineering blockers, test plan and Production boundary. Commit `9a1a1d4069f011df2950fb3964e577cc2c3bbc05`.
+
+### Remaining genuine holds
+1. Not Listed locality/mohalla label in addition to full address.
+2. Deal schedule recurrence/overnight/timezone/overlap/branch semantics.
+3. Kitchen role approval and exact access (deny by default).
+4. Ingredient inventory (excluded unless approved).
+5. Rider arrival-at-restaurant as separate event vs pickup next.
+6. Drop-off pin retention (proposed 24 hours after terminal state) and exceptional Admin/Owner access after terminal state.
+7. Exact legacy source/status/fulfillment/payment DTO mapping and API versioning.
+8. Website security audit remains intentionally deferred, mandatory immediately before website/database integration.
+
+### Migration-readiness outcome
+The design is ready for the next **controlled DDL specification and isolated migration prototype**, not Production. Next begin with read-only verification of the already-applied baseline, then write exact SQL for private schema/privilege rules, tenant/branch keys and identity/role foundation. First confirm an isolated local/test database; do not use Production for tests. Verify backup/restore of both PostgreSQL and Storage. Production remains read-only and every Production change requires separate explicit approval.
+
+No SQL migration was created or applied. No app source, Edge Function, Auth, Storage, Realtime, Vercel, main or original source repository was changed.
