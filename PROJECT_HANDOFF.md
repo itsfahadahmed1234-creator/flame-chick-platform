@@ -1,10 +1,10 @@
 # Flame Chick Platform — Project Handoff
 
-**Last updated:** 2026-11-20 (Asia/Karachi)  
+**Last updated:** 2026-11-20 (Asia/Karachi, 09:14 onward)  
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 source hygiene complete; Stage 2 is blocked pending connection to the separate Flame Chick Supabase Production account  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema design is next  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -158,11 +158,11 @@ The actual website's observed Production deployment was READY and aliased to `fl
 - Plan: Free
 - It belongs to a separate Flame Chick Supabase account/org.
 
-**Critical connection warning:** the previously connected Supabase context showed HFP and Flame Chick Demo, not this separate Production project. Do not run any Supabase command, SQL, migration, function deploy, secret write, or dashboard mutation until the correct Production account is connected and the exact ref is independently verified.
+**Connection verified on 2026-11-20:** the currently connected Supabase organization is `Flamechic` (`ydlbinhyoutdqueilxnd`) and its project list contains only `Flame Chick Production` with exact ref `adkrxfnawdiljhjaavnj`, region `ap-south-1`, status `ACTIVE_HEALTHY`, and Free plan. Re-verify this exact ref before every future database mutation. Do not use HFP or Demo.
 
 ### Known applied Production migration
 
-A security baseline was previously applied to Production:
+A security baseline is already applied to Production. Its live migration record and SQL were retrieved read-only on 2026-11-20:
 
 `20261119125153_flame_chick_postgres_default_privileges_hardening`
 
@@ -179,9 +179,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated, service_role;
 ```
 
-The matching migration SQL file was not present in the new repository at the last audit. Recover/verify the exact SQL and live migration history before adding a migration file to `supabase/migrations/`. Do not reapply this migration. First inspect the actual Production migration history in the correct account and reconcile the timestamp/file.
+The exact SQL was retrieved from `supabase_migrations.schema_migrations` and verified against the recorded version/name. A matching file has now been added to `supabase/migrations/20261119125153_flame_chick_postgres_default_privileges_hardening.sql` on `work/production-source-audit`. This file records an already-applied migration; **do not reapply it**. The file is for repository history/reconciliation only.
 
-Earlier Production inspection reported no business schema tables, app functions, app users, or `flame-chick-media` bucket beyond baseline extensions/security state. That is historical context only; re-check current live state after connecting to the right account before making decisions.
+Read-only Production inspection on 2026-11-20 confirmed: no tables in `public`; no tables in `public` or `private`; zero rows in `auth.users`; no Edge Functions deployed; no Storage buckets; the only app migration is `20261119125153_flame_chick_postgres_default_privileges_hardening`; the security advisor returned zero lints. These are point-in-time findings. Do not infer that the app schema exists.
 
 ### Reference projects — never target for Flame Chick Production
 
@@ -298,7 +298,7 @@ Historic HFP reference used five Realtime tables (`orders`, `delivery_tasks`, `d
 - No merge to `main` has occurred.
 
 
-### Stage 2 connection check on 2026-11-20
+### Stage 2 connection check on 2026-11-20 — superseded by successful verification below
 
 - Read the installed Supabase skill before using Supabase tools.
 - Read-only `list_organizations` returned only organization `hfp supabase` (org id `xzdklhvmheiewpnnqgsa`).
@@ -308,8 +308,23 @@ Historic HFP reference used five Realtime tables (`orders`, `delivery_tasks`, `d
   - Flame Chick Demo `nthtslzeqglcforbsirz` (ACTIVE_HEALTHY)
 - The required Production ref `adkrxfnawdiljhjaavnj` is **not visible** to the currently connected Supabase account. The only connected organization is HFP. This confirms the existing connection warning.
 - No database tables, migrations, SQL, functions, secrets, auth users, storage, or project settings were queried or changed for a guessed project. No migration was applied.
-- Stage 2 is blocked. Ask the user to connect/authenticate the separate Flame Chick Supabase account/organization in ChatGPT, then re-run the read-only organization/project list. Proceed only when exact project ref `adkrxfnawdiljhjaavnj` is visible and its name/region/plan match the handoff.
+- At that earlier checkpoint Stage 2 was blocked. This was superseded after the user confirmed the Production account was connected. The successful connection/read-only inspection is recorded next.
 - Do not use HFP `ycwzmgvljaskjfatresh` or Demo `nthtslzeqglcforbsirz` as a substitute.
+
+
+### Stage 2 successful Production connection and migration reconciliation — 2026-11-20
+
+- Read the Supabase skill before any Supabase operation.
+- `list_organizations` now returns only `Flamechic` organization id `ydlbinhyoutdqueilxnd`.
+- `list_projects` returns only `Flame Chick Production` (`adkrxfnawdiljhjaavnj`), region `ap-south-1`, status `ACTIVE_HEALTHY`. The project API URL is `https://adkrxfnawdiljhjaavnj.supabase.co`. Plan is Free per project details/context.
+- `list_migrations` confirms exactly one application migration: version `20261119125153`, name `flame_chick_postgres_default_privileges_hardening`.
+- Read `supabase_migrations.schema_migrations` and recovered the exact recorded SQL and migration name. It matches the security baseline SQL recorded in this handoff.
+- Added matching repository file `supabase/migrations/20261119125153_flame_chick_postgres_default_privileges_hardening.sql` to branch `work/production-source-audit`. This is a history/reconciliation file for a migration that is already applied. **Do not apply/reapply it.**
+- Read-only schema inspection: no `public` tables; no `public` or `private` application tables; `auth.users` has zero rows; no Edge Functions; no Storage buckets.
+- Security advisor returned zero lints.
+- The installed extensions list includes managed/preinstalled extensions. No extension was enabled, disabled, or changed.
+- All operations were read-only except the GitHub file creation. No Supabase SQL, migration, secret, user, bucket, function, or project setting was changed.
+- Stage 2 account verification and migration-history reconciliation are complete. Next: Stage 3 design the Production schema in small reviewed migrations. Before any DDL, inspect current source function contracts, reference Demo schema selectively, and document the proposed schema/migration plan. Do not mutate Production until the specific DDL batch is reviewed and approved.
 
 ## 11. Implementation roadmap — continue in this order
 
@@ -355,12 +370,6 @@ Run full end-to-end tests, security checks, rollback rehearsal, and backup resto
 
 **Stage 1 source-hygiene review is complete on `work/production-source-audit`.** Do not repeat the same source scans. The remaining Stage 1 limitation is that automated build/type/runtime tests have not been run; add an appropriate CI/test harness later when the app tooling is established, or run checks in a controlled local workspace before merge.
 
-**Stage 2 is now blocked** because the connected Supabase account lists only the HFP organization and HFP, Pizza Bite, and Flame Chick Demo projects. The intended Production ref `adkrxfnawdiljhjaavnj` is not visible. Ask the user to connect/authenticate the separate Flame Chick Supabase account/organization in ChatGPT. After that, verify the exact Production ref, name, Mumbai region, and Free plan read-only. Never substitute HFP or Demo.
+**Stage 2 is complete:** the Flamechic organization and exact Production project `adkrxfnawdiljhjaavnj` are visible and verified. The one applied migration was read from live migration history and its exact SQL has been added to the working branch as a historical migration file. It must not be reapplied. Production currently has no application schema, users, buckets, or Edge Functions. Continue with Stage 3 schema design/review; keep Production unchanged until the migration plan and each DDL batch are explicitly approved.
 
-Once the correct Production project is visible:
-
-1. Inspect migration history read-only and recover the exact applied migration `20261119125153_flame_chick_postgres_default_privileges_hardening`; compare it byte-for-byte with the expected SQL before adding its matching file to `supabase/migrations/`.
-2. Do not apply/reapply SQL, migrate, deploy functions, create users, seed data, or change settings during this reconciliation stage without separate explicit approval.
-3. Update this handoff with the exact verified account/project, migration history, file/commit changes, and next step.
-
-**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, then inspect the current branch head and continue the immediate next action above. Do not repeat the entire initial audit. Ask the user only for a decision that genuinely requires their preference or approval.
+**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, inspect the current branch head, and continue Stage 3 by reviewing the existing four Edge Function contracts and the archived Demo schema as references. Do not repeat the initial audit or Stage 2 account check unless the project/account identity changes. Keep Production read-only until a concrete schema plan is reviewed and approved.
