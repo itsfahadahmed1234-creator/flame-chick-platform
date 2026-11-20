@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security, menu requirements and Production schema/reliability blueprint drafted; API/column contract mapping remains  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security, menu requirements and Production schema/reliability blueprint drafted; GST deliberately deferred; API/column contract mapping remains  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -424,9 +424,20 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 - Demo raw catalog tables have anon SELECT policies and authenticated table grants. Production should use narrow allowlisted public catalog DTOs, private operational schemas, least-privilege grants, tenant/branch composite constraints and server-checked roles rather than copy policies blindly.
 - Demo order function writes zero tax and contains a Demo-specific manual-address/zero-fee path. Neither is approved for Production. Current published menu artwork says prices exclude applicable GST, but provides no rate or calculation policy; tax policy must be confirmed, not guessed.
 - Existing Admin writes compound catalog changes through multiple browser REST calls and lacks full modifier/schedule editors, unpriced draft support and complete deal-component editing. Blueprint recommends transactional server-side commands, concurrency checks, audit, and full Admin workflow.
-- Key schema domains: restaurant/branch tenancy; categories/subcategories/products/variants; modifier groups/options/assignments/pricing; deals/components/choice pools/schedules; draft and immutable publication; orders/items/modifiers/components/payments/tax snapshots; delivery/rider; staff/access/audit; POS devices/registers; settings/media/outbox.
+- Key schema domains: restaurant/branch tenancy; categories/subcategories/products/variants; modifier groups/options/assignments/pricing; deals/components/choice pools/schedules; draft and immutable publication; orders/items/modifiers/components/payments and immutable price snapshots; delivery/rider; staff/access/audit; POS devices/registers; settings/media/outbox.
 - No Production database, Storage, Function, role, settings or app deployment was changed.
-- Next: map current Admin/website/POS/catalog/order/delivery API field contracts to target columns/RPCs; refine ERD and migration dependencies; obtain owner decisions for GST, offline stale-price policy, publication roles, schedule scope and deal choices. Then create reviewed SQL in small migration batches for a disposable test project first. Do not apply Production DDL yet.
+- Next: map current Admin/website/POS/catalog/order/delivery API field contracts to target columns/RPCs; refine ERD and migration dependencies; obtain owner decisions for offline stale-price policy, publication roles, schedule scope and deal choices. GST is deferred from the initial schema by explicit owner decision. Then create reviewed SQL in small migration batches for a disposable test project first. Do not apply Production DDL yet.
+
+
+### Owner decision — defer GST/tax from initial schema — 2026-11-20
+
+- User explicitly agreed to keep GST out of the initial database/schema design to avoid unnecessary complexity. GST/tax is deferred until the user specifically asks to implement it.
+- Do **not** create tax configuration/rule tables, tax categories, tax schedules, order tax-line tables, tax snapshots, tax-rate/effective-date engines, or tax-calculation RPCs in the initial Production migrations.
+- Keep the first order financial model focused on item/variant/deal prices, quantities, subtotal, explicit discounts only where required, delivery fee, and total. Preserve immutable price and order snapshots.
+- Do not guess or hardcode a GST rate. The current menu artwork's note that prices exclude applicable GST is retained as reference context only; it does not authorize GST calculation or schema additions in this phase.
+- When GST becomes necessary, design it as a separate, reviewed forward migration and coordinated API/website/POS change. Do not retroactively rewrite completed order snapshots.
+- Blueprint updated to reflect this decision: `docs/architecture/production-schema-blueprint.md`, commit `cc0c917869ab4f7480049e8824f829332d967283`.
+- No Production database changes were made.
 
 ## 11. Implementation roadmap — continue in this order
 
