@@ -43,7 +43,7 @@ The current published artwork presents Quarter, Half and Full Broast as three na
 - An intentional free item is numeric zero and is distinct from missing price.
 - Price fields on product variants, deal bundle prices and delivery fees must not have a silent zero default where zero would conceal missing configuration.
 - A publish validator must reject a purchasable published product/variant/deal when its required price is unknown. It should report the precise offending records.
-- Keep the current menu's listed item prices as tax-exclusive base prices only if the confirmed Production tax policy follows the menu wording. Tax calculations and display must be configured server-side; no GST rate is inferred from the image.
+- GST/tax is explicitly deferred from the initial Production schema. Do not create tax-rule tables, tax-category fields, tax schedules, tax-line tables, rate engines or tax-calculation RPCs in this phase. Do not infer a GST rate from the menu image. Revisit GST later through a separately reviewed forward migration when the owner provides the applicable policy.
 
 ### Modifiers and reusable options
 
@@ -132,18 +132,17 @@ Any contract change must use an explicit catalog schema version and a staged com
 ### Order entities
 
 - orders: branch, order identity, customer/contact/address snapshots, fulfilment, source, status, totals, currency, payment state and lifecycle timestamps.
-- order_items: product or deal reference plus immutable name/variant/price/quantity/discount/tax snapshots.
+- order_items: product or deal reference plus immutable name/variant/price/quantity/discount snapshots.
 - order_item_modifiers: immutable selected modifier and price snapshots.
 - order_item_components: immutable deal component/selected product/variant/option snapshots.
 - order_status_history and order_events: append-only operational history, with actor, timestamp and reason.
 - payments: separate payment attempts/settlements/refunds with idempotency and provider references.
-- order_tax_lines: tax name/code/rate, taxable base, tax amount and calculation snapshot where GST or other taxes apply.
 
 Historical orders must never be re-priced or renamed when the menu changes. Catalog references may be retained for traceability, but snapshots are the historical truth.
 
 ### Server-side calculation
 
-The browser/POS must submit item IDs, quantities and selected option IDs; it must not be trusted for prices or totals. The server/database validates that the submitted items/options belong to the applicable publication and are eligible, then calculates subtotal, discount, tax, fees and total inside one transaction.
+The browser/POS must submit item IDs, quantities and selected option IDs; it must not be trusted for prices or totals. The server/database validates that the submitted items/options belong to the applicable publication and are eligible, then calculates subtotal, discount, delivery fee and total inside one transaction. GST/tax calculation is deferred from this initial schema phase and must not be inferred or silently introduced.
 
 The current Demo order function:
 - Reads live mutable products/variants/deals and uses their current prices.
@@ -160,20 +159,17 @@ Production should store catalog_publication_id and the publication version on ea
 - Option B: honour the exact retained publication snapshot used when the local order was started, subject to availability/validity safeguards.
 Do not implement silent re-pricing. This policy affects the order RPC and must be decided before Production order DDL is finalized.
 
-## 5. Tax, delivery and financial configuration
+## 5. Delivery and basic financial configuration
 
-### GST / tax
+### GST / tax deliberately deferred
 
-The current menu artwork explicitly says all prices are exclusive of applicable GST. The image does not specify the rate, effective date, jurisdiction, rounding method, tax-inclusive/exclusive checkout display or whether all product classes share the same treatment.
+The user explicitly decided on 2026-11-20 to leave GST for a later phase and avoid complicating the initial schema.
 
-Production needs:
-- Configurable tax rule(s) with code/name, rate, effective period, restaurant/branch scope and calculation/display mode.
-- Product/deal tax category or an explicit default tax category if the owner confirms one common rate.
-- Server-side tax calculation and a dedicated order tax snapshot/line.
-- Published menu/checkout copy that clearly says whether displayed prices are before tax.
-- Audit history for tax-rule changes.
-
-Do not guess the GST rate or treat the current Demo's zero tax as a valid Production rule. Confirm tax policy and rate with the owner/accountant before launch.
+- Do not create tax-rule tables, product/deal tax categories, tax schedules, tax-line tables, rate/effective-date engines or GST calculation RPCs in the initial schema.
+- Do not invent a GST rate or tax treatment.
+- Keep the initial order-money model focused on the required basics: item prices, quantity, subtotal, discounts only where confirmed, delivery fee and total.
+- The current menu artwork says prices are exclusive of applicable GST. That statement is recorded as a business requirement to revisit before changing customer-facing checkout/accounting behaviour, but it does not authorize implementing a tax model now.
+- When the user is ready, GST can be added through a separately reviewed forward migration and coordinated API/website/POS changes without rebuilding the catalog schema.
 
 ### Delivery fees
 
@@ -213,7 +209,7 @@ Do not guess the GST rate or treat the current Demo's zero tax as a valid Produc
 
 ### Proposed role separation (to confirm)
 
-- Owner: full control, staff/security/tax settings, publish and rollback.
+- Owner: full control, staff/security settings, publish and rollback.
 - Admin: catalog and operational administration; publish/rollback may be restricted by owner policy.
 - Manager: routine catalog drafting/availability and operations; publishing/price changes may require owner/admin depending on chosen policy.
 - Cashier: read published menu, create/serve orders and permitted POS actions; no catalog edits.
@@ -232,7 +228,7 @@ This is a proposed matrix. Reconcile it with the current role requirements and o
 
 ## 8. Audit, concurrency and operational reliability
 
-- Menu price, availability, category, modifier, deal, schedule, media publication, staff-role, tax and delivery-fee changes should be auditable.
+- Menu price, availability, category, modifier, deal, schedule, media publication, staff-role and delivery-fee changes should be auditable. GST/tax auditability is deferred until the later tax phase.
 - Audit records should identify actor, action, target, timestamp and safe change summary; redact credentials and customer PII.
 - Compound Admin actions must be atomic server-side transactions (e.g. create product + variants; create/edit deal + components; publish catalog + pointer switch).
 - Use optimistic concurrency (revision/version checks) to prevent one Admin user silently overwriting another's edits.
@@ -263,24 +259,24 @@ Do not apply these migrations until each SQL batch is authored, reviewed, tested
 5. Options/customization: modifier groups, options, assignments and variant-bound pricing rules.
 6. Deals and schedules: deal groups/components/choices, explicit schedule tables and selection validation.
 7. Publication: immutable catalog snapshots, current publication pointer, validation/publish/rollback RPCs and audit.
-8. Orders and finance: customers if needed, orders, items, components, modifiers, payments, taxes, idempotency and state transitions.
+8. Orders and finance: customers if needed, orders, items, components, modifiers, payments, idempotency and state transitions. GST/tax is excluded from this initial migration set.
 9. POS resources: devices, registers/sessions, tables and cash movements only where current app flows require them.
 10. Delivery and rider operations: areas/fees, tasks, offers, assignments, proofs, profiles, private push config, rate limit and outbox.
 11. Storage policies, indexes, views and narrowly scoped Realtime publication.
-12. Approved initial restaurant/branch/tax/delivery configuration and menu entry through Admin (not bulk SQL seed from either image).
+12. Approved initial restaurant/branch/delivery configuration and menu entry through Admin (not bulk SQL seed from either image).
 
 The actual migration split may change after full dependency mapping and the app contract review. Keep each migration focused and reversible where feasible.
 
 ## 11. Open decisions before final DDL
 
 1. For stale offline POS orders, should the server hold for cashier confirmation when the locally cached catalog version is no longer current, or honor the retained historical version?
-2. What GST rate/policy applies, when does it take effect, and should website/POS show an added tax line at checkout?
+2. GST/tax is deliberately deferred. Do not add it to the initial schema; revisit through a later reviewed migration when requested.
 3. Should product flavors/portion choices be represented as variants, modifiers, or separate products by menu family?
 4. Should deals allow curated customer choices, category/subcategory pools, substitutions, surcharges and optional add-ons?
 5. Are scheduled offers recurring daily/selected days or one-off date windows, and are they restaurant-wide or branch-specific?
 6. Which roles may edit prices, approve/publish catalog versions, change tax/delivery fees and roll back?
 7. Should website and POS share one restaurant-wide published catalog, or can branch/channel-specific availability and pricing differ?
-8. Are stock counts, ingredient inventory, allergens, dietary labels or item-level taxes required in the first production version?
+8. Are stock counts, ingredient inventory, allergens or dietary labels required in the first production version?
 
 Do not invent these rules. Record confirmed answers in the handoff before finalizing affected tables/RPCs.
 
@@ -298,7 +294,7 @@ These are observations from the current branch source and archived Demo SQL, not
 - The current POS uses schemaVersion 2, requires a fixed array contract, and converts missing variant prices/delivery fees to zero in its adapter.
 - The current POS's IndexedDB catalog replacement clears existing stores before writing the new cache version; use staged versioned storage and an atomic active-version switch.
 - The current POS submits product/deal IDs after offline entry; the order function calculates using live database values. Add catalog version binding and a safe stale-price policy.
-- The old Demo order function writes zero tax amounts. It does not implement the GST stated on the current menu artwork.
+- The old Demo order function writes zero tax amounts. GST/tax is explicitly deferred from the initial Production schema at the user's direction; do not copy Demo's zero-tax behaviour as a claimed tax implementation or create tax structures now. Revisit separately later.
 - The old Demo delivery/order functions include an explicit manual-address/zero-fee path and zero defaults; Production must not inherit those behaviours.
 - The source contains legacy HFP/Pizza Bite internal identifiers and trigger names. Rename only as part of an explicitly coordinated contract migration; do not mass-rename.
 
