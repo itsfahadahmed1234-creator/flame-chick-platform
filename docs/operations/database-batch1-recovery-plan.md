@@ -102,3 +102,21 @@ If application tables/functions/types are ever added to `app_private`, this empt
 ## What this plan does not reverse
 
 This migration must not change project settings, API exposed schemas, Auth, Storage, Realtime configuration, secrets, Edge Functions, Vercel, websites, POS or Rider apps. Those controls remain untouched.
+
+
+
+## 2026-11-20 — User-confirmed exposed schemas and candidate rollback rehearsal
+
+The user inspected the correct Flame Chick Production API settings and confirmed exactly two exposed schemas: `graph_ql` and `public`. `app_private` is absent. No API setting was changed.
+
+The exact current candidate SQL was executed against connected Production with only the final `COMMIT;` changed to `ROLLBACK;`. Post-run verification returned:
+- current_user/session_user = postgres/postgres
+- app_private exists = false
+- app_private default ACL rows = 0
+- app_private Realtime publication rows = 0
+- public application relation count = 0
+- no additional application migration history beyond the baseline
+
+This validates transaction execution and rollback of the candidate statements. It does not leave any objects behind and does not constitute a persistent migration.
+
+Persistent Batch 1 remains unapplied. External encrypted schema dump has not been created because the available environment lacks Supabase CLI, Docker and pg_dump. Since the target project has no application data/tables and Batch 1 is only an empty schema plus scoped default ACLs, the remaining decision is whether the user explicitly accepts proceeding without an external dump or wants to arrange a dump first.
