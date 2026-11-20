@@ -315,6 +315,17 @@ Constraints and write rules:
 - No customer-facing direct SELECT. The future branch discovery command may return only the approved safe projection: opaque branch ID, customer-facing name and supported fulfilment modes. Do not return operational address/phone without an explicit public-field decision.
 - `updated_at` must be updated by every trusted mutation command.
 
+### 4.2A Application fulfilment contract (source-reviewed 2026-11-20)
+
+Canonical values for future orders:
+- `delivery`: Website and POS; delivery address/area and delivery-fee validation apply; delivery task may be created.
+- `pickup`: Website and POS; this is the canonical stored value for the POS UI label Takeaway; no delivery address/area or rider task.
+- `dine_in`: POS only; no rider task. Website active checkout currently exposes Delivery and Takeaway only.
+
+Do not store a separate `takeaway` value. Keep customer/staff labels separate from canonical API/database values. The website's active checkout maps Delivery → `delivery` and Takeaway → `pickup`; its legacy `js/app.js` is not loaded and must not be treated as the active website contract. The POS contains Dine-in handlers despite its hidden UI controls; preserve Dine-in support in the future data/API model. Owner explicitly instructed not to fix the current POS UI mismatch now.
+
+The authoritative source findings and sync requirements are in `docs/architecture/pos-fulfillment-and-offline-sync-contract-review.md`.
+
 ### 4.3 Tenant and branch FK rule for all future tables
 
 For a branch-owned child:
