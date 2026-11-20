@@ -334,7 +334,7 @@
     deps = deps || {};
     var conf = deps.config || (typeof HFP_CONFIG !== 'undefined' ? HFP_CONFIG : null);
     if (!conf || !conf.apiBase) {
-      return Promise.reject(new Error('Pizza Bite catalog API is missing.'));
+      return Promise.reject(new Error('Flame Chick catalog API is missing.'));
     }
     var fetchImpl = deps.fetchImpl ||
       (typeof window !== 'undefined' && window.fetch
@@ -348,11 +348,11 @@
     var timeoutMs = deps.timeoutMs !== undefined ? deps.timeoutMs : (conf.requestTimeoutMs || 12000);
     var retries = deps.retries !== undefined ? deps.retries : (conf.retries !== undefined ? conf.retries : 2);
     var retryDelayMs = deps.retryDelayMs !== undefined ? deps.retryDelayMs : (conf.retryDelayMs || 600);
-    var cacheKey = conf.catalogCacheKey || 'pizza_bite_catalog_v1';
+    var cacheKey = conf.catalogCacheKey || 'flame_chick_catalog_v1';
     var formatVersion = conf.cacheFormatVersion !== undefined ? conf.cacheFormatVersion : 1;
 
     if (!conf.publishableKey) {
-      return Promise.reject(new Error('Pizza Bite public API key is missing.'));
+      return Promise.reject(new Error('Flame Chick public API key is missing.'));
     }
     var fetchOpts = {
       fetchImpl: fetchImpl,
