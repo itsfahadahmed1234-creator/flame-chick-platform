@@ -200,6 +200,10 @@ No Kitchen role is created in V1. Current source code contains a Kitchen role re
 
 **Staff invitation is a cross-system workflow, not one ACID transaction.** Supabase Auth invitation and PostgreSQL role assignment cannot be assumed to commit atomically. Use a recoverable invitation state machine with a unique command key: record pending request, call Auth invite from the server, then bind/activate the role through an idempotent database command after the invited identity is verified. Record pending/sent/accepted/failed/expired outcomes without exposing invite tokens. If Auth succeeds but the role write fails, reconcile/retry the same invitation command rather than creating duplicate users or invitations. Never activate a role for an unverified or mismatched Auth identity.
 
+### 5.4A user_role_branch consistency guard
+
+The logical rule is one active role_key per (restaurant_id,user_id). Operational roles may have that same role assigned to multiple branches; Admin/Owner are restaurant-wide and cannot coexist with branch-scoped rows. Enforce this in the transactional staff command under a per-user/restaurant advisory lock and add a constraint-trigger/guard as defense in depth. A plain partial unique index cannot enforce a cross-row same-role invariant by itself. Concurrent role changes must serialize. Role audit and assignment changes commit together.
+
 ### 5.5 staff_role_audit
 
 Append-only staff identity/role history.
@@ -408,6 +412,36 @@ deal_schedule_days:
 
 The exact recurrence, overlap, overnight and branch-scope rules remain open. Do not enable schedule rows in Production until those semantics are confirmed. No scheduler/Edge Function is required merely to represent a schedule; order/catalog commands check eligibility.
 
+
+## 7.5 Branch availability overlays and catalog identity
+
+V1 base menu definitions and base prices are restaurant-wide. Sellability may vary by branch; delivery pricing is already branch-specific. No branch price override is allowed in V1.
+
+### `branch_variant_availability`
+- restaurant_id, branch_id, product_variant_id uuid NOT NULL
+- is_available boolean NOT NULL
+- reason text NULL (bounded operational note; no customer PII)
+- updated_by uuid NOT NULL; updated_at timestamptz NOT NULL
+- PK (branch_id, product_variant_id)
+- Composite FKs bind branch and variant to the same restaurant.
+- Missing row inherits the global published variant availability. Global inactive/archived variant always remains unsellable; branch override cannot reactivate it.
+
+### `branch_deal_availability`
+- restaurant_id, branch_id, deal_id uuid NOT NULL
+- is_available boolean NOT NULL
+- updated_by uuid NOT NULL; updated_at timestamptz NOT NULL
+- PK (branch_id, deal_id)
+- Composite FKs bind branch and deal to the same restaurant.
+- Missing row inherits global published deal availability. Global inactive/archived deal cannot be reactivated.
+
+### `branch_catalog_state`
+- restaurant_id, branch_id uuid PK (composite)
+- availability_revision bigint NOT NULL DEFAULT 1
+- updated_at timestamptz NOT NULL
+- Increment atomically for every branch availability change; Admin/Owner only.
+
+Every order snapshots both `catalog_publication_id/version` and `branch_availability_revision`. Website/POS catalog cache identity includes publication ID/version, branch ID, branch availability revision and catalog schema version. POS stale-cache hold/explicit confirmation checks both versions. Do not silently reprice; V1 base prices are identical across branches.
+
 ## 8. Draft revision and immutable publication
 
 ### 8.1 catalog_draft_state
@@ -596,25 +630,36 @@ Preserve what was selected in a deal; validate choices against active publicatio
 
 Append-only; status update and history insert must be one transaction. No normal app DELETE or UPDATE.
 
-### 10.6 payments
+### 10.6 payments — immutable collection/refund ledger
 
-Include only fields required by the current POS payment flow; do not invent a payment provider or refund engine.
+Do not overwrite a collection row to represent a refund. Model every actual money movement as an append-only payment ledger entry.
 
 - id uuid PK
 - restaurant_id, branch_id, order_id uuid NOT NULL
-- payment_method text NOT NULL (match existing cash/card/bank/other methods after source audit)
-- amount numeric(12,2) NOT NULL CHECK >= 0
+- entry_type text NOT NULL CHECK IN ('collection','refund')
+- payment_method text NOT NULL (source-confirmed cash/card/bank/other)
+- amount numeric(12,2) NOT NULL CHECK (amount > 0)
 - currency_code char(3) NOT NULL
-- status text NOT NULL (only source-confirmed states)
-- provider_reference text NULL (unique when supplied)
+- status text NOT NULL CHECK IN ('succeeded','failed','voided') only where source flow needs these; failed/voided rows never count as collected
+- original_collection_id uuid NULL FK payments(id); required for refund, null for collection
+- provider_reference text NULL (unique per provider/tenant when supplied)
 - idempotency_key text NOT NULL
-- received_by_user_id uuid NULL (verified actor)
-- paid_at timestamptz NULL
-- created_at, updated_at timestamptz NOT NULL
+- received_by_user_id uuid NULL (verified actor for collection)
+- refunded_by_user_id uuid NULL (verified Admin/Owner actor for refund)
+- reason_code text NULL; reason_note text NULL
+- occurred_at timestamptz NOT NULL (database time)
+- created_at timestamptz NOT NULL
 
-No raw card number, CVV, bank password, wallet secret or payment token is stored here. A returned order does not automatically create a refund; payment/notification outcome remains a separate confirmed business decision. Keep original payment events.
+Constraints/commands:
+- A collection is positive and has no original_collection_id. A refund is positive and references a succeeded collection for the same order, restaurant, branch and currency.
+- Refund amount may not exceed the remaining refundable amount. The refund command locks the original collection row, sums prior succeeded refunds and inserts the new refund in the same transaction.
+- Refund idempotency is scoped by restaurant/branch/command key; unique constraint is final race guard. Concurrent refunds cannot over-refund.
+- Only Admin/Owner may authorize and record a refund in V1. Manager/Cashier/Rider cannot do this.
+- Record a refund only after money was actually returned through the recorded method. A refund request or promised refund is not a completed refund.
+- Payment/order status is a derived or command-maintained summary; it never rewrites/deletes ledger entries.
+- Returned COD order with no successful collection is marked not_collected/closed_uncollected in the payment summary and creates no refund entry.
+- No payment gateway, raw card data, CVV, bank credentials, wallet secrets, automatic refund, store credit or tax/GST implementation in V1.
 
-No tax, GST, tax-line, tax-rate or zero-tax implementation is included in V1.
 
 ## 11. Delivery and rider tables
 
@@ -637,6 +682,26 @@ The authoritative detailed delivery contract is docs/architecture/delivery-lifec
 - created_at, updated_at timestamptz NOT NULL
 
 Task/order branch must match. Creation is atomic with order acceptance/dispatch eligibility. Fee/contact/address snapshots are immutable after task creation except by an audited correction command.
+
+### 11.1A delivery_dropoff_locations (app_private)
+
+Optional single customer-shared fixed destination pin per delivery order/task; private schema, no Data API exposure.
+
+- id uuid PK
+- restaurant_id, branch_id, order_id, delivery_task_id uuid NOT NULL
+- latitude numeric(9,6) NOT NULL CHECK BETWEEN -90 AND 90
+- longitude numeric(9,6) NOT NULL CHECK BETWEEN -180 AND 180
+- accuracy_m numeric(9,2) NULL CHECK IS NULL OR >= 0
+- location_source text NOT NULL CHECK IN ('device_once','manual_map_pin')
+- customer_consented_at timestamptz NOT NULL
+- consent_notice_version text NOT NULL
+- created_at timestamptz NOT NULL DEFAULT transaction_timestamp()
+- UNIQUE(order_id), UNIQUE(delivery_task_id)
+- Composite FKs bind same restaurant, branch, order and delivery task; delivery task must reference the same order. Add parent composite unique keys where necessary rather than weakening tenant integrity.
+
+Insert only as part of the atomic website delivery-order command. Written address remains required; pin is optional. No direct browser table grants. Rider can read only for their current active assignment; authorized POS reads are branch-scoped; Admin/Owner access follows restaurant-wide business authority. Reassignment immediately revokes previous Rider access. Generate Google Maps directions from validated coordinates; never store arbitrary customer URL.
+
+No Rider GPS, continuous customer tracking, location sessions, updates, movement history, polling, geofencing or Realtime location channel. Proposed precise-coordinate cleanup within 24 hours after terminal delivery state remains pending operational/legal confirmation. No pin must never be treated as (0,0).
 
 ### 11.2 rider_profiles
 
@@ -952,124 +1017,16 @@ Free plan logs retain only one day; permanent audit is in append-only applicatio
 
 ## 20. Open decisions still requiring the owner
 
-These are genuinely unresolved and must not be silently inferred:
+These items remain genuine blockers or implementation details and must not be silently inferred:
 
-1. Must rejection and failed-delivery reasons be mandatory? Which reason codes and free-text note rules?
-2. Should Not Listed ask for a separate locality/mohalla label in addition to the required full address?
-3. Who exactly may create, change prices, publish and roll back menu versions? Reconcile the existing owner-only role assignment rule with Admin's full business access.
-4. Do deals support curated choices only, category/subcategory pools, substitutions, surcharges, optional extras, or multiple modes?
-5. What are the recurring schedule rules (weekday, one-off, overnight, timezone, branch scope)?
-6. Are different branch prices/menu availability required at first release, or is the approved first version restaurant-wide menu + branch-specific delivery fees?
-7. Is a Kitchen-only role needed at launch? No Kitchen role is created by default.
-8. Are ingredient stock counts required? Current V1 excludes ingredient inventory.
-9. On confirmed physical return, what should happen to payment status, customer notification and any refund/reorder process? No automatic refund is implemented or assumed.
-10. Does the Rider workflow need a distinct arrival-at-restaurant event, or is pickup the next explicit recorded state?
+1. **Not Listed locality:** collect a separate locality/mohalla label in addition to full address? It must never determine fee.
+2. **Deal schedules:** recurring weekday/date-range, overnight, timezone, overlap and branch-scope semantics. Keep schedule authoring disabled until settled.
+3. **Kitchen role:** current source has a Kitchen read path; V1 denies it unless owner explicitly approves role and exact fields/actions.
+4. **Inventory:** ingredient-level stock/inventory remains excluded unless approved.
+5. **Rider arrival event:** does Rider need a distinct arrived-at-restaurant event, or is pickup the next recorded state?
+6. **Customer pin retention:** proposed 24-hour precise-coordinate deletion after terminal state; confirm operational support/legal requirements before implementation.
+7. **Terminal pin support access:** may Admin/Owner access a pin after terminal state for a support case? Default deny after terminal state until explicitly decided.
+8. **Website security audit:** intentionally deferred; mandatory stop-gate immediately before attaching website to database. No website audit is part of this database-only stage.
 
-No further delivery lifecycle decisions are needed; all five are confirmed. The stale offline POS catalog hold/confirmation rule is also confirmed.
+**Resolved and removed from open questions:** branch resolution; restaurant-wide base menu/prices with branch availability overlays; one role identity per user/restaurant with same-role multi-branch assignment; curated deal choices and explicit surcharges; returned-order payment ledger/refund behavior; no Rider GPS/continuous customer tracking.
 
-## 21. Official references and evidence date
-
-Checked 2026-11-20:
-- Supabase Free plan and organization usage quotas: https://supabase.com/docs/guides/platform/billing-on-supabase
-- Edge Function invocation billing (all response statuses count; OPTIONS excluded; Free 500k): https://supabase.com/docs/guides/platform/manage-your-usage/edge-function-invocations
-- Edge Function runtime/platform limits: https://supabase.com/docs/guides/functions/limits
-- Edge Function authentication and JWT guidance: https://supabase.com/docs/guides/functions/auth
-- Auth endpoint rate limits: https://supabase.com/docs/guides/auth/rate-limits
-- Edge Function rate-limiting example: https://supabase.com/docs/guides/functions/examples/rate-limiting
-- Realtime limits by plan: https://supabase.com/docs/guides/realtime/limits
-- Supabase Cron overview (optional only; verify actual Free project behavior before adopting): https://supabase.com/docs/guides/cron
-- Securing Data API and RLS exposure: https://supabase.com/docs/guides/api/securing-your-api
-
-This is a planning snapshot, not a guarantee that quotas remain unchanged. Recheck official docs and the live Flame Chick project's actual usage before implementation/cutover.
-
-
-### 14.6 Owner-confirmed customer order quota (2026-11-20)
-
-The owner explicitly approved these simultaneous rolling-window limits per normalized customer phone for customer website submissions (source=website) only:
-
-| Window | Maximum newly committed order records |
-|---|---:|
-| 1 minute | 3 |
-| 10 minutes | 3 |
-| 1 hour | 15 |
-
-Use database time and rolling windows, not calendar boundaries. The 1-minute rule is mathematically dominated by the 3-per-10-minute rule, but retain the explicit check and named policy because the owner asked for all three. A fourth order within either the 1-minute or 10-minute window is rejected; a sixteenth within one hour is rejected.
-
-**Scope:** apply this quota ONLY to customer website submissions (`source=website`). POS orders are exempt even if POS delivery orders use the same Order API. Authenticated staff-created phone/WhatsApp/manual/third-party orders are also exempt. Keep authentication and authorization requirements on those channels. The cap is deliberately a customer-website checkout policy, not a whole-business order quota.
-
-**Identity limitation:** the current website collects a phone number but does not prove ownership with OTP. This quota is therefore per canonical phone number supplied, not a verified natural person. A customer can evade a phone-keyed cap by using a different number. Do not add SMS/OTP spend or login friction without a separate approval. A trusted-IP abuse signal may be added as a secondary control only after ingress header spoofing tests; shared mobile-carrier NAT means IP should not replace phone as the person key.
-
-**Atomic algorithm:**
-1. For website `source=website` only, the Order Edge Function validates the public request, normalizes the phone using one shared documented rule and computes HMAC-SHA-256 with a server-only key (e.g. FLAME_CHICK_ORDER_RATE_HMAC_SECRET). The browser cannot supply or override the digest. For POS and other staff-authenticated sources, do not apply or require this website quota digest.
-2. It passes the website-only digest, key-version and (during rotation) previous-key digest to the service-role-only order-creation RPC. POS and staff order creation call the same order command but skip the website-only quota branch. Do not make a separate public preflight limiter RPC call.
-3. Inside the same DB transaction, first look up the existing order by branch/source/idempotency key. An exact matching replay returns the original order and consumes no quota; key reuse with a different request is a 409.
-4. Only when source=website, acquire a transaction-scoped advisory lock derived from the normalized phone digest. Count committed website order events inside each rolling window. If any count is already at its maximum, reject with stable RATE_LIMITED and compute Retry-After as the maximum time until all exceeded windows admit another order. POS and staff sources skip this step.
-5. Validate canonical catalog prices, delivery area/default fee, order items and branch. Create order, line snapshots, status event and any required delivery task. Insert one website rate event linked uniquely to the new order only when source=website. POS and staff sources do not write quota events. Any failure rolls back the order and, for website, the quota event.
-6. On commit, one new order consumes exactly one slot. A later restaurant rejection/cancellation does not remove the event. Never manually delete a rate event as part of order cancellation.
-
-**Private event table:** app_private.website_order_rate_limit_events with order_id UUID PRIMARY KEY REFERENCES public.orders(id) ON DELETE RESTRICT, restaurant_id UUID NOT NULL, branch_id UUID NOT NULL, phone_subject_digest BYTEA NOT NULL, digest_key_version SMALLINT NOT NULL, occurred_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(). Insert rows only for `source=website`. Add an index on (phone_subject_digest, occurred_at DESC). The table is private, append-only and inaccessible to anon/authenticated. No raw phone, raw IP or request payload is stored. Retain 48 hours, then remove expired rows in bounded batches; the longest enforcement window is one hour.
-
-**Key rotation:** Edge Function keeps current and previous HMAC versions during a minimum one-hour overlap; database checks matching digest/version pairs across both versions. New event rows use the current version. Never rotate in a way that resets the customer's active quota. Secret values are never committed to Git or exposed to a browser.
-
-**Idempotency nuance:** the website currently retains its request payload/key in sessionStorage and POS derives an order key from localOrderId. Preserve these. Return replay before rate-limit evaluation; use a canonical payload fingerprint and enforce unique order idempotency. A malicious new key is a new attempt/order and consumes quota only if committed.
-
-**Public replay privacy:** a public website replay must return only a minimal generic success acknowledgement and a non-sensitive receipt reference. Never return an order row, address, phone, status history or reusable order-lookup capability merely because the caller knows an idempotency key. Staff replay responses may include only fields their verified role and branch are authorized to read.
-
-**Failure semantics:** invalid JSON, invalid phone, invalid area, unavailable/unpriced item, failed constraint or rolled-back order does not consume quota. A request rejected because the cap is reached creates no order/event and responds 429 with Retry-After. Rate limiting never substitutes for validation, authorization or anti-bot protection.
-
-**Quota caveat:** a 429 generated by an Edge Function is still an Edge Function invocation. This website-only quota protects successful website order writes; it does not shield the 500,000 invocation allowance from volumetric traffic. Universal Website/POS idempotency protects against accidental duplicate writes on both channels but does not save invocations from repeated malicious requests. Keep upstream protection as a separate measured response.
-
-
-### 14.7 Universal order idempotency — Website and POS (2026-11-20)
-
-Idempotency is mandatory for all order sources, not only the customer website:
-- Unique scope: (restaurant_id, branch_id, source, idempotency_key), subject to final source-compatibility verification.
-- request_fingerprint is calculated server-side from canonical validated business fields; never trust a client-supplied fingerprint.
-- Website keeps its stable pending idempotency key/payload in sessionStorage until confirmed success. POS keeps a stable key derived from localOrderId through retries, reloads and offline reconnection.
-- The order RPC takes a transaction-scoped idempotency lock, looks up the scoped key, returns the existing order on an exact fingerprint match, and returns 409 IDEMPOTENCY_KEY_REUSED on a changed fingerprint.
-- A unique database constraint is the final concurrency guard. Same-key parallel retries must produce one order.
-- Exact replay must not recreate order items, payment rows, delivery task, status event, outbox event or website quota event.
-- POS never invokes or consumes the customer website phone quota. It still receives identical idempotent replay protection and server-side transaction/validation guarantees.
-- A network timeout after commit is an ambiguous outcome. The client must keep the key and retry/query by that key; never create a replacement key merely because it did not receive the response.
-- Other retryable mutations use unique command/request IDs stored with the business event (status, delivery, return, staff, catalog publish); notifications use a unique transactional outbox event key.
-
-## Future customer drop-off pin — field-level schema extension
-
-Authoritative detail: [Customer Drop-Off Pin ERD & Authorization Addendum V1](./customer-dropoff-pin-erd-authorization-addendum-v1.md).
-
-### `app_private.delivery_dropoff_locations`
-
-This private table stores at most one fixed destination pin per delivery order. It is not exposed through the Supabase Data API.
-
-| Field | Candidate type | Rule |
-|---|---|---|
-| id | uuid PK | Server-generated |
-| restaurant_id | uuid NOT NULL | Composite tenant FK |
-| branch_id | uuid NOT NULL | Composite branch FK |
-| order_id | uuid NOT NULL UNIQUE | One optional pin per order |
-| delivery_task_id | uuid NOT NULL UNIQUE | One optional pin per task |
-| latitude | numeric(9,6) NOT NULL | CHECK BETWEEN -90 AND 90 |
-| longitude | numeric(9,6) NOT NULL | CHECK BETWEEN -180 AND 180 |
-| accuracy_m | numeric(9,2) NULL | If supplied, non-negative |
-| location_source | text NOT NULL | CHECK in device_once, manual_map_pin |
-| customer_consented_at | timestamptz NOT NULL | Consent timestamp |
-| consent_notice_version | text NOT NULL | Notice version shown |
-| created_at | timestamptz NOT NULL | Database transaction time |
-
-Required:
-- Composite FKs bind `(order_id, restaurant_id, branch_id)` and `(delivery_task_id, restaurant_id, branch_id, order_id)` to the same order/task/tenant/branch. Add matching parent unique keys if absent; never weaken the tenant relation.
-- A database constraint/command invariant rejects non-delivery orders.
-- No cascading deletion of operational history. Purge precise coordinates explicitly after the approved retention period.
-- No row means the customer did not share a pin; written address remains required.
-- No public/browser table grants. The existing Order API validates and inserts an optional pin in the same transaction as order, order items, delivery task, status event, outbox and Website-only quota event. Rollback removes all writes together.
-- No location write RPC, location token, recurring update endpoint, GPS session, coordinate history or Realtime location channel.
-
-### Google Maps URL
-
-Do not persist a user-provided map URL. Generate the Rider/POS directions URL from the validated coordinates using a fixed Google Maps directions template. The generated link is not a credential and must not be logged. The Rider/POS client receives coordinates only through the narrow authorized delivery-detail DTO and constructs the URL.
-
-### Retention proposal
-
-Purge precise coordinates within 24 hours after a terminal delivery outcome, subject to confirming support/legal needs before implementation. Keep non-coordinate consent/access audit metadata under its separate retention schedule. Cleanup must not cascade-delete orders, tasks, payment events or audit history.
-
-No Production DDL or app feature is authorized by this design addition.
