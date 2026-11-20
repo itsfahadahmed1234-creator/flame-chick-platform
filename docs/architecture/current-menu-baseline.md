@@ -8,7 +8,7 @@
 
 The image states: **“All prices are exclusive of applicable GST.”**
 
-The image does not state a GST rate, tax calculation method, tax registration configuration, or whether tax is applied per line or at order level. Do not invent these settings. Tax must be configurable and calculated on the server once business/accounting rules are confirmed.
+The image does not state a GST rate, tax calculation method, tax registration configuration, or whether tax is applied per line or at order level. The user has explicitly deferred GST from the initial Production schema to keep the first release simple. Record the menu's GST wording as source context only; do not create tax tables or tax-calculation logic in this phase.
 
 ### Starters
 
@@ -93,7 +93,7 @@ The Production schema and Admin panel must comfortably support:
 - This document is transcription from the supplied artwork only. It is not proof of the exact live website/POS catalog values or internal variant structure.
 - The artwork is a user-provided visual baseline, not an authoritative tax/accounting policy.
 - The beverage heading is not visible in the image. Confirm the intended category name and placement.
-- Confirm whether the displayed amounts are entered as tax-exclusive selling prices and GST is added at checkout, or whether a separate accounting treatment applies. The artwork only says prices exclude applicable GST.
+- GST implementation is explicitly deferred from the initial schema by owner decision. No GST rate or checkout calculation should be inferred from the artwork.
 - Confirm how “NEW” behaves (permanent until manually removed, or automatic expiry).
 - Confirm whether Platter components are fixed products and whether Fries & Dips are tracked as catalog components or descriptive inclusions.
 - Current menu artwork has no explicit flavor modifiers or customer-selected combo choices. Do not invent these for current published items; design future Admin capabilities separately.
