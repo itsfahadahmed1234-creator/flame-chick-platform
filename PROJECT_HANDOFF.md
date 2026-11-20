@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security, menu requirements and Production schema/reliability blueprint drafted; GST deliberately deferred; API/column contract mapping remains  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security, menu requirements, Production schema/reliability blueprint and delivery-area fee behavior documented; GST deliberately deferred; API/column contract mapping remains  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -443,6 +443,45 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 
 - After the owner decision, aligned both menu design records with the GST deferral: `docs/architecture/current-menu-baseline.md` (commit `4cb4fe5b001713633a7f51d99a32fb38df0b4771`) now treats the GST phrase as source context only, and `docs/architecture/menu-management-design.md` (commit `8385e29a62688e3190b0a6d510ed263a9d1118e8`) marks tax as out of scope for the initial schema.
 
+### Owner decision — Delivery area pricing logic confirmed — 2026-11-20
+
+The user confirmed the Production delivery-fee behavior:
+
+- Admin manages a list of named delivery areas/localities, each with its own explicit delivery fee. Examples discussed: fee amounts such as Rs. 0 to Rs. 500; no fee bands or formula are implied by that phrase.
+- Customer selects their matching listed area and the backend uses that area's configured fee.
+- If their locality is not in the list, customer can select **Not Listed / Other**. This uses the separate default delivery fee configured by Admin.
+- Not Listed is a distinct selection mode, not a distance calculation, geolocation calculation, nearest-area match or client-supplied fee.
+- Default fee can deliberately be zero, but an unset/missing default is not zero and must block Not Listed checkout. Explicit zero means the Admin saved zero on purpose.
+- Listed and Other fee values must be read and enforced server-side; never trust price/fee from the website/POS request.
+- Snapshot fee source, selected area/Other classification, displayed area label and exact calculated fee on the order and delivery task. Later changes to Admin fees affect new orders only, never historic orders.
+- Keep area and default-fee scope aligned to the selected branch. Current single-main-branch configuration may use one branch default; do not allow branch A's area list/default to leak into branch B if multi-branch support is activated.
+- A manually typed locality/mohalla for an Other selection is recommended for rider/manager context, but the user has not explicitly confirmed whether this field is mandatory. Confirm UI requirement before implementing it; it must never determine the fee.
+
+**Existing source audit findings (current branch code, not changes to live apps):**
+- Admin already manages delivery_areas CRUD and a separate restaurant_settings key DefaultDeliveryFee. The current UI stores this default as restaurant-wide (branch_id IS NULL, is_public=true) and area rows against the selected branch.
+- Existing Admin's new-area fee form is prefilled with 0; make the initial field blank/required, and accept zero only after explicit input.
+- Current customer website already displays each active area's fee and a Not Listed choice, reads DefaultDeliveryFee from the catalog settings, and blocks checkout when that default is unset.
+- Current POS resolves the entered area against active area rows or uses DefaultDeliveryFee for the explicit Not Listed label, and blocks delivery order submission when default is unset.
+- Current POS catalog adapter converts a missing area fee to zero (Number(value) || 0). Production contract must not do this for a required fee.
+- Current POS delivery-order payload sends null area_id with area_name: Not Listed for Other; the Production order contract should add an explicit selection discriminator (e.g. delivery.selection_type = listed_area | not_listed) rather than infer Other from NULL area_id alone. Server must reject ambiguous/missing selection.
+- Current catalog Edge Function reads active areas for the restaurant without selecting a branch. Production catalog must expose only area choices and default fee applicable to the selected fulfilment branch. The public response may expose area names and delivery prices only, not unrelated restaurant settings or staff/internal data.
+- No live app code or Production database was changed during this audit.
+
+**Blueprint:** Delivery fee model has been documented in docs/architecture/production-schema-blueprint.md (commit 703df0269b76a689a489ea29ec617d99671dfd41). It covers Admin CRUD, listed/Other fee resolution, explicit zero vs unset, server enforcement, snapshots, branch scope, and current source gaps.
+
+**Test cases required before launch:**
+1. Listed active area with a configured positive fee -> fee matches DB area record.
+2. Listed active area with explicitly saved Rs. 0 -> order may proceed at zero only if that is the actual Admin setting.
+3. Inactive/unknown area ID -> rejected; never treated as Other.
+4. Explicit Not Listed with configured default positive fee -> use default.
+5. Explicit Not Listed with explicitly configured zero default -> use zero.
+6. Not Listed with NULL/missing/invalid default -> blocked; no order or delivery task.
+7. Client sends tampered area fee/default fee -> ignored; server-calculated fee wins.
+8. Client sends NULL area_id without explicit Not Listed selection -> rejected.
+9. Area belonging to another branch/restaurant -> rejected.
+10. Admin fee changed after an order was placed -> prior order and delivery-task snapshots unchanged; next new order uses new fee.
+11. Public catalog for a branch must not include other branch's restricted areas/default.
+12. Takeaway/pickup does not incur delivery fee and does not require an area selection.
 ## 11. Implementation roadmap — continue in this order
 
 ### Stage 1 — Source hygiene and durable handoff (current)
@@ -489,4 +528,4 @@ Run full end-to-end tests, security checks, rollback rehearsal, and backup resto
 
 **Stage 2 is complete:** the Flamechic organization and exact Production project `adkrxfnawdiljhjaavnj` are visible and verified. The one applied migration was read from live migration history and its exact SQL has been added to the working branch as a historical migration file. It must not be reapplied. Production currently has no application schema, users, buckets, or Edge Functions. Continue with Stage 3 schema design/review; keep Production unchanged until the migration plan and each DDL batch are explicitly approved.
 
-**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, `docs/architecture/menu-management-design.md`, `docs/architecture/current-menu-baseline.md`, and `docs/architecture/production-schema-blueprint.md`; inspect the current branch head and continue Stage 3 with API/column/RPC contract mapping and open decision resolution. Do not repeat completed repository/Production-account audits unless identity changes. Production remains read-only until migration batches have been tested and explicitly approved. The reference image is not content to publish. Design routine menu authoring in Admin so future menu changes do not require DDL. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
+**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, `docs/architecture/menu-management-design.md`, `docs/architecture/current-menu-baseline.md`, and `docs/architecture/production-schema-blueprint.md`; inspect the current branch head and continue Stage 3 with API/column/RPC contract mapping, delivery-fee enforcement and remaining open decision resolution. Do not repeat completed repository/Production-account audits unless identity changes. Production remains read-only until migration batches have been tested and explicitly approved. The reference image is not content to publish. Design routine menu authoring in Admin so future menu changes do not require DDL. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
