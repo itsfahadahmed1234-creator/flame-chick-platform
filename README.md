@@ -2,6 +2,10 @@
 
 Private source repository for the Flame Chick customer website, POS, Admin panel, Rider portal, and Supabase backend.
 
+## Project handoff
+
+Start every new work session with [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md). It records the verified project context, safety rules, current branch/stage, completed work, known risks, and next implementation steps. Keep it updated as the project changes.
+
 ## Current platform
 
 - **Supabase Production:** `Flame Chick Production`
@@ -28,7 +32,7 @@ supabase/
 docs/
   architecture/
   deployment/
-  legacy-demo/
+  operations/
 .github/
 ```
 
