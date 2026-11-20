@@ -338,3 +338,22 @@ Detailed field definitions, private limiter table, exact RLS/grants and initial 
 - https://supabase.com/docs/guides/auth/rate-limits
 - https://supabase.com/docs/guides/realtime/limits
 
+## 16. Owner-approved per-customer ordering caps (2026-11-20)
+
+The owner approved these three simultaneous rolling windows per canonical customer phone:
+
+| Rolling window | Maximum newly committed customer orders |
+|---|---:|
+| 1 minute | 3 |
+| 10 minutes | 3 |
+| 1 hour | 15 |
+
+All order sources that reach the central order-create transaction and carry a customer phone share the quota: website, cloud POS delivery, and staff-entered phone/WhatsApp/manual/third-party sources. Staff-entered sources remain Auth/role protected. POS takeaway/dine-in orders that remain only in IndexedDB cannot be covered by a server-enforced phone quota until registered centrally; do not claim otherwise.
+
+Count an order at successful order-record commit, even if it is later rejected/cancelled by the restaurant. Invalid or rolled-back attempts do not consume a slot. Exact idempotent retry returns the existing order and consumes no additional slot. A new idempotency key is a new customer order if it commits. The quota does not verify phone ownership; the active website currently accepts a typed phone without OTP. Do not add OTP/SMS spend without separate approval.
+
+Enforce all three windows inside the same database transaction as the order create, after exact idempotency replay is recognized. Acquire a transaction advisory lock per HMAC-normalized phone digest before counting, then create order/items/task and insert one private append-only rate event linked uniquely to that committed order. This prevents concurrent requests from both passing and prevents failed order inserts from consuming slots. Return stable HTTP 429 + Retry-After when the next request would exceed any window. Keep phone HMAC secret only in the Order Edge Function; no raw phone/IP in limiter table or logs. Keep current+previous HMAC key versions overlapping for at least one hour during rotation.
+
+The Demo-only limiter is not suitable as-is: it separately records attempts before order creation, uses an unsalted phone SHA-256, currently caps at 3/10m and 10/hour, and lacks the explicit 3/minute check. Do not copy unchanged. Production was last verified with no application schema; do not deploy/enable website order writes until its replacement atomic Production implementation is tested.
+
+A 429 from an Edge Function still consumes one invocation. This order quota protects committed order writes/database work; it does not protect the monthly invocation quota from a volumetric attack. Keep client idempotency, avoid duplicate function calls, and use upstream protection if abuse is measured. See production-field-level-schema-v1.md and source-schema-consistency-audit-v1.md for implementation detail.
