@@ -1,10 +1,10 @@
 # Flame Chick Platform — Project Handoff
 
-**Last updated:** 2026-11-20 (Asia/Karachi; updated with owner-confirmed role boundaries)  
+**Last updated:** 2026-11-20 (Asia/Karachi; field-level schema and Free-plan security/rate-limit design added)  
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 and Stage 2 complete; Stage 3 schema/security design in progress. Menu requirements, V1 ERD, application contract map, delivery pricing contract, role access matrix and Free-plan performance/operations review are documented. GST deliberately deferred; offline stale-order confirmation approved; main role boundaries now owner-confirmed. Manager restricted POS scope is owner-confirmed; cashier rejection boundary and remaining rider/deal/scheduling details still require finalization before field-level migration specification  
+**Current stage:** Stage 1 and Stage 2 complete; Stage 3 field-level schema/security design in progress. The V1 field-level schema, delivery lifecycle/pricing contracts, role matrix, application contract map and Free-plan operations/rate-limit design are documented on the review branch. GST deliberately deferred; offline stale-order confirmation and core role/delivery decisions are owner-confirmed. Remaining deal/schedule/branch/locality/return-payment decisions must be resolved before migrations  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -748,3 +748,43 @@ Complete the remaining field-level schema dependency matrix (tenant/branch ident
 - Corrected superseded open-decision wording: Manager restricted POS access, Rider lifecycle and offline stale-catalog policy are confirmed, not pending. Relevant consistency commits: `4f41085bd82805f7708708250cbcef0bb2cdefee` (security matrix), `4a8a02571a4b9feb4d1805656cf72ec0181c7e43` (schema blueprint), `d655088af126a97de5d81ab44955297b7907c4a1` (ERD), and `a556e0c5a0fb1666f9db58362ab093f845d93a97` (handoff next action).
 - No Production SQL, database, Supabase settings, Edge Functions, Storage, users, Vercel deployment, `main`, or original source repository was changed.
 
+## Field-level schema + Free-plan security checkpoint — 2026-11-20
+
+### New canonical design document
+
+- Added `docs/architecture/production-field-level-schema-v1.md` on `work/production-source-audit`.
+- File creation commit: `b7dd21ff4fd96940fd3440464c32a512bc62a3c7`.
+- Verified the saved file exists, has all 21 expected sections, includes rate-limiting and Edge Function budget guidance, and contains no SQL DDL statements. Latest verified file blob SHA at verification: `19b979d77075987f62e3a7929b3ca9e3ccbc0025`.
+- It defines candidate fields/types/constraints for tenant/branch, staff roles, catalog, modifiers, deals/schedules, immutable menu publications, delivery pricing, orders and snapshots, payments (without inventing a payment gateway), delivery tasks/offers/assignments/events, internal notification outbox, private rate-limit buckets, RLS/grants, indexes, migration order and tests.
+- It deliberately leaves unresolved business decisions marked open; it does not seed menu data or infer GST/inventory/payment refund rules.
+
+### Supporting documents updated
+
+- `docs/architecture/production-erd-v1.md` — links to the field-level schema. Commit `0b4e0696823e56ac409a05d562143346528c2e35`.
+- `docs/architecture/production-schema-blueprint.md` — adds Free-plan and rate-limit implications. Commit `9def86b47face3ab7fec2587aee13bf5551ae27e`.
+- `docs/architecture/database-application-contract-map.md` — records function/read path budget. Commit `3fc860aba51c516423e1c96a69900280bb47644a`.
+- `docs/architecture/performance-security-operations-plan.md` — records current invocation limits, rate-limit proposal, usage thresholds and official references. Commit `39472371c485ade276d11ddd668df68abac69c5a`.
+
+### Free-plan / Edge Function design decisions
+
+- Retain the four existing domain functions: catalog, order, delivery and staff-admin. No function-per-CRUD, no function chaining, no extra worker for V1.
+- Current official Free allowance checked 2026-11-20: 500,000 Edge Function invocations/month; function count ceiling 100/project; 256 MB memory; 2 seconds CPU/request; 150 seconds worker wall clock. Invocation allowance is shared at organization usage level, so inspect usage by project. A function 401/403/429/500 still counts; CORS preflight OPTIONS is not billed.
+- High-frequency POS 15-second polling and safe Rider reads should use RLS-protected Data API reads, not Edge invocations. Rider gets own-offer/assignment filtering; POS Realtime stays branch-filtered. Order History remains normal paginated fetch/manual refresh.
+- Cache immutable published catalog by version/checksum. Coordinate any combined health+catalog response with an API schema-version change; preserve last-known-good POS IndexedDB cache until new cache is fully staged and atomically switched.
+- Retain Supabase Auth native rate limits. Add a private Postgres token-bucket limiter only for high-risk writes: guest order creation, Rider state mutations, Cashier/Manager dispatch and staff invitations. HMAC subject digests only; do not store raw IP/phone/email. Do not add Redis/Upstash or continuous workers at current scale.
+- Candidate test thresholds (not Production enforcement): guest order 10/IP/10 min and 4/phone/15 min + 10/hour; Rider 20 actions/min; staff dispatch 30/min; staff invitations 5/hour. Tune under load tests; shared mobile/NAT IPs mean IP-only hard blocking is unsafe.
+- Validate actual trusted client-IP header at Supabase ingress with spoofed forwarding-header tests before relying on IP rate buckets. If trust cannot be established, don't claim IP rate limiting works; use actor/phone limits and consider verified Turnstile step-up after evidence. Application 429 does not save function invocation quota; sustained volumetric abuse needs upstream/platform mitigation.
+- Warning thresholds: 50%/250k invocations investigate; 70%/350k optimize; 85%/425k prepare degradation response; 95%/475k stop nonessential calls while protecting essential order/delivery writes. These are internal manual thresholds, not platform alerts.
+
+### Safety / state
+
+- Documentation-only changes on the review branch. No Production SQL, schema, data, secrets, Supabase settings, Auth users, Storage, Edge Functions, Vercel deployment, `main`, or original source repo was changed.
+- No migration file has been created or applied. Production remains read-only.
+
+### Next work (in order)
+
+1. Conduct a consistency review of the new field-level specification against the current four application source contracts and existing schema/ERD. Fix any mismatched fields, enum/status values, request/response payloads or permission assumptions before writing SQL.
+2. Resolve the remaining owner decisions: rejection/failure reason requirements; Not Listed locality label; menu price/publish/rollback authority; deal choice model; schedule recurrence/branch scope; branch-specific menu/pricing needs; Kitchen/inventory needs; returned-order payment/customer-notification treatment; Rider arrival event.
+3. Produce the complete RLS/grant/function authorization matrix and adversarial test matrix from the field-level spec.
+4. Review the schema with the owner. Only then create isolated test migrations. Check project slot availability; use local Supabase if no safe Free test project slot exists.
+5. Production remains read-only until the user explicitly approves a specific reviewed migration batch.
