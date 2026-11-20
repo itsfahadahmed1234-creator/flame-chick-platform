@@ -135,14 +135,25 @@ It is not a final SQL schema. All identifiers and API request fields must be che
 
 ## 6. Open design dependencies (do not guess)
 
-- **RESOLVED by owner:** stale offline POS orders that would change price/availability are held with CATALOG_VERSION_STALE and require explicit authenticated cashier/manager confirmation before resubmission. No silent repricing; audit the confirmation. Detailed implementation requirements are in performance-security-operations-plan.md.
-- Whether Not Listed needs a separate required locality/mohalla input in addition to the full address; the user has confirmed the fee behavior, not this extra field.
-- Whether menu visibility/price differs by branch or channel in the first release.
-- Whether deals need curated choice lists, category/subcategory pools, substitutions and surcharges.
-- Whether menu content, product/variant prices, availability and delivery-area definitions are restaurant-wide or branch-specific in V1. The current field-level proposal is predominantly restaurant-scoped for catalog/publication and branch-scoped for delivery areas/settings; do not implement branch overrides or expose a mixed cross-branch catalog until this scope is explicitly decided. If branches differ, publication identity and order pricing must bind to branch (or to a validated restaurant publication plus branch override revision), and cache/version keys must include that scope.
-- Which roles can edit prices, publish, rollback and change delivery defaults.
-- Whether inventory/stock is part of the first Production version.
-- The user explicitly deferred GST/tax; it is excluded from the initial schema.
+Resolved and reflected in the canonical V1 decisions/schema:
+- Website branch resolution: one eligible branch auto-resolves; multiple require explicit customer selection; zero fail closed.
+- Restaurant-wide product/deal definitions and base prices; branch-specific variant/deal availability and delivery areas/fees. Orders/cache bind publication version and branch availability revision. No branch price override in V1.
+- One role identity per user/restaurant; operational roles may span branches only with the same role. Admin/Owner is restaurant-wide and exclusive.
+- Curated deal choice groups only, with explicit surcharge and deterministic variant resolution.
+- Returned COD without collection closes uncollected; actual collection remains immutable; refund is a separate Admin/Owner-only ledger event after actual payout.
+- Customer may optionally provide one fixed drop-off pin; no Rider GPS or continuous customer tracking.
+
+Still open:
+- Whether Not Listed needs a separate locality/mohalla field in addition to the required full address; it must not control fee.
+- Deal schedule recurrence, overnight, timezone, overlap and branch-scope semantics. Do not enable schedule authoring until resolved.
+- Kitchen role approval and exact access; deny current source Kitchen read path by default.
+- Ingredient inventory/stock; excluded from V1 unless approved.
+- Whether Rider arrival-at-restaurant is a distinct event or pickup is next.
+- Drop-off pin retention (24-hour proposal) and exceptional Admin/Owner access after terminal state.
+- Exact legacy source/status/fulfillment/payment field mapping and versioned DTO adapters; do not rename/migrate app fields blindly.
+- Website security audit is deferred by request and is a mandatory stop-gate immediately before website/database integration.
+- GST/tax remains excluded from V1.
+
 
 ## 7. Review boundaries and status
 
@@ -191,3 +202,14 @@ Detailed fields, HMAC rotation, identity limitation and tests are documented in 
 ## Database security and reliability controls
 
 See [production-database-security-reliability-controls-v1.md](./production-database-security-reliability-controls-v1.md) for the required universal Website/POS order idempotency contract, command deduplication, RLS/grants, SECURITY DEFINER rules, atomic transactions, audit/outbox, offline retry handling, recovery and migration testing. The customer phone quota remains Website-only; POS delivery bypasses the quota but not idempotency.
+
+## V1 scope reconciliation (2026-11-20)
+
+The canonical branch/catalog decision is restaurant-wide base menu and prices with branch-specific availability overlays and branch-specific delivery pricing. The selected branch is resolved before catalog/area/fee reads. Include restaurant publication version plus branch availability revision in catalog cache identity and order snapshots. Do not create branch price overrides in V1.
+
+The canonical role decision is one role identity per user/restaurant, with same-role multi-branch assignments for Manager/Cashier/Rider and one restaurant-wide Admin or Owner role. Role changes require serialized database enforcement; indexes alone do not prevent conflicting role rows.
+
+Payment records use append-only collection/refund events; returned orders do not erase collections or automatically refund. Refund only after actual payout and with Admin/Owner authority.
+
+Static customer drop-off pin is private and optional; it is not live tracking. See customer-dropoff-pin-data-contract-v1.md and its ERD/authorization addendum.
+
