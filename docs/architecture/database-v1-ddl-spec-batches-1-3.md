@@ -196,7 +196,7 @@ Append-only event table:
 - `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`
 - `restaurant_id uuid NOT NULL`
 - `branch_id uuid NULL`
-- `target_user_id uuid NOT NULL`
+- `target_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT`
 - `old_role_key text NULL`
 - `new_role_key text NULL`
 - `action text NOT NULL CHECK IN ('invited','activated','deactivated','role_changed','branch_changed')`
@@ -215,6 +215,7 @@ Supabase Auth invite and PostgreSQL role assignment are not one ACID transaction
 `app_private.staff_invitation_requests`:
 - `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`
 - `restaurant_id uuid NOT NULL REFERENCES public.restaurants(id) ON DELETE RESTRICT`
+- `UNIQUE(id, restaurant_id)` (composite parent key for branch-target rows)
 - `requested_by uuid NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT`
 - `normalized_email text NOT NULL` (private; normalize before insert)
 - `role_key text NOT NULL CHECK IN ('admin','owner','manager','cashier','rider')`
