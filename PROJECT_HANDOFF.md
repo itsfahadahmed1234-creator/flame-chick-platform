@@ -1058,3 +1058,22 @@ Read-only queries and advisors only. No SQL writes, migrations, Production setti
 - Latest handoff commit after recording Batch 0: `ba0ad951b68f41dfc8054d26f1a807671c386b30`.
 
 The nine principal schema/readiness/location/handoff documents were fetched again after edits. Core branch/role/payment/pin decisions and Batch 0 findings were verified. Some simple keyword checks were inconclusive because headings/phrasing differ; content was inspected directly where needed. No SQL writes were made.
+
+
+
+## 2026-11-20 — Foundation DDL specification prepared (Batches 1–3)
+
+Prepared `docs/architecture/database-v1-ddl-spec-batches-1-3.md` — commit `bef7937c885b44599a28d5a75426c67f34abb2c6`, then tightened invitation parent keys and role lifecycle consistency — latest commit `024924d932a91dab42b28d2ba99e1c1d5f9d0638`.
+
+The specification covers:
+1. Private `app_private` schema, privilege boundary, postgres-owned default ACL expectations and exact public RPC wrapper policy.
+2. Restaurant/branch tables, website eligibility flags, composite tenant keys and no seed data.
+3. User profiles, one-role-per-user/restaurant rule, same-role multi-branch assignments, serialized role changes, last-active-Owner protection, append-only staff audit and normalized private invitation workflow.
+
+No SQL migration file has been created or applied. The document is a reviewed DDL specification, not executable SQL.
+
+### Test-environment constraint
+The current execution environment did not expose a local Supabase CLI, Docker or psql binary. Do not create a Supabase cloud branch/project without checking Free-plan availability/cost and obtaining the required user confirmation. The Production project must not be used as a migration test target.
+
+### Next action
+Before turning this specification into SQL migrations, establish a verified isolated local/test database and prove migrations run as `postgres`, not `supabase_admin`. Then implement/test Batch 1 first, inspect object ownership/default ACL/RLS/grants, and continue to Batches 2–3 only after passing. Website audit remains deferred until immediately before website/database integration.
