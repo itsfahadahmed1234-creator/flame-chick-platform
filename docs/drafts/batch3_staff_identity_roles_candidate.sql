@@ -413,3 +413,34 @@ BEGIN
  END IF;
 END
 $verify$;
+
+
+-- Reject TRUNCATE on every Batch 3 relation as an additional retention safeguard.
+CREATE FUNCTION app_private.reject_staff_truncate()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path=''
+AS $fn$
+BEGIN
+ RAISE EXCEPTION 'STAFF_RECORD_TRUNCATE_DENIED' USING ERRCODE='55000';
+END
+$fn$;
+REVOKE EXECUTE ON FUNCTION app_private.reject_staff_truncate() FROM PUBLIC,anon,authenticated,service_role;
+
+CREATE TRIGGER user_profiles_no_truncate
+ BEFORE TRUNCATE ON public.user_profiles
+ FOR EACH STATEMENT EXECUTE FUNCTION app_private.reject_staff_truncate();
+CREATE TRIGGER user_roles_no_truncate
+ BEFORE TRUNCATE ON public.user_roles
+ FOR EACH STATEMENT EXECUTE FUNCTION app_private.reject_staff_truncate();
+CREATE TRIGGER staff_role_audit_no_truncate
+ BEFORE TRUNCATE ON public.staff_role_audit
+ FOR EACH STATEMENT EXECUTE FUNCTION app_private.reject_staff_truncate();
+CREATE TRIGGER staff_invitation_requests_no_truncate
+ BEFORE TRUNCATE ON app_private.staff_invitation_requests
+ FOR EACH STATEMENT EXECUTE FUNCTION app_private.reject_staff_truncate();
+CREATE TRIGGER staff_invitation_branch_targets_no_truncate
+ BEFORE TRUNCATE ON app_private.staff_invitation_branch_targets
+ FOR EACH STATEMENT EXECUTE FUNCTION app_private.reject_staff_truncate();
+
