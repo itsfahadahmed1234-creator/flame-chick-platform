@@ -1,3 +1,5 @@
+> **OBSOLETE — DO NOT IMPLEMENT.** This draft proposed continuous customer live-location sessions and update streams. The owner rejected live location tracking. It is superseded by [Customer Drop-Off Pin Data Contract V1](./customer-dropoff-pin-data-contract-v1.md) and [Drop-Off Pin ERD & Authorization Addendum V1](./customer-dropoff-pin-erd-authorization-addendum-v1.md). Flame Chick will store only one optional fixed customer delivery destination pin; it will not collect Rider GPS or continuously track the customer.
+
 # Flame Chick Production — Customer Live Location Data Contract V1
 
 **Status:** Future-ready database design; no live tracking is enabled  
