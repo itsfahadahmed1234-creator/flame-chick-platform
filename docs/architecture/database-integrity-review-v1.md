@@ -8,19 +8,20 @@
 
 ## 1. Review outcome
 
-The current design has a sound direction: explicit tenant and branch ownership, immutable catalog publications and order snapshots, server-calculated prices/fees, narrow role authority, append-only operational history, atomic order/delivery commands, universal order idempotency and a website-only successful-order quota.
+The V1 design now has confirmed product decisions for branch resolution, catalog scope, role multiplicity, deal choices and returned-order financial handling. The current pass reconciles the schema direction and identifies remaining engineering gates; it is not yet executable DDL.
 
-The review identified several places where the design must be made more precise before SQL is authored:
+The most important technical risks to resolve before migrations:
+1. Cross-tenant composite keys must exist at every relationship boundary, including branch availability, order lines, payment ledger, delivery task/offer/assignment, and private drop-off pin.
+2. One-role-per-user/restaurant across multiple branch rows is a cross-row invariant. A plain partial unique index cannot enforce it; serialize the staff command and add a database-side guard.
+3. Website and POS idempotency must share one atomic order command while only website source invokes the phone quota. Same-key concurrency and public replay privacy need isolated tests.
+4. Payment collections/refunds must be append-only, idempotent and protected from concurrent over-refunds.
+5. Delivery state transitions, offer expiry and reassignment must be row-locked and idempotent; stale Rider access must be revoked by current-assignment checks.
+6. Customer drop-off coordinates must stay private and static; no Rider GPS or continuous customer tracking.
+7. The existing Production default-privilege hardening changes default grants. Every new function/table requires explicit owner/grants verification; do not assume Supabase defaults.
+8. The existing application sources use legacy field names, statuses and direct REST reads. A versioned DTO/adapter and compatibility tests are required before app cutover.
+9. Backup and restore must include both database and Storage media; a Git repository or SQL dump alone is not a full recovery plan.
+10. Website security audit is intentionally deferred but is a mandatory stop-gate before website/database attachment.
 
-1. **Branch resolution is a foundational dependency.** A website order must resolve to exactly one active branch before pricing, area lookup, idempotency scope and order creation. Never accept an arbitrary browser-supplied branch as authority. The current documents do not yet define the website branch selection/routing rule.
-2. **Catalog scope is not yet decided.** The current schema proposes one restaurant-wide draft/publication pointer, while delivery fees are branch-scoped and the contract map notes possible branch-specific menu/price/availability. Do not silently mix branch data into a restaurant-wide snapshot. Decide whether V1 catalog/prices are restaurant-wide or branch-specific before finalizing publication keys, versioning and cache keys.
-3. **Staff authority needs concurrency protection.** Admin and Owner both have full business authority. The last-active-Owner guard must serialize concurrent role changes/deactivation at the restaurant scope; a simple count without a lock is raceable.
-4. **Staff invitation crosses two systems.** Supabase Auth invitation and database role assignment are not one PostgreSQL transaction. Treat invitation as an idempotent, recoverable workflow; do not claim atomicity across Auth and SQL.
-5. **Public idempotent replay must not disclose order data.** Knowing an idempotency key is not proof of customer identity. Website replay returns only a minimal acknowledgement/reference; customer order lookup is a separate capability requiring its own design.
-6. **Publication checksum is integrity metadata, not authentication.** Compute it server-side from a canonical serialization, verify it when serving/loading a publication, and never trust a browser-provided checksum. A checksum alone is not a signature.
-7. **Delivery area selection needs mutually exclusive validation.** A listed-area request must reference an active area in the resolved branch. Not Listed requires a NULL area ID and an explicitly configured branch default fee. Contradictory combinations are rejected.
-
-These clarifications have been added to the field-level schema where applicable. The branch-routing and restaurant-vs-branch catalog scope remain open owner/product decisions because they affect the database key structure.
 
 ## 2. Tenant and branch integrity rules
 
@@ -111,18 +112,20 @@ These clarifications have been added to the field-level schema where applicable.
 | New public table/function created after default-privilege hardening | No accidental default PUBLIC/anon/authenticated/service_role access; explicit grants verified |
 | Backup restore test | Restored database and required Storage assets reconcile; application integrity checks pass |
 
-## 8. Open decisions blocking final schema freeze
+## 8. Remaining decisions / explicit holds
 
-1. **Public website branch resolution:** Is there one customer-facing branch in V1, or does the customer choose a branch / get routed by delivery address? Define the authoritative resolution method.
-2. **Catalog scope:** Are menu, prices and availability identical across all branches in V1, or can they differ by branch/channel?
-3. **Deal choice model:** Confirm curated choice sets, category/subcategory pools, substitutions and surcharges before finalizing deal component relations.
-4. **Not Listed address detail:** Is full delivery address sufficient, or must customer also provide a locality/mohalla label?
-5. **Returned order settlement:** What payment/cash/notification action follows a physically returned order? No automatic refund is assumed.
-6. **Delivery event detail:** Is arrival-at-restaurant a distinct event, or is pickup the next recorded action?
-7. **POS source values and order types:** Confirm exact source/status values and whether local-only takeaway/dine-in orders remain outside cloud order storage for V1.
-8. **Staff role multiplicity:** Can one Auth user hold more than one active role in the same branch (for example cashier and rider), or must assignments be mutually exclusive? The current schema needs an explicit uniqueness rule.
+Resolved and reflected in `database-v1-product-decisions.md`: branch routing, restaurant-wide base menu/prices with branch availability, same-role multi-branch identity, curated deal choices, returned-order ledger/refund policy and static customer destination pin.
 
-Do not guess these where they alter primary keys, publication scope, order routing, authorization or financial records. Security-safe defaults remain deny/hold until resolved.
+Remaining:
+1. Not Listed locality/mohalla label alongside full address.
+2. Deal schedule semantics: recurrence, overnight, timezone, overlap and branch scope. Do not activate schedule authoring until defined.
+3. Kitchen role: deny existing source read path by default until role and exact permissions are approved.
+4. Ingredient inventory: excluded from V1 unless approved.
+5. Rider arrival-at-restaurant event vs pickup as next explicit state.
+6. Precise coordinate retention proposal (24 hours after terminal state) and whether Admin/Owner need exceptional terminal-state support access.
+7. Website threat-model/security audit at the later website/database integration milestone.
+8. Exact legacy source/status/fulfillment/payment value mapping and API DTO versioning. This is an engineering compatibility gate, not a business decision to guess.
+
 
 ## 9. Next step
 
@@ -156,3 +159,25 @@ The owner-approved scope is one optional fixed customer-shared delivery destinat
 11. Retention cleanup removes only eligible precise coordinate rows and never cascades to orders, delivery tasks, payment or audit history.
 
 No migration or Production implementation is implied.
+
+## V1 resolved decisions and additional adversarial tests
+
+- Website branch: one eligible branch auto-resolves; multiple require explicit customer choice; zero fail closed. Branch ID is selector only and is revalidated server-side.
+- Menu: restaurant-wide base products/prices; branch-specific variant/deal availability overlays and delivery fees. Global inactive state cannot be overridden. Orders bind publication version and branch availability revision.
+- Staff: one role_key per user/restaurant. Operational roles may repeat across branches only with the same role. Admin/Owner are restaurant-wide and exclusive. Test concurrent conflicting role assignments and role change races, including last active Owner.
+- Deals: curated choices only, explicit non-negative surcharge, deterministic variant resolution; no category pools/free-text substitutions.
+- Returned delivery: COD with no collection closes uncollected; actual collection remains immutable; refund is separate ledger entry only after actual payout; Admin/Owner only; row lock and cumulative refund bound prevent over-refund.
+- Drop-off pin: one optional fixed coordinate in app_private, same transaction as order/task; no Rider GPS or continuous customer tracking.
+
+Additional tests:
+1. One operational role assigned to multiple branches is accepted; different role across branches and Admin/Owner plus operational role are rejected, including concurrent races.
+2. Branch A variant/deal unavailable does not affect Branch B; globally inactive item cannot be re-enabled by branch overlay.
+3. Order with stale branch availability revision is held for confirmation; old cached data is not silently activated.
+4. Curated deal choice outside allowlist or invalid variant resolution is rejected; surcharge always server-derived.
+5. Concurrent refunds cannot exceed successful collected balance; failed/voided collection cannot be refunded.
+6. Returned COD without collection creates no refund; returned collected order preserves collection.
+7. Drop-off pin read is denied to prior Rider after reassignment and to all Riders after terminal status; coordinate absent from logs and public response.
+8. Restore test reconciles DB rows, object storage references, publication checksums and application media files.
+9. Every newly created function/table is checked against hardened default privileges; no unexpected PUBLIC/anon/authenticated/service_role grant.
+10. Source compatibility test maps all existing app fields/statuses into versioned database DTOs without changing production source until cutover approval.
+
