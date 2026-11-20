@@ -364,3 +364,17 @@ These are observations from the current branch source and archived Demo SQL, not
 ## Owner-confirmed delivery lifecycle — implementation addendum (2026-11-20)
 
 The delivery workflow is no longer an open decision. The owner confirmed manual POS reassignment after rider rejection/60-second timeout, rider-initiated failed-delivery return, immediate order completion when Rider marks delivered, and Cashier-or-Manager physical return confirmation. See [`delivery-lifecycle-contract.md`](./delivery-lifecycle-contract.md) for the detailed field-level schema, transition rules, commands, expiry strategy, security and tests. This addendum supersedes the generic role/lifecycle alternatives above where they conflict. The stale offline POS policy is also confirmed in the handoff and performance plan; it is not open for reconsideration.
+
+## Field-level schema + Free-plan guardrails (2026-11-20)
+
+A detailed draft is available in [production-field-level-schema-v1.md](./production-field-level-schema-v1.md). It specifies candidate columns, data types, tenant/branch constraints, index candidates, grants/RLS, immutable snapshots, rate-limit bucket design and Edge Function usage controls. Important decisions in this draft:
+
+- Keep the existing four domain Edge Functions; do not make one function per action or chain functions together.
+- Free includes 500,000 monthly Edge Function invocations. All function response statuses count; CORS preflight OPTIONS does not. A function-level 429 protects backend work but does not save an invocation.
+- Use direct RLS-protected Data API reads for frequent POS polling and Rider reads where the existing app contract safely allows; do not poll an Edge Function every 15 seconds.
+- Combine catalog health/version metadata and snapshot where possible during a coordinated catalog schema-version rollout; cache by immutable publication version.
+- Use a small private Postgres token-bucket store for high-risk writes, keyed by server-generated HMAC digests. Do not store raw IP/phone values. Keep Supabase Auth's native rate limits; no Upstash/Redis dependency is required at current scale.
+- Validate the actual hosted client-IP header with a spoofing test before relying on IP-based buckets. Do not trust a caller-supplied X-Forwarded-For value.
+- Realtime remains narrow and POS polling remains the fallback. Offer expiry correctness is database-time enforced; no additional Edge worker or scheduled Function is needed for correctness.
+
+Rate limits shown in the field-level spec are initial test values only. No rate limiter, settings, secrets, SQL or Production services have been configured by documenting them.
