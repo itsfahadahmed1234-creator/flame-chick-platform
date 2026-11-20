@@ -404,7 +404,7 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 ### Current published menu baseline received — 2026-11-20
 
 - User supplied the current Flame Chick menu image. This is the current published-menu baseline, distinct from the earlier future-capability reference image.
-- Inventory transcription is recorded in `docs/architecture/current-menu-baseline.md` (commit `64ca4e6263de50e0b5ee23e6acadd36c6a63f00c`). It records 25 named entries from the image: 5 Starters (including Platter), 3 Injected Broast entries, 3 Wraps, 4 Burgers, and 10 beverage-list entries. All 25 show numeric PKR prices. The artwork says prices are exclusive of applicable GST, but does not specify the GST rate or tax calculation rules.
+- Inventory transcription is recorded in `docs/architecture/current-menu-baseline.md` (commit `64ca4e6263de50e0b5ee23e6acadd36c6a63f00c`). It records 25 named entries from the image: 5 Starters (including Platter), 3 Injected Broast entries, 3 Wraps, 4 Burgers, and 10 beverage-list entries. All 25 show numeric PKR prices. The artwork says prices are exclusive of applicable GST; the user explicitly deferred GST implementation from the initial schema, so this is retained only as source context.
 - The menu artwork's beverage list is displayed below Burgers without a visible separate “Beverages” heading; verify the intended category in live Admin/catalog before importing.
 - Platter is described as 6 Classic Nuggets, 6 Injected Nuggets, 6 Fire Wings, 6 Injected Wings, Fries & Dips, priced PKR 1,499. Confirm whether Fries & Dips are tracked catalog components or only description/inclusions.
 - “NEW” labels appear on Platter, Sunset Splash, 1.5 Ltr Water Bottle, and Cold Drinks 1.5 Ltr. Artwork does not define automatic expiry or badge rules.
@@ -422,7 +422,7 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 - POS offline delivery orders submit product/variant/deal IDs plus idempotency key; server prices using live mutable catalog values. Blueprint requires catalog publication version binding and an explicit stale-price policy before order DDL.
 - Catalog function currently builds from mutable source tables and its health check does not enforce a separate approved publication pointer. Blueprint specifies immutable publication snapshots, a current pointer, validated publish/rollback, checksum and schema-version contract.
 - Demo raw catalog tables have anon SELECT policies and authenticated table grants. Production should use narrow allowlisted public catalog DTOs, private operational schemas, least-privilege grants, tenant/branch composite constraints and server-checked roles rather than copy policies blindly.
-- Demo order function writes zero tax and contains a Demo-specific manual-address/zero-fee path. Neither is approved for Production. Current published menu artwork says prices exclude applicable GST, but provides no rate or calculation policy; tax policy must be confirmed, not guessed.
+- Demo order function writes zero tax and contains a Demo-specific manual-address/zero-fee path. Neither is approved for Production. Current published menu artwork mentions GST, but the user explicitly deferred GST from the initial schema; do not add tax schema or calculation in this phase.
 - Existing Admin writes compound catalog changes through multiple browser REST calls and lacks full modifier/schedule editors, unpriced draft support and complete deal-component editing. Blueprint recommends transactional server-side commands, concurrency checks, audit, and full Admin workflow.
 - Key schema domains: restaurant/branch tenancy; categories/subcategories/products/variants; modifier groups/options/assignments/pricing; deals/components/choice pools/schedules; draft and immutable publication; orders/items/modifiers/components/payments and immutable price snapshots; delivery/rider; staff/access/audit; POS devices/registers; settings/media/outbox.
 - No Production database, Storage, Function, role, settings or app deployment was changed.
@@ -438,6 +438,8 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 - When GST becomes necessary, design it as a separate, reviewed forward migration and coordinated API/website/POS change. Do not retroactively rewrite completed order snapshots.
 - Blueprint updated to reflect this decision: `docs/architecture/production-schema-blueprint.md`, commit `cc0c917869ab4f7480049e8824f829332d967283`.
 - No Production database changes were made.
+
+- After the owner decision, aligned both menu design records with the GST deferral: `docs/architecture/current-menu-baseline.md` (commit `4cb4fe5b001713633a7f51d99a32fb38df0b4771`) now treats the GST phrase as source context only, and `docs/architecture/menu-management-design.md` (commit `8385e29a62688e3190b0a6d510ed263a9d1118e8`) marks tax as out of scope for the initial schema.
 
 ## 11. Implementation roadmap — continue in this order
 
