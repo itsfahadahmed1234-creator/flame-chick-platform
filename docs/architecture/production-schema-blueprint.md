@@ -359,3 +359,8 @@ These are observations from the current branch source and archived Demo SQL, not
 - It does not create or apply SQL.
 - No Production tables, functions, policies, Storage buckets, users, settings or data have been changed by preparing it.
 - Next work: finish the table/column/RPC dependency matrix, confirm the open decisions that affect the schema, then convert this blueprint into small reviewed migration files and matching Admin/API implementation tasks.
+
+
+## Owner-confirmed delivery lifecycle — implementation addendum (2026-11-20)
+
+The delivery workflow is no longer an open decision. The owner confirmed manual POS reassignment after rider rejection/60-second timeout, rider-initiated failed-delivery return, immediate order completion when Rider marks delivered, and Cashier-or-Manager physical return confirmation. See [`delivery-lifecycle-contract.md`](./delivery-lifecycle-contract.md) for the detailed field-level schema, transition rules, commands, expiry strategy, security and tests. This addendum supersedes the generic role/lifecycle alternatives above where they conflict. The stale offline POS policy is also confirmed in the handoff and performance plan; it is not open for reconsideration.
