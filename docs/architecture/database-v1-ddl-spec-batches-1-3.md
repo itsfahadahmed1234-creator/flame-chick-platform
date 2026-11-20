@@ -165,6 +165,7 @@ Columns:
 - `reason text NOT NULL` (bounded non-empty reason for role/branch grant)
 - `created_at timestamptz NOT NULL DEFAULT transaction_timestamp()`
 - `disabled_at timestamptz NULL`
+- CHECK (`(is_active AND disabled_at IS NULL) OR (NOT is_active AND disabled_at IS NOT NULL)`).
 
 Scope CHECK:
 - admin/owner → branch_id IS NULL.
@@ -207,21 +208,36 @@ Append-only event table:
 
 No UPDATE/DELETE. Unique request_id/action scope prevents duplicate audit events for retries. Do not store invitation tokens or secrets. Composite tenant/branch relation applies when branch_id is non-null.
 
-### 5.5 Invitation workflow state
+### 5.5 Invitation workflow state (private normalized tables)
 
-Supabase Auth invite and PostgreSQL role assignment are not one ACID transaction. Use an idempotent recoverable state machine:
-- `id uuid PK`
-- `restaurant_id uuid NOT NULL`
-- `requested_by uuid NOT NULL`
-- `normalized_email text NOT NULL` (private; access tightly restricted)
-- `role_key text NOT NULL`
-- `branch_ids uuid[] NOT NULL` or normalized child assignment table if constraints must validate every branch (prefer child table for relational integrity)
+Supabase Auth invite and PostgreSQL role assignment are not one ACID transaction. Use an idempotent recoverable state machine; keep invite PII and workflow state in `app_private`.
+
+`app_private.staff_invitation_requests`:
+- `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`
+- `restaurant_id uuid NOT NULL REFERENCES public.restaurants(id) ON DELETE RESTRICT`
+- `requested_by uuid NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT`
+- `normalized_email text NOT NULL` (private; normalize before insert)
+- `role_key text NOT NULL CHECK IN ('admin','owner','manager','cashier','rider')`
 - `status text NOT NULL CHECK IN ('pending','sent','accepted','failed','expired','cancelled')`
 - `request_id uuid NOT NULL UNIQUE`
-- `auth_user_id uuid NULL`
+- `auth_user_id uuid NULL REFERENCES auth.users(id) ON DELETE RESTRICT`
+- `failure_code text NULL` (safe stable code only; no raw Auth response/token)
 - `created_at, updated_at timestamptz NOT NULL`
-- Do not store invite tokens.
+
+`app_private.staff_invitation_branch_targets`:
+- `invitation_id uuid NOT NULL REFERENCES app_private.staff_invitation_requests(id) ON DELETE RESTRICT`
+- `restaurant_id uuid NOT NULL`
+- `branch_id uuid NOT NULL`
+- PRIMARY KEY (`invitation_id, branch_id`)
+- Composite FK (`branch_id, restaurant_id`) → `public.branches(id, restaurant_id)`
+- Composite FK (`invitation_id, restaurant_id`) → `app_private.staff_invitation_requests(id, restaurant_id)` (add matching UNIQUE parent key).
+
+Rules:
+- Manager/Cashier/Rider invitations require one or more valid branch-target rows, all same restaurant and same role.
+- Admin/Owner invitations are restaurant-wide and have no branch-target rows.
+- Do not store invitation tokens or raw provider responses.
 - Verify invited identity before binding/activating role. Reconcile Auth success + DB failure by retrying same request, not duplicating user/invite.
+- Auth invite delivery and database role assignment remain a recoverable saga, not a single ACID transaction.
 
 ### 5.6 Staff permissions and RLS bootstrap
 
