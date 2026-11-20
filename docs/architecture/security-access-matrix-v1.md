@@ -17,47 +17,68 @@
 9. Every query/write is tenant- and branch-scoped. Composite foreign keys enforce relationships; RPCs repeat authorization at transaction time.
 10. SECURITY DEFINER functions are privileged endpoints. Prefer SECURITY INVOKER; where definer is unavoidable, set an empty/fixed search_path, schema-qualify objects, use a safe owner, verify actor/role/branch inside the function, and grant EXECUTE only to the required caller.
 
-## 2. Principals
+## 2. Owner-confirmed principals and application boundaries
 
-| Principal | How identified | Base access |
+The owner supplied the following role model on 2026-11-20. These rules replace the earlier proposed access matrix wherever they conflict.
+
+| Principal | Allowed application(s) | Confirmed authority |
 |---|---|---|
-| Public customer / guest | No staff session | Read published catalog projection; submit a website order through rate-limited Order API |
-| Authenticated non-staff | Valid Supabase user, no active Flame Chick role | No business data by default; may use only explicit self-service Auth/profile functions if later required |
-| Owner | Active owner role, restaurant-wide or branch-scoped | Highest business authority within assigned restaurant/branch scope |
-| Admin | Active admin role | Admin operations within assigned branch scope |
-| Manager | Active manager role | Routine branch operations and menu work within assigned branch scope |
-| Cashier | Active cashier role | POS orders, permitted payment/order actions and dispatch actions within assigned branch scope |
-| Kitchen | Active kitchen role | Minimum order/item data and permitted kitchen status transitions |
-| Rider | Active rider role plus active rider profile | Own offers, own active assignments, and customer/delivery fields required for those jobs only |
-| service_role | Server-side credential only | Technical row-access bypass where needed; not a human role and never proof that an actor is authorized |
+| Admin (the owner-designated administrator) | Admin panel + POS + operational tools | Full Flame Chick business access, equivalent to Owner. Separate identity and audit actor. |
+| Owner | Admin panel + POS + operational tools | Full Flame Chick business access, equivalent to Admin. |
+| Manager | **No Admin panel access** | Restricted operational role; no deletion privileges. Exact POS access and approval powers are still to be clarified. |
+| Cashier | POS only | Process POS work, assign/reassign riders and reject orders. Cannot delete orders or other records. Rejections/cancellations must be audited. |
+| Rider | Rider portal only | Can see and respond to their own offers and manage their own assigned deliveries. Cannot view another rider's offers, assignments or private delivery data. |
+| Public customer / guest | Customer website | Read the published catalog projection and submit an order through the rate-limited Order API. No general order/table reads. |
+| Authenticated non-staff | No business application by default | Valid Supabase authentication without an active Flame Chick role grants no business access. |
+| service_role | Server-side functions only | Technical privileged credential, never a human role or proof of actor authorization. |
 
-A user with multiple active roles should be resolved deterministically by a server-side authorization helper and an explicit policy. Do not accidentally grant the union of roles if the application expects one selected role/branch.
+### Global invariants
 
-## 3. Proposed data-access matrix
+- Admin and Owner are equivalent for business capabilities, but must have distinct account IDs so audits identify the actual person.
+- Manager must be denied the Admin application at the API/data layer, not just hidden from the login screen. Manager deletion rights are denied.
+- Cashier is restricted to the POS application. Cashier must never be granted catalog administration, staff-role management or system settings access.
+- Rider is restricted to the Rider application. A rider's offers are rows addressed to that authenticated rider, not a branch-wide list filtered only in the browser.
+- Orders are not physically deleted through normal business applications. Rejection, cancellation, void/correction and other state changes preserve the original order plus an append-only audit trail. This is the recommended rule for all roles, including Admin/Owner, to prevent accidental loss of financial and operational history.
+- Every protected action derives the actor from the verified JWT. Never accept a browser-supplied actor ID as proof of identity.
+- UI role checks are only a usability layer. Edge Functions, RPCs, SQL privileges and RLS enforce the actual permission.
 
-This is the intended minimum scope. Specific columns and RPCs will be finalized in the field-level schema specification.
+## 3. Owner-confirmed access matrix
 
-| Data / capability | Public customer | Owner | Admin | Manager | Cashier | Kitchen | Rider |
-|---|---|---|---|---|---|---|---|
-| Published menu projection | Read | Read | Read | Read | Read | Minimum item data | Minimum active-delivery item data |
-| Draft catalog | None | Full restaurant scope | Assigned branch/scope | Draft/edit if allowed | None | None | None |
-| Product/category/variant edits | None | Full | Edit | Edit within assigned scope | None | None | None |
-| Price changes | None | Full | Proposed: edit | Proposed: no price authority unless separately approved | None | None | None |
-| Publish / rollback catalog | None | Proposed: allowed | Proposed: owner-approved publish only | No | No | No | No |
-| Delivery areas and Not Listed default | None | Full | Edit in assigned scope | Proposed: edit or request change | Read active choice/fee | None | Read own job snapshot |
-| Orders | No general order list/read | Assigned branch/restaurant scope | Assigned branch | Assigned branch | Required POS/branch fields | Minimum kitchen fields | Only linked to own active jobs |
-| Customer phone/address | None via catalog | Business-required scope | Business-required scope | Business-required scope | Required to process delivery | Exclude unless operationally necessary | Only current offered/assigned deliveries |
-| Payments | None | Financial authority | Financial authority if assigned | Limited summary if needed | Create/record permitted POS payments; no reconciliation administration unless approved | None | None |
-| Delivery tasks | None | Assigned branch | Assigned branch | Assigned branch | Dispatch-required data | None | Own task/assignment only |
-| Offers / assignments | None | Assigned branch | Assigned branch | Assigned branch | Dispatch workflow, branch only | None | Own offers/assignments only |
-| Rider profile / presence | None | Assigned branch | Assigned branch | Operational summary | Minimum dispatch availability | None | Own profile/presence |
-| Push subscription secrets | None | No direct table access | No direct table access | No direct table access | None | None | Only through own scoped Edge Function operations |
-| Staff roles/invitations | None | Manage | Proposed: view only or delegated later | None | None | None | None |
-| Security/audit history | None | Read | Narrow read | Narrow read if required | Own operational events only where required | None | Own relevant delivery events only |
-| Restaurant-wide system secrets | None | Server-controlled settings actions only | No direct read | No direct read | None | None | None |
+| Capability | Admin | Owner | Manager | Cashier | Rider |
+|---|---|---|---|---|---|
+| Enter Admin panel | Yes | Yes | **No** | No | No |
+| Enter POS | Yes | Yes | Pending confirmation | Yes | No |
+| Enter Rider portal | No business need | No business need | No | No | Yes |
+| Full menu/category/product editing | Yes | Yes | No (no Admin panel) | No | No |
+| Change product/variant/deal prices | Yes | Yes | No | No | No |
+| Publish or roll back menu | Yes | Yes | No | No | No |
+| Change listed delivery areas and Not Listed default fee | Yes | Yes | Pending confirmation; no Admin panel | No | No |
+| Manage staff roles/invitations | Yes | Yes | No | No | No |
+| View branch operational orders | Yes | Yes | Pending POS scope | POS scope | Only own active delivery orders |
+| Accept/process POS orders | Yes | Yes | Pending POS scope | Yes | No |
+| Reject incoming orders | Yes | Yes | Pending authority | Yes | No |
+| Cancel accepted/in-progress orders | Yes | Yes | Pending authority | **Not yet approved** | No |
+| Assign/reassign riders | Yes | Yes | Pending authority | Yes | No |
+| Accept/reject a rider offer | No | No | No | No | Own offer only |
+| Pickup and delivery status actions | No | No | No | No | Own assigned delivery only |
+| View another rider's offers/assignments | Full operational oversight only | Full operational oversight only | Not yet specified | Dispatch-only minimum data | **Never** |
+| Hard-delete an order | No (audit-preserving state changes only) | No (audit-preserving state changes only) | No | **No** | No |
+| Hard-delete catalog records | Yes, only when unreferenced and policy permits; otherwise archive | Same as Admin | No | No | No |
+| Read audit history | Full | Full | Not yet specified | Own/operational action receipts only | Own delivery events only |
 
-**Important:** Proposed price/publish/payment authority is a conservative design recommendation, not yet an owner-approved business rule. Keep those permissions unresolved in the migration spec until confirmed. Do not infer them from whether a button is visible in the current UI.
+**Audit requirement for order rejection/cancellation:** persist the order ID, action (`rejected` / `cancelled` / other approved state), previous and new state, authenticated actor user ID, actor role at the time, server timestamp, mandatory reason where applicable, and request/correlation ID. Append an immutable event and update the order's current state in one database transaction. Do not let users rewrite or delete the event.
 
+**Important distinction:** Rejecting a newly received order and cancelling an order already accepted/preparing are different business actions. Cashier rejection is confirmed; cashier cancellation after acceptance is not yet approved. Until clarified, deny cashier cancellation of an accepted/in-progress order.
+
+**Rider isolation:** Rider list/lookup functions, SQL policies, offer acceptance/rejection RPCs, and Realtime filters must bind to `auth.uid()`. The API must return only offers sent to that rider and assignments linked to that rider. Knowing another rider's UUID or offer/task UUID must not expand access. Customer address and phone are visible only for that rider's current offered/assigned delivery, for the duration needed to complete it.
+
+## 3A. Remaining role details to confirm
+
+1. Should Manager have POS access for supervision, order-status oversight and dispatch, while still being blocked from Admin? If yes, specify whether Manager can assign/reassign riders and reject/cancel orders.
+2. Can Cashier reject only a newly received order before it is accepted, or also reject an already accepted order? Cashier cancellation of accepted/preparing orders is denied by default until approved.
+3. Should Riders retain the complete existing delivery cycle: accept/decline offer, arrive at restaurant, confirm pickup, mark delivered, and report failed delivery/physical return? The return should require Manager/Admin/Owner confirmation rather than rider-side cancellation.
+4. Do you need a Kitchen-only staff role/app in V1, or should kitchen staff use the POS with a restricted role? No Kitchen role should inherit full POS or Admin privileges automatically.
+5. For order rejection, should a reason be mandatory every time? Recommendation: yes, with a short controlled reason plus optional note.
 ## 4. Current source behavior versus target
 
 ### Existing Admin
