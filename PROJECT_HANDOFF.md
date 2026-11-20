@@ -1019,3 +1019,31 @@ Completed a database-only consistency pass across the canonical field-level sche
 The design is ready for the next **controlled DDL specification and isolated migration prototype**, not Production. Next begin with read-only verification of the already-applied baseline, then write exact SQL for private schema/privilege rules, tenant/branch keys and identity/role foundation. First confirm an isolated local/test database; do not use Production for tests. Verify backup/restore of both PostgreSQL and Storage. Production remains read-only and every Production change requires separate explicit approval.
 
 No SQL migration was created or applied. No app source, Edge Function, Auth, Storage, Realtime, Vercel, main or original source repository was changed.
+
+
+
+## 2026-11-20 — Batch 0 read-only Production baseline verified
+
+After the migration-readiness review, performed read-only verification against Flame Chick Production project ref `adkrxfnawdiljhjaavnj`.
+
+Verified:
+- Project ACTIVE_HEALTHY; PostgreSQL 17.12.0; Mumbai ap-south-1.
+- Exactly one application migration: `20261119125153 flame_chick_postgres_default_privileges_hardening`. Never reapply.
+- No application base tables in `public`; `app_private` schema does not exist yet.
+- No app tables published to Realtime.
+- Only public routine is `public.rls_auto_enable()`; its current EXECUTE ACL is postgres only.
+- Security, performance and health advisors each returned zero lints during this read-only check.
+- Extensions observed: pg_stat_statements, pgcrypto, plpgsql, supabase_vault, uuid-ossp.
+- Public schema USAGE exists for anon/authenticated/service_role; this is not itself table DML access.
+
+**Important residual risk confirmed:** pg_default_acl still has broad anon/authenticated/service_role defaults for objects created by internal role `supabase_admin` in public. The applied hardening has removed application-role defaults for objects created by normal `postgres`, but does not remove the internal `supabase_admin` defaults. No application tables currently exist, so no application data exposure was observed. Before first migration, prove migration sessions create application objects as `postgres`; verify object owner, ACL and RLS on every created object. Never create Flame Chick application objects as `supabase_admin`. Do not try to alter Supabase-managed internal defaults without a supported approved route.
+
+Read-only queries and advisors only. No SQL writes, migrations, Production settings, app source, functions, Auth, Storage, Realtime, Vercel or deployments changed.
+
+### Current readiness status
+- Database V1 business decisions reconciled.
+- Migration-readiness review written.
+- Batch 0 read-only baseline verified.
+- Production remains read-only; zero advisor lints are not proof of future schema security.
+- Next: prepare the exact DDL/constraint/index/trigger/function/grant specification for private schema, tenant/branch foundation and role identity. Before isolated testing, confirm the local/test environment and verify migration execution role. No Production SQL without separate explicit approval.
+
