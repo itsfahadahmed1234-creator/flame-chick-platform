@@ -177,3 +177,48 @@ After each isolated migration:
 ## 9. Safety status
 
 This is the target permission and RLS/grant design, not applied SQL. Existing live code still contains mismatches called out above. No Production RLS, grants, tables, functions, secrets, Auth users, Storage or deployments have been changed.
+
+## Future customer drop-off pin — authorization matrix extension
+
+Authoritative detail: [Customer Drop-Off Pin ERD & Authorization Addendum V1](./customer-dropoff-pin-erd-authorization-addendum-v1.md).
+
+### Private storage and direct grants
+
+`app_private.delivery_dropoff_locations` is not exposed through the Data API. Revoke schema/table access from `PUBLIC`, `anon` and `authenticated`; no direct browser-role SELECT, INSERT, UPDATE or DELETE grants. Do not add it to a public view, Realtime publication or broad notification payload.
+
+### Narrow access matrix
+
+| Principal | Read coordinate | Submit/change coordinate |
+|---|---|---|
+| anon / public guest | Deny | Optional pin only through existing validated website Order API transaction; no direct table write |
+| Authenticated non-staff | Deny | Deny |
+| Admin / Owner | Restaurant-wide operational delivery detail | Only through audited authorized command; no direct table write |
+| Manager | Active operational delivery detail in assigned branch | No general edit |
+| Cashier | Active operational delivery detail in assigned branch | No general edit |
+| Rider | Own current active delivery assignment only | No |
+| Former/unassigned Rider | Deny immediately | No |
+| service_role | Backend implementation only | Only inside validated transaction; still verify actor/role where action requires a human authority |
+
+### Function boundary
+
+- Do not add another Edge Function. Extend the existing Delivery API's authenticated delivery-detail action to include the optional pin only after current authorization succeeds.
+- Derive actor from verified JWT/Auth identity; load active role/branch from database, not metadata or request fields.
+- Recheck current assignment and task state on every Rider read. Reassignment immediately revokes the old Rider's access.
+- Manager/Cashier reads must match their active branch. Admin/Owner may read across the restaurant according to operational permissions.
+- Public Order API may accept an optional pin during order creation, but must never return it in the public response or offer any pin-read operation.
+- No direct coordinate write after order creation in V1. Any future correction requires a separately approved audited command.
+
+No SECURITY DEFINER helper or direct grant is required merely to add this capability. If later implementation needs one, it must follow the existing safe-search_path, owner, exact EXECUTE grant and privilege review standards.
+
+### Required authorization tests
+
+- Public/anon and authenticated non-staff cannot read private rows or enumerate IDs.
+- Rider A cannot read Rider B's pin; modifying task/assignment IDs does not bypass this.
+- Reassignment revokes previous Rider immediately; new Rider sees only the currently assigned task.
+- Manager/Cashier cannot read another branch's pin.
+- Admin/Owner access remains attributed to the real actor.
+- Revoked/disabled staff role and terminal task deny Rider/POS operational reads according to lifecycle.
+- No pin is leaked in public order response, catalog, logs, analytics, notifications, or Realtime.
+- No Rider GPS or continuous customer tracking tables, grants, functions or channels exist.
+
+This is target authorization design only; no grants, RLS policies or functions have been applied to Production.
