@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security, menu requirements, Production schema/reliability blueprint and detailed delivery pricing contract documented; GST deliberately deferred; API/column contract mapping remains  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security, menu requirements, Production schema/reliability blueprint, detailed delivery pricing contract and cross-application contract map drafted; GST deliberately deferred; ERD/field-level schema and remaining decisions next  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -416,7 +416,7 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 
 ### Production schema/reliability blueprint drafted — 2026-11-20
 
-- Added `docs/architecture/production-schema-blueprint.md`, `docs/architecture/delivery-pricing-contract.md` (commit `d0e58a68cdda582b02d9bf198fdcc58c7cc43e71`). Design only; no SQL created/applied.
+- Added `docs/architecture/production-schema-blueprint.md`, `docs/architecture/delivery-pricing-contract.md`, `docs/architecture/database-application-contract-map.md` (commit `d0e58a68cdda582b02d9bf198fdcc58c7cc43e71`). Design only; no SQL created/applied.
 - Reviewed archived Demo baseline SQL and follow-on security, media, offer expiry, staff audit/index, helper-usage, Admin connection, and Demo-only manual-address/zero-fee migrations. Confirmed Demo baseline contains 45 tables (42 public, 3 private), 33 functions, 35 triggers, 108 RLS policies and 103 explicit indexes. Treat Demo as a reference, not a Production migration set.
 - Inspected current POS adapter and catalog refresh: schemaVersion 2, required arrays for categories/products/productVariants/subcategories/deals/dealComponents/modifierGroups/modifiers/modifierPriceRules/modifierGroupAssignments/deliveryAreas/drinkOptions; health then catalog fetch; IndexedDB cache. POS currently clears menu/category/delivery-area stores before repopulating them, so a failed cache update could lose the previous working cache. It converts missing variant prices and delivery fees to zero in the adapter. Blueprint requires version-staged cache writes, an atomic active-version pointer and no silent zero fallback.
 - POS offline delivery orders submit product/variant/deal IDs plus idempotency key; server prices using live mutable catalog values. Blueprint requires catalog publication version binding and an explicit stale-price policy before order DDL.
@@ -495,6 +495,19 @@ The user confirmed the Production delivery-fee behavior:
 - Updated `docs/architecture/production-schema-blueprint.md` to link the detailed delivery contract (commit `add4f436214c1e1d529e790c75b16ffb0dbdeb9f`).
 - The only user decision still open on this delivery flow is whether Not Listed should collect a separate locality/mohalla field; the full delivery address is already required. If not collected separately, the address snapshot still carries the destination information.
 - Production remains read-only. No Supabase tables, rows, functions, settings, buckets, secrets or app deployments were changed.
+
+### Cross-application/database contract map drafted — 2026-11-20
+
+- Added `docs/architecture/database-application-contract-map.md` (commit `93ec46bcb3bd5ed658a046a80691ed9d18d09785`). It maps the four applications, four Edge Functions, database domains, current request/response contracts, required Production changes and unresolved decisions.
+- Website: schemaVersion 2 catalog loader with version-aware cache; creates web orders using product/variant/deal IDs and area selection. Production catalog should return immutable published snapshots; delivery selection must be explicit.
+- POS: schemaVersion 2, IndexedDB local catalog/order queues; only POS delivery orders are cloud-submitted in the current source, while takeaway and dine-in remain local. Cache refresh must be staged/versioned and atomic. POS realtime currently branch-filters orders/tasks but not offers/assignments; Production needs branch-specific event scope.
+- Admin: direct PostgREST CRUD for catalog/deals/areas/settings; multiple requests for compound writes can leave partial data. Production needs transactional server-side catalog commands plus revision checks. Admin currently has basic product/deal/area forms but not full modifiers, deal editing, schedules or publication workflow.
+- Rider: rider-specific Realtime subscriptions for offers and assignments by rider_user_id; retain own-job-only access.
+- Catalog Edge Function: currently builds from mutable rows and treats active product/variant existence as published; queries delivery areas by restaurant without branch filtering; general public settings allowlist includes DefaultDeliveryFee. Production must read immutable published snapshot and branch-specific delivery pricing projection.
+- Order Edge Function: rate limits website orders, verifies staff for non-website orders, calls order RPCs. Database command remains authoritative for prices, item eligibility, delivery fees, branch scope and idempotency.
+- Delivery Edge Function: validates rider role/profile and routes presence, offers, push subscriptions and task lifecycle through service RPCs. Preserve strict rider/branch authorization.
+- The map documents source observations and recommendations only. No Production schema, app code, deployed functions, Storage, Vercel config or live app was changed.
+- Next: finalize the ERD and field-level schema design, decide offline POS stale-price handling and publication/price role boundaries, then prepare small migrations for isolated test execution before Production DDL.
 
 ## 11. Implementation roadmap — continue in this order
 
