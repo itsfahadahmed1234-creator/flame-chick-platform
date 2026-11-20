@@ -437,6 +437,8 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 - Do not guess or hardcode a GST rate. The current menu artwork's note that prices exclude applicable GST is retained as reference context only; it does not authorize GST calculation or schema additions in this phase.
 - When GST becomes necessary, design it as a separate, reviewed forward migration and coordinated API/website/POS change. Do not retroactively rewrite completed order snapshots.
 - Blueprint updated to reflect this decision: `docs/architecture/production-schema-blueprint.md`, commit `cc0c917869ab4f7480049e8824f829332d967283`.
+
+- Final documentation consistency pass removed deferred tax requirements from the current-menu capability bullets and order snapshot descriptions: `docs/architecture/current-menu-baseline.md` commit `dd83b49f270593ba4f3ef7c153ac9238efe403a5`; `docs/architecture/menu-management-design.md` commit `7d25e673fa2703b2a0342c12442af78f95fa083e`. The artwork's GST wording remains transcribed as source context only. No tax schema/calculation is in the initial design.
 - No Production database changes were made.
 
 - After the owner decision, aligned both menu design records with the GST deferral: `docs/architecture/current-menu-baseline.md` (commit `4cb4fe5b001713633a7f51d99a32fb38df0b4771`) now treats the GST phrase as source context only, and `docs/architecture/menu-management-design.md` (commit `8385e29a62688e3190b0a6d510ed263a9d1118e8`) marks tax as out of scope for the initial schema.
