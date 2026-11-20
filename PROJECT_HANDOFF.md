@@ -1399,3 +1399,14 @@ No Auth, Storage, Realtime, API settings, Functions, secrets, Vercel or applicat
 - Field-level tenant/branch alignment commit: `f752603a1337be948e4734be04d96c992d2de9d7`.
 - Handoff Batch 2 review record commit: `0245fc66ae84f59fdb12951f7f1168ffdf644769`.
 - Batch 2 remains design-only. No SQL migration file has been created and no Production DDL has been executed.
+
+
+## 2026-11-20 — Batch 3 candidate complete (NOT applied)
+
+Candidate: `docs/drafts/batch3_staff_identity_roles_candidate.sql` (commit `c336e74202d335dc71857eacc452f892f56042dc`). Acceptance review: `docs/drafts/batch3_staff_identity_roles_acceptance_review.md` (commit `8e95b40d6d4d2d00d220daa0b041883339934f0f`). Working branch: `work/production-source-audit`.
+
+Five candidate tables: `public.user_profiles`, `public.user_roles`, `public.staff_role_audit`, `app_private.staff_invitation_requests`, and `app_private.staff_invitation_branch_targets`. The design enforces one active role identity per user/restaurant, same-role multi-branch operational assignments, restaurant-wide Admin/Owner, postgres-only initial bootstrap, serialized role changes, last-active-Owner protection, append-only role audit, tenant-safe branch FKs, and a recoverable private Auth invitation workflow. All five tables are RLS-enabled, postgres-owned, deny-by-default, without client grants, policies, or Realtime membership; app_private remains unexposed.
+
+Disposable DDL-only and behavioral rollback tests passed. They covered bootstrap, actor checks, role conflicts, multi-branch role assignments, cross-tenant branch rejection, last-Owner guard and transfer, profile deactivation, invitation target consistency, Auth email confirmation, duplicate open invitations, audit immutability, and TRUNCATE denial. Every test was rolled back. Follow-up Production state: 0 Auth users, 0 restaurants, 0 branches, 0 Batch 3 tables; migration history unchanged (baseline, Batch 1, Batch 2 only).
+
+**Remaining gate:** true parallel two-session testing of concurrent last-Owner changes has not been performed; run in isolated staging before Production approval. The Staff Admin API, JWT actor derivation, invitation orchestration, projections and exact command grants are later work. **Batch 3 has NOT been applied. Separate explicit owner approval is required.** No app source or Vercel settings/deployments changed.
