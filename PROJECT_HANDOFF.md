@@ -1228,3 +1228,27 @@ Database-side Batch 1 rollback-only acceptance probe passes. This is not approva
 ### Current status / next gate
 - No persistent Batch 1 migration applied; no new schema or defaults persisted; no changes to app code, API settings, Auth, Storage, Realtime, Functions, secrets or Vercel.
 - Before execution: open the correct Flamechic organization/project in Dashboard, verify `app_private` is absent from Exposed schemas, establish/export an encrypted schema-only backup if possible, then review and approve candidate SQL. Reconfirm project ref and postgres identity immediately before apply.
+
+
+## 2026-11-20 — User-confirmed API exposed schemas and exact candidate rollback
+
+### API exposure gate
+User checked the correct Flame Chick Production Project Settings → API screen and reported exactly two exposed schemas: `graph_ql` and `public`. `app_private` is absent. Treat this as user-confirmed Dashboard evidence; no setting was changed.
+
+### Exact candidate transaction test
+Executed the current candidate SQL file's statements against connected Production, changing only its terminal `COMMIT;` to `ROLLBACK;` so the entire candidate transaction was reverted. This was a rollback-only rehearsal, not a migration apply.
+
+Post-test read-only verification:
+- `current_user=postgres`, `session_user=postgres`.
+- `app_private` does not exist.
+- app_private default ACL rows: 0.
+- app_private Realtime publication rows: 0.
+- public application relations: 0.
+- no additional application migration history row beyond the existing baseline.
+
+This confirms the candidate can execute under the connected role and its schema/default ACL statements roll back cleanly. It does not prove PostgREST negative request behavior, because no schema was left behind to test; however user-confirmed exposed-schema configuration already excludes app_private.
+
+### Decision status
+The exposed-schema gate is now satisfied. Exact candidate rollback rehearsal passed. Persistent Batch 1 remains unapplied pending explicit user authorization to create the empty private schema and its scoped default ACLs. External encrypted backup has not been produced: this environment does not provide Supabase CLI, Docker or pg_dump. Because the target is empty and Batch 1 is schema-only, this is a low-impact change, but user must explicitly accept proceeding without an external dump or arrange a dump first.
+
+No Auth, Storage, Realtime, API settings, Functions, secrets, Vercel or application code changed.
