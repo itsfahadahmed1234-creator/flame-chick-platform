@@ -1,3 +1,22 @@
+## 2026-11-20 — POS fulfilment and offline-sync source review
+
+Reviewed the working-branch POS, active website entrypoint and order API for exact fulfilment contracts. Detailed report: [POS fulfilment and offline-sync contract review](docs/architecture/pos-fulfillment-and-offline-sync-contract-review.md).
+
+**Canonical future order values**
+- Delivery → `delivery` (Website + POS).
+- Takeaway → `pickup` (Website + POS).
+- Dine-in → `dine_in` (POS only).
+
+**POS UI instruction:** The Dine-in button and Open Tables navigation are hidden, while table selection, table management, open checks, Immediate/Pre-Order scheduling, table movement and payment/close logic remain. Owner says this is a UI bug and explicitly instructed not to fix it now. Leave all POS UI/code untouched; retain all three modes in the future data/API design.
+
+**Current sync gap:** POS IndexedDB stores orders/queue/status queue/tables and cached catalog. Current Supabase POS sync only selects POS `delivery` orders; takeaway and dine-in remain local. Delivery sync requires connectivity and an authenticated staff session. Table records are local and default ten local tables are created when no local table records exist. This is not yet full offline multi-mode synchronization.
+
+**Required future work:** implement durable local outbox and stable local IDs; per-command idempotency; ordered sync; server-side role/branch/catalog/price/fee/status validation; stale catalog hold for Cashier/Manager confirmation (no silent repricing); branch-scoped shared table configuration; recoverable multi-device table conflict handling; dine-in open-check edits, scheduling, table moves and close/payment commands; preserve actor attribution and audit. Delivery creates delivery task; pickup and dine-in do not. Resolve offline actor authentication/attribution before shipping.
+
+Website active UI currently offers Delivery and Takeaway only; its active payload maps these to `delivery` and `pickup`. `js/app.js` is explicitly inactive legacy code and is not evidence of current website dine-in support. Batch 2 website flags remain delivery/pickup only; do not add website dine-in based on legacy code.
+
+No UI, source code, SQL, database, Vercel configuration or deployment was changed. Website security audit remains deferred until immediately before website database integration. Batch 2 SQL remains unapproved/unapplied.
+
 ## 2026-11-20 — Batch 2 owner decisions confirmed
 
 The owner approved the following Batch 2 decisions:
@@ -79,7 +98,7 @@ External encrypted schema dump was not created; user explicitly accepted proceed
 Batch 1 is complete. Continue with remaining Stage 3 design/source consistency: resolve outstanding business/schema decisions, complete field-level table and API mapping, then separately review Batch 2/3 migration design. Do not start website security audit until immediately before attaching website to DB. No application deployment, Vercel changes, Auth/Storage/Edge Function work, or business table creation was performed in this Batch 1 action.
 # Flame Chick Platform — Project Handoff
 
-**Last updated:** 2026-11-20 (Batch 2 owner decisions confirmed; Batch 1 applied and verified)  
+**Last updated:** 2026-11-20 (POS fulfilment/offline-sync source review recorded; Batch 2 owner decisions confirmed; Batch 1 applied and verified)  
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
