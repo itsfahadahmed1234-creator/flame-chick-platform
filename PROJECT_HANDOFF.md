@@ -1204,3 +1204,27 @@ All assertions passed:
 
 ### Decision
 Database-side Batch 1 rollback-only acceptance probe passes. This is not approval to persist the migration yet. Before persistent foundation DDL: manually verify Data API exposed schemas, review final migration SQL, and establish a suitable recovery/backup plan. Production schema remains empty; no persistent database changes, no Auth/Edge Functions/Storage/Realtime/Vercel/app code changes.
+
+
+## 2026-11-20 — Batch 1 pre-deployment review, candidate SQL and recovery plan
+
+### Dashboard/API exposed-schema gate
+- The currently connected browser Dashboard tab was inspected read-only. It belongs to the separate organization `hfp supabase` (org ref `xzdklhvmheiewpnnqgsa`) and lists Flame Chick Demo, HFP and Pizza Bite projects; it is NOT the `Flamechic` organization (`ydlbinhyoutdqueilxnd`) containing Flame Chick Production.
+- Therefore no API exposed-schema setting was inspected or changed. Do not use the HFP org tab as evidence. Correct production Dashboard path still must be checked: Project Settings → API → Exposed schemas; `app_private` must not be listed.
+- The SQL integration remains connected to Flame Chick Production ref `adkrxfnawdiljhjaavnj` for read-only and rollback-only database checks.
+
+### Important narrowing of privilege plan
+- Initial rollback-only probes showed schema-specific default ACL revokes do not remove PostgreSQL implicit global PUBLIC EXECUTE on new functions or PUBLIC USAGE on new types.
+- A prior proposed global revoke for postgres-created functions/types would affect every schema, not only Flame Chick `app_private`. On review, this broad global change is rejected for Batch 1.
+- Candidate design is now narrow: schema-specific defaults for app roles, private schema has no client USAGE, and every future `app_private` function/type migration must immediately revoke PUBLIC and all client roles on that exact object and assert effective permissions. Public RPCs receive only exact explicit grants after review.
+- DDL specification updated accordingly. This is a deliberate correction: previous acceptance probe proved global revokes work, but not that global scope is appropriate for this project.
+
+### Candidate SQL and recovery
+- Added review-only candidate SQL: `docs/drafts/batch1-private-schema-bootstrap-candidate.sql`. It is NOT under `supabase/migrations`, has not been applied, and creates only the empty `app_private` schema plus scoped defaults.
+- Added recovery plan: `docs/operations/database-batch1-recovery-plan.md`.
+- Supabase Free plan does not include automatic daily database backups per current official documentation. Before persistent migration, preferred protection is a Supabase CLI schema-only logical dump stored encrypted off-site; available environment currently has no Supabase CLI, Docker or pg_dump, and no backup artifact has been created.
+- If external backup cannot be created, this limitation must be explicitly accepted before the schema-only transactional change. Candidate is intentionally narrow and empty; recovery uses a guarded `DROP SCHEMA ... RESTRICT` only while no objects exist. Never use CASCADE.
+
+### Current status / next gate
+- No persistent Batch 1 migration applied; no new schema or defaults persisted; no changes to app code, API settings, Auth, Storage, Realtime, Functions, secrets or Vercel.
+- Before execution: open the correct Flamechic organization/project in Dashboard, verify `app_private` is absent from Exposed schemas, establish/export an encrypted schema-only backup if possible, then review and approve candidate SQL. Reconfirm project ref and postgres identity immediately before apply.
