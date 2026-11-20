@@ -270,7 +270,7 @@ This is not a reason to grant broad access to service_role or authenticated. Edg
 - Cashier: read published menu, create/serve orders and permitted POS actions; no catalog edits.
 - Kitchen: read minimum order/item information and update only permitted kitchen workflow actions.
 - Rider: own rider profile/presence, offers and assigned delivery lifecycle only.
-This is a proposed matrix. Reconcile it with the current role requirements and owner preference before writing RLS policies.
+This older generic matrix is superseded by the owner-confirmed role matrix in `security-access-matrix-v1.md`; do not implement its Manager catalog editing or publishing permissions.
 
 ## 7. Media and privacy
 
@@ -324,7 +324,7 @@ The actual migration split may change after full dependency mapping and the app 
 
 ## 11. Open decisions before final DDL
 
-1. For stale offline POS orders, should the server hold for cashier confirmation when the locally cached catalog version is no longer current, or honor the retained historical version?
+1. **RESOLVED:** stale offline POS orders are held for explicit authenticated Cashier/Manager confirmation if the current catalog changes price or availability; never silently reprice. See the handoff and performance-security-operations-plan.md.
 2. GST/tax is deliberately deferred. Do not add it to the initial schema; revisit through a later reviewed migration when requested.
 3. Should product flavors/portion choices be represented as variants, modifiers, or separate products by menu family?
 4. Should deals allow curated customer choices, category/subcategory pools, substitutions, surcharges and optional add-ons?
