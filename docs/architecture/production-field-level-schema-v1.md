@@ -420,7 +420,7 @@ Immutable approved snapshots.
 - published_at timestamptz NOT NULL
 - validation_summary jsonb NOT NULL (allowlisted counts/warnings, no PII)
 
-Constraints: UNIQUE(restaurant_id, version); unique id/version pair; checksum format/length validation. Block UPDATE/DELETE through grants and triggers/commands. Snapshot schema is explicitly versioned and has no private staff/customer/payment data.
+Constraints: UNIQUE(restaurant_id, version); unique id/version pair; checksum format/length validation. Block UPDATE/DELETE through grants and triggers/commands. Snapshot schema is explicitly versioned and has no private staff/customer/payment data. The checksum must be computed by trusted server/database code over a documented canonical serialization (not arbitrary JSON key order or browser-supplied checksum); verify it before serving and when loading a cached publication. Never treat a checksum as an authenticity signature.
 
 ### 8.3 restaurant_catalog_state
 
@@ -447,7 +447,7 @@ Publish/rollback command atomically inserts an immutable publication (when publi
 - safe_details jsonb NULL
 - request_id uuid NULL
 
-Append-only. Who may change prices/publish/rollback still needs explicit reconciliation with the owner-confirmed Admin/Owner powers and the existing staff-admin restrictions. Do not give Manager any catalog/publishing access.
+Append-only. Admin and Owner may both edit catalog drafts, prices, delivery pricing, publish and rollback, with distinct actor attribution and immutable audit events. Manager, Cashier and Rider have no catalog authoring or publication authority. Publish/rollback commands must lock or compare-and-set the catalog state pointer, validate the expected draft revision, create the immutable snapshot/event and move the pointer atomically; a failed step leaves the previous publication active.
 
 ## 9. Delivery pricing configuration
 
@@ -476,7 +476,7 @@ A new area form must start blank and require explicit fee entry. Do not default 
 
 NULL means Not Listed is not configured; checkout must block. Explicit 0 is valid. Manager and Cashier cannot edit. Admin/Owner only.
 
-The order command requires explicit selection_type = listed_area or not_listed. A NULL area_id does not imply Not Listed. It calculates the canonical fee from the database and snapshots it on both order and delivery task. Fee values supplied by the browser are ignored/rejected.
+The order command requires explicit selection_type = listed_area or not_listed. A NULL area_id does not imply Not Listed. It calculates the canonical fee from the database and snapshots it on both order and delivery task. Fee values supplied by the browser are ignored/rejected. For listed_area, require an active area belonging to the resolved branch; for not_listed, require area_id to be NULL and a configured branch default fee. Reject contradictory combinations.
 
 ## 10. Orders, line snapshots and payments
 
@@ -507,8 +507,8 @@ The order command requires explicit selection_type = listed_area or not_listed. 
 | currency_code | char(3) NOT NULL | Snapshot of currency |
 | payment_status | text NOT NULL | Align to current payment flow |
 | created_by_user_id | uuid NULL | Null for guest; otherwise server-verified staff |
-| idempotency_key | text NOT NULL | Unique order creation request key |
-| request_fingerprint | text NOT NULL | Hash of normalized canonical request; prevents key reuse with changed payload |
+| idempotency_key | text NOT NULL | Unique order creation request key; bounded length and strict format/entropy validation; not an authorization secret |
+| request_fingerprint | text NOT NULL | Server-computed hash of normalized canonical business fields using a versioned canonicalization algorithm; prevents key reuse with changed payload; excludes transport noise and server-generated values |
 | accepted_at, ready_at, completed_at | timestamptz NULL | Server-controlled lifecycle times |
 | created_at, updated_at | timestamptz NOT NULL | Database-managed |
 
