@@ -214,6 +214,20 @@ The user confirmed the intended business rule on 2026-11-20:
 
 The detailed delivery business and API contract is maintained in `docs/architecture/delivery-pricing-contract.md`. Use that document as the source of truth for named-area versus Not Listed behavior, branch scoping, server fee resolution, immutable snapshots and acceptance tests. Do not re-infer or simplify this contract during implementation.
 
+### Production default-privilege hardening must be respected
+
+The one baseline migration already applied in Production revoked default privileges for objects created by role postgres in schema public, including privileges from PUBLIC, anon, authenticated and service_role. It also revoked default function execution privileges and sequence privileges. It revoked client/service-role EXECUTE on public.rls_auto_enable().
+
+Every future migration must therefore:
+- Explicitly ENABLE ROW LEVEL SECURITY on every exposed application table; do not assume an auto-enable trigger will cover a table.
+- Explicitly GRANT schema/table/sequence privileges to the exact required roles. Edge Functions using the service_role key need explicit privileges on each table or function they call; service_role does not receive the removed default grant automatically.
+- Explicitly GRANT EXECUTE on each RPC/function only to its intended caller role (for example service_role for a server-only RPC, or a narrowly selected authenticated/anon call only when deliberately designed).
+- Explicitly REVOKE all unnecessary privileges from PUBLIC, anon, authenticated and service_role before adding required grants.
+- Verify final grants with catalog queries after every migration, then test as anon, authenticated staff and service_role. RLS and SQL privileges must both be tested.
+- Prefer UUID defaults over serial sequences unless a sequence is actually required; when sequences are used, grant only the exact required sequence privileges.
+
+This is not a reason to grant broad access to service_role or authenticated. Edge Functions must still validate actor, role, restaurant and branch even when using a server-side key.
+
 ## 6. Security and access boundaries
 
 ### Data access model
