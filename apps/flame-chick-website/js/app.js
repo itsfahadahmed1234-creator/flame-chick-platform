@@ -1,4 +1,8 @@
-/* HFP app: UI + rendering, catalog-driven (Phase 2C: ordering, deals, modifiers, checkout). */
+/* LEGACY / INACTIVE — DO NOT LOAD IN THE PRODUCTION STOREFRONT.
+   The current index.html does not load this file. This retained historical
+   implementation contains HFP/Pizza Bite-era settings and HFP staging image
+   URLs. Do not re-enable it or reuse its settings without a deliberate review.
+   Current storefront runtime is documented in apps/flame-chick-website/README.md. */
 
 let menu=[],categories=[],activeCategory="",pizzaGroups=[],siteConfig={},editingKey=null;let HFP_VIEW_DEALS=[];
 /* Published site-image slots are authoritative only after the catalog settles
