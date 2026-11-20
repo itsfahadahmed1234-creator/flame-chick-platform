@@ -212,3 +212,8 @@ The owner confirmed these permissions and workflow outcomes:
 
 The broad Admin/Owner columns above reflect their full operational authority; the Cashier/Manager return confirmation is the only new narrow confirmation grant. Preserve the existing prohibition on hard deletion and on general Cashier cancellation of accepted/in-progress orders.
 
+
+
+## Delivery lifecycle permissions — confirmed addendum (2026-11-20)
+
+For exact state and command rules, see [`delivery-lifecycle-contract.md`](./delivery-lifecycle-contract.md). The delivery lifecycle is confirmed: Rider rejection and 60-second timeout return tasks to POS for manual Cashier/Manager reassignment; Rider can report failure and choose return; Rider marks successful delivery and order completes immediately; Cashier or Manager confirms physical return. This supersedes the earlier pending Rider-lifecycle questions in this matrix. Cashier's return confirmation is a narrow permission and does not authorize general cancellation of accepted orders.
