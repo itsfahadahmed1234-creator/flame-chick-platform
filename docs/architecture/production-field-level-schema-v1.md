@@ -179,7 +179,7 @@ Constraints:
 - CHECK owner/admin have branch_id NULL; manager/cashier/rider have branch_id NOT NULL.
 - Composite branch/tenant FK.
 - Partial unique indexes prevent duplicate active restaurant-wide role assignments and duplicate active branch role assignments.
-- Prevent self-escalation and protect the last active Owner account in transactional staff-admin commands.
+- Prevent self-escalation. Serialize role/branch changes and deactivation by locking a restaurant-level staff-authority guard row before checking the last-active-Owner invariant; concurrent Admin actions must not both remove or demote the final active Owner. Enforce this in the database command, not only the Edge Function.
 - Role assignment changes use an audited command. Admin and Owner may both invite staff, assign/change roles, change branch assignments and deactivate staff, subject to the same safeguards and immutable audit trail. This follows the owner-confirmed rule that Admin and Owner have equivalent full business authority with distinct audit identities. Manager, Cashier and Rider cannot administer staff or roles. Prevent self-escalation, enforce the last-active-Owner safeguard, and require a reason for privileged role/branch changes.
 
 No Kitchen role is created in V1 unless separately approved.
