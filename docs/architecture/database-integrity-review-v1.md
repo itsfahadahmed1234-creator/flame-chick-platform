@@ -127,3 +127,32 @@ Do not guess these where they alter primary keys, publication scope, order routi
 ## 9. Next step
 
 Continue a source-independent schema consistency pass for exact role multiplicity, branch routing and catalog scope. Then reconcile the open business decisions that affect table keys and constraints. Only after that prepare a clean migration plan and execute it against an isolated test database. Production remains read-only and requires separate explicit approval.
+
+## Future customer drop-off pin integrity review
+
+The owner-approved scope is one optional fixed customer-shared delivery destination coordinate, not live tracking. See [drop-off pin data contract](./customer-dropoff-pin-data-contract-v1.md) and [ERD/authorization addendum](./customer-dropoff-pin-erd-authorization-addendum-v1.md).
+
+### Integrity invariants
+- Pin row is optional, one per delivery order/task, stored in non-exposed `app_private`.
+- Composite tenant/branch/order/task FKs bind the coordinate to exactly the order's delivery task and branch.
+- Written delivery address remains required; missing pin is valid and never blocks checkout.
+- Optional pin is validated and committed atomically with the website order and delivery task; failure leaves no orphan pin and consumes no website quota slot.
+- Coordinates are never exposed in public order responses, catalog, analytics, logs, general notifications or Realtime.
+- Rider read requires the current active assignment; reassignment revokes the prior Rider. POS read requires active role and branch scope.
+- Google Maps directions URL is generated from validated coordinates; arbitrary user-supplied URLs are never persisted or opened.
+- No Rider GPS, continuous customer tracking, coordinate update stream, location history or Realtime location channel exists.
+
+### Adversarial tests
+1. Optional valid pin + website delivery order commits with the order/task; transaction failure rolls all writes back.
+2. No pin / permission denied still allows delivery checkout with written address.
+3. Pickup/non-delivery order cannot attach a pin.
+4. Invalid coordinates, cross-tenant IDs, cross-branch IDs, wrong order/task pairing and missing consent fail.
+5. Anonymous callers cannot read private pin storage or use the order-create route to retrieve a pin.
+6. Rider A cannot read Rider B's pin; reassignment immediately removes Rider A access.
+7. Manager/Cashier cannot read pins outside their authorized branch; Admin/Owner access is audited.
+8. Terminal task and revoked role/assignment deny access.
+9. Arbitrary maps URLs are rejected; generated URL contains only validated coordinate.
+10. Coordinate absent from logs, analytics, public response, notifications and Realtime.
+11. Retention cleanup removes only eligible precise coordinate rows and never cascades to orders, delivery tasks, payment or audit history.
+
+No migration or Production implementation is implied.
