@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security and Admin-managed menu capability design in progress  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security and Admin-managed menu capability design in progress; current published menu baseline documented  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -359,7 +359,7 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 
 ### Menu information gate
 
-- The actual final launch menu has **not yet been supplied**. A reference image has been supplied to demonstrate required catalog capabilities, not content to publish.
+- The actual final launch menu has **not yet been supplied**. Two menu images have been supplied: the current published menu baseline and a separate future-capability reference image; neither is an instruction to seed Production.
 - Known historical Demo context (five categories, about 24 regular products/variants plus a Platter Deal) is not an authoritative specification for the new menu. Do not assume its categories, product set, modifier structure, deal logic, pricing, or media are unchanged.
 - Do not block schema design waiting for the final menu. Design the catalog so future menu items and rules can be created in Admin. The reference image and user clarification are documented in `docs/architecture/menu-management-design.md`. Ask about unresolved business rules only where they change the schema; do not seed the reference image.
 - Continue independent platform/security analysis while waiting, but do not finalize catalog DDL or create menu seed data until the new menu is reviewed.
@@ -399,6 +399,19 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 - The design file records unresolved business choices; do not invent whether flavors are variants/modifiers/products, whether combo choices are fixed/curated, how substitutions/surcharges work, schedule recurrence/scope, channel availability, stock/tax/allergen needs, or who can publish.
 - Next: complete the API/schema contract map; review existing Demo publication tables only as reference; then draft a concrete Production ERD/migration sequence and Admin/API work plan. Keep Production read-only. No menu data or Production DDL was created.
 - Ask the user for clarification only on business rules that materially affect the model, not for the final menu itself. The final menu can later be entered through Admin if the designed capabilities cover it.
+
+
+### Current published menu baseline received — 2026-11-20
+
+- User supplied the current Flame Chick menu image. This is the current published-menu baseline, distinct from the earlier future-capability reference image.
+- Inventory transcription is recorded in `docs/architecture/current-menu-baseline.md` (commit `64ca4e6263de50e0b5ee23e6acadd36c6a63f00c`). It records 25 named entries from the image: 5 Starters (including Platter), 3 Injected Broast entries, 3 Wraps, 4 Burgers, and 10 beverage-list entries. All 25 show numeric PKR prices. The artwork says prices are exclusive of applicable GST, but does not specify the GST rate or tax calculation rules.
+- The menu artwork's beverage list is displayed below Burgers without a visible separate “Beverages” heading; verify the intended category in live Admin/catalog before importing.
+- Platter is described as 6 Classic Nuggets, 6 Injected Nuggets, 6 Fire Wings, 6 Injected Wings, Fries & Dips, priced PKR 1,499. Confirm whether Fries & Dips are tracked catalog components or only description/inclusions.
+- “NEW” labels appear on Platter, Sunset Splash, 1.5 Ltr Water Bottle, and Cold Drinks 1.5 Ltr. Artwork does not define automatic expiry or badge rules.
+- Artwork shows Quarter/Half/Full Broast as separately named priced entries; do not assume their current backend representation is product variants until live catalog records are inspected.
+- This image is evidence of displayed menu content only, not proof of live backend IDs, exact current Admin data, tax configuration, stock rules, or checkout calculations.
+- No menu rows have been inserted into Production. No Production schema or live app was changed.
+- Next: compare this artwork with the actual current catalog/export from the live system (where available), then map stable product identities and order snapshots. Incorporate these requirements into the proposed ERD and Admin authoring workflow. Keep Production read-only.
 
 ## 11. Implementation roadmap — continue in this order
 
@@ -446,4 +459,4 @@ Run full end-to-end tests, security checks, rollback rehearsal, and backup resto
 
 **Stage 2 is complete:** the Flamechic organization and exact Production project `adkrxfnawdiljhjaavnj` are visible and verified. The one applied migration was read from live migration history and its exact SQL has been added to the working branch as a historical migration file. It must not be reapplied. Production currently has no application schema, users, buckets, or Edge Functions. Continue with Stage 3 schema design/review; keep Production unchanged until the migration plan and each DDL batch are explicitly approved.
 
-**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md` and `docs/architecture/menu-management-design.md`, inspect the current branch head, and continue Stage 3 from the API/database contract analysis and menu capability requirements. The reference image is not content to publish. Design routine menu authoring in Admin so future menu changes do not require DDL. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
+**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, `docs/architecture/menu-management-design.md`, and `docs/architecture/current-menu-baseline.md`, inspect the current branch head, and continue Stage 3 from the API/database contract analysis and menu capability requirements. The reference image is not content to publish. Design routine menu authoring in Admin so future menu changes do not require DDL. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
