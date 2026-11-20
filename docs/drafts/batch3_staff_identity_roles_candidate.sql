@@ -434,9 +434,6 @@ CREATE TRIGGER user_profiles_no_truncate
 CREATE TRIGGER user_roles_no_truncate
  BEFORE TRUNCATE ON public.user_roles
  FOR EACH STATEMENT EXECUTE FUNCTION app_private.reject_staff_truncate();
-CREATE TRIGGER staff_role_audit_no_truncate
- BEFORE TRUNCATE ON public.staff_role_audit
- FOR EACH STATEMENT EXECUTE FUNCTION app_private.reject_staff_truncate();
 CREATE TRIGGER staff_invitation_requests_no_truncate
  BEFORE TRUNCATE ON app_private.staff_invitation_requests
  FOR EACH STATEMENT EXECUTE FUNCTION app_private.reject_staff_truncate();
