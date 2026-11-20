@@ -412,3 +412,22 @@ The owner-confirmed delivery lifecycle is now specified in detail in [`delivery-
 ## Field-level schema and Free-plan implementation spec
 
 The draft field-level design is now maintained in [production-field-level-schema-v1.md](./production-field-level-schema-v1.md). It expands the conceptual entities above into candidate columns/types, tenant and branch constraints, indexes, RLS/grant strategy, Edge Function command boundaries, rate-limit storage and Free-plan usage budgets. This is still a design proposal; no SQL migrations or Production DDL are authorized. Use it together with delivery-lifecycle-contract.md, delivery-pricing-contract.md and security-access-matrix-v1.md.
+
+## Future customer drop-off pin — ERD extension
+
+The optional fixed customer-supplied delivery destination pin is specified in [customer-dropoff-pin-erd-authorization-addendum-v1.md](./customer-dropoff-pin-erd-authorization-addendum-v1.md) and [customer-dropoff-pin-data-contract-v1.md](./customer-dropoff-pin-data-contract-v1.md).
+
+Conceptual relationship:
+
+```mermaid
+erDiagram
+  ORDERS ||--o| DELIVERY_TASKS : may_have
+  DELIVERY_TASKS ||--o| DELIVERY_DROP_OFF_LOCATIONS : optional_destination
+  DELIVERY_TASKS ||--o{ DELIVERY_ASSIGNMENTS : assignment_history
+```
+
+The physical table is `app_private.delivery_dropoff_locations`, not a public Data API table. It contains one optional coordinate pair per delivery order/task, source, consent timestamp and notice version. Composite foreign keys bind it to the exact tenant, branch, order and delivery task. It has no coordinate history, update stream, or Rider GPS relationship.
+
+The Rider can retrieve the pin only for their own current active assignment. POS reads are constrained by current role and branch scope. The app generates a Google Maps directions URL from validated coordinates; no arbitrary customer URL is stored. A written delivery address remains required, and the pin is optional.
+
+This is future-ready schema design only. No location table, policy, grant, RPC, application feature or Realtime channel has been created or enabled in Production.
