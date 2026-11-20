@@ -313,7 +313,7 @@ An Edge Function invocation is counted regardless of HTTP status; returning 401/
 - Rider reads should use own-rider RLS queries and targeted Realtime. Edge Functions handle protected state-changing commands.
 - Combine catalog metadata/health and published snapshot into one request when a coordinated API schema-version rollout permits; cache the immutable catalog by publication version/checksum.
 - Preserve Supabase Auth's native IP/user rate limits. Do not duplicate sign-in/token rate counters in application tables without evidence.
-- Use atomic Postgres-backed controls for high-risk writes: the owner-approved successful-customer-order quota (normalized phone HMAC, atomically inside order creation), Rider state mutations (authenticated rider HMAC), Cashier/Manager dispatch writes (staff HMAC), and staff invitations (authorized actor HMAC). Optional IP abuse signals are secondary only after the trusted ingress header is verified.
+- Use atomic Postgres-backed controls for high-risk writes: the owner-approved successful-customer-website-order quota (normalized phone HMAC, atomically inside website order creation), Rider state mutations (authenticated rider HMAC), Cashier/Manager dispatch writes (staff HMAC), and staff invitations (authorized actor HMAC). Optional IP abuse signals are secondary only after the trusted ingress header is verified.
 - Keep raw IP, phone and email out of the limiter table. Derive HMAC-SHA-256 subject digests in server-side code with a dedicated secret; never persist raw request identity. The private limiter function returns only allow/deny and bounded Retry-After.
 - Candidate test limits for non-order actions: Rider state actions 20/minute; staff dispatch writes 30/minute; staff invitations 5/hour. These are load-test starting points, not approved Production values. Customer order limits are separately owner-approved at 3 per rolling minute, 3 per rolling 10 minutes and 15 per rolling hour per normalized customer phone.
 - Public catalog reads are cached first and do not write a limiter bucket by default. Add a per-IP read bucket only if measured abuse justifies its own database write cost.
@@ -348,7 +348,7 @@ The owner approved these three simultaneous rolling windows per canonical custom
 | 10 minutes | 3 |
 | 1 hour | 15 |
 
-All order sources that reach the central order-create transaction and carry a customer phone share the quota: website, cloud POS delivery, and staff-entered phone/WhatsApp/manual/third-party sources. Staff-entered sources remain Auth/role protected. POS takeaway/dine-in orders that remain only in IndexedDB cannot be covered by a server-enforced phone quota until registered centrally; do not claim otherwise.
+Only customer website orders (`source=website`) are subject to this quota. POS orders are exempt, including cloud POS delivery orders. Authenticated staff-entered phone/WhatsApp/manual/third-party orders are also exempt. Keep the same secure order idempotency requirements on every source, including POS.
 
 Count an order at successful order-record commit, even if it is later rejected/cancelled by the restaurant. Invalid or rolled-back attempts do not consume a slot. Exact idempotent retry returns the existing order and consumes no additional slot. A new idempotency key is a new customer order if it commits. The quota does not verify phone ownership; the active website currently accepts a typed phone without OTP. Do not add OTP/SMS spend without separate approval.
 
