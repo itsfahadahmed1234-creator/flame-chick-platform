@@ -760,19 +760,18 @@ Additional enforcement:
 
 ### 14.2 Rate-limit targets (initial proposals for isolated testing)
 
-These are starting values to load-test, not final business decisions or Production settings:
+Only the owner-approved ordering caps below are business requirements; other values in this table are initial test values, not Production settings:
 
 | Route/action | Subject key(s) | Initial test limit | Purpose |
 |---|---|---:|---|
-| Guest order create | Trusted client IP HMAC | 10 attempts / 10 minutes | Reduce automated bursts |
-| Guest order create | Normalized phone HMAC | 4 attempts / 15 minutes; 10 / hour | Limit repeated orders against one contact |
+| Customer order creation (all server-registered customer order sources) | Server-normalized customer phone HMAC | **3 orders / rolling minute; 3 / rolling 10 minutes; 15 / rolling hour** | Owner-confirmed successful-order quota; checked atomically during order creation |
 | Public catalog read | Client cache first; no DB bucket by default | Add 60/minute/IP only if observed abuse justifies | Avoid extra DB write per view |
 | Rider offer response/status | Authenticated rider HMAC | 20 actions / minute | Suppress retries/automation; state machine still decisive |
 | Cashier/Manager dispatch writes | Authenticated staff HMAC | 30 actions / minute | Suppress duplicate/broken dispatch loops |
 | Staff invite/role administration | Authenticated authorized actor HMAC | 5 invitations / hour | Reduce account abuse |
 | Auth login/token operations | Supabase Auth's built-in IP/user policies | Keep current Supabase defaults unless verified need | Avoid duplicating Auth controls |
 
-Tune with real staff behavior and controlled load tests before enforcing. Shared NAT/mobile carrier IPs can represent many legitimate customers; never rely on an IP threshold alone for an irreversible order denial. Phone-based limits are privacy-protective HMAC keys, not permanent identity records. Duplicate idempotent retries should return their original result and must not create multiple orders.
+Tune with real staff behavior and controlled load tests before enforcing. Shared NAT/mobile carrier IPs can represent many legitimate customers; never rely on an IP threshold alone for an irreversible order denial. Phone-based limits are privacy-protective HMAC keys, not permanent identity records. The owner-confirmed caps are 3 per rolling minute, 3 per rolling 10 minutes, and 15 per rolling hour, all keyed by canonical customer phone. Count newly committed customer order records across server-registered order sources (website, POS delivery, and any staff-entered phone/WhatsApp/manual/third-party source using the common order RPC). A later restaurant rejection/cancellation does not erase the fact that an order was submitted and counted. Invalid/rolled-back submissions do not count. Exact idempotent retries return the original order without consuming another slot. Current POS local-only takeaway/dine-in records are invisible to the server and therefore cannot be included until they are centrally registered.
 
 ### 14.3 IP trust requirement
 
@@ -966,3 +965,38 @@ Checked 2026-11-20:
 - Securing Data API and RLS exposure: https://supabase.com/docs/guides/api/securing-your-api
 
 This is a planning snapshot, not a guarantee that quotas remain unchanged. Recheck official docs and the live Flame Chick project's actual usage before implementation/cutover.
+
+
+### 14.6 Owner-confirmed customer order quota (2026-11-20)
+
+The owner explicitly approved these simultaneous rolling-window limits per normalized customer phone:
+
+| Window | Maximum newly committed order records |
+|---|---:|
+| 1 minute | 3 |
+| 10 minutes | 3 |
+| 1 hour | 15 |
+
+Use database time and rolling windows, not calendar boundaries. The 1-minute rule is mathematically dominated by the 3-per-10-minute rule, but retain the explicit check and named policy because the owner asked for all three. A fourth order within either the 1-minute or 10-minute window is rejected; a sixteenth within one hour is rejected.
+
+**Scope:** apply across all customer sales orders created through the central order RPC and carrying a valid customer phone, including website, cloud POS delivery, and any staff-entered phone/WhatsApp/manual/third-party order. Staff authentication still applies to staff-entered sources. This prevents channel switching around the phone-based limit. Existing POS takeaway/dine-in sales that remain in the device-local IndexedDB queue are not visible to the server and cannot be honestly claimed as capped; migrate them to a central order-write path before describing this as a whole-business limit.
+
+**Identity limitation:** the current website collects a phone number but does not prove ownership with OTP. This quota is therefore per canonical phone number supplied, not a verified natural person. A customer can evade a phone-keyed cap by using a different number. Do not add SMS/OTP spend or login friction without a separate approval. A trusted-IP abuse signal may be added as a secondary control only after ingress header spoofing tests; shared mobile-carrier NAT means IP should not replace phone as the person key.
+
+**Atomic algorithm:**
+1. Order Edge Function validates the request/API key and staff Auth for non-website sources. It normalizes the phone using one shared documented rule and computes HMAC-SHA-256 with a server-only key (e.g. FLAME_CHICK_ORDER_RATE_HMAC_SECRET). The browser cannot supply or override the digest.
+2. It passes the digest, key-version and (during rotation) previous-key digest to a service-role-only order-creation RPC. Do not make a separate public preflight limiter RPC call.
+3. Inside the same DB transaction, first look up the existing order by branch/source/idempotency key. An exact matching replay returns the original order and consumes no quota; key reuse with a different request is a 409.
+4. Acquire a transaction-scoped advisory lock derived from the normalized phone digest. Count committed order events inside each rolling window. If any count is already at its maximum, reject with stable RATE_LIMITED and compute Retry-After as the maximum time until all exceeded windows admit another order.
+5. Validate canonical catalog prices, delivery area/default fee, order items and branch. Create order, line snapshots, status event and any required delivery task. Insert one rate event linked uniquely to the new order in this transaction. Any failure rolls back both the order and quota event.
+6. On commit, one new order consumes exactly one slot. A later restaurant rejection/cancellation does not remove the event. Never manually delete a rate event as part of order cancellation.
+
+**Private event table:** app_private.customer_order_rate_limit_events with order_id UUID PRIMARY KEY REFERENCES public.orders(id) ON DELETE RESTRICT, restaurant_id UUID NOT NULL, branch_id UUID NOT NULL, phone_subject_digest BYTEA NOT NULL, digest_key_version SMALLINT NOT NULL, occurred_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(). Add an index on (phone_subject_digest, occurred_at DESC) and scope/tenant constraints. The table is private, append-only and inaccessible to anon/authenticated. No raw phone, raw IP or request payload is stored. Retain 48 hours, then remove expired rows in bounded batches; the longest enforcement window is one hour.
+
+**Key rotation:** Edge Function keeps current and previous HMAC versions during a minimum one-hour overlap; database checks matching digest/version pairs across both versions. New event rows use the current version. Never rotate in a way that resets the customer's active quota. Secret values are never committed to Git or exposed to a browser.
+
+**Idempotency nuance:** the website currently retains its request payload/key in sessionStorage and POS derives an order key from localOrderId. Preserve these. Return replay before rate-limit evaluation; use a canonical payload fingerprint and enforce unique order idempotency. A malicious new key is a new attempt/order and consumes quota only if committed.
+
+**Failure semantics:** invalid JSON, invalid phone, invalid area, unavailable/unpriced item, failed constraint or rolled-back order does not consume quota. A request rejected because the cap is reached creates no order/event and responds 429 with Retry-After. Rate limiting never substitutes for validation, authorization or anti-bot protection.
+
+**Quota caveat:** a 429 generated by an Edge Function is still an Edge Function invocation. This quota protects successful order writes and duplicate business operations; it does not shield the 500,000 invocation allowance from volumetric traffic. Keep idempotency, reduce repeat calls, use trusted upstream protection if measured abuse warrants it, and do not claim DB rate limiting solves invocation exhaustion.
