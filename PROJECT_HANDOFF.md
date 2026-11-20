@@ -1,10 +1,10 @@
 # Flame Chick Platform — Project Handoff
 
-**Last updated:** 2026-11-20 (Asia/Karachi; field-level schema and Free-plan security/rate-limit design added)  
+**Last updated:** 2026-11-20 (Asia/Karachi; source/schema audit, website-only quota and universal idempotency/security controls added)  
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 and Stage 2 complete; Stage 3 field-level schema/security design in progress. The V1 field-level schema, delivery lifecycle/pricing contracts, role matrix, application contract map and Free-plan operations/rate-limit design are documented on the review branch. GST deliberately deferred; offline stale-order confirmation and core role/delivery decisions are owner-confirmed. Remaining deal/schedule/branch/locality/return-payment decisions must be resolved before migrations  
+**Current stage:** Stage 1 and Stage 2 complete; Stage 3 schema/source consistency and database security design in progress. The field-level schema, source audit, universal Website/POS order idempotency, website-only customer quota, delivery/pricing contracts, role matrix and Free-plan operations/security controls are documented on the review branch. GST deliberately deferred; offline stale-order confirmation and core role/delivery decisions are owner-confirmed. Remaining deal/schedule/branch/locality/return-payment decisions and schema/API mapping must be resolved before migrations  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -691,7 +691,7 @@ The user approved restricted Manager access to the POS application. This superse
 
 **Implementation implications:** POS route guards must admit Manager but expose only approved operational capabilities; Admin routes/APIs must reject Manager independently of UI; SQL grants, RLS, Edge Functions/RPCs and Realtime subscriptions must enforce branch scope and the same capability set. Add adversarial tests for Manager direct API/RPC calls, attempted catalog/staff/settings access, order deletion, cross-branch reads and unauthorized rejection/cancellation.
 
-**Current Stage 3 next action:** complete the field-level schema dependency matrix and resolve remaining non-delivery decisions: rejection/failure reason requirements, Not Listed locality, publication/price authority, deal choices, schedule recurrence/branch scope, branch-specific menu needs, Kitchen/inventory scope and returned-order notification/payment treatment. Manager POS and the Rider delivery lifecycle are already confirmed. No Production SQL or live app deployment is authorized.
+**Current Stage 3 next action:** finish field/status/API compatibility mapping against the source audit, complete RLS/grant and command-authorization matrix, and resolve remaining non-delivery decisions: rejection/failure reason requirements, Not Listed locality, publication/price authority, deal choices, schedule recurrence/branch scope, branch-specific menu needs, Kitchen/inventory scope and returned-order notification/payment treatment. Manager POS, Rider lifecycle and Website-only order quota are confirmed. Universal idempotency applies to Website and POS; POS is exempt from the customer website quota. No Production SQL or live app deployment is authorized.
 
 ## Owner decision — delivery lifecycle confirmed (2026-11-20)
 
@@ -771,8 +771,8 @@ Complete the remaining field-level schema dependency matrix (tenant/branch ident
 - Current official Free allowance checked 2026-11-20: 500,000 Edge Function invocations/month; function count ceiling 100/project; 256 MB memory; 2 seconds CPU/request; 150 seconds worker wall clock. Invocation allowance is shared at organization usage level, so inspect usage by project. A function 401/403/429/500 still counts; CORS preflight OPTIONS is not billed.
 - High-frequency POS 15-second polling and safe Rider reads should use RLS-protected Data API reads, not Edge invocations. Rider gets own-offer/assignment filtering; POS Realtime stays branch-filtered. Order History remains normal paginated fetch/manual refresh.
 - Cache immutable published catalog by version/checksum. Coordinate any combined health+catalog response with an API schema-version change; preserve last-known-good POS IndexedDB cache until new cache is fully staged and atomically switched.
-- Retain Supabase Auth native rate limits. Add a private Postgres token-bucket limiter only for high-risk writes: guest order creation, Rider state mutations, Cashier/Manager dispatch and staff invitations. HMAC subject digests only; do not store raw IP/phone/email. Do not add Redis/Upstash or continuous workers at current scale.
-- Candidate test thresholds (not Production enforcement): guest order 10/IP/10 min and 4/phone/15 min + 10/hour; Rider 20 actions/min; staff dispatch 30/min; staff invitations 5/hour. Tune under load tests; shared mobile/NAT IPs mean IP-only hard blocking is unsafe.
+- Retain Supabase Auth native rate limits. The owner-approved customer phone quota is Website-only (source=website): 3 committed orders per rolling minute, 3 per rolling 10 minutes, 15 per rolling hour. POS is explicitly exempt, including POS delivery. Universal idempotency remains required for Website and POS. Any additional Rider/dispatch/staff rate limits remain test proposals, not approved Production policies. Use private HMAC subject digests where applicable; do not store raw IP/phone/email. Do not add Redis/Upstash or continuous workers at current scale.
+- Candidate test thresholds for non-order actions only (not Production enforcement): Rider 20 actions/min; staff dispatch 30/min; staff invitations 5/hour. Customer website-order caps are separately owner-approved as 3/rolling minute, 3/rolling 10 minutes and 15/rolling hour per normalized phone. This supersedes earlier generic guest-order thresholds.
 - Validate actual trusted client-IP header at Supabase ingress with spoofed forwarding-header tests before relying on IP rate buckets. If trust cannot be established, don't claim IP rate limiting works; use actor/phone limits and consider verified Turnstile step-up after evidence. Application 429 does not save function invocation quota; sustained volumetric abuse needs upstream/platform mitigation.
 - Warning thresholds: 50%/250k invocations investigate; 70%/350k optimize; 85%/425k prepare degradation response; 95%/475k stop nonessential calls while protecting essential order/delivery writes. These are internal manual thresholds, not platform alerts.
 
@@ -788,3 +788,61 @@ Complete the remaining field-level schema dependency matrix (tenant/branch ident
 3. Produce the complete RLS/grant/function authorization matrix and adversarial test matrix from the field-level spec.
 4. Review the schema with the owner. Only then create isolated test migrations. Check project slot availability; use local Supabase if no safe Free test project slot exists.
 5. Production remains read-only until the user explicitly approves a specific reviewed migration batch.
+
+## Source/schema audit and owner correction — website-only quota — 2026-11-20
+
+### Correct customer order limit scope
+
+The owner clarified that the three customer phone limits apply **only to customer website checkout**:
+- 3 committed website orders per rolling minute.
+- 3 committed website orders per rolling 10 minutes.
+- 15 committed website orders per rolling hour.
+- Keyed by server-normalized customer phone with server-side HMAC digest.
+- POS orders are exempt, including POS delivery orders that use the shared Order API. Authenticated staff-entered phone/WhatsApp/manual/third-party sources are also exempt.
+- Do not rate-limit POS by customer phone. The Website quota branch is invoked only for a server-verified source=website route.
+- Count only successful new website orders that commit. Exact idempotent replay is free; later restaurant reject/cancel does not refund a committed order slot; invalid/rolled-back attempts do not consume it.
+- This is per phone number entered, not verified human identity; no OTP/SMS requirement is being added.
+
+### Universal idempotency is separate and applies to Website + POS
+
+- Website retains its stable pending idempotency key and payload in sessionStorage until confirmed success.
+- POS retains its stable idempotency key derived from localOrderId across network retry, page/device restart and offline resubmission.
+- Both sources use server-generated canonical request fingerprints and unique database scope (restaurant, branch, source, idempotency_key).
+- Exact same key + same canonical payload returns the existing order without duplicate order items, task, payment, status event or notification. Same key + changed payload returns HTTP 409.
+- Retry after timeout reuses the same key; clients do not create a new key merely because the response was lost.
+- Command IDs/deduplication also required for retryable status, dispatch, Rider, return, staff and catalog mutations. Notifications use unique transactional outbox keys.
+- POS remains exempt from the website phone quota while retaining all idempotency, authorization, transactional and price-validation controls.
+
+### Source/schema consistency audit
+
+- Added [source-schema-consistency-audit-v1.md](docs/architecture/source-schema-consistency-audit-v1.md). Latest audit correction commit: 5cd9f953d8dec540b41e12c8c43900ec9a11cb90.
+- Created [production-database-security-reliability-controls-v1.md](docs/architecture/production-database-security-reliability-controls-v1.md). Commit: a9ad95d50ce900ba6eb165a3fd1608333f62eb56.
+- Updated [production-field-level-schema-v1.md](docs/architecture/production-field-level-schema-v1.md). Latest idempotency/quota scope commit: a4fbf4350748678e93000feee019015d8497e80b.
+- Updated [performance-security-operations-plan.md](docs/architecture/performance-security-operations-plan.md). Latest quota clarification commit: f986d4b5d014a93baa197f9b75158e2f1ec7b3d5.
+- Updated [database-application-contract-map.md](docs/architecture/database-application-contract-map.md). Website-only scope and reliability link commit: a91ed837e0231187eeffdf4dd4e2ebd21860fdb0.
+
+### Security/reliability items added to the design
+
+- Universal order idempotency: stable source-scoped keys, server canonical fingerprints, database uniqueness, transaction locks, exact replay behavior, 409 on changed payload, concurrency/ambiguous-timeout tests.
+- Command idempotency for status, dispatch, Rider, return, staff, publish/rollback and payments/webhooks when implemented.
+- RLS default-deny for every public app table, verified branch/tenant checks, Rider own-resource isolation, Manager Admin denial, explicit SECURITY DEFINER hardening, and explicit service_role grants after existing default-privilege revocation.
+- Immutable order/item/fee/catalog snapshots; append-only status/delivery/staff audit events; no normal-app hard deletion.
+- Atomic multi-row order/dispatch/return/publish commands; DB row locks and database time for transition rules.
+- Transactional notification outbox with uniqueness and bounded retry; notification failure cannot roll back a committed order/delivery event.
+- Bounded retry/backoff, stable offline POS localOrderId, preserve queue until server confirmation, and last-known-good catalog cache with atomic switch.
+- Server-side money calculation, delivery area/default fee validation, idempotency and catalog-version checks; no client-supplied authority.
+- Encrypted off-project DB and Storage backups, restore tests, additive expand/migrate/contract migrations, and security/concurrency/recovery verification gates.
+- Free-plan-conscious read paths, pagination, focused indexes, narrow Realtime and four-function architecture.
+
+### Safety and current implementation status
+
+These are design and documentation updates only. The source audit was read-only; no application code was modified. No Production SQL/schema/data, Auth users, settings/secrets, Edge Functions, Storage, Vercel, main branch or original source repository was changed. No website quota is active yet. No universal idempotency hardening has been deployed yet; the existing source already has client order keys and an order idempotency mechanism, but the stronger canonical fingerprint, transaction-safe all-source verification and command-level idempotency remain implementation requirements. Production remains read-only.
+
+### Next actions
+
+1. Resolve exact application schema names/status mappings and introduce versioned DTO adapters rather than blindly renaming fields.
+2. Complete the exact RLS/grant/function execution matrix and test cases against the security access matrix.
+3. Define the service-only atomic order RPC: universal idempotency for Website and POS; website-only HMAC phone quota; POS bypass.
+4. Finalize remaining menu/deal/schedule/branch/locality/return-payment decisions.
+5. Only after owner schema review, create isolated test migrations and test against local Supabase or a verified safe test project. Production requires explicit separate approval.
+
