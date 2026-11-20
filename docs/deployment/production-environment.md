@@ -19,7 +19,7 @@ Configure these in Supabase Dashboard > Project Settings > Edge Functions > Secr
 - `SUPABASE_PUBLISHABLE_KEYS` = JSON map containing the Production publishable key(s)
 - `SUPABASE_SERVICE_ROLE_KEY` = Production service-role secret, server-side only
 - `FLAME_CHICK_MAIN_BRANCH_ID` = Main Branch UUID created by the reviewed Production seed migration; required by staff checks in the order API
-- `FLAME_CHICK_RIDER_PORTAL_URL` = approved final Rider portal URL; required when inviting staff/riders
+- `FLAME_CHICK_RIDER_PORTAL_URL` = approved final Rider portal URL; used for staff invitation redirects and Web Push notification clicks. If unset, Rider notification clicks open the service worker's own app scope.
 
 Do not paste secret values in chat or commit them.
 
