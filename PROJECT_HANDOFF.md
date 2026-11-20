@@ -1,6 +1,6 @@
 # Flame Chick Platform — Project Handoff
 
-**Last updated:** 2026-11-20 (Asia/Karachi, 09:14 onward)  
+**Last updated:** 2026-11-20 (Asia/Karachi; refreshed after the V1 ERD and roadmap consistency pass)  
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
@@ -94,6 +94,7 @@ The root README currently contains an outdated illustrative `docs/legacy-demo/` 
 - Branch: `work/production-source-audit`
 - Created on 2026-11-20 from `main`.
 - All review/design changes belong here; `main` remains unchanged.
+- Latest verified comparison after the V1 ERD and handoff roadmap updates: `work/production-source-audit` is 44 commits ahead of `main`, 0 behind, with 15 changed paths. `main` remains unchanged; re-check before any PR/merge because subsequent commits change these counts.
 - Stage 1 commits on this branch include:
   - `0da616e0586213990bb43812855875c94d1fd1bd` — clean Pizza Bite catalog fallback labels/cache key.
   - `50096cf779dfd7b101a9445e42980b208c1f0067` — mark inactive legacy website `js/app.js` explicitly as legacy/inactive.
