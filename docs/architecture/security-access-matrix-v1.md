@@ -19,7 +19,7 @@
 
 ## 2. Owner-confirmed principals and application boundaries
 
-The owner supplied the following role model on 2026-11-20. These rules replace the earlier proposed access matrix wherever they conflict.
+The owner supplied the following role model and delivery lifecycle decisions on 2026-11-20. These rules replace the earlier proposed access matrix wherever they conflict.
 
 | Principal | Allowed application(s) | Confirmed authority |
 |---|---|---|
@@ -74,7 +74,7 @@ The owner supplied the following role model on 2026-11-20. These rules replace t
 
 ## 3A. Remaining role details to confirm
 
-1. Should Manager have POS access for supervision, order-status oversight and dispatch, while still being blocked from Admin? If yes, specify whether Manager can assign/reassign riders and reject/cancel orders.
+1. **RESOLVED:** Manager has restricted POS access for branch operations, dispatch and rider reassignment; no Admin panel. Manager rejection/cancellation of orders remains denied unless separately approved.
 2. Can Cashier reject only a newly received order before it is accepted, or also reject an already accepted order? Cashier cancellation of accepted/preparing orders is denied by default until approved.
 3. Should Riders retain the complete existing delivery cycle: accept/decline offer, arrive at restaurant, confirm pickup, mark delivered, and report failed delivery/physical return? The return should require Manager/Admin/Owner confirmation rather than rider-side cancellation.
 4. Do you need a Kitchen-only staff role/app in V1, or should kitchen staff use the POS with a restricted role? No Kitchen role should inherit full POS or Admin privileges automatically.
@@ -157,7 +157,7 @@ Test each attempt with anon, authenticated non-staff, every staff role and anoth
 Owner has confirmed the main role boundaries and restricted Manager POS access. These remaining details still affect authorization policy and app behavior:
 
 2. **Cashier rejection/cancellation boundary:** Cashier can reject orders. Distinguish rejecting a newly received order from cancelling an accepted/preparing/ready order. Default: Cashier may reject only a new/unaccepted order with a mandatory reason; cannot cancel an order after acceptance unless Owner approves that authority.
-3. **Rider lifecycle:** Recommended full rider workflow is accept/decline own offer, arrive at restaurant, confirm pickup, mark delivered, and report failed delivery/physical return. Rider reports return; Manager/Admin/Owner confirms the physical return and final order cancellation. Confirm that this existing lifecycle is retained.
+3. **RESOLVED:** Rider accepts/rejects own offer, records pickup/out-for-delivery, marks delivered (immediate order completion), or reports failed delivery and chooses return. Cashier or Manager confirms physical return. See `delivery-lifecycle-contract.md`.
 4. **Reason requirement:** Recommended mandatory rejection/cancellation reason (controlled reason code plus optional short note).
 5. **Kitchen:** The user has not yet confirmed whether a Kitchen-only role is required at launch. Do not grant the Kitchen role broad POS access by default.
 6. **Cashier order visibility:** Recommended branch active-order queue and dispatch details needed for POS, but no payment reconciliation, staff management, full audit or private settings.
