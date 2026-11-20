@@ -329,7 +329,7 @@ Some functions/triggers should be introduced in the same migration as the tables
 
 ## 7. Decisions still open before SQL is authored
 
-1. **Offline POS stale catalog:** recommended safe behavior is reject/hold sync with a clear CATALOG_VERSION_STALE response and require cashier/manager confirmation before re-pricing. Do not silently change the amount. The owner must confirm this policy.
+1. **Offline POS stale catalog — CONFIRMED:** hold sync when the locally used publication is stale and the server-calculated price/availability would change. Require explicit authenticated cashier/manager confirmation before resubmission; never silently reprice. Implement publication version binding, a stable CATALOG_VERSION_STALE conflict, local needs_confirmation state, a new idempotency key after confirmation, and an audit event. See performance-security-operations-plan.md.
 2. **Not Listed locality:** should the website/POS collect a separate locality/mohalla label when Not Listed is selected, in addition to the full delivery address? This field should never control the fee.
 3. **Publishing authority:** owner only, or owner/admin/manager? Who can change prices and roll back?
 4. **Deal options:** should choices be curated lists, category/subcategory pools, fixed components, or all three?
