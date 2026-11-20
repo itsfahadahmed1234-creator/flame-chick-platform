@@ -691,7 +691,7 @@ The user approved restricted Manager access to the POS application. This superse
 
 **Implementation implications:** POS route guards must admit Manager but expose only approved operational capabilities; Admin routes/APIs must reject Manager independently of UI; SQL grants, RLS, Edge Functions/RPCs and Realtime subscriptions must enforce branch scope and the same capability set. Add adversarial tests for Manager direct API/RPC calls, attempted catalog/staff/settings access, order deletion, cross-branch reads and unauthorized rejection/cancellation.
 
-**Current Stage 3 next action:** update the field-level permission specification and test matrix to reflect Manager POS approval; then finish remaining order rejection/cancellation, Rider return lifecycle, deal/schedule, and Not Listed locality decisions. No Production SQL or live app deployment is authorized by this decision.
+**Current Stage 3 next action:** complete the field-level schema dependency matrix and resolve remaining non-delivery decisions: rejection/failure reason requirements, Not Listed locality, publication/price authority, deal choices, schedule recurrence/branch scope, branch-specific menu needs, Kitchen/inventory scope and returned-order notification/payment treatment. Manager POS and the Rider delivery lifecycle are already confirmed. No Production SQL or live app deployment is authorized.
 
 ## Owner decision — delivery lifecycle confirmed (2026-11-20)
 
