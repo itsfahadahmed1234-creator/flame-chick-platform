@@ -286,14 +286,13 @@ Historic HFP reference used five Realtime tables (`orders`, `delivery_tasks`, `d
 - Corrected a user-facing delivery API configuration error label from HFP to Flame Chick. Legacy `hfp_*` RPC names remain untouched because they are database compatibility contracts until reviewed.
 - Updated deployment documentation to explain that `FLAME_CHICK_RIDER_PORTAL_URL` controls staff invitation redirects and Web Push clicks, with a safe service-worker app-scope fallback.
 - Added this handoff document at the repository root as the durable context entry point and linked it from the root README. Corrected the README's illustrative docs tree to the actual `operations/` folder.
-- Branch diff against `main` at the last check: 11 commits ahead, 0 behind. Changed paths are limited to `PROJECT_HANDOFF.md`, root README, website README, website `js/app.js`, website `js/catalog.js`, Rider `index.html`, delivery API, and Production environment docs.
+- Latest GitHub compare after Stage 2 reconciliation: branch is 15 commits ahead of `main`, 0 behind. There are nine changed paths: `PROJECT_HANDOFF.md`, root README, Rider `index.html`, website README, website `js/app.js`, website `js/catalog.js`, Production environment docs, delivery API, and the newly added historical Production baseline migration file. The latest compare is the source of truth for counts; older commit-count notes elsewhere in this document are historical snapshots.
 - Static review was performed through GitHub source reads. No app build, Deno type-check, browser test, or end-to-end test was run because no CI workflow/test harness is configured in this repository and no local project runtime was provisioned. Treat runtime/type validation as pending; do not describe this branch as fully tested.
 - No live deployment was triggered.
 - No Vercel settings/domains/Git connections were changed.
 - No Supabase SQL, migration, function, secret, user, or data was changed.
 - No original repository or branch was modified.
 - No new backup repository was created.
-- Latest branch comparison against `main` showed the review branch is ahead by 5 commits, behind by 0, with exactly three changed paths: this handoff, the root README, and the catalog loader.
 - No automated test suite or app build was run in this documentation/source-only pass; record this as pending verification rather than treating it as tested.
 - No merge to `main` has occurred.
 
@@ -319,7 +318,7 @@ Historic HFP reference used five Realtime tables (`orders`, `delivery_tasks`, `d
 - `list_projects` returns only `Flame Chick Production` (`adkrxfnawdiljhjaavnj`), region `ap-south-1`, status `ACTIVE_HEALTHY`. The project API URL is `https://adkrxfnawdiljhjaavnj.supabase.co`. Plan is Free per project details/context.
 - `list_migrations` confirms exactly one application migration: version `20261119125153`, name `flame_chick_postgres_default_privileges_hardening`.
 - Read `supabase_migrations.schema_migrations` and recovered the exact recorded SQL and migration name. It matches the security baseline SQL recorded in this handoff.
-- Added matching repository file `supabase/migrations/20261119125153_flame_chick_postgres_default_privileges_hardening.sql` to branch `work/production-source-audit`. This is a history/reconciliation file for a migration that is already applied. **Do not apply/reapply it.**
+- Added matching repository file `supabase/migrations/20261119125153_flame_chick_postgres_default_privileges_hardening.sql` to branch `work/production-source-audit` (blob SHA `9ed6364ed5f7de9a16eb9e372d0c00ddcb98fb0a`). This is a history/reconciliation file for a migration that is already applied. Re-read and hash-verified the repository file after writing; Production still lists exactly the same one migration. **Do not apply/reapply it.**
 - Read-only schema inspection: no `public` tables; no `public` or `private` application tables; `auth.users` has zero rows; no Edge Functions; no Storage buckets.
 - Security advisor returned zero lints.
 - The installed extensions list includes managed/preinstalled extensions. No extension was enabled, disabled, or changed.
