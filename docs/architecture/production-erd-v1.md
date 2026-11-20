@@ -327,17 +327,26 @@ This is a dependency order, not an instruction to apply:
 
 Some functions/triggers should be introduced in the same migration as the tables and constraints they depend on. Keep migrations focused, test the entire chain against an isolated disposable project first, and run adversarial authorization tests before Production.
 
-## 7. Decisions still open before SQL is authored
+## 7. Remaining decisions before SQL is authored
 
-1. **Offline POS stale catalog — CONFIRMED:** hold sync when the locally used publication is stale and the server-calculated price/availability would change. Require explicit authenticated cashier/manager confirmation before resubmission; never silently reprice. Implement publication version binding, a stable CATALOG_VERSION_STALE conflict, local needs_confirmation state, a new idempotency key after confirmation, and an audit event. See performance-security-operations-plan.md.
-2. **Not Listed locality:** should the website/POS collect a separate locality/mohalla label when Not Listed is selected, in addition to the full delivery address? This field should never control the fee.
-3. **Publishing authority:** owner only, or owner/admin/manager? Who can change prices and roll back?
-4. **Deal options:** should choices be curated lists, category/subcategory pools, fixed components, or all three?
-5. **Schedule policy:** recurring days, date ranges, timezone, and whether branch-specific schedules are required in V1.
-6. **Menu scope:** current recommendation is restaurant-wide products/prices with branch-scoped delivery pricing. Confirm whether different branches need different menu prices/availability in the first release.
-7. **Inventory:** no ingredient-level stock/inventory schema in V1 unless the user confirms it is required.
+Resolved in `database-v1-product-decisions.md`:
+- Website branch resolution and fail-closed selection.
+- Restaurant-wide base menu/prices with branch-specific sellability and delivery fees.
+- One staff role identity per user/restaurant; same operational role can be assigned across multiple branches.
+- Curated deal choices and explicit choice surcharges.
+- Returned-order collection/refund ledger behavior.
+- Optional fixed customer drop-off pin; no Rider GPS or continuous customer tracking.
 
-GST/tax is not an open V1 decision; it is explicitly deferred.
+Still open:
+1. Not Listed locality/mohalla label alongside full address.
+2. Deal schedule semantics (recurrence, overnight, timezone, overlap and branch scope).
+3. Kitchen role (deny by default) and exact permissions if needed.
+4. Ingredient-level inventory (excluded by default).
+5. Rider arrival-at-restaurant event vs pickup as next recorded state.
+6. Customer pin retention proposal (24 hours after terminal outcome) and whether Admin/Owner need exceptional terminal-state support access.
+7. Website security audit at the later website/database integration gate.
+
+Do not create schedule or inventory schema beyond the documented conservative baseline until those decisions are confirmed.
 
 ## 8. Validation plan before Production
 
@@ -431,3 +440,12 @@ The physical table is `app_private.delivery_dropoff_locations`, not a public Dat
 The Rider can retrieve the pin only for their own current active assignment. POS reads are constrained by current role and branch scope. The app generates a Google Maps directions URL from validated coordinates; no arbitrary customer URL is stored. A written delivery address remains required, and the pin is optional.
 
 This is future-ready schema design only. No location table, policy, grant, RPC, application feature or Realtime channel has been created or enabled in Production.
+
+## V1 consistency addendum — branch availability, roles, payment and drop-off pin
+
+- Branch catalog identity = restaurant publication ID/version + branch ID + branch availability revision + schema version. Orders snapshot both publication and availability revision. V1 base prices are restaurant-wide; branch variant/deal availability overlays cannot reactivate globally inactive items. No branch-specific price override.
+- A user has one role_key per restaurant at a time. Manager/Cashier/Rider may have multiple branch assignments only for that same role. Admin/Owner is one restaurant-wide role and cannot coexist with branch roles. Enforce under a serialized database command; partial unique indexes alone do not enforce same-role-across-branches.
+- Payments are append-only collection/refund ledger entries. Returned COD without collection is closed-uncollected and has no refund. Refund is recorded only after actual payout, Admin/Owner-only, idempotent and locked against over-refund.
+- Optional one-time customer destination pin is a private app_private row, transactionally inserted with delivery order/task. No Rider GPS, continuous customer tracking, movement history or location Realtime. See the drop-off pin addendum.
+- Exact DDL must include composite tenant/branch/order/task keys, checks, unique constraints, server command authorization, idempotency and transaction tests; this ERD remains conceptual.
+
