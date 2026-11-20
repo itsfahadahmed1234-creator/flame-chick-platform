@@ -81,14 +81,14 @@ The owner explicitly set these rolling limits for customer website ordering:
 | 10 minutes | 3 |
 | 1 hour | 15 |
 
-All three apply simultaneously. The 3-per-10-minute cap mathematically implies the 3-per-minute cap is not normally the tighter one, but record/enforce all three explicitly so the policy remains visible and safely configurable. The 15-per-hour window is independently important.
+All three apply simultaneously. The 3-per-10-minute cap mathematically implies the 3-per-minute cap is not normally the tighter one, but record/enforce all three explicitly. The 15-per-hour window is independently important.
 
 ### Identity and scope
 
 - The current website requires a customer phone number, so the primary rate-limit subject is the server-normalized phone number.
 - The present website does not verify phone ownership. The rule therefore limits orders per normalized phone number entered, not a proven natural person. Do not describe this as identity verification or claim that phone switching cannot bypass it.
 - Do not add OTP/SMS authentication in this change; that would require a separate UX, provider, deliverability and possible cost decision.
-- V1 application scope follows the current public guest route: source=website. Staff-authenticated POS source=pos remains outside this guest web-order cap. Any future remote phone/WhatsApp customer channel must be explicitly classified and wired into the same policy; public callers cannot bypass this by setting another source because non-website sources require staff authentication.
+- Apply the cap to all customer orders that reach the central order-creation RPC and include a valid customer phone, regardless of source (website, cloud POS delivery, phone, WhatsApp, manual or third-party). Staff-entered sources still require verified staff Auth and role. This prevents channel switching around the phone-based limit. Current POS takeaway/dine-in orders that remain only in IndexedDB are outside central server visibility; they must be centrally registered before the cap can be described as covering those sales too.
 - IP is not the person identity. The current Edge Function reads cf-connecting-ip as a best-effort secondary signal and ignores X-Forwarded-For. Do not rely on IP for the per-person cap or add a hard shared-IP block until the hosted ingress header is tested for spoofing and shared-network effects.
 
 ### Exact counting semantics
@@ -106,7 +106,7 @@ Count successful, newly committed customer website orders, not failed attempts:
 
 ### Required implementation shape
 
-1. Website submits the same phone it already collects plus its stable idempotency key.
+1. Website or authenticated staff POS/phone/WhatsApp/manual/third-party order flow submits customer phone plus its stable idempotency key.
 2. Order Edge Function canonicalizes the phone using one documented normalization rule and computes HMAC-SHA-256 with a server-only secret, e.g. FLAME_CHICK_ORDER_RATE_HMAC_SECRET. Do not persist raw IP/phone in limiter records; do not store an unsalted SHA-256 of phone.
 3. Edge Function invokes a single service-role-only order-creation RPC and attaches a server-generated internal phone digest context. Strip/reject any browser-supplied internal rate context.
 4. Inside the same transaction, the database:
