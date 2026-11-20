@@ -115,46 +115,89 @@ Never assume service_role automatically has table or function privileges after t
 
 ### 5.1 restaurants
 
-One row for the Flame Chick tenant.
+One row is provisioned for the Flame Chick tenant. This schema is tenant-safe but does not imply a multi-brand SaaS product.
 
 | Column | Type | Rules / purpose |
 |---|---|---|
 | id | uuid PK | Tenant identity |
-| name | text NOT NULL | Display name |
-| slug | text NOT NULL UNIQUE | Stable identifier |
-| currency_code | char(3) NOT NULL | PKR for current tenant |
-| timezone | text NOT NULL | IANA timezone; currently Asia/Karachi |
-| is_active | boolean NOT NULL DEFAULT true | Tenant lifecycle |
-| created_at, updated_at | timestamptz NOT NULL | Database-managed |
+| name | text NOT NULL | Trimmed display name, 1–120 characters |
+| slug | text NOT NULL UNIQUE | Stable lower-case URL-safe identifier |
+| currency_code | text NOT NULL DEFAULT 'PKR' | ISO-4217 alphabetic code; trusted command checks supported-code allowlist |
+| timezone | text NOT NULL DEFAULT 'Asia/Karachi' | Validated IANA timezone |
+| is_active | boolean NOT NULL DEFAULT true | Tenant lifecycle gate |
+| created_at, updated_at | timestamptz NOT NULL | Database-managed; every update command sets updated_at |
 
-No public role may enumerate tenant rows.
+Constraints:
+- CHECK name = btrim(name), length 1–120.
+- CHECK slug matches canonical lower-case URL-safe pattern `^[a-z0-9]+(-[a-z0-9]+)*$`.
+- CHECK currency_code matches `^[A-Z]{3}$`; command validates actual supported ISO-4217 code.
+- Validate timezone against PostgreSQL's IANA timezone catalog in trusted provisioning command. No subquery CHECK or unsafe mutable validator.
+- No client raw SELECT/DML or tenant enumeration.
 
 ### 5.2 branches
 
-V1 website-routing fields and rules:
-- `website_ordering_enabled` boolean NOT NULL DEFAULT false
-- `website_delivery_enabled` boolean NOT NULL DEFAULT false
-- `website_pickup_enabled` boolean NOT NULL DEFAULT false
-- Public branch discovery returns only opaque ID, customer-facing name and supported fulfilment modes.
-- Server auto-resolves exactly one eligible branch, requires customer selection for multiple eligible branches, and fails closed for zero.
-- Revalidate the selected branch's tenant, active state and fulfilment capability before branch-scoped reads/writes. A browser-supplied branch ID is a selector, never authority.
-
+Branches are operational locations under the Flame Chick restaurant.
 
 | Column | Type | Rules / purpose |
 |---|---|---|
 | id | uuid PK | Branch identity |
 | restaurant_id | uuid NOT NULL FK | Tenant owner |
-| branch_code | text NOT NULL | Unique within restaurant |
-| name | text NOT NULL | Branch label |
-| address | text | Private operational address |
-| phone | text | Private operational phone |
-| is_active | boolean NOT NULL DEFAULT true | Only active branch is eligible |
-| website_ordering_enabled | boolean NOT NULL DEFAULT false | Explicit public website-order eligibility |
-| website_delivery_enabled | boolean NOT NULL DEFAULT false | Website delivery capability |
-| website_pickup_enabled | boolean NOT NULL DEFAULT false | Website pickup capability |
-| created_at, updated_at | timestamptz NOT NULL | Database-managed |
+| branch_code | text NOT NULL | Canonical lower-case ASCII key, 1–32 chars, letters/numbers/underscore/hyphen |
+| name | text NOT NULL | Trimmed customer-facing label, 1–120 characters |
+| address | text NULL | Private operational address; not in public discovery projection by default |
+| phone | text NULL | Private operational phone; not in public discovery projection by default |
+| is_active | boolean NOT NULL DEFAULT true | Active-state gate |
+| website_ordering_enabled | boolean NOT NULL DEFAULT false | Explicit website order gate |
+| website_delivery_enabled | boolean NOT NULL DEFAULT false | Delivery capability gate |
+| website_pickup_enabled | boolean NOT NULL DEFAULT false | Pickup capability gate |
+| created_at, updated_at | timestamptz NOT NULL | Database-managed; update command maintains updated_at |
 
-Constraints: UNIQUE(id, restaurant_id); UNIQUE(restaurant_id, branch_code). All child records use a composite FK to (branch_id, restaurant_id).
+Constraints and rules:
+- UNIQUE(id, restaurant_id) for composite tenant references; UNIQUE(restaurant_id, branch_code).
+- CHECK name = btrim(name), length 1–120; branch_code canonical format and nonblank.
+- Delivery/pickup flags may be true only when website_ordering_enabled is true.
+- All website flags default false.
+- Effective eligibility requires restaurant active, branch active, website ordering enabled and the requested mode's capability enabled.
+- A branch capability flag is not proof that a delivery address qualifies; later delivery-area and explicit Not Listed fee validation still applies.
+- Public discovery later returns only an allowlisted projection: opaque branch ID, customer-facing name and supported fulfilment modes. Address/phone stay private unless separately approved.
+- No direct client SELECT/DML on raw branch rows.
+
+### 5.2A tenant/branch integrity rules
+
+- Every tenant-owned table carries restaurant_id.
+- Every branch-owned table carries restaurant_id and branch_id NOT NULL and a composite FK (branch_id, restaurant_id) → branches(id, restaurant_id) ON DELETE RESTRICT.
+- Every deeper relation that can cross tenant/branch scope carries matching tenant/branch keys and composite FKs.
+- Restaurant-wide rows (e.g. base catalog and Admin/Owner roles) carry restaurant_id without a fake branch_id. NULL branch scope never means all branches for an operational permission.
+- Business history uses RESTRICT and archival/deactivation, not ON DELETE CASCADE.
+- Parent composite UNIQUE keys must be created for every referenced column tuple.
+
+### 5.2B Batch 2 security boundary
+
+- Both tables are in public, so explicitly ENABLE ROW LEVEL SECURITY.
+- Revoke ALL table privileges from PUBLIC, anon, authenticated and service_role. No direct browser or service_role table grants in this batch.
+- No public discovery view or RPC is created in Batch 2. A narrow safe projection is a later API-contract item with explicit exact grants.
+- Table owner must be postgres; migration preflight asserts current_user and session_user are postgres.
+- RLS and SQL grants are separate controls; no client table policies are needed while all direct grants remain revoked.
+
+### 5.2C Website branch resolution
+
+For the server-verified Flame Chick tenant and requested fulfilment mode:
+1. Compute eligible branches from current restaurant/branch active state and matching capability.
+2. Zero eligible branches: fail closed.
+3. One eligible branch: resolve automatically.
+4. Multiple eligible branches: customer chooses from the safe discovery projection.
+5. Revalidate the selected ID on every catalog, quote and order command. Browser-supplied ID is a selector, never authority.
+6. Delivery address/area fee is validated separately against the selected branch. No GPS routing or distance pricing is implied.
+
+### 5.2D Initial provisioning
+
+- No restaurant/branch seed rows in schema migration.
+- Separate idempotent, audited provisioning command creates the initial Flame Chick tenant and branches.
+- Defaults are PKR and Asia/Karachi unless owner-approved settings differ before provisioning.
+- Website flags remain false until explicitly enabled by Admin/Owner.
+- No implicit delivery fee, Not Listed fee, free delivery or zero-fee fallback.
+- Deactivate rather than physically delete.
+- V1 base products/prices remain restaurant-wide; branch-specific sellability overlays and delivery pricing are separate later batches. No branch price override.
 
 ### 5.3 user_profiles
 
