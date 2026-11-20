@@ -217,3 +217,7 @@ The broad Admin/Owner columns above reflect their full operational authority; th
 ## Delivery lifecycle permissions — confirmed addendum (2026-11-20)
 
 For exact state and command rules, see [`delivery-lifecycle-contract.md`](./delivery-lifecycle-contract.md). The delivery lifecycle is confirmed: Rider rejection and 60-second timeout return tasks to POS for manual Cashier/Manager reassignment; Rider can report failure and choose return; Rider marks successful delivery and order completes immediately; Cashier or Manager confirms physical return. This supersedes the earlier pending Rider-lifecycle questions in this matrix. Cashier's return confirmation is a narrow permission and does not authorize general cancellation of accepted orders.
+
+## Production database enforcement matrix link (2026-11-20)
+
+The table-by-table RLS/grant and Edge Function action enforcement target is maintained in production-rls-grant-function-matrix-v1.md. Use that document together with this human-role matrix and production-database-security-reliability-controls-v1.md before authoring RLS SQL. The website phone quota is Website-only; POS is exempt while universal idempotency remains required for both Website and POS.
