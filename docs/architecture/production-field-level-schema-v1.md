@@ -131,6 +131,15 @@ No public role may enumerate tenant rows.
 
 ### 5.2 branches
 
+V1 website-routing fields and rules:
+- `website_ordering_enabled` boolean NOT NULL DEFAULT false
+- `website_delivery_enabled` boolean NOT NULL DEFAULT false
+- `website_pickup_enabled` boolean NOT NULL DEFAULT false
+- Public branch discovery returns only opaque ID, customer-facing name and supported fulfilment modes.
+- Server auto-resolves exactly one eligible branch, requires customer selection for multiple eligible branches, and fails closed for zero.
+- Revalidate the selected branch's tenant, active state and fulfilment capability before branch-scoped reads/writes. A browser-supplied branch ID is a selector, never authority.
+
+
 | Column | Type | Rules / purpose |
 |---|---|---|
 | id | uuid PK | Branch identity |
