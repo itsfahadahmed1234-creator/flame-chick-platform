@@ -208,6 +208,37 @@ For the server-verified Flame Chick tenant and requested fulfilment mode:
 - Deactivate rather than physically delete.
 - V1 base products/prices remain restaurant-wide; branch-specific sellability overlays and delivery pricing are separate later batches. No branch price override.
 
+### 5.2E Channel-specific fulfilment modes (source-reviewed 2026-11-20)
+
+| Channel | UI label | Canonical stored value |
+|---|---|---|
+| Website | Delivery | `delivery` |
+| Website | Takeaway | `pickup` |
+| POS | Delivery | `delivery` |
+| POS | Takeaway | `pickup` |
+| POS | Dine-in | `dine_in` |
+
+Do not add a `takeaway` enum/text variant; `pickup` is canonical. The active website entrypoint has no Dine-in choice. Its legacy `js/app.js` is not loaded and does not establish active channel support. Website branch capability flags therefore remain delivery and pickup only. POS dine-in is an independent channel mode and must not be gated by website capability flags.
+
+Delivery alone requires delivery address/area/fee and creates a delivery task. Pickup requires no delivery address/area and creates no rider task. Dine-in requires table/open-check lifecycle and creates no rider task.
+
+### 5.2F POS offline and synchronization requirements
+
+The current POS has IndexedDB stores for orders, queue, status queue, tables and catalog cache. Current Supabase sync only selects POS delivery orders; pickup and dine-in remain local. Local tables are device-scoped and default ten tables are generated locally when no records exist. This must not become the permanent shared table source of truth.
+
+Future implementation must:
+- Capture all three POS modes locally while offline.
+- Maintain durable outbox records and stable local order identity across reconnects/retries; each server command/event has its own idempotency key.
+- Preserve per-order command ordering; mark synced only after server acknowledgement.
+- Revalidate branch, staff authority, catalogue publication/version, prices, discounts, delivery fees and status transitions server-side.
+- Hold stale-catalog orders for explicit Cashier/Manager confirmation; never silently reprice or remove products.
+- Provide branch-scoped shared table configuration and local cache; detect multi-device table conflicts server-side and return recoverable conflicts.
+- Sync dine-in open-check edits, scheduled arrival/preparation, table assignment/movement and payment/close operations as ordered idempotent commands.
+- Resolve secure offline actor authentication/attribution and preserve who captured/changed each order.
+- Keep delivery task creation exclusive to delivery; pickup/dine-in do not create rider tasks.
+
+Do not modify the current hidden Dine-in/Open Tables UI as part of schema work. The owner explicitly deferred that UI bug fix. Full report: `docs/architecture/pos-fulfillment-and-offline-sync-contract-review.md`.
+
 ### 5.3 user_profiles
 
 Minimal staff profile extension for auth.users. Do not mirror every Auth field.
