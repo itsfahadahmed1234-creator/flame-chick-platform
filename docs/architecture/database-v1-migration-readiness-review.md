@@ -209,3 +209,32 @@ The customer website security audit is intentionally not performed now. It must 
 - Production remains read-only and requires separate explicit approval for any future DDL/data/settings changes.
 
 **Next recommended action:** begin Batch 0 as a read-only verification and produce the exact DDL/constraint/grant specification for Batches 1–3. Do not start Production changes.
+
+## 10. Batch 0 — read-only Production baseline verification (2026-11-20)
+
+Read-only checks were run against the exact Production project `adkrxfnawdiljhjaavnj`.
+
+### Verified
+- Project is `ACTIVE_HEALTHY`, PostgreSQL 17.12.0, region `ap-south-1`.
+- Applied migration history contains exactly one application migration: `20261119125153 flame_chick_postgres_default_privileges_hardening`. Do not reapply it.
+- No application base tables exist in `public`; `app_private` schema does not yet exist.
+- No application Realtime-published tables exist.
+- The only routine found in `public` is `public.rls_auto_enable()`; its current function ACL lists only postgres EXECUTE.
+- Security, performance and health advisor responses each returned zero lints at the time of this check.
+- Installed extensions observed: pg_stat_statements 1.11, pgcrypto 1.3, plpgsql 1.0, supabase_vault 0.3.2 and uuid-ossp 1.1.
+- Public schema has USAGE grants for anon/authenticated/service_role. This alone does not grant table access; table/function grants and RLS remain separate checks.
+
+### Important residual default-privilege limitation
+
+The catalog query confirms that the existing hardening migration has restricted default privileges for objects created by the normal `postgres` migration role in `public` (postgres retains owner-level privileges; anon/authenticated/service_role are not included).
+
+However, the catalog still contains a separate `pg_default_acl` entry for objects created by `supabase_admin` in `public`, granting broad schema/table/function defaults to anon, authenticated and service_role. This is the previously noted internal-role limitation. No existing application tables exist for this to have exposed at the time of audit, and the current public helper ACL is restricted, but it is a real future-object risk if application objects are created under `supabase_admin`.
+
+**Mandatory migration gate:** before writing/applying the first application migration, prove which database role owns/executes the migration session. Use the controlled `postgres` migration owner path and verify every created object owner, ACL and RLS state. Never create Flame Chick application objects as `supabase_admin`. Do not attempt to alter Supabase-managed internal defaults without a supported/approved method. If a migration tool/session unexpectedly creates objects as `supabase_admin`, stop and resolve the privilege path before continuing.
+
+### What this does not prove
+- Zero advisor lints do not prove the future schema is secure.
+- No app tables means there are no app RLS policies or grants to test yet.
+- This check does not validate Edge Function secrets, Auth policies, Storage configuration, website source or Vercel.
+- No migration, SQL write, setting change, function deployment or Production data change was performed.
+
