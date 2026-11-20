@@ -47,7 +47,7 @@ It is not a final SQL schema. All identifiers and API request fields must be che
 - Reads categories, subcategories, products, variants, deals, deal components, drink options, delivery areas and restaurant settings through direct PostgREST calls.
 - Performs category/product/variant/deal/component/delivery-area writes as multiple direct REST requests from the browser. The current product and deal workflows can be partially written if a later request fails.
 - Uses a dashboard RPC for reporting.
-- Uses the staff-admin Edge Function for staff invitations and role activation. This endpoint is owner-only for invitations/role changes in the current code.
+- Uses the staff-admin Edge Function for staff invitations and role activation. The current source is Owner-only for invitations/role changes; the Production target must authorize both Admin and Owner equally for staff invitations, role/branch assignment changes and deactivation, while retaining verified actor identity, self-escalation prevention, last-active-Owner protection and append-only audit. Manager/Cashier/Rider remain denied.
 - Current Admin has basic category/product/variant/deal/area CRUD, but lacks full modifier group editing, complete existing deal-component editing, scheduled deal configuration, unpriced drafts, and a robust draft/preview/publish/rollback workflow.
 - Production recommendation: all multi-record catalog commands (create/edit product+variants, deal+components, publish, rollback, fee configuration) should be server-side transactional commands with role and branch authorization. A UI button is never a security control.
 
@@ -139,6 +139,7 @@ It is not a final SQL schema. All identifiers and API request fields must be che
 - Whether Not Listed needs a separate required locality/mohalla input in addition to the full address; the user has confirmed the fee behavior, not this extra field.
 - Whether menu visibility/price differs by branch or channel in the first release.
 - Whether deals need curated choice lists, category/subcategory pools, substitutions and surcharges.
+- Whether menu content, product/variant prices, availability and delivery-area definitions are restaurant-wide or branch-specific in V1. The current field-level proposal is predominantly restaurant-scoped for catalog/publication and branch-scoped for delivery areas/settings; do not implement branch overrides or expose a mixed cross-branch catalog until this scope is explicitly decided. If branches differ, publication identity and order pricing must bind to branch (or to a validated restaurant publication plus branch override revision), and cache/version keys must include that scope.
 - Which roles can edit prices, publish, rollback and change delivery defaults.
 - Whether inventory/stock is part of the first Production version.
 - The user explicitly deferred GST/tax; it is excluded from the initial schema.
