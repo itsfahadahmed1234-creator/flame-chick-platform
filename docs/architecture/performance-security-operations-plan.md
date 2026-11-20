@@ -340,7 +340,7 @@ Detailed field definitions, private limiter table, exact RLS/grants and initial 
 
 ## 16. Owner-approved per-customer ordering caps (2026-11-20)
 
-The owner approved these three simultaneous rolling windows per canonical customer phone:
+The owner approved these three simultaneous rolling windows per canonical customer phone for customer website orders (source=website) only:
 
 | Rolling window | Maximum newly committed customer orders |
 |---|---:|
@@ -360,3 +360,6 @@ A 429 from an Edge Function still consumes one invocation. This order quota prot
 
 
 **Supersession note:** the old generic guest-order attempt limits in the earlier operations draft (10/IP per 10 minutes; 4 per phone per 15 minutes; 10/hour) are superseded by the owner-approved successful-order caps in Section 16. Do not implement both policies in parallel or count the same order twice.
+
+
+**Security/reliability contract:** see [production-database-security-reliability-controls-v1.md](./production-database-security-reliability-controls-v1.md) for universal Website/POS idempotency, transactional replay, RLS/grants, SECURITY DEFINER hardening, audit/outbox, offline recovery, backup/restore and migration gates.
