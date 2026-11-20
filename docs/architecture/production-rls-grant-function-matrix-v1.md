@@ -50,7 +50,7 @@ Legend:
 |---|---|---|---|---|---|---|---|
 | restaurants, branches | No raw table; published projection only | No or own branch label only if needed | Full | Own branch basics only | Own branch basics only | Own branch identity basics only | Command for configuration changes |
 | user_profiles | No | Own minimal profile only | Full branch staff details | No staff directory | Own minimum profile | Own minimum profile | Profile/admin command; never self-change role or branch |
-| user_roles | No | Own active role rows only if needed by app | Full | No | Own role only | Own rider role only | Admin/Owner staff command only; Admin + Owner allowed |
+| user_roles | No | Own minimal active role identity only if needed | Full | No | Own role only | Own rider role only | Admin/Owner staff command only; one role identity per user/restaurant, same operational role may span branches; serialized role changes and last-Owner guard |
 | staff_role_audit | No | No | Full | No | No (only own action receipt) | No | Append-only server command |
 | categories, subcategories, products, variants, modifiers and assignments | Published catalog projection only | No raw mutable rows | Full | No | POS projection only | No | Draft/publish command; no direct browser DML |
 | deals, components, choices, schedules | Published catalog projection only | No raw mutable rows | Full | No | POS projection only | No | Draft/publish command; no direct browser DML |
@@ -222,3 +222,30 @@ No SECURITY DEFINER helper or direct grant is required merely to add this capabi
 - No Rider GPS or continuous customer tracking tables, grants, functions or channels exist.
 
 This is target authorization design only; no grants, RLS policies or functions have been applied to Production.
+
+## Resolved V1 authorization refinements
+
+### Staff role identity across branches
+- A staff identity may hold only one role_key per restaurant at a time.
+- Manager, Cashier or Rider may have multiple active branch assignments only when the role_key is identical across all of them.
+- Admin or Owner is restaurant-wide and cannot coexist with branch-scoped role rows or a second role identity.
+- Role changes run through one serialized Admin/Owner database command, lock the (restaurant_id,user_id) role scope, close old assignments, insert new assignments and append audit events atomically. Keep the last-active-Owner guard under a restaurant authority lock.
+- A plain partial unique index is not enough to enforce same-role-across-branches; use transactional validation plus a database-side guard/trigger and test concurrency.
+
+### Branch-specific catalog availability
+- Admin/Owner only may update branch variant/deal availability via commands. Manager/Cashier/Rider have no catalog availability mutation.
+- Branch availability does not override global inactive/archived state. V1 prices remain restaurant-wide; no branch price override.
+- Catalog cache/order scope binds restaurant publication version and branch availability revision.
+
+### Financial records
+- Payment collection/refund records are append-only ledger events. No browser direct DML.
+- Refund record only after actual payout; Admin/Owner only, locked cumulative amount check, unique idempotency key, same order/currency/original collection.
+- Manager/Cashier/Rider cannot authorize or record refunds.
+- Returned COD with no collection is marked closed-uncollected; no refund row is created.
+
+### Drop-off pin
+- Keep `app_private.delivery_dropoff_locations` private, no browser schema/table grants and no Realtime.
+- Existing Order API transaction is the only customer pin write path; no standalone public location endpoint.
+- Delivery API may include coordinate in a narrow authenticated detail response only after verifying current assignment (Rider) or current branch/role (POS). Terminal pin access defaults denied pending owner decision.
+- No Rider GPS or continuous customer location tracking.
+
