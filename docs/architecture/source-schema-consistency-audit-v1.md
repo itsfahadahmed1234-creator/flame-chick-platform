@@ -110,13 +110,12 @@ Count successful, newly committed customer website orders only, not failed attem
 2. Order Edge Function computes phone HMAC context only for `source=website`; never apply or require the website quota context for POS or other staff-created sources. Do not persist raw phone/IP in limiter records; do not store an unsalted SHA-256 of phone.
 3. Edge Function invokes one service-role-only order-creation RPC. Strip/reject any browser-supplied internal rate context.
 4. Inside the same transaction, the database:
-   - checks the existing order idempotency record first and returns an exact replay without consuming quota;
-   - obtains an advisory transaction lock derived from the phone HMAC digest;
-   - counts committed order-rate events newer than now minus 1 minute, 10 minutes and 1 hour;
-   - denies if the count already meets any corresponding maximum;
+   - checks the existing order idempotency record first for every source and returns an exact replay without repeating any write;
+   - only for source=website, obtains an advisory transaction lock derived from the phone HMAC digest, counts website rate events newer than now minus 1 minute, 10 minutes and 1 hour, and denies if a cap is met;
+   - POS and authenticated staff sources bypass the website quota check and event insert;
    - validates and creates order/items/delivery task using server-side prices and fees;
-   - inserts one successful-order rate event linked uniquely to the created order before commit.
-5. A unique event per order prevents duplicate counting. HMAC key version is stored with the digest; key rotation must support a dual-key grace period at least as long as the longest window (one hour) so a rotation cannot reset a customer's active allowance.
+   - inserts one website rate event linked uniquely to the created order before commit only for a website order.
+5. A unique website rate event per order prevents duplicate counting. HMAC key version is stored with the digest; key rotation must support a dual-key grace period at least as long as the longest window (one hour) so a rotation cannot reset a customer's active allowance.
 6. Keep the private event table inaccessible to anon/authenticated. Grant the limiter helper only to the server transaction that needs it. Do not create a public limiter RPC callable directly by browsers.
 7. Remove the current separate pre-order limiter RPC call once the atomic order command is implemented; the API will then do one order RPC per website submission instead of a rate-check RPC followed by the create-order RPC.
 
@@ -301,3 +300,10 @@ The source mismatches listed above must be reconciled before initial Production 
 
 The website phone quota is source-specific; order idempotency is not. Website and POS must both use stable idempotency keys, server-generated canonical request fingerprints, a database unique constraint scoped by restaurant/branch/source/key, and transaction-safe replay handling. Website preserves its pending key/payload in sessionStorage. POS preserves the key derived from localOrderId through retry/reload/offline recovery. Same key + same canonical request returns the existing order without repeating child writes or side effects; same key + changed request returns 409. POS, including POS delivery, bypasses the website phone quota entirely while keeping all idempotency and database integrity controls.
 
+
+
+### Website quota scope and universal order idempotency
+
+The owner has explicitly clarified that the 3 / 1 minute, 3 / 10 minutes and 15 / 1 hour limits apply only to customer website checkout submissions (source=website). POS is exempt even when a delivery order goes through the same Order API. Authenticated staff-created order channels are also exempt. Do not put a phone-quota check before common order creation without a verified website-only source boundary.
+
+Idempotency is universal: Website retains the stable sessionStorage key/payload; POS retains its stable key derived from localOrderId. Both go through the same transaction-safe uniqueness and canonical fingerprint contract. Exact replay returns the original order; changed payload under the same key returns 409; neither creates duplicate order items, delivery task, status event, payment, notification or other side effect. POS continues to be accepted regardless of the website phone quota counters.
