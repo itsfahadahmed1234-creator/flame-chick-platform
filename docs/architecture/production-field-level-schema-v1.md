@@ -180,7 +180,7 @@ Constraints:
 - Composite branch/tenant FK.
 - Partial unique indexes prevent duplicate active restaurant-wide role assignments and duplicate active branch role assignments.
 - Prevent self-escalation and protect the last active Owner account in transactional staff-admin commands.
-- Role assignment changes use an audited command. Preserve owner-only role assignment until the delegation rule is explicitly confirmed; do not infer authority from the word Admin alone if existing staff-admin policy still restricts it.
+- Role assignment changes use an audited command. Admin and Owner may both invite staff, assign/change roles, change branch assignments and deactivate staff, subject to the same safeguards and immutable audit trail. This follows the owner-confirmed rule that Admin and Owner have equivalent full business authority with distinct audit identities. Manager, Cashier and Rider cannot administer staff or roles. Prevent self-escalation, enforce the last-active-Owner safeguard, and require a reason for privileged role/branch changes.
 
 No Kitchen role is created in V1 unless separately approved.
 
