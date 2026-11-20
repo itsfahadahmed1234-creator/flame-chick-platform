@@ -1030,3 +1030,35 @@ These items remain genuine blockers or implementation details and must not be si
 
 **Resolved and removed from open questions:** branch resolution; restaurant-wide base menu/prices with branch availability overlays; one role identity per user/restaurant with same-role multi-branch assignment; curated deal choices and explicit surcharges; returned-order payment ledger/refund behavior; no Rider GPS/continuous customer tracking.
 
+## 21. Cross-document implementation contracts
+
+The detailed implementation contracts are maintained in their dedicated documents and remain normative:
+- Website-only successful-order phone quota and HMAC event design: [production-database-security-reliability-controls-v1.md](./production-database-security-reliability-controls-v1.md), section 3; [source-schema-consistency-audit-v1.md](./source-schema-consistency-audit-v1.md).
+- Universal Website/POS order idempotency, canonical payload fingerprint, replay privacy and command deduplication: [production-database-security-reliability-controls-v1.md](./production-database-security-reliability-controls-v1.md), sections 2 and 10.
+- RLS, grants, SECURITY DEFINER and role/function action rules: [production-rls-grant-function-matrix-v1.md](./production-rls-grant-function-matrix-v1.md).
+- Static customer drop-off pin, private storage, consent, generated Google Maps URL, Rider/POS authorization and tests: [customer-dropoff-pin-data-contract-v1.md](./customer-dropoff-pin-data-contract-v1.md) and [customer-dropoff-pin-erd-authorization-addendum-v1.md](./customer-dropoff-pin-erd-authorization-addendum-v1.md).
+- Full migration readiness, dependency batches, blockers and isolated test plan: [database-v1-migration-readiness-review.md](./database-v1-migration-readiness-review.md).
+
+### 21.1 Website-only quota reminder
+
+Apply 3 rolling orders/minute, 3/10 minutes and 15/hour per normalized submitted phone only to newly committed source=website orders. POS and authenticated staff order sources are exempt. Idempotent replay consumes no additional slot. The event insert and order commit are atomic; failures do not consume quota. Phone HMAC secret is server-only and raw phone/IP are not stored in the limiter event.
+
+### 21.2 Universal idempotency reminder
+
+Website and POS both require server-computed canonical fingerprints and a unique restaurant/branch/source/idempotency key scope. Same key/same payload returns existing order; same key/changed payload conflicts. Exact replay creates no duplicate child rows or side effects. POS bypasses the website phone quota, not idempotency.
+
+### 21.3 Static drop-off pin reminder
+
+One optional fixed customer destination coordinate per delivery order, private in app_private, same transaction as order/task, no direct browser table access. The Rider sees only their current assignment; authorized POS reads follow branch/role. No Rider GPS or continuous customer tracking.
+
+## 22. Official Supabase references
+
+Reference links and plan limits are a dated planning snapshot, not guarantees. Recheck live official documentation and actual project usage before implementation:
+- https://supabase.com/docs/guides/platform/billing-on-supabase
+- https://supabase.com/docs/guides/platform/manage-your-usage/edge-function-invocations
+- https://supabase.com/docs/guides/functions/limits
+- https://supabase.com/docs/guides/functions/auth
+- https://supabase.com/docs/guides/auth/rate-limits
+- https://supabase.com/docs/guides/realtime/limits
+- https://supabase.com/docs/guides/api/securing-your-api
+
