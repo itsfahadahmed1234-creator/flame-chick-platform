@@ -296,3 +296,45 @@ The performance numbers and plan quotas in this document are point-in-time offic
 - Supabase billing details, including database, Storage and Edge Function quotas: https://supabase.com/docs/guides/platform/billing-on-supabase
 
 Re-check these official limits at launch and before architecture changes. No fixed log-retention period is asserted in this plan.
+
+## 15. Edge Function invocation budget and abuse controls — checked 2026-11-20
+
+### Current published Free limits
+
+Official Supabase documentation currently lists 500,000 Edge Function invocations/month, 100 Functions/project, 256 MB function memory, 2 seconds active CPU/request and a 150-second Free worker wall-clock limit. Free Realtime includes 200 peak connections and 2 million messages/month (100 messages/second throughput). Free also lists 500 MB database size/project, 1 GB Storage and 5 GB egress. The organization-level invocation quota is shared across projects; check the organization usage page and filter for Flame Chick.
+
+An Edge Function invocation is counted regardless of HTTP status; returning 401/403/429/500 does not avoid the invocation. Preflight OPTIONS requests are not billed. Therefore application-level rate limiting does not protect the invocation allowance from volumetric traffic. Do not claim otherwise.
+
+### Architecture rules
+
+- Keep the four current domain Functions: catalog, order, delivery and staff-admin. Do not create a Function per CRUD action.
+- Do not chain Functions. One external request should invoke one handler and one bounded transactional command.
+- Keep high-frequency POS 15-second polling on RLS-protected Data API reads where safe; do not poll an Edge Function every 15 seconds.
+- Rider reads should use own-rider RLS queries and targeted Realtime. Edge Functions handle protected state-changing commands.
+- Combine catalog metadata/health and published snapshot into one request when a coordinated API schema-version rollout permits; cache the immutable catalog by publication version/checksum.
+- Preserve Supabase Auth's native IP/user rate limits. Do not duplicate sign-in/token rate counters in application tables without evidence.
+- Use atomic Postgres token buckets for high-risk application writes only: guest order creation (IP + normalized phone HMAC), Rider state mutations (authenticated rider HMAC), Cashier/Manager dispatch writes (staff HMAC), and staff invitations (authorized actor HMAC).
+- Keep raw IP, phone and email out of the limiter table. Derive HMAC-SHA-256 subject digests in server-side code with a dedicated secret; never persist raw request identity. The private limiter function returns only allow/deny and bounded Retry-After.
+- Candidate test limits: guest order 10 attempts/10 minutes per IP and 4/15 minutes plus 10/hour per normalized phone; Rider state actions 20/minute; staff dispatch writes 30/minute; staff invitations 5/hour. These are load-test starting points, not approved Production values. Tune for shared NAT/mobile carrier traffic before enforcement.
+- Public catalog reads are cached first and do not write a limiter bucket by default. Add a per-IP read bucket only if measured abuse justifies its own database write cost.
+- Verify which hosted ingress header represents the actual client IP with a spoofing test before using it. Do not trust a client-supplied X-Forwarded-For value. If the trusted IP cannot be determined, do not pretend IP throttling is effective; use authenticated identity controls and consider verified Turnstile step-up.
+- Do not add Upstash/Redis or a continuously running worker for current volume. A database token bucket is shared and atomic for this single Postgres project; keep the request write overhead focused on risky routes.
+- Retain short-lived limiter buckets (proposed 24–48h) and bounded cleanup. Optional pg_cron cleanup must first be verified on the actual Free project; correctness must never depend on Cron.
+
+### Usage warning thresholds
+
+These are manual operational thresholds, not built-in Supabase alerts: 50% (250k invocations/month) investigate route mix; 70% (350k) investigate loops/abuse; 85% (425k) optimize caching and read paths; 95% (475k) stop nonessential calls and investigate immediately while preserving essential order/delivery writes. Review usage weekly at launch and monthly after stable operation, because Free log retention is only one day.
+
+A function-level 429 still consumes an invocation. Protecting the invocation quota from a sustained volumetric attack requires upstream/platform mitigation; code inside the Function cannot guarantee it. A future upstream WAF/proxy or Turnstile step-up needs measured evidence and separate approval. No additional paid service is assumed.
+
+Detailed field definitions, private limiter table, exact RLS/grants and initial thresholds are in [production-field-level-schema-v1.md](./production-field-level-schema-v1.md). No Production Functions, settings, SQL, secrets or rate limits have been deployed or configured by this design update.
+
+### Official references checked 2026-11-20
+
+- https://supabase.com/docs/guides/platform/billing-on-supabase
+- https://supabase.com/docs/guides/platform/manage-your-usage/edge-function-invocations
+- https://supabase.com/docs/guides/functions/limits
+- https://supabase.com/docs/guides/functions/auth
+- https://supabase.com/docs/guides/auth/rate-limits
+- https://supabase.com/docs/guides/realtime/limits
+
