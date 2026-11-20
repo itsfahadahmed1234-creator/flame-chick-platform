@@ -740,3 +740,11 @@ All are design-only updates on `work/production-source-audit`. No SQL migration 
 ### Current next action
 
 Complete the remaining field-level schema dependency matrix (tenant/branch identity, orders, order snapshots, delivery, publication, catalog and role/audit), then reconcile the outstanding business decisions: rejection/failure reason requirements; Not Listed locality field; publication/price authority; deal choice model; schedule recurrence and branch scope; branch-specific menu requirements; Kitchen role/inventory needs; returned-order notification/payment treatment. Do not reopen the five confirmed delivery lifecycle decisions or the confirmed role/offline-order policies. Once the schema spec is internally consistent, present it for review before authoring isolated test migrations. Production DDL still requires separate explicit approval.
+
+### Schema consistency pass — 2026-11-20
+
+- Added the detailed delivery lifecycle specification: `docs/architecture/delivery-lifecycle-contract.md`, commit `5fa5392fba6968fc59996316b6c338a5c2b7f9d3`.
+- Linked the delivery contract from the Production ERD (commit `782b9d20ab458279133fd25e41027c43df817d15`). Updated the schema blueprint to mark the lifecycle confirmed (commit `cac6c3ce0b755e062104734d0456aec345d3a581`) and the security matrix with the narrow Cashier/Manager return-confirmation permission (commit `8195c32e36d5d46ce39834bce8b2c331f63c99ef`).
+- Corrected superseded open-decision wording: Manager restricted POS access, Rider lifecycle and offline stale-catalog policy are confirmed, not pending. Relevant consistency commits: `4f41085bd82805f7708708250cbcef0bb2cdefee` (security matrix), `4a8a02571a4b9feb4d1805656cf72ec0181c7e43` (schema blueprint), `d655088af126a97de5d81ab44955297b7907c4a1` (ERD), and `a556e0c5a0fb1666f9db58362ab093f845d93a97` (handoff next action).
+- No Production SQL, database, Supabase settings, Edge Functions, Storage, users, Vercel deployment, `main`, or original source repository was changed.
+
