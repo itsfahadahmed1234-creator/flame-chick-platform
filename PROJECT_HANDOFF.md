@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security and Admin-managed menu capability design in progress; current published menu baseline documented  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security, menu requirements and Production schema/reliability blueprint drafted; API/column contract mapping remains  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -413,6 +413,21 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 - No menu rows have been inserted into Production. No Production schema or live app was changed.
 - Next: compare this artwork with the actual current catalog/export from the live system (where available), then map stable product identities and order snapshots. Incorporate these requirements into the proposed ERD and Admin authoring workflow. Keep Production read-only.
 
+
+### Production schema/reliability blueprint drafted — 2026-11-20
+
+- Added `docs/architecture/production-schema-blueprint.md` (commit `d0e58a68cdda582b02d9bf198fdcc58c7cc43e71`). Design only; no SQL created/applied.
+- Reviewed archived Demo baseline SQL and follow-on security, media, offer expiry, staff audit/index, helper-usage, Admin connection, and Demo-only manual-address/zero-fee migrations. Confirmed Demo baseline contains 45 tables (42 public, 3 private), 33 functions, 35 triggers, 108 RLS policies and 103 explicit indexes. Treat Demo as a reference, not a Production migration set.
+- Inspected current POS adapter and catalog refresh: schemaVersion 2, required arrays for categories/products/productVariants/subcategories/deals/dealComponents/modifierGroups/modifiers/modifierPriceRules/modifierGroupAssignments/deliveryAreas/drinkOptions; health then catalog fetch; IndexedDB cache. POS currently clears menu/category/delivery-area stores before repopulating them, so a failed cache update could lose the previous working cache. It converts missing variant prices and delivery fees to zero in the adapter. Blueprint requires version-staged cache writes, an atomic active-version pointer and no silent zero fallback.
+- POS offline delivery orders submit product/variant/deal IDs plus idempotency key; server prices using live mutable catalog values. Blueprint requires catalog publication version binding and an explicit stale-price policy before order DDL.
+- Catalog function currently builds from mutable source tables and its health check does not enforce a separate approved publication pointer. Blueprint specifies immutable publication snapshots, a current pointer, validated publish/rollback, checksum and schema-version contract.
+- Demo raw catalog tables have anon SELECT policies and authenticated table grants. Production should use narrow allowlisted public catalog DTOs, private operational schemas, least-privilege grants, tenant/branch composite constraints and server-checked roles rather than copy policies blindly.
+- Demo order function writes zero tax and contains a Demo-specific manual-address/zero-fee path. Neither is approved for Production. Current published menu artwork says prices exclude applicable GST, but provides no rate or calculation policy; tax policy must be confirmed, not guessed.
+- Existing Admin writes compound catalog changes through multiple browser REST calls and lacks full modifier/schedule editors, unpriced draft support and complete deal-component editing. Blueprint recommends transactional server-side commands, concurrency checks, audit, and full Admin workflow.
+- Key schema domains: restaurant/branch tenancy; categories/subcategories/products/variants; modifier groups/options/assignments/pricing; deals/components/choice pools/schedules; draft and immutable publication; orders/items/modifiers/components/payments/tax snapshots; delivery/rider; staff/access/audit; POS devices/registers; settings/media/outbox.
+- No Production database, Storage, Function, role, settings or app deployment was changed.
+- Next: map current Admin/website/POS/catalog/order/delivery API field contracts to target columns/RPCs; refine ERD and migration dependencies; obtain owner decisions for GST, offline stale-price policy, publication roles, schedule scope and deal choices. Then create reviewed SQL in small migration batches for a disposable test project first. Do not apply Production DDL yet.
+
 ## 11. Implementation roadmap — continue in this order
 
 ### Stage 1 — Source hygiene and durable handoff (current)
@@ -459,4 +474,4 @@ Run full end-to-end tests, security checks, rollback rehearsal, and backup resto
 
 **Stage 2 is complete:** the Flamechic organization and exact Production project `adkrxfnawdiljhjaavnj` are visible and verified. The one applied migration was read from live migration history and its exact SQL has been added to the working branch as a historical migration file. It must not be reapplied. Production currently has no application schema, users, buckets, or Edge Functions. Continue with Stage 3 schema design/review; keep Production unchanged until the migration plan and each DDL batch are explicitly approved.
 
-**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, `docs/architecture/menu-management-design.md`, and `docs/architecture/current-menu-baseline.md`, inspect the current branch head, and continue Stage 3 from the API/database contract analysis and menu capability requirements. The reference image is not content to publish. Design routine menu authoring in Admin so future menu changes do not require DDL. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
+**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, `docs/architecture/menu-management-design.md`, `docs/architecture/current-menu-baseline.md`, and `docs/architecture/production-schema-blueprint.md`; inspect the current branch head and continue Stage 3 with API/column/RPC contract mapping and open decision resolution. Do not repeat completed repository/Production-account audits unless identity changes. Production remains read-only until migration batches have been tested and explicitly approved. The reference image is not content to publish. Design routine menu authoring in Admin so future menu changes do not require DDL. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
