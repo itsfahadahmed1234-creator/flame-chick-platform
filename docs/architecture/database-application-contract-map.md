@@ -185,3 +185,8 @@ Only customer website orders (`source=website`) are subject to the approved roll
 The current website persists a pending idempotency key/payload in sessionStorage; POS derives its retry key from localOrderId. Preserve both. The existing Order API's separate pre-order limiter call must be replaced with one service-only atomic create-order RPC: first return exact idempotent replay; then acquire a transaction lock on phone HMAC; evaluate all three rolling windows; validate canonical price/fee; write order/items/task and one private rate event linked to the committed order in the same transaction. Failed/rolled-back submissions do not count; subsequent restaurant rejection/cancellation does not refund a slot. On cap reached, return HTTP 429 with Retry-After while preserving the website cart and pending idempotency key.
 
 Detailed fields, HMAC rotation, identity limitation and tests are documented in production-field-level-schema-v1.md and source-schema-consistency-audit-v1.md. No Production limiter is deployed by documenting the contract.
+
+
+## Database security and reliability controls
+
+See [production-database-security-reliability-controls-v1.md](./production-database-security-reliability-controls-v1.md) for the required universal Website/POS order idempotency contract, command deduplication, RLS/grants, SECURITY DEFINER rules, atomic transactions, audit/outbox, offline retry handling, recovery and migration testing. The customer phone quota remains Website-only; POS delivery bypasses the quota but not idempotency.
