@@ -360,3 +360,46 @@ GST/tax is not an open V1 decision; it is explicitly deferred.
 - It does not create SQL migration files and has not been applied to Production.
 - No Production data, schema, functions, policies, Storage, users, settings or deployments were changed.
 - Next: resolve the listed decisions that affect the schema, then produce a field-level migration specification and review it before writing the first new Production DDL migration.
+
+## 3J. Owner-confirmed delivery lifecycle (2026-11-20)
+
+The following workflow is now a confirmed business contract and must be implemented consistently by the Delivery API, POS, Rider portal, transactional database commands, audit records and Realtime events.
+
+### Offer dispatch and response
+
+1. An order becomes ready for rider dispatch. Cashier or Manager explicitly selects a rider and creates a targeted offer. Do not automatically offer the task to the next rider after a rejection or timeout.
+2. Only the addressed rider may read or respond to that offer. The offer has a server-generated `offered_at` and `expires_at = offered_at + 60 seconds`.
+3. Rider rejection records `rejected`, response time and authenticated actor; the task returns to the POS dispatch queue as unassigned/awaiting reassignment. Cashier or Manager chooses the next rider.
+4. If no response arrives, the offer expires at 60 seconds and returns to the POS dispatch queue. The expiry boundary is authoritative in the database: an accept command at or after `expires_at` must fail even if a background expiry worker has not yet updated the row.
+5. Expiry processing must be idempotent and safe under concurrent accept/reject/expiry attempts. Use row locking/conditional updates so only one terminal offer outcome wins. POS must be able to recover the queue via normal fetch/polling if a Realtime event is missed.
+6. The POS must show the offer outcome and allow a new manual assignment. Preserve each offer attempt; do not overwrite a rejected/expired offer when creating the next one.
+
+### Acceptance, pickup and delivery
+
+7. A rider can accept only their own pending, unexpired offer. Acceptance atomically changes the offer to accepted, creates/activates the current assignment, and moves the task into assigned state. Enforce at most one current assignment per task.
+8. The assigned rider alone may record pickup and the out-for-delivery transition, following the existing Rider workflow. All transitions validate the current task/assignment and authenticated rider identity server-side.
+9. When the assigned rider marks the order delivered, the delivery task and order complete immediately in the same transaction. No cashier/manager confirmation or proof/OTP/photo is required by the confirmed V1 policy. Store delivered actor and server timestamp; any future proof requirement is a separate decision.
+
+### Failed delivery and physical return
+
+10. If delivery fails, the assigned rider may report failure and choose to return the order. This records a failure/return-in-progress event and moves the task to a return-awaiting-physical-confirmation state; it does not complete the order or mark the return as physically received.
+11. Once the rider physically brings the order back, either Cashier or Manager may confirm physical receipt. The confirmation must be a role-checked transactional command and record authenticated actor, role, server timestamp, task/order, previous and resulting states, outcome/reason and request/correlation ID.
+12. After confirmation, the delivery task reaches a returned/closed outcome and the order reaches a distinct returned/failed terminal outcome (not delivered/completed). Preserve the original order and all snapshots; no hard deletion.
+13. Do not allow the rider to self-confirm physical return. Do not allow a cashier/manager to confirm before the task is in the return-awaiting-confirmation state. Duplicate confirmations must be idempotent or safely rejected without duplicate history.
+14. Cashier and Manager both have physical-return confirmation permission. This specific confirmation permission does not grant Cashier general Manager privileges, Admin-panel access, or authority to cancel accepted orders outside this return flow.
+
+### Suggested state model (final names to be normalized in migration specification)
+
+- Offer: `pending -> accepted | rejected | expired` (exactly one terminal outcome).
+- Task: `awaiting_assignment -> offered -> assigned -> picked_up -> out_for_delivery -> delivered`; failure path: `out_for_delivery -> return_pending_confirmation -> returned`. A rejected/expired offer returns the task to `awaiting_assignment`.
+- Order: retain the existing order acceptance/preparation lifecycle; delivery success transitions to `delivered/completed` immediately, while confirmed physical return transitions to a separate `returned` or equivalent failed-delivery terminal state. Do not conflate delivery-task state and order state.
+
+### Database/API implementation invariants
+
+- Use server time for offer creation/expiry and every lifecycle timestamp. Never accept client-supplied actor IDs, role, timestamp, task status or expiry.
+- Offer acceptance, rejection, timeout, assignment activation, pickup, delivery completion, rider failure/return report and physical-return confirmation are narrow commands with explicit role/branch/ownership checks and append-only events.
+- Preserve rejected/expired offer attempts and status history. Audit actor, actor role, old/new state, timestamp, reason/outcome and correlation ID as applicable.
+- Keep Rider reads and Realtime strictly filtered to the authenticated rider's own offers/assignments. POS dispatch updates remain branch-scoped. Order History remains ordinary fetch/manual refresh, not broad Realtime.
+- The 60-second deadline must be enforced synchronously by the accept command; background expiry processing exists to update POS visibility and emit events, not to define whether an offer is still acceptable.
+- No Production DDL or application implementation has been created by recording this decision.
+
