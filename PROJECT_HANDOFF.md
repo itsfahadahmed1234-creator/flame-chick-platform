@@ -1,3 +1,14 @@
+## 2026-11-20 — Batch 2 owner decisions confirmed
+
+The owner approved the following Batch 2 decisions:
+- Branch codes are canonical lower-case ASCII, 1–32 characters, using letters, digits, underscore or hyphen (examples: `main`, `gulberg`, `dha-01`). Codes must be unique within a restaurant.
+- Branch names are customer-facing and may appear in the future allowlisted public branch-discovery response.
+- Operational branch address and phone remain private and are excluded from public discovery by default. No public disclosure of those fields is authorized.
+- V1 uses restaurant-wide base menu prices across all branches. Branch-specific product availability and delivery fees are supported; branch-specific base product pricing is excluded.
+- Existing website branch-resolution rule remains: zero eligible branches blocks ordering; one eligible branch auto-resolves; multiple eligible branches require customer choice. The server revalidates eligibility on catalog/quote/order commands.
+
+These decisions resolve the corresponding Batch 2 owner-review questions. They do **not** approve SQL or Production DDL. Remaining pre-SQL work: confirm exact fulfilment-mode vocabulary against active app contracts, reconcile exact columns/types/FKs/indexes across specs, author exact candidate SQL, run isolated disposable acceptance tests, and present the complete migration for separate explicit approval.
+
 
 
 
@@ -68,7 +79,7 @@ External encrypted schema dump was not created; user explicitly accepted proceed
 Batch 1 is complete. Continue with remaining Stage 3 design/source consistency: resolve outstanding business/schema decisions, complete field-level table and API mapping, then separately review Batch 2/3 migration design. Do not start website security audit until immediately before attaching website to DB. No application deployment, Vercel changes, Auth/Storage/Edge Function work, or business table creation was performed in this Batch 1 action.
 # Flame Chick Platform — Project Handoff
 
-**Last updated:** 2026-11-20 (Batch 1 private schema bootstrap applied and verified)  
+**Last updated:** 2026-11-20 (Batch 2 owner decisions confirmed; Batch 1 applied and verified)  
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
