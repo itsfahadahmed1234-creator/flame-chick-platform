@@ -180,7 +180,7 @@ See [production-field-level-schema-v1.md](./production-field-level-schema-v1.md)
 
 ## Owner-approved ordering quota (2026-11-20)
 
-All customer orders reaching the central order-create RPC and carrying a customer phone share the approved rolling caps: maximum 3 in 1 minute, 3 in 10 minutes, and 15 in 1 hour per server-normalized phone. Applies to website, cloud POS delivery, and staff-entered phone/WhatsApp/manual/third-party orders using the same RPC; staff sources still require verified Auth and role. Current POS takeaway/dine-in local IndexedDB records cannot be counted until they are centrally registered.
+Only customer website orders (`source=website`) are subject to the approved rolling caps: maximum 3 in 1 minute, 3 in 10 minutes, and 15 in 1 hour per server-normalized phone. All POS orders are exempt, including POS delivery orders that use the shared Order API; authenticated staff-entered phone/WhatsApp/manual/third-party orders are also exempt. The limit must not affect POS processing.
 
 The current website persists a pending idempotency key/payload in sessionStorage; POS derives its retry key from localOrderId. Preserve both. The existing Order API's separate pre-order limiter call must be replaced with one service-only atomic create-order RPC: first return exact idempotent replay; then acquire a transaction lock on phone HMAC; evaluate all three rolling windows; validate canonical price/fee; write order/items/task and one private rate event linked to the committed order in the same transaction. Failed/rolled-back submissions do not count; subsequent restaurant rejection/cancellation does not refund a slot. On cap reached, return HTTP 429 with Retry-After while preserving the website cart and pending idempotency key.
 
