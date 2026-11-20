@@ -93,7 +93,7 @@ The root README currently contains an outdated illustrative `docs/legacy-demo/` 
 
 - Branch: `work/production-source-audit`
 - Created on 2026-11-20 from `main`.
-- Stage 1 changes belong here; `main` remains unchanged.
+- All review/design changes belong here; `main` remains unchanged.
 - Stage 1 commits on this branch include:
   - `0da616e0586213990bb43812855875c94d1fd1bd` — clean Pizza Bite catalog fallback labels/cache key.
   - `50096cf779dfd7b101a9445e42980b208c1f0067` — mark inactive legacy website `js/app.js` explicitly as legacy/inactive.
@@ -286,7 +286,7 @@ Historic HFP reference used five Realtime tables (`orders`, `delivery_tasks`, `d
 - Corrected a user-facing delivery API configuration error label from HFP to Flame Chick. Legacy `hfp_*` RPC names remain untouched because they are database compatibility contracts until reviewed.
 - Updated deployment documentation to explain that `FLAME_CHICK_RIDER_PORTAL_URL` controls staff invitation redirects and Web Push clicks, with a safe service-worker app-scope fallback.
 - Added this handoff document at the repository root as the durable context entry point and linked it from the root README. Corrected the README's illustrative docs tree to the actual `operations/` folder.
-- Latest GitHub compare after Stage 2 reconciliation: branch is 15 commits ahead of `main`, 0 behind. There are nine changed paths: `PROJECT_HANDOFF.md`, root README, Rider `index.html`, website README, website `js/app.js`, website `js/catalog.js`, Production environment docs, delivery API, and the newly added historical Production baseline migration file. The latest compare is the source of truth for counts; older commit-count notes elsewhere in this document are historical snapshots.
+- Latest GitHub compare is recorded near the end of this handoff; treat it as a point-in-time count and re-check the branch head before writing. `main` has not been modified.
 - Static review was performed through GitHub source reads. No app build, Deno type-check, browser test, or end-to-end test was run because no CI workflow/test harness is configured in this repository and no local project runtime was provisioned. Treat runtime/type validation as pending; do not describe this branch as fully tested.
 - No live deployment was triggered.
 - No Vercel settings/domains/Git connections were changed.
@@ -359,10 +359,10 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 
 ### Menu information gate
 
-- The actual final launch menu has **not yet been supplied**. Two menu images have been supplied: the current published menu baseline and a separate future-capability reference image; neither is an instruction to seed Production.
+- The actual final launch menu planned for the coming weeks has **not yet been supplied**. Two images are available: the current published menu baseline and a separate future-capability reference sample. They inform catalog structure and compatibility; neither is an instruction to automatically seed Production.
 - Known historical Demo context (five categories, about 24 regular products/variants plus a Platter Deal) is not an authoritative specification for the new menu. Do not assume its categories, product set, modifier structure, deal logic, pricing, or media are unchanged.
-- Do not block schema design waiting for the final menu. Design the catalog so future menu items and rules can be created in Admin. The reference image and user clarification are documented in `docs/architecture/menu-management-design.md`. Ask about unresolved business rules only where they change the schema; do not seed the reference image.
-- Continue independent platform/security analysis while waiting, but do not finalize catalog DDL or create menu seed data until the new menu is reviewed.
+- Do not block schema design waiting for the final launch menu. Design the catalog so future menu items and rules can be created in Admin. The reference image and user clarification are documented in `docs/architecture/menu-management-design.md`; the current menu transcription is in `docs/architecture/current-menu-baseline.md`. Ask about unresolved business rules only where they change the schema.
+- Continue schema/security design now. Do not create initial menu seed data from either image; once the Admin workflow is implemented, the actual launch menu can be entered and validated through Admin.
 
 ### Mandatory database/security/reliability design checklist
 
@@ -382,7 +382,7 @@ The user explicitly requires a secure, reliable, maintainable database designed 
 ### Current decision / next action
 
 - Do not apply Production DDL or seed data yet.
-- Ask for the latest new-menu material. After receiving it, inventory products/categories/variants/modifiers/deals/fees/availability/media/languages and flag unclear items for the user.
+- Current menu baseline and future-capability reference have been received and documented. Final launch menu entry is a later Admin task, not a prerequisite for schema design. Continue the ERD, resolve decisions that affect the table model, then prepare the field-level migration spec.
 - In parallel, continue documenting API-to-database contracts and security boundaries without changing Production.
 - The user expects this handoff to be updated after every meaningful project step. Update it with menu source/version, design decisions, migrations, commits, tests, risks, and precise next action.
 
@@ -532,48 +532,66 @@ The user confirmed the Production delivery-fee behavior:
 
 ## 11. Implementation roadmap — continue in this order
 
-### Stage 1 — Source hygiene and durable handoff (current)
+### Stage 1 — Source hygiene and durable handoff (COMPLETE)
 
-1. Keep working on `work/production-source-audit`.
-2. Finish reviewing stale source references, active vs inactive files, hardcoded portal links, and documentation inconsistencies.
-3. Do not delete or bulk-rename code until references and behavior are checked.
-4. Run available static checks/tests where possible; record any test limitations.
-5. Update this handoff after meaningful work, with exact branch/commit/file status.
-6. Review the diff. Keep `main` unchanged until a reviewed PR is ready.
+- Separate review branch created; source cleanup and handoff documentation committed.
+- Main branch and original source repository remain unchanged.
+- Static/build/runtime testing remains a known gap to complete before merge.
 
-### Stage 2 — Reconcile Production migration history
+### Stage 2 — Production account and migration reconciliation (COMPLETE)
 
-1. Connect the correct separate Flame Chick Supabase Production account.
-2. Verify exact ref `adkrxfnawdiljhjaavnj`, region, project name and plan.
-3. Inspect current migration history and exact applied baseline migration SQL.
-4. Add the matching historical migration file only after exact reconciliation; never reapply it.
-5. Confirm no HFP or Demo project is the target.
+- Verified exact project `adkrxfnawdiljhjaavnj` in the separate Flamechic organization, Mumbai region, Free plan.
+- Retrieved the exact applied migration `20261119125153_flame_chick_postgres_default_privileges_hardening` from live migration history and added its matching historical SQL file to the review branch.
+- Never reapply that migration. Production still has no application schema, business data, users, Storage buckets or Edge Functions as of the last read-only inspection; recheck before any future DDL.
 
-### Stage 3 — Design and implement Production schema
+### Stage 3 — Schema design and security review (CURRENT)
 
-Build reviewed Production migrations in dependency order: restaurant/branch tenant core, catalog/menu, staff roles/profiles, orders/checkout, delivery/dispatch, audit and supporting functions/RLS, Storage bucket and policies, and approved initial seed.
-Use Demo migrations as reference only. Create fresh Production IDs. Keep delivery fees unknown until explicitly approved; do not infer zero fees.
+- Continue from `docs/architecture/production-erd-v1.md`, `docs/architecture/production-schema-blueprint.md`, `docs/architecture/database-application-contract-map.md` and `docs/architecture/delivery-pricing-contract.md`.
+- Resolve only decisions that materially affect table shape or server contract.
+- Produce the field-level schema/migration specification, permission matrix and adversarial test plan.
+- Keep Production read-only. Do not write or apply SQL yet.
 
-### Stage 4 — Edge Function configuration and security
+### Stage 4 — Migration authoring and isolated validation (AFTER STAGE 3 APPROVAL)
 
-Review each function's authentication, authorization, tenant/branch scoping, input validation, CORS, error handling, and secrets. Configure secrets only in the verified Production project. Deploy functions only after schema readiness and explicit approval.
+- Author small ordered SQL migrations in the review branch; preserve the already-applied baseline file untouched.
+- Test the complete migration chain on an isolated disposable Supabase project using the same PostgreSQL/Supabase feature set.
+- Verify explicit grants required by the Production hardening baseline, RLS, composite tenant constraints, RPC EXECUTE grants, function security, indexes and advisors.
+- Run negative tests as anon, authenticated users across roles/branches, and service_role. Do not treat service_role as a substitute for server-side actor authorization.
+- Apply to Production only after the user separately approves the exact migration batch and exact project ref.
 
-### Stage 5 — Connect and test all four apps
+### Stage 5 — Edge Function configuration and security
 
-Connect website, POS, Admin, Rider to the Production project using browser-safe publishable keys only. Test authentication, catalog, checkout, POS order flow, dispatch, rider accept/reject, pickup, delivered, failure, return, and role restrictions. Keep Realtime narrow and preserve POS 15-second polling fallback.
+- Review each function's authentication, authorization, tenant/branch scoping, input validation, CORS, error handling and secrets.
+- Configure secrets only in verified Production. Deploy functions after schema readiness and specific approval.
 
-### Stage 6 — Vercel previews and project wiring
+### Stage 6 — Connect and test all four apps
 
-After backend readiness, connect the four Vercel projects to this repo with the correct app root directories. Use Preview deployments first. Resolve canonical POS/Admin/Rider domain assignments with the user before changing any aliases or links. Keep the current live website untouched.
+- Connect website, POS, Admin and Rider to Production using browser-safe publishable keys only.
+- Test authentication, catalog, Admin CRUD, publish/rollback, website checkout, POS online/offline delivery orders, dispatch, rider accept/reject, pickup, delivered, failure, return and role restrictions.
+- Preserve catalog schema compatibility, targeted Realtime and the POS 15-second polling fallback.
 
-### Stage 7 — End-to-end verification and cutover
+### Stage 7 — Vercel previews and project wiring
 
-Run full end-to-end tests, security checks, rollback rehearsal, and backup restore test. Only switch production traffic/domains after a separate explicit cutover approval. Retain the previous deployments/source as rollback.
+- Connect four Vercel projects to the correct app root directories only after backend readiness.
+- Use Preview deployments first. Resolve canonical POS/Admin/Rider domain assignments with the user before changing aliases or links.
+- Keep the existing live customer website untouched until a separately approved cutover.
+
+### Stage 8 — End-to-end verification and cutover
+
+- Run full end-to-end tests, security checks, rollback rehearsal and backup restore test.
+- Switch production traffic/domains only after a separate explicit cutover approval. Retain previous deployments/source as rollback.
 
 ## 12. Immediate next action
 
-**Stage 1 source-hygiene review is complete on `work/production-source-audit`.** Do not repeat the same source scans. The remaining Stage 1 limitation is that automated build/type/runtime tests have not been run; add an appropriate CI/test harness later when the app tooling is established, or run checks in a controlled local workspace before merge.
+Stage 1 and Stage 2 are complete. Stage 3 (schema design/security review) is current. The key design artifacts are:
 
-**Stage 2 is complete:** the Flamechic organization and exact Production project `adkrxfnawdiljhjaavnj` are visible and verified. The one applied migration was read from live migration history and its exact SQL has been added to the working branch as a historical migration file. It must not be reapplied. Production currently has no application schema, users, buckets, or Edge Functions. Continue with Stage 3 schema design/review; keep Production unchanged until the migration plan and each DDL batch are explicitly approved.
+- `docs/architecture/production-erd-v1.md`
+- `docs/architecture/production-schema-blueprint.md`
+- `docs/architecture/database-application-contract-map.md`
+- `docs/architecture/delivery-pricing-contract.md`
+- `docs/architecture/menu-management-design.md`
+- `docs/architecture/current-menu-baseline.md`
 
-**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, `docs/architecture/menu-management-design.md`, `docs/architecture/current-menu-baseline.md`, and `docs/architecture/production-schema-blueprint.md`; inspect the current branch head and continue Stage 3 from production-erd-v1.md: resolve the remaining schema decisions, then prepare a field-level migration spec and isolated test plan. Do not restart completed source/account audits. Do not repeat completed repository/Production-account audits unless identity changes. Production remains read-only until migration batches have been tested and explicitly approved. The reference image is not content to publish. Design routine menu authoring in Admin so future menu changes do not require DDL. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
+Next work: resolve the offline POS stale-catalog price policy and the publication/price permission boundary; then produce the field-level migration specification and isolated validation plan. No Production SQL, seeds, secrets, buckets, Functions or app deployments until the exact changes are reviewed and approved.
+
+**New-chat instruction:** Read this file first, then read the listed design artifacts. Continue from Stage 3 and the exact next action above. Do not repeat the original repository/source audit or Production account/migration check unless the repo/project identity changes. Always update this handoff after meaningful work. Keep `main`, the original source repo and all live deployments unchanged until separate approvals.
