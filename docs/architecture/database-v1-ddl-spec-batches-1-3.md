@@ -84,7 +84,16 @@ When later functions need Data API invocation:
 
 ## 4. Batch 2 — tenant and branch foundation
 
-**Review status:** structurally approved as the proposed V1 boundary; the exact DDL still requires owner sign-off before any migration is authored or applied. Batch 2 contains only `public.restaurants` and `public.branches`.
+**Review status:** owner-approved business decisions recorded; exact DDL still requires source-contract reconciliation, isolated acceptance tests and separate migration approval. Batch 2 contains only `public.restaurants` and `public.branches`.
+
+### 4.0A Owner-confirmed Batch 2 decisions (2026-11-20)
+
+- `branch_code`: lower-case ASCII letters, digits, underscore and hyphen; 1–32 characters; unique per restaurant. Examples: `main`, `gulberg`, `dha-01`.
+- `name`: customer-facing branch name; eligible for a future narrow public discovery projection.
+- `address` and `phone`: operational/private fields; excluded from public discovery by default. No public disclosure is authorized.
+- Base product/menu prices are restaurant-wide and identical across branches in V1. Branch-specific availability overlays and delivery fees are supported; branch-specific base product prices are not.
+- Branch resolution remains fail-closed: zero eligible branches blocks ordering; one eligible branch auto-resolves; multiple eligible branches require customer selection. Server revalidates the chosen branch for every relevant catalog/quote/order operation.
+- These are design decisions only. They do not authorize SQL or a Production migration.
 
 ### 4.1 public.restaurants
 
