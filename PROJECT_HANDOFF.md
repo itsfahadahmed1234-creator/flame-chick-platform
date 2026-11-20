@@ -947,3 +947,39 @@ Owner clarified that Flame Chick will **not** collect Rider live location and do
 No application code, SQL/migrations, Production schema/data/settings, Edge Functions, Realtime, Vercel, `main`, or original source repository was changed. Website security audit remains deferred until immediately before website/database integration and is a mandatory stop-gate.
 
 **Next database action:** incorporate the static drop-off location row and narrow Rider/POS read permissions into the canonical ERD and RLS/function matrix. Do not add any live tracking or location-stream structures. Continue documentation/test design first; Production remains read-only.
+
+
+## 2026-11-20 — Static customer drop-off pin integrated into database design
+
+Completed the next database-only step for the owner-approved one-time customer delivery pin. Re-read the handoff and canonical schema, ERD, RLS matrix, integrity review, product decisions and drop-off pin contract before editing. No website audit was performed.
+
+### Exact approved feature
+- Customer may optionally share one fixed delivery destination pin using one-time device coordinates or a manually placed map pin.
+- Written delivery address remains required; skipping the pin or denying GPS permission must not block checkout.
+- The assigned Rider and authorized POS staff can retrieve the same point and open Google Maps directions generated from validated coordinates.
+- No Rider GPS/live location, no continuous customer tracking, no location update streams, no movement history, no geofencing, no location Realtime, no polling, no background tracking.
+- Coordinates are private and bound to the exact restaurant, branch, order and delivery task. At most one current pin per delivery.
+- Rider can read only their current active assignment; reassignment removes the previous Rider's access. POS Manager/Cashier access is branch-scoped; Admin/Owner access follows restaurant-wide business authority.
+- Public clients cannot read private coordinates. Optional pin writes are part of the existing validated website order transaction; no direct table write or separate location endpoint.
+- Google Maps URL is generated from validated coordinates; arbitrary customer-provided URLs are never persisted/opened.
+- Proposed precise-coordinate retention is 24 hours after terminal delivery outcome; confirm support/legal needs before implementation.
+
+### Documentation updated
+- docs/architecture/customer-dropoff-pin-erd-authorization-addendum-v1.md — commit d9625236ece0110e8647e9e767502dd57ec6d780.
+- docs/architecture/production-erd-v1.md — ERD relationship extension, commit 3d4bbd259865faa9b74afc765db1b118ef7b13ee.
+- docs/architecture/production-field-level-schema-v1.md — private table/constraints/transaction/retention, commit 7b8ed35fb05314efcc5b5512fcf5d024d2aa29a9.
+- docs/architecture/production-rls-grant-function-matrix-v1.md — no direct grants; narrow Rider/POS read rules, commit 23e4ab00c45b8ddb6434ffa3c0260555965f6212.
+- docs/architecture/database-integrity-review-v1.md — integrity invariants and adversarial tests, commit fc3dd7affa88430ea1255d8e84e3e48f97420e20.
+- docs/architecture/customer-live-location-data-contract-v1.md — explicitly marked OBSOLETE / DO NOT IMPLEMENT, commit 668b746718bb369d217d17820daab92eb15dde0f. Use only the static drop-off pin docs as normative.
+- This handoff entry records the integration.
+
+### Remaining design checks
+- Confirm whether Admin/Owner can access pin after terminal state for customer support; default is no Rider access and operational POS access ends with terminal task.
+- Confirm 24-hour coordinate retention against actual support/legal requirements before migration.
+- During SQL design, ensure matching composite unique keys exist on orders/tasks to support tenant/branch/order/task foreign keys without weakening isolation.
+- Add precise pin only to the authorized Rider/branch POS delivery-detail projection; verify existing Delivery API DTO does not accidentally return customer coordinates to any other role.
+- Website security audit remains a mandatory stop-gate immediately before attaching website to database.
+
+No application source, SQL migration, Production schema/data/Auth/settings, Edge Function, Realtime publication, Storage, Vercel, main, or original source repository was changed. Production remains read-only.
+
+**Next database-only step:** complete a cross-document consistency check for the static pin design and then proceed with the wider migration-readiness/test plan. Do not implement continuous location tracking.
