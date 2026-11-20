@@ -150,15 +150,21 @@ The current Demo order function:
 - Contains a Demo manual-address/zero-delivery-fee path.
 These behaviours must not be carried into Production unchanged.
 
-### Offline POS stale-price policy — unresolved
+### Offline POS stale-catalog policy — confirmed by owner
 
-The current POS saves local delivery orders and later submits product/variant/deal IDs when connectivity returns. The server then calculates against the current database prices. If a catalog price or availability changed while the POS was offline, the submitted local quote may not match the server's live price.
+The owner confirmed on 2026-11-20 that an offline POS delivery order created on an older catalog version must be held for explicit cashier/manager confirmation before it can be submitted using a changed price.
 
-Production should store catalog_publication_id and the publication version on each local order and include it in the server request. The server must detect stale versions and must not silently charge a different price. A business policy is still required:
-- Option A: reject/hold a stale offline order for cashier/manager review and explicit re-price confirmation before submission.
-- Option B: honour the exact retained publication snapshot used when the local order was started, subject to availability/validity safeguards.
-Do not implement silent re-pricing. This policy affects the order RPC and must be decided before Production order DDL is finalized.
+Required implementation:
+1. Store the exact `catalog_publication_id` and version used by the local POS order.
+2. Include the publication version in the sync request.
+3. On sync, the server validates the submitted items and calculates the current canonical total.
+4. If publication changed and price or availability changes, do not create the order. Return a stable conflict such as `CATALOG_VERSION_STALE` with a safe old-versus-current quote summary.
+5. POS keeps the order queued, marks it `needs_confirmation`, and shows the old quote and current server quote.
+6. An authenticated cashier/manager must explicitly confirm the new amount (or cancel/edit) before the client resubmits with a new idempotency key tied to the confirmed request/version.
+7. Audit the confirming actor, prior/current publication versions, old/new totals and time.
+8. Never silently reprice, and never treat a held order as a successfully submitted order.
 
+This is a confirmed business policy, not an open decision. Implement it in the POS local state machine, Order API and database order RPC as one coordinated versioned change.
 ## 5. Delivery and basic financial configuration
 
 ### GST / tax deliberately deferred
