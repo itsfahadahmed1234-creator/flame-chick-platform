@@ -508,7 +508,7 @@ The user confirmed the Production delivery-fee behavior:
 - Order Edge Function: rate limits website orders, verifies staff for non-website orders, calls order RPCs. Database command remains authoritative for prices, item eligibility, delivery fees, branch scope and idempotency.
 - Delivery Edge Function: validates rider role/profile and routes presence, offers, push subscriptions and task lifecycle through service RPCs. Preserve strict rider/branch authorization.
 - The map documents source observations and recommendations only. No Production schema, app code, deployed functions, Storage, Vercel config or live app was changed.
-- Next: finalize the ERD and field-level schema design, decide offline POS stale-price handling and publication/price role boundaries, then prepare small migrations for isolated test execution before Production DDL.
+- At this earlier checkpoint, the ERD was still a proposal and publication/price role boundaries were unresolved. The offline POS stale-price decision has since been confirmed and the ERD/map/blueprint were updated.
 
 ### Production ERD and V1 table proposal drafted — 2026-11-20
 
@@ -567,6 +567,15 @@ The user explicitly approved this policy:
 - Supabase Security, Performance and Health advisors each returned zero lints. Since the application schema is not yet present, zero lints must not be represented as proof that the future application has been secured or optimized.
 - The applied migration remains a default privilege hardening base only; new table RLS, grants, function execute rights and policies must be set explicitly in each future migration.
 - No Production tables, rows, roles/users, buckets, functions, secrets, settings, project configuration or app deployments were changed during this audit.
+
+### Security access matrix drafted — 2026-11-20
+
+- Added `docs/architecture/security-access-matrix-v1.md` (commit `7dfece6b9f2770f340e2ff43a4390f04543c2f69`). It distinguishes public customer/guest, authenticated non-staff, owner, admin, manager, cashier, kitchen, rider and server-side service_role. It is a security design proposal, not RLS SQL.
+- Key boundary: a valid Supabase authenticated session is not automatically a Flame Chick staff role. Business authorization must use an active controlled user_roles assignment and branch scope; never user-editable metadata.
+- Proposed access minimum: guests get published catalog projection + rate-limited website-order command only; riders get only their own offers/assignments and the data necessary for those active jobs; kitchen gets minimum order/item data; cashier gets POS/dispatch scope; manager/admin/owner get branch-scoped operational access. Raw mutable catalog rows should not be public.
+- Current-source findings: Admin allows owner/admin/manager; permanent deletes are limited to owner/admin; staff invitations and role activation changes are owner-only in the staff-admin function; order API accepts owner/admin/manager/cashier for staff order creation; kitchen can advance permitted preparation statuses; rider function provides own-job access. Production must formalize these in RLS + grants + server commands, not rely on UI buttons.
+- Important owner decisions remain open: who can publish/rollback, who can change product prices and delivery fees, whether Admin can manage staff roles, cashier order visibility scope, manager financial visibility, and whether multiple branches are active at launch. The matrix marks these as proposals, not silently approved policies.
+- The archived Demo SQL has RLS enabled across its application tables and 108 policies, but also has anonymous SELECT policies on raw public catalog tables. This is a source-level observation, not proof of a leak; Production should return an explicit public catalog projection and must not copy policies mechanically.
 
 ## 11. Implementation roadmap — continue in this order
 
@@ -627,9 +636,11 @@ Stage 1 and Stage 2 are complete. Stage 3 (schema design/security review) is cur
 - `docs/architecture/production-schema-blueprint.md`
 - `docs/architecture/database-application-contract-map.md`
 - `docs/architecture/delivery-pricing-contract.md`
+- `docs/architecture/security-access-matrix-v1.md`
+- `docs/architecture/performance-security-operations-plan.md`
 - `docs/architecture/menu-management-design.md`
 - `docs/architecture/current-menu-baseline.md`
 
-Next work: resolve the remaining publication/price permission boundary, deal component choice rules, schedule recurrence/scope, branch/channel menu differences and Not Listed locality field. Then finish the field-level migration specification and isolated validation plan. The offline stale-catalog policy is resolved. No Production SQL, seeds, secrets, buckets, Functions or app deployments until the exact changes are reviewed and approved.
+Next work: refine the role/data-access matrix with the owner, finalize the field-level table/column/index/constraint specification, and resolve deal component choices, schedule recurrence/scope, branch/channel menu differences and Not Listed locality field. Then prepare migrations and an isolated validation plan. The offline stale-catalog policy is resolved. No Production SQL, seeds, secrets, buckets, Functions or app deployments until the exact changes are reviewed and approved.
 
 **New-chat instruction:** Read this file first, then read `production-erd-v1.md`, `production-schema-blueprint.md`, `delivery-pricing-contract.md`, `database-application-contract-map.md`, and `performance-security-operations-plan.md`. Continue from Stage 3. Offline stale-catalog orders must require explicit cashier/manager confirmation (confirmed owner decision). Do not repeat the original repository/source audit or Production account/migration check unless the repo/project identity changes. Always update this handoff after meaningful work. Keep `main`, the original source repo and all live deployments unchanged until separate approvals.
