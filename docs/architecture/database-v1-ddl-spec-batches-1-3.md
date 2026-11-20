@@ -41,8 +41,9 @@ No Production SQL is permitted without separate explicit approval.
 Create `app_private` owned by `postgres`, with no client role access:
 - Revoke all schema privileges from PUBLIC, anon, authenticated and service_role.
 - Do not grant USAGE to browser roles.
-- Do not expose `app_private` in Supabase API exposed schemas.
+- Do not expose `app_private` in Supabase API exposed schemas. Supabase API exposed-schema configuration is a dashboard/API setting and is not readable from the SQL catalog queries available in this session; record a manual Dashboard check of **Project Settings → API → Exposed schemas** as a pre-migration and post-migration gate. Expected exposed schemas remain the project's intended defaults (currently `public` and `graphql_public`); `app_private` must not be present.
 - Schema owner and object owner must be verified after migration.
+- Explicitly enable RLS on every table created in `app_private` as defense in depth; do not assume the existing `ensure_rls` event trigger covers non-public schemas.
 - Do not place client-facing RPCs in this schema; use narrow public wrappers only where required and grant exact EXECUTE to the intended caller.
 
 ### 3.2 Default privileges for postgres-created private objects
@@ -72,8 +73,8 @@ When later functions need Data API invocation:
 
 - Confirm schema owner = postgres.
 - Confirm anon/authenticated/service_role have no USAGE on app_private.
-- Confirm no app_private relation/function is discoverable through PostgREST.
-- Confirm no table/sequence/function default ACL grants client roles.
+- Confirm `app_private` is absent from Supabase API exposed schemas in Dashboard settings; SQL-only catalog inspection cannot prove this control. Confirm no app_private relation/function is discoverable through PostgREST using an authenticated negative API test once schema exists.
+- Confirm no table/sequence/function/type default ACL grants unintended client roles; test actual effective privileges rather than inspecting ACL text alone.
 - Confirm public wrappers have only intended EXECUTE grants.
 - Confirm newly created objects are owned by postgres and RLS is enabled for any later exposed table.
 - Confirm no app_private object appears in Realtime publication.
