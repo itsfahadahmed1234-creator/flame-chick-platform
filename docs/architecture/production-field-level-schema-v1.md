@@ -307,6 +307,14 @@ Append-only staff identity/role history.
 
 No client INSERT/UPDATE/DELETE. Staff role change and audit insert occur in one transaction.
 
+### Batch 2 exact candidate status (2026-11-20)
+
+The candidate is `docs/drafts/batch2_restaurant_branch_foundation_candidate.sql`; not yet applied. It defines only `public.restaurants` and `public.branches`, with UUID IDs, named constraints, tenant-safe branch uniqueness, RLS enabled, postgres ownership and no direct client/service-role grants or policies. No RPC/view/function/trigger/seed/Auth/Realtime objects.
+
+Both tenant and branch default inactive. Website ordering, delivery and pickup capabilities default false. Currency and IANA timezone are required; trusted provisioning validates canonical currency/timezone. `updated_at` is updated by trusted server-side commands. Branch address and phone remain private. Branch code is 1–32 lowercase ASCII letters/digits with single hyphen/underscore separators and unique within restaurant.
+
+Disposable rollback acceptance passed, including valid insert, fail-closed defaults, invalid slug/currency format/code, FK and duplicate code tests. Post-rollback catalog showed zero Batch 2 tables and zero Realtime entries. Security, Performance and Health Advisors returned zero lints. Separate explicit owner approval is required before applying.
+
 ## 6. Catalog authoring tables
 
 The Admin panel must support future menu changes through data, not schema edits. New category/product/variant/modifier/deal names and labels are not hardcoded in code or database enums.
