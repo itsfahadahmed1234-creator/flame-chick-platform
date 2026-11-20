@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 — source repository hygiene and handoff; review branch only  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 Production migration-history reconciliation is next, subject to verifying the correct Supabase account  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -94,10 +94,14 @@ The root README currently contains an outdated illustrative `docs/legacy-demo/` 
 - Branch: `work/production-source-audit`
 - Created on 2026-11-20 from `main`.
 - Stage 1 changes belong here; `main` remains unchanged.
-- First commit on this branch:
-  - `0da616e0586213990bb43812855875c94d1fd1bd`
-  - Message: `Clean legacy Pizza Bite catalog fallback labels`
-  - File: `apps/flame-chick-website/js/catalog.js`
+- Stage 1 commits on this branch include:
+  - `0da616e0586213990bb43812855875c94d1fd1bd` — clean Pizza Bite catalog fallback labels/cache key.
+  - `50096cf779dfd7b101a9445e42980b208c1f0067` — mark inactive legacy website `js/app.js` explicitly as legacy/inactive.
+  - `4eaa173fea6e4117513ea258c1f98b1f292d8e3a` — document the active storefront scripts and inactive legacy module.
+  - `8d1922b77249cf9d0a250e1cb5be4367314e61f1` — remove the invalid hardcoded POS URL from the Rider account setup message; direct staff to ask the owner/manager for the approved current POS address.
+  - `f6d93ddfa5e8e3b17bae6a7c783ec8ef63817bd8` — route Web Push notification clicks using `FLAME_CHICK_RIDER_PORTAL_URL` rather than a stale hardcoded Rider URL; correct a user-facing HFP error label.
+  - `70313d15953c98f4fd63f752dc72ca200a821852` — document the Rider URL's Web Push use and safe app-scope fallback.
+  - Additional commits added and updated this handoff and the root README; see branch history for exact commit sequence.
 - This commit changes only three legacy fallback strings/values: two Pizza Bite error labels become Flame Chick labels, and the fallback cache key becomes `flame_chick_catalog_v1`. The current Flame Chick config already explicitly sets that same cache key, so the normal configured path is unchanged. No live deployment was triggered.
 
 ### Original source/archive repository
@@ -274,10 +278,16 @@ Historic HFP reference used five Realtime tables (`orders`, `delivery_tasks`, `d
 ### Stage 1 work completed on 2026-11-20
 
 - Created review branch `work/production-source-audit` from `main`.
-- Updated only `apps/flame-chick-website/js/catalog.js` to remove Pizza Bite fallback error wording and use a Flame Chick fallback cache key.
-- This commit is `0da616e0586213990bb43812855875c94d1fd1bd`.
-- Added this handoff document at the repository root as the durable context entry point and linked it from the root README.
-- Corrected the README's illustrative docs tree from the obsolete `legacy-demo/` entry to the actual `operations/` folder.
+- Updated `apps/flame-chick-website/js/catalog.js` to remove Pizza Bite fallback error wording and use the Flame Chick fallback cache key. The current config already sets this same cache key, so the normal configured path is unchanged.
+- Reviewed the website entrypoint: it loads `js/config.js`, `js/catalog.js`, and inline scripts only. It does not load `js/app.js`. Reviewed the website's sibling JS modules and the other three app entrypoints; no active HTML script reference to the legacy website `js/app.js` was found. The file is retained, not deleted, and its header now clearly marks it LEGACY / INACTIVE. Website README documents the actual active runtime and warns not to re-enable the old module without review.
+- The inactive legacy `js/app.js` contains Pizza Bite/HFP-era settings and HFP staging image URLs. It remains in the repo only as historical source pending any future explicit removal decision.
+- Rider app had a hardcoded POS URL `https://flame-chick-pos.vercel.app/` that was not an assigned Vercel domain. Replaced that link with safe owner/manager instructions; no final POS domain was guessed.
+- Delivery API push notifications had a hardcoded Rider URL `https://flame-chick-rider.vercel.app/`, inconsistent with the observed Vercel Rider project domains. It now reads `FLAME_CHICK_RIDER_PORTAL_URL`. If the environment variable is unset, the payload omits the URL and the Rider service worker safely falls back to its own app scope. No Vercel domain or secret was changed.
+- Corrected a user-facing delivery API configuration error label from HFP to Flame Chick. Legacy `hfp_*` RPC names remain untouched because they are database compatibility contracts until reviewed.
+- Updated deployment documentation to explain that `FLAME_CHICK_RIDER_PORTAL_URL` controls staff invitation redirects and Web Push clicks, with a safe service-worker app-scope fallback.
+- Added this handoff document at the repository root as the durable context entry point and linked it from the root README. Corrected the README's illustrative docs tree to the actual `operations/` folder.
+- Branch diff against `main` at the last check: 11 commits ahead, 0 behind. Changed paths are limited to `PROJECT_HANDOFF.md`, root README, website README, website `js/app.js`, website `js/catalog.js`, Rider `index.html`, delivery API, and Production environment docs.
+- Static review was performed through GitHub source reads. No app build, Deno type-check, browser test, or end-to-end test was run because no CI workflow/test harness is configured in this repository and no local project runtime was provisioned. Treat runtime/type validation as pending; do not describe this branch as fully tested.
 - No live deployment was triggered.
 - No Vercel settings/domains/Git connections were changed.
 - No Supabase SQL, migration, function, secret, user, or data was changed.
@@ -329,12 +339,14 @@ Run full end-to-end tests, security checks, rollback rehearsal, and backup resto
 
 ## 12. Immediate next action
 
-Continue Stage 1 on `work/production-source-audit`:
+**Stage 1 source-hygiene review is complete on `work/production-source-audit`.** Do not repeat the same source scans. The remaining Stage 1 limitation is that automated build/type/runtime tests have not been run; add an appropriate CI/test harness later when the app tooling is established, or run checks in a controlled local workspace before merge.
 
-1. Review the diff for commit `0da616e...`.
-2. Check the actual references to `apps/flame-chick-website/js/app.js` (HTML, imports, loaders, tests, service worker, all four app roots). Do not remove it until this is proven safe.
-3. Delivery API inspection confirmed a push-notification URL hardcoded to `https://flame-chick-rider.vercel.app/`, which does not match the currently observed Rider project domains. Inspect the Rider/POS links too, then propose a safe configuration approach. Do not decide the final domain without user confirmation.
-4. Completed: corrected the README directory-tree typo and added a prominent link to this handoff.
-5. Next: run available checks, review the branch diff, and update this handoff with results.
+Proceed to Stage 2 only after checking whether the currently connected Supabase account can see the exact Production project:
+
+1. Read the Supabase skill and inspect connected projects read-only.
+2. Confirm project ref `adkrxfnawdiljhjaavnj`, name Flame Chick Production, Mumbai `ap-south-1`, and Free plan. If it is not visible, stop and ask the user to connect the separate Flame Chick Supabase account. Never substitute HFP or Demo.
+3. If visible, inspect migration history read-only and recover the exact applied migration `20261119125153_flame_chick_postgres_default_privileges_hardening`; compare it byte-for-byte with the expected SQL before adding its matching file to `supabase/migrations/`.
+4. Do not apply/reapply SQL, migrate, deploy functions, create users, seed data, or change settings during this reconciliation stage without separate explicit approval.
+5. Update this handoff with the exact verified account/project, migration history, file/commit changes, and next step.
 
 **New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, then inspect the current branch head and continue the immediate next action above. Do not repeat the entire initial audit. Ask the user only for a decision that genuinely requires their preference or approval.
