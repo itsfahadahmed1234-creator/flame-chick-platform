@@ -1,5 +1,35 @@
 
 
+
+## 2026-11-20 — Batch 2 restaurant/branch foundation review
+
+**Status: design reviewed and tightened; no Batch 2 SQL authored or applied.**
+
+Reviewed the Batch 2 tenant/branch section against the field-level V1 schema and owner-confirmed operating model. Updated `docs/architecture/database-v1-ddl-spec-batches-1-3.md` (commit `a1916ac74c20568a4a967e15d5e2b16f20021449`) with:
+- Strong canonical format and length checks for restaurant slug, name, currency code, branch code and branch name.
+- IANA timezone validation in trusted provisioning logic rather than an unsafe CHECK/subquery.
+- Explicit public-schema RLS and grant boundary: RLS enabled, no direct grants to PUBLIC/anon/authenticated/service_role in this batch; no public discovery RPC/view yet.
+- Server-derived branch eligibility based on active restaurant + active branch + website ordering enabled + requested fulfilment capability.
+- Website branch resolution: zero eligible branches fail closed; one auto-resolves; multiple require customer choice; chosen branch revalidated on catalog/quote/order calls.
+- Operational address/phone excluded from public branch discovery by default.
+- Composite tenant/branch FK rule, RESTRICT history behavior, audited/idempotent provisioning and no seed rows.
+- No implicit delivery fee/Not Listed fee/zero fallback and no branch-specific base prices in V1.
+
+### Batch 2 scope
+Only `public.restaurants` and `public.branches`. No user/staff roles, menu/catalog, delivery areas, orders, RPCs, policies granting client access, functions, seeds, Auth users, Realtime or app deployments in this batch.
+
+### Design review findings / gates before SQL
+1. Confirm the exact branch-code canonicalization (proposed lower-case ASCII letters/numbers/underscore/hyphen, 1–32 chars).
+2. Confirm whether branch name is customer-visible and whether any public address/phone should be returned; current safe default is name only.
+3. Confirm the exact fulfilment-mode vocabulary from the active website/POS contracts before adding any enum/check or RPC.
+4. Confirm no branch-specific base pricing in V1; current approved model in the schema notes is restaurant-wide base prices plus branch availability overlays and branch delivery pricing.
+5. Before a Batch 2 migration, reconcile exact column names/types and FK/index definitions across the DDL spec, field-level spec and source contract; run isolated disposable acceptance probes first.
+6. No Batch 2 production DDL until exact SQL is presented and separately approved.
+
+### Existing handoff correction
+Batch 1 is applied and verified as recorded above. Any earlier pre-apply Batch 1 status text below is historical and superseded; it must not be read as current state.
+
+
 ## 2026-11-20 — Batch 1 permanently applied and verified
 
 ### Applied Production migration
@@ -1264,8 +1294,8 @@ Database-side Batch 1 rollback-only acceptance probe passes. This is not approva
 - If external backup cannot be created, this limitation must be explicitly accepted before the schema-only transactional change. Candidate is intentionally narrow and empty; recovery uses a guarded `DROP SCHEMA ... RESTRICT` only while no objects exist. Never use CASCADE.
 
 ### Current status / next gate
-- No persistent Batch 1 migration applied; no new schema or defaults persisted; no changes to app code, API settings, Auth, Storage, Realtime, Functions, secrets or Vercel.
-- Before execution: open the correct Flamechic organization/project in Dashboard, verify `app_private` is absent from Exposed schemas, establish/export an encrypted schema-only backup if possible, then review and approve candidate SQL. Reconfirm project ref and postgres identity immediately before apply.
+- Historical pre-apply status (superseded): Batch 1 has since been applied and verified as recorded at the top of this handoff. Do not treat this earlier checkpoint as current.
+- Historical pre-apply gate (superseded): the user later confirmed Exposed schemas are exactly `graph_ql` and `public`, approved applying Batch 1 without an external dump, and Batch 1 was applied and verified.
 
 
 ## 2026-11-20 — User-confirmed API exposed schemas and exact candidate rollback
