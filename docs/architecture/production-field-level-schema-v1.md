@@ -113,6 +113,15 @@ Never assume service_role automatically has table or function privileges after t
 
 ## 5. Tenant, branch and identity tables
 
+### Batch 2 owner-confirmed refinements (2026-11-20)
+
+- Branch code is lower-case ASCII letters, digits, underscore or hyphen, 1–32 characters, unique per restaurant (examples: `main`, `gulberg`, `dha-01`).
+- Branch `name` is customer-facing and may be returned in a future allowlisted discovery response.
+- Branch `address` and `phone` remain private and are excluded from public discovery by default.
+- V1 base menu/product prices are restaurant-wide and identical across branches. Branch-specific availability and delivery fees are allowed; branch-specific base prices are not.
+- Website branch resolution is fail-closed: no eligible branch means no order; one eligible branch is auto-selected; multiple eligible branches require customer selection. The server revalidates the selected branch on each relevant command.
+- These owner decisions do not authorize DDL. Exact fulfilment-mode vocabulary must still be reconciled against active app contracts before SQL is authored.
+
 ### 5.1 restaurants
 
 One row is provisioned for the Flame Chick tenant. This schema is tenant-safe but does not imply a multi-brand SaaS product.
