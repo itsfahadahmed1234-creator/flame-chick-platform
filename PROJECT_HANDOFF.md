@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema contract analysis in progress  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security contract analysis in progress; catalog design awaits the new menu specification  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -352,6 +352,40 @@ Read the four Production Edge Function source files on `work/production-source-a
 3. Produce a reviewed schema/migration plan and migration dependency order in docs before any DDL is applied.
 4. Do not apply SQL, deploy functions, create users, seed menu data, or change Production settings until the design and the specific first migration batch are reviewed and explicitly approved.
 
+
+## Production engineering quality bar — user requirement (2026-11-20)
+
+The user explicitly requires a secure, reliable, maintainable database designed to run for years without avoidable data loss, leaks, damage, or operational failure. The implementation must prioritize security, correctness, resilience, recoverability, and compatibility with the NEW Flame Chick menu planned for launch in the coming weeks. Do not rush schema creation or copy the Demo schema blindly.
+
+### Menu information gate
+
+- The new launch menu specification has **not yet been supplied**.
+- Known historical Demo context (five categories, about 24 regular products/variants plus a Platter Deal) is not an authoritative specification for the new menu. Do not assume its categories, product set, modifier structure, deal logic, pricing, or media are unchanged.
+- Before finalizing catalog schema details, seed shape, modifier/deal modelling, import/migration, or catalog API contracts, ask the user to provide the latest menu file/export (spreadsheet, PDF, document, images, or unfinished draft). Accept partial/in-progress material and map uncertain fields explicitly rather than inventing values.
+- Continue independent platform/security analysis while waiting, but do not finalize catalog DDL or create menu seed data until the new menu is reviewed.
+
+### Mandatory database/security/reliability design checklist
+
+1. **Tenant and branch isolation:** every business record must be scoped to the Flame Chick restaurant and relevant branch where applicable. Enforce relationships with foreign keys/composite constraints and server-side authorization; never trust client-supplied restaurant, branch, role, user, fee, amount, or status values.
+2. **Default-deny access:** enable RLS on every exposed application table. Keep internal/private tables and sensitive helper functions outside exposed schemas. Define narrow role-specific policies and grants; authenticated alone is not authorization. Use app-controlled authorization sources, not user-editable auth metadata.
+3. **RPC/function hardening:** review every API/RPC for authentication, role/branch scoping, input validation, idempotency, bounded payloads, safe errors, rate limits, replay protection for webhooks, and least privilege. Avoid unnecessary SECURITY DEFINER; where essential, constrain search_path, ownership, execution grants, and authorization checks. Do not expose privileged keys.
+4. **Data-leak resistance:** prevent cross-branch/tenant IDOR, enumerate/list leaks, verbose database errors, private customer address/phone exposure, staff/rider data leakage, public Storage listing, insecure object paths, and accidental secrets in logs. Use field minimization, explicit public catalog allowlists, safe response DTOs, and private Storage by default unless public product media is intentionally published.
+5. **Order and financial correctness:** store immutable order/item/price/modifier/deal/delivery-fee snapshots so menu edits never rewrite past orders. Use numeric money types, currency rules, database constraints, server-calculated totals, idempotency keys, transactions, and explicit state-transition rules. Never rely on browser-calculated totals.
+6. **Menu evolution:** support categories/subcategories, products, variants/sizes, modifiers and pricing rules, deals/bundles/components, drink options/add-ons, availability/schedule, media, Urdu/English fields, sort/display rules, and versioned publication only where the actual new menu requires them. Prefer a normalized source of truth plus an atomic/versioned published catalog snapshot so partially updated menus are not served. Confirm actual menu requirements before locking this model.
+7. **Delivery and pricing correctness:** unset/unknown delivery fees must remain unknown, not default to zero. Snapshot the fee and area at checkout. Validate delivery area, branch, fee, and fulfillment server-side. Never inherit Demo zero-fee behavior.
+8. **Auditing and accountability:** record security-sensitive staff/role/configuration changes and order/delivery state transitions with actor, timestamp, reason, and minimal safe metadata. Restrict audit reads and prevent ordinary app clients from rewriting history.
+9. **Operational reliability:** use explicit constraints, indexes aligned with real queries, lock/transaction strategy, bounded retries, timeouts, health checks, structured redacted logs, monitoring, and safe failure behavior. Avoid unbounded Realtime subscriptions; retain the agreed targeted POS/Rider subscriptions and 15-second POS polling fallback.
+10. **Backups and recovery:** define encrypted database and Storage backups, retention, integrity checks, restore drills, and a documented recovery runbook. Verify actual Free-plan backup/retention limitations; external backups do not guarantee zero downtime or prevent an inactive project from pausing. Test restores rather than only checking that backup files exist.
+11. **Migration safety:** small ordered migrations, reviewable diff, preflight checks, stable migration history, forward-fix/rollback strategy where feasible, backups before risky changes, and post-migration verification. Never edit/reapply an already-applied migration. Test schema changes in an isolated non-production environment before Production application.
+12. **Long-term maintainability:** document invariants, role matrix, data lifecycle/retention, operational procedures, ownership of secrets, key rotation, and dependency/version strategy. Design for evolving menu and operational workflows without prematurely overgeneralizing.
+
+### Current decision / next action
+
+- Do not apply Production DDL or seed data yet.
+- Ask for the latest new-menu material. After receiving it, inventory products/categories/variants/modifiers/deals/fees/availability/media/languages and flag unclear items for the user.
+- In parallel, continue documenting API-to-database contracts and security boundaries without changing Production.
+- The user expects this handoff to be updated after every meaningful project step. Update it with menu source/version, design decisions, migrations, commits, tests, risks, and precise next action.
+
 ## 11. Implementation roadmap — continue in this order
 
 ### Stage 1 — Source hygiene and durable handoff (current)
@@ -398,4 +432,4 @@ Run full end-to-end tests, security checks, rollback rehearsal, and backup resto
 
 **Stage 2 is complete:** the Flamechic organization and exact Production project `adkrxfnawdiljhjaavnj` are visible and verified. The one applied migration was read from live migration history and its exact SQL has been added to the working branch as a historical migration file. It must not be reapplied. Production currently has no application schema, users, buckets, or Edge Functions. Continue with Stage 3 schema design/review; keep Production unchanged until the migration plan and each DDL batch are explicitly approved.
 
-**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, inspect the current branch head, and continue Stage 3 from the recorded API/database contract analysis. Complete the contract map and draft the Production schema/migration design. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
+**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, inspect the current branch head, and continue Stage 3 from the recorded API/database contract analysis and security/reliability quality bar. The user must provide the new menu specification before catalog schema/seed design is finalized. Continue non-menu security/contract analysis meanwhile. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
