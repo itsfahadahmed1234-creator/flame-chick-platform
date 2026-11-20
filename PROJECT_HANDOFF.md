@@ -857,3 +857,26 @@ These are design and documentation updates only. The source audit was read-only;
 ### Next design/implementation gate
 
 Finish field/status compatibility and decide the remaining business details. Then prepare a migration-specific RLS/grant inventory and SQL only for an isolated test database. No Production SQL, RLS, grants, Edge Function changes or deployments are authorized yet.
+
+
+## 2026-11-20 — Customer website security threat model added
+
+User clarified that security review must not blindly enforce only previously stated preferences or ignore additional risks. Treat security as a system-wide, defense-in-depth objective: the owner's requirements are constraints and business decisions, not a complete threat model. Independently identify threats, make security recommendations, explain trade-offs, and verify controls before claiming the website is secure. No "fully secure" guarantee.
+
+New canonical document:
+- \`docs/architecture/website-security-threat-model-v1.md\`
+
+This document establishes a customer-website threat model covering assets and trust boundaries; public API validation; secret leakage; broken access control/IDOR; source and role spoofing; server-side price/fee validation; replay/idempotency; bot/volumetric abuse; SQL/HTML injection and XSS; CSRF/CORS; order enumeration; PII/log leakage; Storage abuse; webhook replay (future); dependency/deployment risks; database resource exhaustion; availability/backup/restore; audit integrity; security headers/CSP; release gates and tests.
+
+Important distinctions:
+- Existing owner-approved website-only quotas remain 3/minute, 3/10 minutes, 15/hour per normalized submitted phone; POS remains exempt. These controls do not prevent Edge Function invocation exhaustion or verify phone ownership.
+- Evaluate trustworthy IP signals carefully; do not trust client-supplied X-Forwarded-For. Consider managed challenge only if measured abuse justifies friction/dependency/cost.
+- Public site should expose published catalog only, never raw customer orders or order history. Any future customer tracking endpoint requires separate high-entropy expiring capability design.
+- All prices, discounts, delivery fees, availability and state transitions must be computed/validated server-side. No browser-supplied actor, role, branch or source authority.
+- Add/verify CSP, HSTS (after domain/HTTPS checks), nosniff, Referrer-Policy, Permissions-Policy, frame policy, exact CORS allowlists, cache isolation and source-map hygiene.
+- Audit third-party scripts, dependencies, secrets, build artifacts, Git/Vercel permissions and deployed headers.
+- No Redis/Upstash/OTP/SMS/WAF/Turnstile or other paid/dependency addition is assumed; assess cost and evidence first.
+- Threat model is design only, not evidence the controls currently exist. Actual live headers, dependency/XSS audit, route security tests, isolated implementation and release testing remain outstanding.
+- No live application, Production database, Supabase function/Storage policy/secret, Vercel setting, header, domain or deployment was changed. Work remains confined to documentation on \`work/production-source-audit\`.
+
+Next recommended work: perform a focused source-level review of the customer website and public Order API for XSS sinks, unsafe DOM rendering, third-party scripts, exposed config/secrets, PII leakage, CORS/input/body bounds and cache behavior; then inspect deployed response headers and build artifacts. Keep Production read-only and do not implement or deploy changes without explicit approval.
