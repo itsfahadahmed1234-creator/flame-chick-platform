@@ -41,7 +41,7 @@ No Production SQL is permitted without separate explicit approval.
 Create `app_private` owned by `postgres`, with no client role access:
 - Revoke all schema privileges from PUBLIC, anon, authenticated and service_role.
 - Do not grant USAGE to browser roles.
-- Do not expose `app_private` in Supabase API exposed schemas. Supabase API exposed-schema configuration is a dashboard/API setting and is not readable from the SQL catalog queries available in this session; record a manual Dashboard check of **Project Settings → API → Exposed schemas** as a pre-migration and post-migration gate. Expected exposed schemas remain the project's intended defaults (currently `public` and `graphql_public`); `app_private` must not be present.
+- Do not expose `app_private` in Supabase API exposed schemas. Supabase API exposed-schema configuration is a dashboard/API setting and is not readable from the SQL catalog queries available in this session; record a manual Dashboard check of **Project Settings → API → Exposed schemas** as a pre-migration and post-migration gate. User-confirmed exposed schemas are exactly `graph_ql` and `public`; `app_private` must not be present.
 - Schema owner and object owner must be verified after migration.
 - Explicitly enable RLS on every table created in `app_private` as defense in depth; do not assume the existing `ensure_rls` event trigger covers non-public schemas.
 - Do not place client-facing RPCs in this schema; use narrow public wrappers only where required and grant exact EXECUTE to the intended caller.
@@ -279,3 +279,8 @@ Rules:
 
 No menu/catalog/order/payment/delivery/pin tables; no Edge Functions; no Auth invites sent; no customer/staff accounts created; no Storage buckets/policies; no Realtime publication; no production settings or deployment. Those belong to later reviewed batches.
 
+
+
+### Batch 1 deployment record (2026-11-20)
+
+Batch 1 was applied as migration `20261120154413_batch1_private_schema_bootstrap` after explicit user approval. The canonical SQL is in `supabase/migrations/20261120154413_batch1_private_schema_bootstrap.sql`. Production verification confirmed owner postgres, no PUBLIC/anon/authenticated/service_role schema USAGE, no app objects, no Realtime membership and no global postgres default ACL changes. A rollback-only effective privilege test for a disposable table/sequence/function/type passed and left no objects behind. Advisors: zero security, performance and health lints. Dashboard exposed schemas were user-confirmed as `graph_ql` and `public`; app_private absent. PostgREST negative API request still pending.
