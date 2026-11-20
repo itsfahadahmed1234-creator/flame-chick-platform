@@ -1077,3 +1077,16 @@ The current execution environment did not expose a local Supabase CLI, Docker or
 
 ### Next action
 Before turning this specification into SQL migrations, establish a verified isolated local/test database and prove migrations run as `postgres`, not `supabase_admin`. Then implement/test Batch 1 first, inspect object ownership/default ACL/RLS/grants, and continue to Batches 2–3 only after passing. Website audit remains deferred until immediately before website/database integration.
+
+
+
+## 2026-11-20 — Owner confirmed migration execution-role safeguard
+
+The owner agreed to the following mandatory rule for all Flame Chick application migrations:
+- Run migrations using the normal `postgres` migration owner role.
+- Never create Flame Chick application objects as internal `supabase_admin`.
+- After every migration, verify object ownership, RLS enabled state for exposed tables, table/schema grants, function EXECUTE ACLs and default ACL behavior.
+- If the migration session role cannot be proven to be `postgres`, stop before applying SQL.
+- Do not attempt unsupported changes to Supabase-managed internal `supabase_admin` defaults.
+
+This is an owner-confirmed safety gate, not an instruction to change Production. Production remains read-only unless separately approved.
