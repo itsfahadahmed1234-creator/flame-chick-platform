@@ -1047,3 +1047,14 @@ Read-only queries and advisors only. No SQL writes, migrations, Production setti
 - Production remains read-only; zero advisor lints are not proof of future schema security.
 - Next: prepare the exact DDL/constraint/index/trigger/function/grant specification for private schema, tenant/branch foundation and role identity. Before isolated testing, confirm the local/test environment and verify migration execution role. No Production SQL without separate explicit approval.
 
+
+
+### Follow-up consistency corrections and latest verification
+
+- Application/database contract map updated to remove resolved business questions from its open list and align branch catalog/role/payment decisions — commit `bf5e50e6299cb865d83ddb648ade8fc7e8bf3398`.
+- Field-level schema restored explicit cross-links/reminders for the website-only quota, universal Website/POS idempotency and static drop-off pin after the V1 open-decision section — commit `f9f717046dd02cfc9f00010f8ac85f11ca8202fc`.
+- Migration-readiness report appended with actual Batch 0 read-only Production findings and the internal `supabase_admin` default-ACL caveat — commit `348041f9df6a48d334f00c8cc6f658c3b1377bb1`.
+- Latest readiness report path: `docs/architecture/database-v1-migration-readiness-review.md`.
+- Latest handoff commit after recording Batch 0: `ba0ad951b68f41dfc8054d26f1a807671c386b30`.
+
+The nine principal schema/readiness/location/handoff documents were fetched again after edits. Core branch/role/payment/pin decisions and Batch 0 findings were verified. Some simple keyword checks were inconclusive because headings/phrasing differ; content was inspected directly where needed. No SQL writes were made.
