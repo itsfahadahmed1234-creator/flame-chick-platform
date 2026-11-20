@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security, menu requirements, Production schema/reliability blueprint, delivery pricing contract, cross-application contract map and V1 ERD drafted; GST deliberately deferred; remaining schema decisions and field-level migration specification next  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security, menu requirements, Production schema/reliability blueprint, delivery pricing contract, cross-application contract map and V1 ERD drafted; GST deliberately deferred; offline stale-price decision confirmed; remaining schema decisions and field-level migration specification next  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -531,6 +531,41 @@ The user confirmed the Production delivery-fee behavior:
 - Do not depend on rls_auto_enable to secure new tables; explicitly ENABLE ROW LEVEL SECURITY and verify it from PostgreSQL catalogs.
 - Test both SQL grants and RLS using anon, authenticated role variants and service_role; server-side functions must still authorize actor, tenant and branch even when using service_role.
 
+### Owner decision — offline POS stale-catalog orders require explicit confirmation — 2026-11-20
+
+The user explicitly approved this policy:
+- Every locally created offline POS delivery order must retain the catalog publication/version used when it was built.
+- On reconnect, the server compares that version and the server-calculated price/availability with the current published catalog.
+- If the version is stale and the charge/availability would change, the server must HOLD the order and return a stable conflict such as `CATALOG_VERSION_STALE`; it must not silently reprice or create a normal submitted order.
+- POS keeps the local order and retry queue record, marks it `needs_confirmation`, and presents the old quote versus the current server quote.
+- An authenticated cashier/manager must explicitly confirm the changed total before resubmission. Cancellation or editing remains available. The confirmed submission uses a new idempotency key tied to the confirmed request/version so the original failed/held attempt cannot be mistaken for a successful order.
+- Record the actor, old/new publication versions, old/new totals and confirmation time in an audit event. Do not let an untrusted browser claim that a different user approved it.
+- This is a confirmed owner policy, not merely a recommendation. Implement it in the POS local-order state machine, Order API contract and database order RPC in a coordinated schema-versioned change.
+
+### Security, performance and Free-plan guidance reviewed — 2026-11-20
+
+- Added `docs/architecture/performance-security-operations-plan.md` (commit `34a6255e214bf9a3958a31894af235b765fac21e`, subsequently corrected and expanded in commit `aaee2e0ad33ae7fcdcb4bc37f73fd609de5196d5`). This compares the user's pasted security/performance advice with current Flame Chick source and current official Supabase documentation.
+- Useful guidance retained: RLS + grants; role/branch authorization; no secret/service_role in browser; server-side price/fee computation; isolated staging; encrypted DB and Storage backups; query-specific indexes; server-side pagination; bounded/filter Realtime; menu/media caching; responsive WebP images; redacted error telemetry.
+- The generic index SQL from the conversation is NOT to be copied. Flame Chick uses `branch_id`, `placed_at`, task/offer/assignment relations rather than assuming `rider_id` on orders. Candidate composite/partial indexes must be checked with actual query plans and RLS filters.
+- Workload context recorded: Free plan, approximately 100–150 orders/day, 3–4 months of live operational history, one POS, one Admin and 8–10 riders. Approximate order count is 9,000–18,000 over 90–120 days. This does not guarantee DB size; item/modifier/component/audit/index/snapshot overhead must be measured.
+- Official Free quotas checked 2026-11-20: 500 MB database/project; 1 GB Storage; 5 GB uncached and 5 GB cached bandwidth; 500,000 Edge Function invocations; 2 million Realtime messages/month; 200 peak Realtime connections; 100 Realtime messages/second; 100 channel joins/second; up to 100 channels per connection. Free plan permits two projects across organizations where user is owner/admin; inactive projects may be paused after about 7 days of low user DB activity, with a 90-day restore window. Re-check limits before launch.
+- Corrected an earlier unverified claim: this plan no longer asserts a fixed one-day log retention period. Verify current Dashboard log retention for the project and do not rely on Dashboard logs as durable audit history.
+- Current source review: website has a version-aware localStorage catalog cache; POS stores catalog in IndexedDB and queues offline delivery orders; POS Realtime cleanup removes channels; Rider Realtime is rider-filtered and cleanup disconnects; Admin currently loads up to 1,000 orders at boot and should move to server-side pagination; POS Realtime does not branch-filter delivery_task_offers/assignments; POS catalog refresh currently clears live local stores before writing a new version; current catalog/order adapters coerce missing prices/fees to zero in places.
+- Existing POS Realtime should be branch-filtered for offers/assignments. Keep one POS live channel while signed in and Rider channels only while rider is online/accepting jobs. Keep 15-second POS polling fallback; no broad Realtime for customer website or Order History.
+- Current browser apps call Supabase Data API/PostgREST. The generic instruction to put these existing calls behind Supavisor is not applicable. Supavisor transaction mode is relevant only if future Edge Functions open direct PostgreSQL connections. Use direct connection for migrations/pg_dump where supported.
+- Backups: Free plan has no automated downloadable daily DB backups. DB backup exports do not include Storage objects; back up Storage separately. Encrypted off-site DB+Storage exports and verified restore drills remain mandatory. A staging project consumes one of the two Free project slots; use an isolated project only after confirming capacity, or a local Supabase stack. Do not include Production customer PII in test data unnecessarily.
+- Important RLS claim distinction: the archived Demo SQL enables RLS across its application tables and defines 108 policies, but also permits anonymous SELECT on a set of raw public catalog tables. This may be intentional for public catalog data, but it is broader than a narrow published-catalog API and must not be copied blindly. The Admin browser app directly performs PostgREST CRUD, so its protection depends on actual grants and row/role policies, not just frontend login.
+- User's security statements (RLS, Supabase Auth and server-side pricing) are treated as context, not a substitute for verification. The live Production check below is the source of truth for the current Production project state.
+
+### Live Production state rechecked — 2026-11-20 (read-only)
+
+- Connected Supabase list still returns only the `Flame Chick Production` project, ref `adkrxfnawdiljhjaavnj`, organization `ydlbinhyoutdqueilxnd`, Mumbai `ap-south-1`, Free, status `ACTIVE_HEALTHY`, PostgreSQL `17.12.0.000`.
+- Exactly one application migration remains recorded: `20261119125153_flame_chick_postgres_default_privileges_hardening`.
+- Read-only list across all non-system schemas shows no application tables in `public` or `private`; `auth.users` is empty; `storage.buckets` is empty. Production has no deployed app Edge Functions at the previous function-list check.
+- Supabase Security, Performance and Health advisors each returned zero lints. Since the application schema is not yet present, zero lints must not be represented as proof that the future application has been secured or optimized.
+- The applied migration remains a default privilege hardening base only; new table RLS, grants, function execute rights and policies must be set explicitly in each future migration.
+- No Production tables, rows, roles/users, buckets, functions, secrets, settings, project configuration or app deployments were changed during this audit.
+
 ## 11. Implementation roadmap — continue in this order
 
 ### Stage 1 — Source hygiene and durable handoff (COMPLETE)
@@ -595,4 +630,4 @@ Stage 1 and Stage 2 are complete. Stage 3 (schema design/security review) is cur
 
 Next work: resolve the offline POS stale-catalog price policy and the publication/price permission boundary; then produce the field-level migration specification and isolated validation plan. No Production SQL, seeds, secrets, buckets, Functions or app deployments until the exact changes are reviewed and approved.
 
-**New-chat instruction:** Read this file first, then read the listed design artifacts. Continue from Stage 3 and the exact next action above. Do not repeat the original repository/source audit or Production account/migration check unless the repo/project identity changes. Always update this handoff after meaningful work. Keep `main`, the original source repo and all live deployments unchanged until separate approvals.
+**New-chat instruction:** Read this file first, then read `production-erd-v1.md`, `production-schema-blueprint.md`, `delivery-pricing-contract.md`, `database-application-contract-map.md`, and `performance-security-operations-plan.md`. Continue from Stage 3. Offline stale-catalog orders must require explicit cashier/manager confirmation (confirmed owner decision). Do not repeat the original repository/source audit or Production account/migration check unless the repo/project identity changes. Always update this handoff after meaningful work. Keep `main`, the original source repo and all live deployments unchanged until separate approvals.
