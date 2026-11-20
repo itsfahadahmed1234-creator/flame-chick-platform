@@ -4,7 +4,7 @@
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
-**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security, menu requirements, Production schema/reliability blueprint, detailed delivery pricing contract and cross-application contract map drafted; GST deliberately deferred; ERD/field-level schema and remaining decisions next  
+**Current stage:** Stage 1 source hygiene complete; Stage 2 Production account verified and applied baseline reconciled; Stage 3 schema/security, menu requirements, Production schema/reliability blueprint, delivery pricing contract, cross-application contract map and V1 ERD drafted; GST deliberately deferred; remaining schema decisions and field-level migration specification next  
 **Live customer website:** https://flame-chick.vercel.app/
 
 > **Start here in every new ChatGPT conversation.** Read this file first and continue from the recorded state. Do not restart a broad repository scan or ask the user to repeat facts already recorded here. Verify only the specific live state or files needed for the next action, because remote services can change after this handoff was written.
@@ -509,6 +509,19 @@ The user confirmed the Production delivery-fee behavior:
 - The map documents source observations and recommendations only. No Production schema, app code, deployed functions, Storage, Vercel config or live app was changed.
 - Next: finalize the ERD and field-level schema design, decide offline POS stale-price handling and publication/price role boundaries, then prepare small migrations for isolated test execution before Production DDL.
 
+### Production ERD and V1 table proposal drafted — 2026-11-20
+
+- Added `docs/architecture/production-erd-v1.md` (commit `c09989ccff7ea6d5bfab98c15a8e155f7078d295`). This is a conceptual ERD/table proposal only, not SQL and not permission to apply DDL.
+- Core domains: restaurants/branches and roles; categories/products/variants; modifier groups/options/variant pricing; deals/components/choice lists/schedules; immutable menu publications/current pointer/audit; branch-scoped delivery areas/default fee; orders/items/modifiers/components/payments/status history; delivery tasks/offers/assignments/rider profiles; private push/outbox/rate-limit records only where required.
+- V1 order financial scope deliberately excludes GST/tax and focuses on item price, subtotal, delivery fee and total, plus existing payment fields required by POS.
+- No ingredient inventory or unconfirmed optional operations tables are assumed. POS resources such as registers/tables/cash movements are included only where active app workflows require them.
+- ERD uses branch-scoped delivery area/configuration, but restaurant-wide catalog products/prices initially. Branch-specific product pricing is not added unless confirmed as a V1 requirement.
+- Proposed publication uses one JSONB immutable snapshot initially; no chunking until payload-size/performance tests justify it. Public catalog health must read the true publication pointer, not infer publication from active item count.
+- Recommended stale offline POS policy in the ERD is fail/hold sync with a stable CATALOG_VERSION_STALE response and explicit cashier/manager price confirmation. This remains pending owner approval; no silent repricing.
+- Remaining schema decisions: Not Listed locality/mohalla field requirement; publish/price permission roles; deal choice pool rules; recurring schedule scope; whether branch-specific catalog pricing/availability is required; whether inventory is needed in V1.
+- Production remains read-only. No DDL, seeds, app changes or deployments were made.
+- Next: resolve only the decisions that materially affect table shape, then produce the field-level migration specification and test it on an isolated disposable Supabase project before requesting approval for Production DDL.
+
 ## 11. Implementation roadmap — continue in this order
 
 ### Stage 1 — Source hygiene and durable handoff (current)
@@ -555,4 +568,4 @@ Run full end-to-end tests, security checks, rollback rehearsal, and backup resto
 
 **Stage 2 is complete:** the Flamechic organization and exact Production project `adkrxfnawdiljhjaavnj` are visible and verified. The one applied migration was read from live migration history and its exact SQL has been added to the working branch as a historical migration file. It must not be reapplied. Production currently has no application schema, users, buckets, or Edge Functions. Continue with Stage 3 schema design/review; keep Production unchanged until the migration plan and each DDL batch are explicitly approved.
 
-**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, `docs/architecture/menu-management-design.md`, `docs/architecture/current-menu-baseline.md`, and `docs/architecture/production-schema-blueprint.md`; inspect the current branch head and continue Stage 3 with API/column/RPC contract mapping, delivery-fee enforcement and remaining open decision resolution. Do not repeat completed repository/Production-account audits unless identity changes. Production remains read-only until migration batches have been tested and explicitly approved. The reference image is not content to publish. Design routine menu authoring in Admin so future menu changes do not require DDL. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
+**New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, `docs/architecture/menu-management-design.md`, `docs/architecture/current-menu-baseline.md`, and `docs/architecture/production-schema-blueprint.md`; inspect the current branch head and continue Stage 3 from production-erd-v1.md: resolve the remaining schema decisions, then prepare a field-level migration spec and isolated test plan. Do not restart completed source/account audits. Do not repeat completed repository/Production-account audits unless identity changes. Production remains read-only until migration batches have been tested and explicitly approved. The reference image is not content to publish. Design routine menu authoring in Admin so future menu changes do not require DDL. Do not repeat the initial repository audit or Stage 2 account check unless project identity changes. Keep Production read-only until a concrete schema plan and DDL batch are reviewed and explicitly approved.
