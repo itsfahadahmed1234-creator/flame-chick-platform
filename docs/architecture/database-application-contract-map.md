@@ -135,7 +135,7 @@ It is not a final SQL schema. All identifiers and API request fields must be che
 
 ## 6. Open design dependencies (do not guess)
 
-- Offline POS stale-price policy: hold for cashier confirmation if catalog version changed, or honor the retained old publication. Do not silently reprice.
+- **RESOLVED by owner:** stale offline POS orders that would change price/availability are held with CATALOG_VERSION_STALE and require explicit authenticated cashier/manager confirmation before resubmission. No silent repricing; audit the confirmation. Detailed implementation requirements are in performance-security-operations-plan.md.
 - Whether Not Listed needs a separate required locality/mohalla input in addition to the full address; the user has confirmed the fee behavior, not this extra field.
 - Whether menu visibility/price differs by branch or channel in the first release.
 - Whether deals need curated choice lists, category/subcategory pools, substitutions and surcharges.
@@ -149,4 +149,4 @@ It is not a final SQL schema. All identifiers and API request fields must be che
 - It records current source behavior and proposed Production changes; it does not claim these changes are deployed.
 - The current production Supabase project was previously inspected read-only and had no application business schema, users, buckets or Edge Functions, apart from its already-applied security baseline migration.
 - No Production database, functions, secrets, Storage, Vercel configuration or live deployment has been changed while preparing this map.
-- Next: finalize the ERD and field-level schema, resolve the stale-offline-price policy and role/publication boundaries, then prepare small SQL migrations for isolated testing before any Production DDL.
+- Next: refine remaining role/publication/deal/schedule/branch-scope decisions, then prepare a field-level schema specification and isolated migration test plan. The stale-offline-price policy is already confirmed.
