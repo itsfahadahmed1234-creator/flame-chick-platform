@@ -276,7 +276,8 @@ Historic HFP reference used five Realtime tables (`orders`, `delivery_tasks`, `d
 - Created review branch `work/production-source-audit` from `main`.
 - Updated only `apps/flame-chick-website/js/catalog.js` to remove Pizza Bite fallback error wording and use a Flame Chick fallback cache key.
 - This commit is `0da616e0586213990bb43812855875c94d1fd1bd`.
-- This handoff document is being added at the repository root as the durable context entry point.
+- Added this handoff document at the repository root as the durable context entry point and linked it from the root README.
+- Corrected the README's illustrative docs tree from the obsolete `legacy-demo/` entry to the actual `operations/` folder.
 - No live deployment was triggered.
 - No Vercel settings/domains/Git connections were changed.
 - No Supabase SQL, migration, function, secret, user, or data was changed.
@@ -331,7 +332,7 @@ Continue Stage 1 on `work/production-source-audit`:
 1. Review the diff for commit `0da616e...`.
 2. Check the actual references to `apps/flame-chick-website/js/app.js` (HTML, imports, loaders, tests, service worker, all four app roots). Do not remove it until this is proven safe.
 3. Inspect the delivery API's Rider portal link and Rider/POS links; document exact references and propose a safe configuration approach. Do not decide the final domain without user confirmation.
-4. Correct the README directory-tree typo and add a link to this handoff.
-5. Run available checks and update this handoff with results.
+4. Completed: corrected the README directory-tree typo and added a prominent link to this handoff.
+5. Next: run available checks, review the branch diff, and update this handoff with results.
 
 **New-chat instruction:** Start by reading `PROJECT_HANDOFF.md`, then inspect the current branch head and continue the immediate next action above. Do not repeat the entire initial audit. Ask the user only for a decision that genuinely requires their preference or approval.
