@@ -93,7 +93,7 @@ These caps apply only to `source=website`; POS, POS delivery and authenticated s
 
 ### Exact counting semantics
 
-Count successful, newly committed website orders only, not failed attempts:
+Count successful, newly committed customer website orders only, not failed attempts. POS and staff-entered sources are exempt from this quota but must still be idempotent:
 - A new order consumes one slot only when the order and its rate-limit event commit in the same database transaction.
 - Invalid JSON, invalid phone, invalid cart, unavailable product, failed price/area validation or any rolled-back order does not consume the customer-order quota.
 - A retry with the same idempotency key and the same canonical request returns the already-created order and does not count again.
@@ -122,7 +122,7 @@ Count successful, newly committed website orders only, not failed attempts:
 
 ### Suggested private event table
 
-app_private.customer_order_rate_limit_events:
+app_private.website_order_rate_limit_events:
 - order_id uuid PRIMARY KEY / UNIQUE FK to the committed order
 - restaurant_id uuid NOT NULL
 - branch_id uuid NOT NULL
@@ -295,3 +295,9 @@ No code currently proves the owner-confirmed stale POS price hold is implemented
 This is a source audit and design update. The archived Demo SQL was read for reference only. No Production SQL, application source code, migrations, Supabase project settings/secrets, deployed Edge Functions, Storage objects, Auth users, Vercel project or live deployment were modified.
 
 The source mismatches listed above must be reconciled before initial Production migration and Preview rollout. The exact ordering caps are approved by the owner; rate-limit enforcement has not been deployed to Production by this audit.
+
+
+### Universal order idempotency across Website and POS
+
+The website phone quota is source-specific; order idempotency is not. Website and POS must both use stable idempotency keys, server-generated canonical request fingerprints, a database unique constraint scoped by restaurant/branch/source/key, and transaction-safe replay handling. Website preserves its pending key/payload in sessionStorage. POS preserves the key derived from localOrderId through retry/reload/offline recovery. Same key + same canonical request returns the existing order without repeating child writes or side effects; same key + changed request returns 409. POS, including POS delivery, bypasses the website phone quota entirely while keeping all idempotency and database integrity controls.
+
