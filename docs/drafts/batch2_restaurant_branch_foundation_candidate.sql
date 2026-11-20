@@ -60,9 +60,9 @@ CREATE TABLE public.restaurants (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   name text NOT NULL,
   slug text NOT NULL,
-  currency_code text NOT NULL DEFAULT 'PKR',
-  timezone text NOT NULL DEFAULT 'Asia/Karachi',
-  is_active boolean NOT NULL DEFAULT true,
+  currency_code text NOT NULL,
+  timezone text NOT NULL,
+  is_active boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
   updated_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
 
@@ -82,7 +82,9 @@ CREATE TABLE public.restaurants (
 COMMENT ON TABLE public.restaurants IS
   'Flame Chick restaurant tenant identity. Provision through an audited server-side command; no client table access.';
 COMMENT ON COLUMN public.restaurants.timezone IS
-  'IANA timezone. Validate against pg_timezone_names in trusted provisioning logic; a CHECK constraint cannot safely query that catalog.';
+  'Required IANA timezone. Validate against pg_timezone_names in trusted provisioning logic; a CHECK constraint cannot safely query that catalog.';
+COMMENT ON COLUMN public.restaurants.updated_at IS
+  'Maintained by trusted server-side provisioning/administration commands in this batch; do not allow client writes.';
 COMMENT ON COLUMN public.restaurants.currency_code IS
   'Three-letter uppercase currency code. Trusted provisioning validates the supported ISO-4217 code.';
 
@@ -93,7 +95,7 @@ CREATE TABLE public.branches (
   name text NOT NULL,
   address text,
   phone text,
-  is_active boolean NOT NULL DEFAULT true,
+  is_active boolean NOT NULL DEFAULT false,
   website_ordering_enabled boolean NOT NULL DEFAULT false,
   website_delivery_enabled boolean NOT NULL DEFAULT false,
   website_pickup_enabled boolean NOT NULL DEFAULT false,
@@ -128,6 +130,8 @@ COMMENT ON COLUMN public.branches.address IS
   'Private operational branch address. Excluded from public branch discovery unless separately approved.';
 COMMENT ON COLUMN public.branches.phone IS
   'Private operational branch phone. Excluded from public branch discovery unless separately approved.';
+COMMENT ON COLUMN public.branches.updated_at IS
+  'Maintained by trusted server-side provisioning/administration commands in this batch; do not allow client writes.';
 COMMENT ON COLUMN public.branches.website_ordering_enabled IS
   'Explicit master gate for customer website ordering at this branch; defaults disabled.';
 COMMENT ON COLUMN public.branches.website_delivery_enabled IS
@@ -234,6 +238,7 @@ $verify$;
 
 COMMIT;
 
+-- Both restaurant and branch start inactive; all website capability flags start false.
 -- Provisioning is intentionally separate from this schema migration.
 -- Before enabling website ordering, an audited server-side command must:
 --   * validate timezone against pg_timezone_names;
