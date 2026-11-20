@@ -692,3 +692,39 @@ The user approved restricted Manager access to the POS application. This superse
 **Implementation implications:** POS route guards must admit Manager but expose only approved operational capabilities; Admin routes/APIs must reject Manager independently of UI; SQL grants, RLS, Edge Functions/RPCs and Realtime subscriptions must enforce branch scope and the same capability set. Add adversarial tests for Manager direct API/RPC calls, attempted catalog/staff/settings access, order deletion, cross-branch reads and unauthorized rejection/cancellation.
 
 **Current Stage 3 next action:** update the field-level permission specification and test matrix to reflect Manager POS approval; then finish remaining order rejection/cancellation, Rider return lifecycle, deal/schedule, and Not Listed locality decisions. No Production SQL or live app deployment is authorized by this decision.
+
+## Owner decision — delivery lifecycle confirmed (2026-11-20)
+
+The owner has now confirmed all five delivery lifecycle choices. This supersedes the earlier open delivery lifecycle questions in Section 13 and any earlier draft alternatives:
+
+1. **Rider rejects an offer:** mark that offer rejected and return the task to the POS dispatch queue. Cashier or Manager manually assigns another rider. Do not auto-offer the next rider.
+2. **Rider does not respond:** offer expires after exactly **60 seconds** from server-recorded creation and returns to POS for manual reassignment.
+3. **Delivery fails:** the assigned Rider may report failure and choose to return the order. This only starts a return-pending-physical-confirmation state; it does not mean the restaurant has received the order.
+4. **Delivery succeeds:** Rider marks delivered and the order completes immediately in the same transaction. No Cashier/Manager confirmation or OTP/photo proof is required in V1.
+5. **Physical return confirmation:** either Cashier or Manager may confirm the returned order has physically arrived. The Rider cannot self-confirm receipt.
+
+### Lifecycle design implications
+
+- Keep order status and delivery-task status separate. A successful delivery is a delivered/completed order. A confirmed return is a distinct returned/failed terminal order outcome; never mark it delivered.
+- Preserve each offer attempt (pending/accepted/rejected/expired), with server `offered_at` and `expires_at = offered_at + 60 seconds`. A rejection/expiry does not erase the offer; the next dispatch creates a new offer attempt.
+- The database accept command must reject at or after `expires_at`, regardless of delayed background expiry processing. Use atomic row locking/conditional transitions so accept, reject and expiry cannot race into conflicting outcomes.
+- Expiry processing is idempotent and updates the POS dispatch queue; missed Realtime events are recovered by POS normal fetch/15-second polling. Only the addressed Rider sees/responds to an offer.
+- Rider acceptance atomically activates the single current assignment. Rider-only commands govern pickup, out-for-delivery, delivery success and failed-delivery/return intent.
+- Return confirmation is a narrow POS command for Cashier or Manager, valid only after return is pending. It atomically closes the task and updates the order to returned/failed, appending immutable audit/history with task/order, prior/new states, verified JWT actor and role, server timestamp, reason/outcome and correlation ID. Duplicate confirmation must not duplicate effects.
+- This specific Cashier permission does not confer Admin-panel access or general authority to cancel accepted/in-progress orders. Existing hard-delete prohibition remains for all roles.
+
+### Updated design documents
+
+- `docs/architecture/production-erd-v1.md`: lifecycle states, offer expiry, atomic acceptance, immediate delivered completion and return confirmation model.
+- `docs/architecture/security-access-matrix-v1.md`: role capabilities; Cashier and Manager can confirm physical return, Rider cannot.
+- `docs/architecture/database-application-contract-map.md`: event-to-application/database contract.
+
+All are design-only updates on `work/production-source-audit`. No SQL migration was authored/applied, no Production schema/data/functions/settings changed, and no Vercel deployment or `main` branch change occurred.
+
+### Next schema-design work
+
+1. Reconcile the ERD's delivery-task, offer and assignment state model into a precise transition table, including order/task atomicity and event/audit payloads.
+2. Specify exact offer-expiry execution: database-enforced 60-second acceptance cutoff plus idempotent expiry sweep/event delivery, without assuming a paid Supabase plan or depending on Realtime for correctness.
+3. Complete the field-level table/column/constraint/index/RLS/grant specification and function contracts for delivery commands.
+4. Finish the remaining business decisions that materially affect schema: cashier rejection reason requirement; Not Listed locality field; menu publish/price authority; deal choice model; schedule recurrence/branch scope; branch-specific menu needs; kitchen role/inventory needs. Preserve the already-confirmed decisions and do not reopen them.
+5. Only after the schema specification is reviewed, create isolated test migrations. Production remains read-only until explicit approval.
