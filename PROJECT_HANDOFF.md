@@ -522,6 +522,14 @@ The user confirmed the Production delivery-fee behavior:
 - Production remains read-only. No DDL, seeds, app changes or deployments were made.
 - Next: resolve only the decisions that materially affect table shape, then produce the field-level migration specification and test it on an isolated disposable Supabase project before requesting approval for Production DDL.
 
+### Production default-privilege migration safeguard added — 2026-11-20
+
+- Updated `docs/architecture/production-schema-blueprint.md` (commit `69ad4f83bb6e14b2d9745c6d7bccf9057268a306`) to record the exact implications of the already-applied Production hardening baseline.
+- Because default privileges for postgres-created public tables, sequences and functions were revoked from PUBLIC, anon, authenticated and service_role, every future migration must explicitly enable RLS and explicitly grant only the permissions each intended role requires.
+- Service-role Edge Functions will not be assumed to have object permissions automatically; table/schema/sequence access and function EXECUTE grants must be explicit and verified after each migration.
+- Do not depend on rls_auto_enable to secure new tables; explicitly ENABLE ROW LEVEL SECURITY and verify it from PostgreSQL catalogs.
+- Test both SQL grants and RLS using anon, authenticated role variants and service_role; server-side functions must still authorize actor, tenant and branch even when using service_role.
+
 ## 11. Implementation roadmap — continue in this order
 
 ### Stage 1 — Source hygiene and durable handoff (current)
