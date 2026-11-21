@@ -1672,3 +1672,19 @@ Flame Hour weekdays; eligible drinks/burgers for each deal; intended Flame Feast
 
 ### Next stage
 Prepare a single review-only migration candidate for variant metadata, exact variant-scoped modifier pricing, deal collections/deals/component groups/options, schedules, branch deal availability, draft revision/audit and immutable publication snapshots/pointer. Then add schema/pricing/schedule/role/concurrency golden tests and reconcile the Admin/public catalog DTOs. Keep catalog/deal Admin UI disabled. Do not apply Production DDL, seed menu data, deploy functions or Vercel until a separate review and explicit owner approval.
+
+
+### Menu V1 relational object contract prepared
+
+**Design commit:** \`1e8bf9a1d7dd27c8f8841c5b3578674ec1050cb9\`.
+**Document:** \`docs/architecture/menu-v1-database-object-contract.md\`.
+
+This is the detailed proposed table/column/FK contract for the next migration candidate:
+- Typed product variants with portion/flavour/pack/volume meaning and explicit standalone-sellable flag.
+- Exact product_variant_id modifier price-rule key.
+- Deal collections, individual deal records, component groups, exact variant component options and branch deal availability.
+- Schedule sets/windows with restaurant timezone fallback and optional branch timezone override.
+- Draft revision, append-only catalog audit, immutable compiled publication snapshots and current-publication pointer.
+- RPC command boundary, pricing rules and migration QA gates.
+
+The contract deliberately excludes generic coupon/stacking engine, inventory, allergens, nested deals and GST for this menu-first V1. It is design-only and does not authorize Production DDL.
