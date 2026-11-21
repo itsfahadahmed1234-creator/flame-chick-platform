@@ -1,7 +1,7 @@
 // Flame Chick delivery dispatch API v1.
 import { ApplicationServer, importVapidKeys, Urgency } from "jsr:@negrel/webpush@0.5.0";
 // Separate function for Flame Chick rider dispatch and delivery lifecycle.
-// All writes go through service-role-only public.hfp_manage_delivery(jsonb).
+// All writes go through service-role-only public.flame_chick_manage_delivery(jsonb).
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const RIDER_PORTAL_URL = (Deno.env.get("FLAME_CHICK_RIDER_PORTAL_URL") ?? "").trim();
 
@@ -79,7 +79,7 @@ async function readAsUser(path: string, token: string, apiKey: string) {
         ok: false,
         error: {
           code: res.status === 401 ? "SESSION_EXPIRED" : res.status === 403 ? "DELIVERY_ACCESS_DENIED" : "DELIVERY_READ_FAILED",
-          message: String(err.message ?? "Unable to read HFP delivery data."),
+          message: String(err.message ?? "Unable to read Flame Chick delivery data."),
         },
       },
     };
@@ -105,7 +105,7 @@ async function readAsService(path: string) {
         ok: false,
         error: {
           code: res.status === 401 ? "SESSION_EXPIRED" : res.status === 403 ? "DELIVERY_ACCESS_DENIED" : "DELIVERY_READ_FAILED",
-          message: String(err.message ?? "Unable to read HFP delivery data."),
+          message: String(err.message ?? "Unable to read Flame Chick delivery data."),
         },
       },
     };
@@ -162,7 +162,7 @@ async function setRiderPresence(userId: string, branchId: string, online: boolea
 }
 
 async function callDeliveryRpc(payload: Record<string, unknown>) {
-  const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/hfp_manage_delivery", {
+  const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/flame_chick_manage_delivery", {
     method: "POST",
     headers: {
       apikey: SERVICE_KEY,
@@ -275,7 +275,7 @@ async function sendOfferPushBatch(offerIdsInput: string[]) {
   const subscriptions = Array.isArray(subResult.data) ? subResult.data.filter(isObject) : [];
   if (!subscriptions.length) return { sent:0, offers:offerRows.length, subscriptions:0, skipped:true };
 
-  const configResult = await callServiceRpc("hfp_get_rider_push_config", {});
+  const configResult = await callServiceRpc("flame_chick_get_rider_push_config", {});
   const config = configResult.ok && isObject(configResult.data) ? configResult.data : null;
   if (!config || !isObject(config.vapid_keys) || typeof config.contact_information !== "string") {
     return { sent:0, offers:offerRows.length, subscriptions:subscriptions.length, error:"Push notification configuration is unavailable." };
@@ -375,7 +375,7 @@ Deno.serve(async (req: Request) => {
       ? [hookBody.offer_id]
       : Array.isArray(hookBody.offer_ids) ? hookBody.offer_ids.filter((id): id is string => typeof id === "string") : [];
     if (!requestedIds.length || requestedIds.length > 100) return response({ ok:false, error:{ code:"OFFER_IDS_INVALID", message:"Provide between 1 and 100 delivery offer ids." } },400);
-    const verified = await callServiceRpc("hfp_verify_delivery_push_webhook", { p_token:pushHook });
+    const verified = await callServiceRpc("flame_chick_verify_delivery_push_webhook", { p_token:pushHook });
     if (!verified.ok || verified.data !== true) return response({ ok:false, error:{ code:"PUSH_HOOK_UNAUTHORIZED", message:"The internal push hook is not authorized." } },401);
     const result = await sendOfferPushBatch(requestedIds);
     return response({ ok:true, ...result });
@@ -383,13 +383,13 @@ Deno.serve(async (req: Request) => {
 
   const apiKey = req.headers.get("apikey") ?? "";
   if (!PUBLIC_KEYS.includes(apiKey)) {
-    return response({ ok: false, error: { code: "API_KEY_INVALID", message: "A valid HFP publishable API key is required." } }, 401);
+    return response({ ok: false, error: { code: "API_KEY_INVALID", message: "A valid Flame Chick publishable API key is required." } }, 401);
   }
 
   const authorization = req.headers.get("authorization") ?? "";
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
   const user = await verifyStaffUser(token, apiKey);
-  if (!user) return response({ ok: false, error: { code: "STAFF_AUTH_REQUIRED", message: "Sign in with an HFP staff account to access delivery dispatch." } }, 401);
+  if (!user) return response({ ok: false, error: { code: "STAFF_AUTH_REQUIRED", message: "Sign in with an Flame Chick staff account to access delivery dispatch." } }, 401);
 
   if (req.method === "GET") {
     const url = new URL(req.url);
@@ -429,7 +429,7 @@ Deno.serve(async (req: Request) => {
     if (view === "push-config") {
       const riderScope = await isActiveRider(user.id, token, apiKey);
       if (!riderScope.ok) return response(riderScope.body, riderScope.status);
-      const pushConfig = await callServiceRpc("hfp_get_rider_push_config", {});
+      const pushConfig = await callServiceRpc("flame_chick_get_rider_push_config", {});
       if (!pushConfig.ok || !isObject(pushConfig.data) || typeof pushConfig.data.vapid_public_key !== "string") {
         return response({ ok:false, error:{ code:"PUSH_NOT_CONFIGURED", message:"Push notifications are not configured." } },503);
       }
@@ -441,7 +441,7 @@ Deno.serve(async (req: Request) => {
 
     const branchId = (url.searchParams.get("branch_id") ?? "").trim();
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(branchId)) {
-      return response({ ok: false, error: { code: "BRANCH_REQUIRED", message: "A valid HFP branch_id is required for the dispatch board." } }, 400);
+      return response({ ok: false, error: { code: "BRANCH_REQUIRED", message: "A valid Flame Chick branch_id is required for the dispatch board." } }, 400);
     }
 
     const taskQuery = new URLSearchParams();
@@ -518,7 +518,7 @@ Deno.serve(async (req: Request) => {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(offerId)) {
       return response({ ok:false, error:{ code:"OFFER_ID_INVALID", message:"A valid delivery offer id is required." } },400);
     }
-    const rpcName = action === "accept_offer" ? "hfp_accept_delivery_offer" : "hfp_decline_delivery_offer";
+    const rpcName = action === "accept_offer" ? "flame_chick_accept_delivery_offer" : "flame_chick_decline_delivery_offer";
     const args:Record<string,unknown> = { p_offer_id:offerId, p_rider_user_id:user.id };
     if(action === "decline_offer") args.p_reason = body.reason ?? null;
     const result = await callServiceRpc(rpcName,args);

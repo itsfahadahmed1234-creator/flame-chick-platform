@@ -2,7 +2,24 @@
 // The gateway validates the browser's public apikey. The database secret is
 // read only from Supabase's standard server-side Edge Function environment.
 const PROJECT_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const DATABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+function readKeyMap(name: string): Record<string, string> {
+  const raw = Deno.env.get(name);
+  if (!raw) return {};
+  try {
+    const value = JSON.parse(raw);
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  } catch {
+    return {};
+  }
+}
+const SECRET_KEY_MAP = readKeyMap("SUPABASE_SECRET_KEYS");
+const DATABASE_KEY = String(
+  SECRET_KEY_MAP.default ??
+  Object.values(SECRET_KEY_MAP)[0] ??
+  Deno.env.get("SUPABASE_SECRET_KEY") ??
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
+  ""
+);
 const SCHEMA_VERSION = 2;
 const RESTAURANT_SLUG = "flame-chick";
 
@@ -250,6 +267,6 @@ Deno.serve(async (req: Request) => {
     return json({ ok: true, data: result.snapshot });
   } catch (error) {
     console.error("flame-chick-catalog error", error);
-    return json({ ok: false, error: { code: "CATALOG_READ_FAILED", message: "The HFP catalog could not be loaded." } }, 500);
+    return json({ ok: false, error: { code: "CATALOG_READ_FAILED", message: "The Flame Chick catalog could not be loaded." } }, 500);
   }
 });

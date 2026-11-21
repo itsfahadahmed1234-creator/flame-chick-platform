@@ -49,7 +49,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function rpcErrorStatus(code: string, message: string): number {
   if (code === "23505" || message.startsWith("IDEMPOTENCY_KEY_REUSED")) return 409;
-  if (code === "P0002" || message.startsWith("ORDER_NOT_FOUND") || message.startsWith("HFP_BRANCH_NOT_FOUND")) return 404;
+  if (code === "P0002" || message.startsWith("ORDER_NOT_FOUND") || message.startsWith("FLAME_CHICK_BRANCH_NOT_FOUND")) return 404;
   if (code === "42501" || message.startsWith("STAFF_AUTH_REQUIRED") || message.startsWith("STAFF_ROLE_REQUIRED")) return 403;
   if (code === "22023" || code === "22P02") return 400;
   return 500;
@@ -106,7 +106,7 @@ function getClientIp(req: Request): string {
   return candidate.length <= 45 && /^[0-9a-fA-F:.]+$/.test(candidate) ? candidate : "";
 }
 
-async function callRpc(name: "hfp_create_order" | "hfp_update_order_status" | "hfp_check_website_order_rate_limit", payload: Record<string, unknown>) {
+async function callRpc(name: "flame_chick_create_order" | "flame_chick_update_order_status" | "flame_chick_check_website_order_rate_limit", payload: Record<string, unknown>) {
   const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + name, {
     method: "POST",
     headers: {
@@ -169,7 +169,7 @@ async function readOrderBoard(token: string, apiKey: string, board: string, limi
   try { data = raw ? JSON.parse(raw) : []; } catch { data = []; }
   if (!res.ok) {
     const err = isObject(data) ? data : {};
-    const msg = String(err.message ?? ("Unable to load HFP orders (" + res.status + ")."));
+    const msg = String(err.message ?? ("Unable to load Flame Chick orders (" + res.status + ")."));
     return { ok: false as const, status: res.status === 401 ? 401 : res.status === 403 ? 403 : 500, body: { ok: false, error: { code: res.status === 401 ? "SESSION_EXPIRED" : res.status === 403 ? "ORDER_ACCESS_DENIED" : "ORDER_READ_FAILED", message: msg } } };
   }
   return { ok: true as const, data };
@@ -178,20 +178,20 @@ async function readOrderBoard(token: string, apiKey: string, board: string, limi
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: CORS_HEADERS });
   if (!SUPABASE_URL || !SERVICE_KEY || PUBLIC_KEYS.length === 0) {
-    return response({ ok: false, error: { code: "CONFIG_MISSING", message: "The HFP order API is not configured." } }, 503);
+    return response({ ok: false, error: { code: "CONFIG_MISSING", message: "The Flame Chick order API is not configured." } }, 503);
   }
   const apiKey = req.headers.get("apikey") ?? "";
   if (!PUBLIC_KEYS.includes(apiKey)) {
-    return response({ ok: false, error: { code: "API_KEY_INVALID", message: "A valid HFP publishable API key is required." } }, 401);
+    return response({ ok: false, error: { code: "API_KEY_INVALID", message: "A valid Flame Chick publishable API key is required." } }, 401);
   }
 
   if (req.method === "GET") {
     const authorization = req.headers.get("authorization") ?? "";
     const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
     const user = await verifyStaffUser(token, apiKey);
-    if (!user) return response({ ok: false, error: { code: "STAFF_AUTH_REQUIRED", message: "Sign in with an HFP staff account to view incoming orders." } }, 401);
+    if (!user) return response({ ok: false, error: { code: "STAFF_AUTH_REQUIRED", message: "Sign in with an Flame Chick staff account to view incoming orders." } }, 401);
     const canReadBoard = await verifyStaffRole(user.id, token, apiKey, ["owner", "admin", "manager", "cashier", "kitchen"]);
-    if (!canReadBoard) return response({ ok: false, error: { code: "STAFF_ROLE_REQUIRED", message: "An active HFP staff role is required to view the order board." } }, 403);
+    if (!canReadBoard) return response({ ok: false, error: { code: "STAFF_ROLE_REQUIRED", message: "An active Flame Chick staff role is required to view the order board." } }, 403);
     const url = new URL(req.url);
     const board = (url.searchParams.get("board") ?? "active").toLowerCase();
     const requestedLimit = Number(url.searchParams.get("limit") ?? 50);
@@ -202,7 +202,7 @@ Deno.serve(async (req: Request) => {
   }
   if (req.method !== "POST") return response({ ok: false, error: { code: "METHOD_NOT_ALLOWED", message: "GET or POST only." } }, 405);
   if (!SUPABASE_URL || !SERVICE_KEY || PUBLIC_KEYS.length === 0) {
-    return response({ ok: false, error: { code: "CONFIG_MISSING", message: "The HFP order API is not configured." } }, 503);
+    return response({ ok: false, error: { code: "CONFIG_MISSING", message: "The Flame Chick order API is not configured." } }, 503);
   }
 
   const contentLength = Number(req.headers.get("content-length") ?? 0);
@@ -238,18 +238,18 @@ Deno.serve(async (req: Request) => {
       const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
       const user = await verifyStaffUser(token, apiKey);
       if (!user) {
-        return response({ ok: false, error: { code: "STAFF_AUTH_REQUIRED", message: "Sign in with an HFP staff account to create POS or phone orders." } }, 401);
+        return response({ ok: false, error: { code: "STAFF_AUTH_REQUIRED", message: "Sign in with an Flame Chick staff account to create POS or phone orders." } }, 401);
       }
       const canCreateOrder = await verifyStaffRole(user.id, token, apiKey, ["owner", "admin", "manager", "cashier"]);
       if (!canCreateOrder) {
-        return response({ ok: false, error: { code: "STAFF_ROLE_REQUIRED", message: "An active HFP cashier, manager, admin or owner role is required to create staff orders." } }, 403);
+        return response({ ok: false, error: { code: "STAFF_ROLE_REQUIRED", message: "An active Flame Chick cashier, manager, admin or owner role is required to create staff orders." } }, 403);
       }
       actorId = user.id;
     }
 
     if (sourceType === "website") {
       const limiterPayload: Record<string, unknown> = { ...body, client_ip: getClientIp(req) };
-      const rateLimit = await callRpc("hfp_check_website_order_rate_limit", limiterPayload);
+      const rateLimit = await callRpc("flame_chick_check_website_order_rate_limit", limiterPayload);
       if (!rateLimit.ok) {
         return response({ ok: false, error: { code: "RATE_LIMIT_CHECK_UNAVAILABLE", message: "We could not safely validate this order request. Please try again shortly." } }, 503);
       }
@@ -267,7 +267,7 @@ Deno.serve(async (req: Request) => {
 
     const orderPayload: Record<string, unknown> = { ...body, source: sourceType, actor_user_id: actorId };
     delete orderPayload.action;
-    const result = await callRpc("hfp_create_order", orderPayload);
+    const result = await callRpc("flame_chick_create_order", orderPayload);
     if (!result.ok) return response(result.body, result.status);
     return response(result.data, 201);
   }
@@ -277,9 +277,9 @@ Deno.serve(async (req: Request) => {
     const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
     const user = await verifyStaffUser(token, apiKey);
     if (!user) {
-      return response({ ok: false, error: { code: "STAFF_AUTH_REQUIRED", message: "Sign in with an HFP staff account to update order statuses." } }, 401);
+      return response({ ok: false, error: { code: "STAFF_AUTH_REQUIRED", message: "Sign in with an Flame Chick staff account to update order statuses." } }, 401);
     }
-    // hfp_update_order_status checks the verified actor's active role and the
+    // flame_chick_update_order_status checks the verified actor's active role and the
     // order's branch inside the row-locked database transaction. Avoid a second
     // user_roles REST query here; actor_user_id is derived from Auth, never the
     // client-supplied request body.
@@ -290,7 +290,7 @@ Deno.serve(async (req: Request) => {
       reason: body.reason ?? null,
       actor_user_id: user.id,
     };
-    const result = await callRpc("hfp_update_order_status", statusPayload);
+    const result = await callRpc("flame_chick_update_order_status", statusPayload);
     if (!result.ok) return response(result.body, result.status);
     return response(result.data, 200);
   }
