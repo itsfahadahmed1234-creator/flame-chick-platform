@@ -1,0 +1,1 @@
+Create an empty Flame Chick modifier commands migration using Supabase CLI v3.2.0. No database credentials or database connection should be used.
