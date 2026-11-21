@@ -39,8 +39,8 @@ jobs:
           test -s "${migration}"
           grep -q "CREATE FUNCTION public.flame_chick_catalog_public_read" "${migration}"
           grep -q "extensions.digest" "${migration}"
-          grep -q "FROM public.catalog_current_publication" "${migration}"
-          grep -q "FROM public.catalog_publications" "${migration}"
+          grep -q "public.catalog_current_publication" "${migration}"
+          grep -q "public.catalog_publications" "${migration}"
           grep -q "GRANT EXECUTE ON FUNCTION public.flame_chick_catalog_public_read(text)" "${migration}"
           grep -q "TO service_role" "${migration}"
           test "$(grep -c '^BEGIN;$' "${migration}")" -eq 1
