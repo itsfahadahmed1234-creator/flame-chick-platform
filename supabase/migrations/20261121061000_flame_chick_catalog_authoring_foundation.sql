@@ -20,6 +20,9 @@
 --     but RLS is enabled and direct privileges are revoked from PUBLIC and all
 --     Supabase application roles.
 --   * No public policies, views, RPCs, Realtime publication entries, or seed rows.
+--   * app_private USAGE is intentionally present for authenticated because Batch 4
+--     routes the staff-admin public invoker wrapper to one explicitly granted private
+--     function. No other private functions/tables are granted by this migration.
 --   * Draft writes must be implemented through authenticated server commands.
 --   * Admin/Owner authorization must be checked from public.user_roles; never
 --     trust user-editable Auth metadata or browser-supplied actor/role fields.
@@ -678,9 +681,10 @@ BEGIN
   END LOOP;
 
   IF has_schema_privilege('anon','app_private','USAGE')
-     OR has_schema_privilege('authenticated','app_private','USAGE')
-     OR has_schema_privilege('service_role','app_private','USAGE') THEN
-    RAISE EXCEPTION 'Catalog verification failed: private schema boundary changed';
+     OR has_schema_privilege('service_role','app_private','USAGE')
+     OR has_schema_privilege('public','app_private','USAGE')
+     OR NOT has_schema_privilege('authenticated','app_private','USAGE') THEN
+    RAISE EXCEPTION 'Catalog verification failed: private schema grants differ from the reviewed Batch 4 boundary';
   END IF;
 
   RAISE NOTICE 'Catalog foundation verification: owner, RLS, ACL, policies and Realtime checks passed';
