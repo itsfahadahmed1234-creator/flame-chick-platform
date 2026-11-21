@@ -1,0 +1,1 @@
+One-time trigger: generate an empty timestamped menu V1 migration with Supabase CLI v3.2.0 on this working branch only. This workflow has no database credentials.
