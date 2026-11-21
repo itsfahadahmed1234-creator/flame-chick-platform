@@ -1,0 +1,1 @@
+Apply only migration 20261121150452_flame_chick_catalog_modifier_commands_v1.sql to Flame Chick Mumbai project. Require 20261121145500 and all previous catalog migrations in the remote ledger, and require this migration to be the only pending migration.
