@@ -409,7 +409,7 @@ async function loadDashboard(){
  try{
   const today=parts(new Date()),period=dateRangeFor(S.range,S.dashboardMonth),week=currentWeekRange(),rush=dateRangeFor(S.rushRange,S.rushMonth);
   const body={p_branch_id:S.branch.id,p_today_start:karachiMidnight(today),p_today_end:karachiMidnight(localDayShift(today,1)),p_period_start:period.start,p_period_end:period.end,p_previous_period_start:period.previousStart,p_previous_period_end:period.previousEnd,p_week_start:week.start,p_week_end:week.end,p_previous_week_start:week.previousStart,p_previous_week_end:week.previousEnd,p_rush_start:rush.start,p_rush_end:rush.end};
-  S.dashboardData=await db("rpc/hfp_admin_dashboard",{method:"POST",body});renderDashboard();
+  S.dashboardData=await db("rpc/flame_chick_admin_dashboard",{method:"POST",body});renderDashboard();
  }catch(e){if($("dashboardUpdated"))$("dashboardUpdated").textContent="Could not refresh";if(!S.dashboardData)toast("Dashboard: "+e.message,true);}
  finally{S.dashboardBusy=false;}
 }

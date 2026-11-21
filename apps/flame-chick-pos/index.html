@@ -1263,8 +1263,8 @@ html,body{background:var(--bg);overflow:hidden}
 'use strict';
 // Flame Chick POS: POS delivery orders are submitted to shared Online Orders immediately on Place Order; receipt remains retry-safe.
 const API_URL='https://adkrxfnawdiljhjaavnj.supabase.co/functions/v1/flame-chick-order-api';
-const HFP_DELIVERY_API='https://adkrxfnawdiljhjaavnj.supabase.co/functions/v1/flame-chick-delivery-api';
-const HFP_SUPABASE_URL='https://adkrxfnawdiljhjaavnj.supabase.co';
+const FLAME_CHICK_DELIVERY_API='https://adkrxfnawdiljhjaavnj.supabase.co/functions/v1/flame-chick-delivery-api';
+const FLAME_CHICK_SUPABASE_URL='https://adkrxfnawdiljhjaavnj.supabase.co';
 // Staff API key for protected backend endpoints (newOrders, order, orderHistory, syncCheck, updatestatus).
 // SECURITY NOTE: This key is visible in browser source. The POS is an internal staff-only tool
 // served from a local file, not a public website. The backend key in ScriptProperties is the
@@ -1276,9 +1276,9 @@ const STORES={settings:'settings',menu:'menu',categories:'categories',deliveryAr
 let db=null,menu=[],categories=[],deliveryAreas=[],cart=[],menuVersion='',choicePending=null;
 let selectedCategoryId='all',selectedSubcategoryId='';
 let lastAddedCartKey='';
-const HFP_CATALOG_API='https://adkrxfnawdiljhjaavnj.supabase.co/functions/v1/flame-chick-catalog';
-const HFP_PUBLISHABLE_KEY='sb_publishable_89MQIj_drF15IrF05ZLt0w_txUjPMxy';
-const HFP_ORDER_API_READY=true;
+const FLAME_CHICK_CATALOG_API='https://adkrxfnawdiljhjaavnj.supabase.co/functions/v1/flame-chick-catalog';
+const FLAME_CHICK_PUBLISHABLE_KEY='sb_publishable_89MQIj_drF15IrF05ZLt0w_txUjPMxy';
+const FLAME_CHICK_ORDER_API_READY=true;
 let catalogSnapshot=null;
 let pizzaCategoryIds=new Set();
 let posPizzaChoice=null;
@@ -1291,14 +1291,14 @@ let selectedTableId='';
 let restaurantTables=[];
 let inboxOrders=new Map();
 const statusMutationByOrder=new Map();
-let hfpRealtimeRefreshRunning=false,hfpRealtimeRefreshQueued=false;
+let flameChickRealtimeRefreshRunning=false,flameChickRealtimeRefreshQueued=false;
 let deliveryTasksByOrder=new Map();
 let dispatchRiders=[];
 let deliveryAssignInProgress=false;
 let deliveryAcceptanceTicker=null;
-let hfpRealtimeClient=null,hfpRealtimeChannel=null,hfpRealtimeRefreshTimer=null,hfpRealtimeRefreshDebounce=null;
-let hfpRealtimeState="off";
-const HFP_REALTIME_EVENTS_PER_SECOND=4;
+let flameChickRealtimeClient=null,flameChickRealtimeChannel=null,flameChickRealtimeRefreshTimer=null,flameChickRealtimeRefreshDebounce=null;
+let flameChickRealtimeState="off";
+const FLAME_CHICK_REALTIME_EVENTS_PER_SECOND=4;
 let inboxInitialLoadPromise=null;
 let inboxCursor="";
 let inboxSignalVersion="";
@@ -1309,62 +1309,62 @@ const statusWriteChains=new Map();
 let statusSyncInProgress=false;
 let statusRetryTimer=null;
 const recoveryAttemptedOrders=new Set();
-const HFP_AUTH_URL='https://adkrxfnawdiljhjaavnj.supabase.co/auth/v1';
-const HFP_REST_URL='https://adkrxfnawdiljhjaavnj.supabase.co/rest/v1';
-const HFP_SESSION_KEY='flame_chick_pos_staff_session_v1';
-const HFP_ALLOWED_POS_ROLES=new Set(['owner','admin','manager','cashier','kitchen']);
-let hfpStaffSession=null;
-let hfpStaffProfile=null;
-function loadHfpStaffSession(){try{const raw=sessionStorage.getItem(HFP_SESSION_KEY);hfpStaffSession=raw?JSON.parse(raw):null;}catch(e){hfpStaffSession=null;}}
-function saveHfpStaffSession(session){hfpStaffSession=session;try{if(session)sessionStorage.setItem(HFP_SESSION_KEY,JSON.stringify(session));else sessionStorage.removeItem(HFP_SESSION_KEY);}catch(e){}}
+const FLAME_CHICK_AUTH_URL='https://adkrxfnawdiljhjaavnj.supabase.co/auth/v1';
+const FLAME_CHICK_REST_URL='https://adkrxfnawdiljhjaavnj.supabase.co/rest/v1';
+const FLAME_CHICK_SESSION_KEY='flame_chick_pos_staff_session_v1';
+const FLAME_CHICK_ALLOWED_POS_ROLES=new Set(['owner','admin','manager','cashier','kitchen']);
+let flameChickStaffSession=null;
+let flameChickStaffProfile=null;
+function loadFlameChickStaffSession(){try{const raw=sessionStorage.getItem(FLAME_CHICK_SESSION_KEY);flameChickStaffSession=raw?JSON.parse(raw):null;}catch(e){flameChickStaffSession=null;}}
+function saveFlameChickStaffSession(session){flameChickStaffSession=session;try{if(session)sessionStorage.setItem(FLAME_CHICK_SESSION_KEY,JSON.stringify(session));else sessionStorage.removeItem(FLAME_CHICK_SESSION_KEY);}catch(e){}}
 function showStaffLoginGate(message=''){const gate=$('staffLoginGate');if(gate)gate.hidden=false;if($('staffGateError'))$('staffGateError').textContent=message;$('staffLoginBtn').textContent='Sign in';}
 function hideStaffLoginGate(){const gate=$('staffLoginGate');if(gate)gate.hidden=true;}
-function hfpAuthHeaders(){return {'apikey':HFP_PUBLISHABLE_KEY,'Authorization':'Bearer '+String(hfpStaffSession?.access_token||''),'Content-Type':'application/json'};}
-async function hfpAuthFetchUser(accessToken){
-  const r=await fetch(HFP_AUTH_URL+'/user',{method:'GET',headers:{'apikey':HFP_PUBLISHABLE_KEY,'Authorization':'Bearer '+accessToken,'Accept':'application/json'},cache:'no-store'});
+function flameChickAuthHeaders(){return {'apikey':FLAME_CHICK_PUBLISHABLE_KEY,'Authorization':'Bearer '+String(flameChickStaffSession?.access_token||''),'Content-Type':'application/json'};}
+async function flameChickAuthFetchUser(accessToken){
+  const r=await fetch(FLAME_CHICK_AUTH_URL+'/user',{method:'GET',headers:{'apikey':FLAME_CHICK_PUBLISHABLE_KEY,'Authorization':'Bearer '+accessToken,'Accept':'application/json'},cache:'no-store'});
   const data=await r.json().catch(()=>({}));
   if(!r.ok||!data.id)throw new Error('Your sign-in session is invalid or expired. Please sign in again.');
   return data;
 }
-async function hfpFetchStaffRole(userId,accessToken){
-  const url=HFP_REST_URL+'/user_roles?select=role,branch_id,is_active&user_id=eq.'+encodeURIComponent(userId)+'&is_active=eq.true';
-  const r=await fetch(url,{method:'GET',headers:{'apikey':HFP_PUBLISHABLE_KEY,'Authorization':'Bearer '+accessToken,'Accept':'application/json'},cache:'no-store'});
+async function flameChickFetchStaffRole(userId,accessToken){
+  const url=FLAME_CHICK_REST_URL+'/user_roles?select=role,branch_id,is_active&user_id=eq.'+encodeURIComponent(userId)+'&is_active=eq.true';
+  const r=await fetch(url,{method:'GET',headers:{'apikey':FLAME_CHICK_PUBLISHABLE_KEY,'Authorization':'Bearer '+accessToken,'Accept':'application/json'},cache:'no-store'});
   const rows=await r.json().catch(()=>[]);
   if(!r.ok)throw new Error('Could not verify Flame Chick staff permissions. Please contact the administrator.');
-  const allowed=Array.isArray(rows)?rows.filter(x=>x.is_active===true&&HFP_ALLOWED_POS_ROLES.has(String(x.role||'').toLowerCase())):[];
+  const allowed=Array.isArray(rows)?rows.filter(x=>x.is_active===true&&FLAME_CHICK_ALLOWED_POS_ROLES.has(String(x.role||'').toLowerCase())):[];
   if(!allowed.length)throw new Error('Your email is signed in, but it has no active Flame Chick staff role. Ask the administrator to assign the cashier role in Flame Chick User Roles.');
   const priority={owner:1,admin:2,manager:3,cashier:4,kitchen:5};
   allowed.sort((a,b)=>(priority[a.role]||99)-(priority[b.role]||99));
   return {role:String(allowed[0].role).toLowerCase(),branch_id:allowed[0].branch_id||null,roles:allowed};
 }
-async function hfpRefreshSessionIfNeeded(session){
+async function flameChickRefreshSessionIfNeeded(session){
   if(!session?.access_token)return null;
   let next=session;
   const expiresAt=Number(session.expires_at||0);
   if(expiresAt && expiresAt*1000>Date.now()+60_000){
-    try{await hfpAuthFetchUser(session.access_token);return next;}catch(e){}
+    try{await flameChickAuthFetchUser(session.access_token);return next;}catch(e){}
   }
   if(!session.refresh_token)return null;
-  const r=await fetch(HFP_AUTH_URL+'/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':HFP_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:session.refresh_token}),cache:'no-store'});
+  const r=await fetch(FLAME_CHICK_AUTH_URL+'/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':FLAME_CHICK_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:session.refresh_token}),cache:'no-store'});
   const data=await r.json().catch(()=>({}));
   if(!r.ok||!data.access_token)return null;
   if(!data.expires_at&&data.expires_in)data.expires_at=Math.floor(Date.now()/1000)+Number(data.expires_in);
   return data;
 }
-async function restoreHfpStaffSession(){
-  if(!hfpStaffSession?.access_token){showStaffLoginGate();return false;}
+async function restoreFlameChickStaffSession(){
+  if(!flameChickStaffSession?.access_token){showStaffLoginGate();return false;}
   try{
-    const refreshed=await hfpRefreshSessionIfNeeded(hfpStaffSession);
-    if(!refreshed){saveHfpStaffSession(null);hfpStaffProfile=null;showStaffLoginGate('Your staff session expired. Please sign in again.');return false;}
-    const user=await hfpAuthFetchUser(refreshed.access_token);
-    const role=await hfpFetchStaffRole(user.id,refreshed.access_token);
-    saveHfpStaffSession({...refreshed,user:{id:user.id,email:user.email}});
-    hfpStaffProfile={...role,email:user.email};
+    const refreshed=await flameChickRefreshSessionIfNeeded(flameChickStaffSession);
+    if(!refreshed){saveFlameChickStaffSession(null);flameChickStaffProfile=null;showStaffLoginGate('Your staff session expired. Please sign in again.');return false;}
+    const user=await flameChickAuthFetchUser(refreshed.access_token);
+    const role=await flameChickFetchStaffRole(user.id,refreshed.access_token);
+    saveFlameChickStaffSession({...refreshed,user:{id:user.id,email:user.email}});
+    flameChickStaffProfile={...role,email:user.email};
     hideStaffLoginGate();$('staffLoginBtn').textContent='Sign out';
     return true;
-  }catch(e){saveHfpStaffSession(null);hfpStaffProfile=null;showStaffLoginGate(e.message);return false;}
+  }catch(e){saveFlameChickStaffSession(null);flameChickStaffProfile=null;showStaffLoginGate(e.message);return false;}
 }
-async function hfpStaffSignIn(event){
+async function flameChickStaffSignIn(event){
   if(event)event.preventDefault();
   const email=String($('staffGateEmail')?.value||$('staffEmail')?.value||'').trim();
   const password=String($('staffGatePassword')?.value||$('staffPassword')?.value||'');
@@ -1373,179 +1373,179 @@ async function hfpStaffSignIn(event){
   if(!email||!password){if(error)error.textContent='Enter your work email and password.';return;}
   const btn=$('staffGateSubmit')||$('staffSignInSubmit');if(btn){btn.disabled=true;btn.textContent='Signing in…';}
   try{
-    const r=await fetch(HFP_AUTH_URL+'/token?grant_type=password',{method:'POST',headers:{'apikey':HFP_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password}),cache:'no-store'});
+    const r=await fetch(FLAME_CHICK_AUTH_URL+'/token?grant_type=password',{method:'POST',headers:{'apikey':FLAME_CHICK_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password}),cache:'no-store'});
     const data=await r.json().catch(()=>({}));
     if(!r.ok||!data.access_token)throw new Error(data.msg||data.message||data.error_description||'Email or password is incorrect.');
     if(!data.expires_at&&data.expires_in)data.expires_at=Math.floor(Date.now()/1000)+Number(data.expires_in);
-    const user=await hfpAuthFetchUser(data.access_token);
-    const role=await hfpFetchStaffRole(user.id,data.access_token);
-    saveHfpStaffSession({...data,user:{id:user.id,email:user.email}});
-    hfpStaffProfile={...role,email:user.email};
+    const user=await flameChickAuthFetchUser(data.access_token);
+    const role=await flameChickFetchStaffRole(user.id,data.access_token);
+    saveFlameChickStaffSession({...data,user:{id:user.id,email:user.email}});
+    flameChickStaffProfile={...role,email:user.email};
     if($('staffGatePassword'))$('staffGatePassword').value='';if($('staffPassword'))$('staffPassword').value='';
     hideStaffLoginGate();closeModal('staffAuthModal');$('staffLoginBtn').textContent='Sign out · '+role.role;
-    await startHfpRealtime();await loadInitialOnlineInbox();await syncPending();showToast('Signed in to Flame Chick as '+role.role);
+    await startFlameChickRealtime();await loadInitialOnlineInbox();await syncPending();showToast('Signed in to Flame Chick as '+role.role);
   }catch(e){if(error)error.textContent=e.message||'Sign in failed.';showStaffLoginGate(e.message||'Sign in failed.');}
   finally{if(btn){btn.disabled=false;btn.textContent='Sign in';}}
 }
-function hfpStaffSignOut(){stopHfpRealtime();saveHfpStaffSession(null);hfpStaffProfile=null;inboxOrders.clear();$('inboxLiveText').textContent='Staff sign-in required';renderKanban();showStaffLoginGate();showToast('Signed out');}
-async function hfpOrderRequest(method,query,body){
-  if(!hfpStaffSession?.access_token)throw new Error('Please sign in with your Flame Chick staff account.');
+function flameChickStaffSignOut(){stopFlameChickRealtime();saveFlameChickStaffSession(null);flameChickStaffProfile=null;inboxOrders.clear();$('inboxLiveText').textContent='Staff sign-in required';renderKanban();showStaffLoginGate();showToast('Signed out');}
+async function flameChickOrderRequest(method,query,body){
+  if(!flameChickStaffSession?.access_token)throw new Error('Please sign in with your Flame Chick staff account.');
   const url=API_URL+(method==='GET'?'?'+new URLSearchParams(query||{}).toString():'');
-  const r=await fetch(url,{method,headers:hfpAuthHeaders(),body:method==='GET'?undefined:JSON.stringify(body||{}),cache:'no-store'});
+  const r=await fetch(url,{method,headers:flameChickAuthHeaders(),body:method==='GET'?undefined:JSON.stringify(body||{}),cache:'no-store'});
   let data={};try{data=await r.json()}catch(e){}
-  if(r.status===401){hfpStaffSignOut();throw new Error('Your staff session expired. Please sign in again.');}
+  if(r.status===401){flameChickStaffSignOut();throw new Error('Your staff session expired. Please sign in again.');}
   if(r.status===403)throw new Error(data?.error?.message||'Your Flame Chick account does not have permission to view or manage orders.');
   if(!r.ok||data.ok===false)throw new Error(data?.error?.message||'Flame Chick order request failed.');
   return data;
 }
-async function hfpDeliveryRequest(method,query,body){
-  if(!hfpStaffSession?.access_token)throw new Error('Please sign in with your Flame Chick staff account.');
-  const url=HFP_DELIVERY_API+(method==='GET'?'?'+new URLSearchParams(query||{}).toString():'');
-  const r=await fetch(url,{method,headers:hfpAuthHeaders(),body:method==='GET'?undefined:JSON.stringify(body||{}),cache:'no-store'});
+async function flameChickDeliveryRequest(method,query,body){
+  if(!flameChickStaffSession?.access_token)throw new Error('Please sign in with your Flame Chick staff account.');
+  const url=FLAME_CHICK_DELIVERY_API+(method==='GET'?'?'+new URLSearchParams(query||{}).toString():'');
+  const r=await fetch(url,{method,headers:flameChickAuthHeaders(),body:method==='GET'?undefined:JSON.stringify(body||{}),cache:'no-store'});
   let data={};try{data=await r.json()}catch(e){}
-  if(r.status===401){hfpStaffSignOut();throw new Error('Your staff session expired. Please sign in again.');}
+  if(r.status===401){flameChickStaffSignOut();throw new Error('Your staff session expired. Please sign in again.');}
   if(r.status===403)throw new Error(data?.error?.message||'Your Flame Chick account does not have permission to access dispatch.');
   if(!r.ok||data.ok===false)throw new Error(data?.error?.message||'Flame Chick delivery request failed.');
   return data;
 }
-async function hfpDirectRest(resource,query){
-  if(!hfpStaffSession?.access_token)throw new Error('Please sign in with your Flame Chick staff account.');
+async function flameChickDirectRest(resource,query){
+  if(!flameChickStaffSession?.access_token)throw new Error('Please sign in with your Flame Chick staff account.');
   const params=new URLSearchParams(query||{});
-  const response=await fetch(HFP_REST_URL+'/'+resource+'?'+params.toString(),{method:'GET',headers:{...hfpAuthHeaders(),'Accept':'application/json'},cache:'no-store'});
+  const response=await fetch(FLAME_CHICK_REST_URL+'/'+resource+'?'+params.toString(),{method:'GET',headers:{...flameChickAuthHeaders(),'Accept':'application/json'},cache:'no-store'});
   const data=await response.json().catch(()=>[]);
-  if(response.status===401){hfpStaffSignOut();throw new Error('Your staff session expired. Please sign in again.');}
+  if(response.status===401){flameChickStaffSignOut();throw new Error('Your staff session expired. Please sign in again.');}
   if(response.status===403)throw new Error('Your Flame Chick account does not have permission to read this operational data.');
   if(!response.ok)throw new Error(data?.message||'Could not refresh Flame Chick data ('+response.status+').');
   return data;
 }
-async function hfpDirectRpc(functionName,payload){
-  if(!hfpStaffSession?.access_token)throw new Error('Please sign in with your Flame Chick staff account.');
-  const response=await fetch(HFP_REST_URL+'/rpc/'+encodeURIComponent(functionName),{
-    method:'POST',headers:{...hfpAuthHeaders(),'Accept':'application/json'},
+async function flameChickDirectRpc(functionName,payload){
+  if(!flameChickStaffSession?.access_token)throw new Error('Please sign in with your Flame Chick staff account.');
+  const response=await fetch(FLAME_CHICK_REST_URL+'/rpc/'+encodeURIComponent(functionName),{
+    method:'POST',headers:{...flameChickAuthHeaders(),'Accept':'application/json'},
     body:JSON.stringify(payload||{}),cache:'no-store'
   });
   const data=await response.json().catch(()=>({}));
-  if(response.status===401){hfpStaffSignOut();throw new Error('Your staff session expired. Please sign in again.');}
+  if(response.status===401){flameChickStaffSignOut();throw new Error('Your staff session expired. Please sign in again.');}
   if(!response.ok)throw new Error(data?.message||data?.details||data?.error?.message||'Flame Chick dispatch action failed ('+response.status+').');
   return data;
 }
 
-function setHfpRealtimeFallback(message){
-  hfpRealtimeState="fallback";
+function setFlameChickRealtimeFallback(message){
+  flameChickRealtimeState="fallback";
   const live=$("inboxLiveText");
   if(live)live.textContent=message||"Realtime unavailable · use Refresh orders";
 }
-function stopHfpRealtime(){
-  clearTimeout(hfpRealtimeRefreshTimer);
-  clearTimeout(hfpRealtimeRefreshDebounce);
-  hfpRealtimeRefreshTimer=null;
-  hfpRealtimeRefreshDebounce=null;
-  const client=hfpRealtimeClient,channel=hfpRealtimeChannel;
-  hfpRealtimeClient=null;hfpRealtimeChannel=null;hfpRealtimeState="off";
+function stopFlameChickRealtime(){
+  clearTimeout(flameChickRealtimeRefreshTimer);
+  clearTimeout(flameChickRealtimeRefreshDebounce);
+  flameChickRealtimeRefreshTimer=null;
+  flameChickRealtimeRefreshDebounce=null;
+  const client=flameChickRealtimeClient,channel=flameChickRealtimeChannel;
+  flameChickRealtimeClient=null;flameChickRealtimeChannel=null;flameChickRealtimeState="off";
   if(client&&channel){try{client.removeChannel(channel).catch(()=>{});}catch(e){}}
 }
-function scheduleHfpRealtimeTokenRefresh(){
-  clearTimeout(hfpRealtimeRefreshTimer);
-  const expiresAt=Number(hfpStaffSession?.expires_at||0);
-  if(!expiresAt||!hfpStaffSession?.refresh_token)return;
+function scheduleFlameChickRealtimeTokenRefresh(){
+  clearTimeout(flameChickRealtimeRefreshTimer);
+  const expiresAt=Number(flameChickStaffSession?.expires_at||0);
+  if(!expiresAt||!flameChickStaffSession?.refresh_token)return;
   const delay=Math.max(1000,expiresAt*1000-Date.now()-120000);
-  hfpRealtimeRefreshTimer=setTimeout(refreshHfpRealtimeToken,delay);
+  flameChickRealtimeRefreshTimer=setTimeout(refreshFlameChickRealtimeToken,delay);
 }
-async function refreshHfpRealtimeToken(){
-  const current=hfpStaffSession;
+async function refreshFlameChickRealtimeToken(){
+  const current=flameChickStaffSession;
   if(!current?.refresh_token)return;
   try{
-    const r=await fetch(HFP_AUTH_URL+"/token?grant_type=refresh_token",{
+    const r=await fetch(FLAME_CHICK_AUTH_URL+"/token?grant_type=refresh_token",{
       method:"POST",
-      headers:{"apikey":HFP_PUBLISHABLE_KEY,"Content-Type":"application/json"},
+      headers:{"apikey":FLAME_CHICK_PUBLISHABLE_KEY,"Content-Type":"application/json"},
       body:JSON.stringify({refresh_token:current.refresh_token}),
       cache:"no-store"
     });
     const data=await r.json().catch(()=>({}));
     if(!r.ok||!data.access_token)throw new Error(data.msg||data.message||data.error_description||"Could not refresh the Realtime session.");
     if(!data.expires_at&&data.expires_in)data.expires_at=Math.floor(Date.now()/1000)+Number(data.expires_in);
-    if(hfpStaffSession!==current)return;
-    saveHfpStaffSession({...data,user:current.user});
-    if(hfpRealtimeClient)await hfpRealtimeClient.realtime.setAuth(data.access_token);
-    scheduleHfpRealtimeTokenRefresh();
+    if(flameChickStaffSession!==current)return;
+    saveFlameChickStaffSession({...data,user:current.user});
+    if(flameChickRealtimeClient)await flameChickRealtimeClient.realtime.setAuth(data.access_token);
+    scheduleFlameChickRealtimeTokenRefresh();
   }catch(e){
     console.warn("Flame Chick POS Realtime token refresh failed.",e);
-    setHfpRealtimeFallback("Realtime token refresh failed · use Refresh orders if needed");
-    if(hfpStaffSession?.access_token)hfpRealtimeRefreshTimer=setTimeout(refreshHfpRealtimeToken,30000);
+    setFlameChickRealtimeFallback("Realtime token refresh failed · use Refresh orders if needed");
+    if(flameChickStaffSession?.access_token)flameChickRealtimeRefreshTimer=setTimeout(refreshFlameChickRealtimeToken,30000);
   }
 }
-function scheduleHfpRealtimeInboxRefresh(){
-  if(!hfpStaffSession?.access_token)return;
+function scheduleFlameChickRealtimeInboxRefresh(){
+  if(!flameChickStaffSession?.access_token)return;
   // Fixed-window coalescing groups rush-hour change bursts instead of resetting
   // a trailing debounce indefinitely while events keep arriving.
-  hfpRealtimeRefreshQueued=true;
-  if(hfpRealtimeRefreshDebounce||hfpRealtimeRefreshRunning)return;
-  hfpRealtimeRefreshDebounce=setTimeout(async()=>{
-    hfpRealtimeRefreshDebounce=null;
-    if(!hfpStaffSession?.access_token){hfpRealtimeRefreshQueued=false;return;}
-    if(!hfpRealtimeRefreshQueued)return;
-    hfpRealtimeRefreshQueued=false;
-    hfpRealtimeRefreshRunning=true;
+  flameChickRealtimeRefreshQueued=true;
+  if(flameChickRealtimeRefreshDebounce||flameChickRealtimeRefreshRunning)return;
+  flameChickRealtimeRefreshDebounce=setTimeout(async()=>{
+    flameChickRealtimeRefreshDebounce=null;
+    if(!flameChickStaffSession?.access_token){flameChickRealtimeRefreshQueued=false;return;}
+    if(!flameChickRealtimeRefreshQueued)return;
+    flameChickRealtimeRefreshQueued=false;
+    flameChickRealtimeRefreshRunning=true;
     try{await loadInitialOnlineInbox();}
     catch(e){console.debug("Flame Chick POS Realtime refresh failed; use manual refresh if needed.",e.message);}
     finally{
-      hfpRealtimeRefreshRunning=false;
-      if(hfpRealtimeRefreshQueued)scheduleHfpRealtimeInboxRefresh();
+      flameChickRealtimeRefreshRunning=false;
+      if(flameChickRealtimeRefreshQueued)scheduleFlameChickRealtimeInboxRefresh();
     }
   },180);
 }
-async function startHfpRealtime(){
-  stopHfpRealtime();
-  const branchId=String(hfpStaffProfile?.branch_id||"").trim();
-  if(!hfpStaffSession?.access_token||!branchId)return;
+async function startFlameChickRealtime(){
+  stopFlameChickRealtime();
+  const branchId=String(flameChickStaffProfile?.branch_id||"").trim();
+  if(!flameChickStaffSession?.access_token||!branchId)return;
   if(!window.supabase?.createClient){
-    setHfpRealtimeFallback("Realtime library unavailable · use Refresh orders");
+    setFlameChickRealtimeFallback("Realtime library unavailable · use Refresh orders");
     return;
   }
   try{
-    const client=window.supabase.createClient(HFP_SUPABASE_URL,HFP_PUBLISHABLE_KEY,{
+    const client=window.supabase.createClient(FLAME_CHICK_SUPABASE_URL,FLAME_CHICK_PUBLISHABLE_KEY,{
       auth:{autoRefreshToken:false,persistSession:false,detectSessionInUrl:false},
-      realtime:{params:{eventsPerSecond:HFP_REALTIME_EVENTS_PER_SECOND}}
+      realtime:{params:{eventsPerSecond:FLAME_CHICK_REALTIME_EVENTS_PER_SECOND}}
     });
-    hfpRealtimeClient=client;
-    await client.realtime.setAuth(hfpStaffSession.access_token);
+    flameChickRealtimeClient=client;
+    await client.realtime.setAuth(flameChickStaffSession.access_token);
     const channel=client.channel("flame-chick-pos-ops-"+branchId);
     channel
-      .on("postgres_changes",{event:"*",schema:"public",table:"orders",filter:"branch_id=eq."+branchId},scheduleHfpRealtimeInboxRefresh)
-      .on("postgres_changes",{event:"*",schema:"public",table:"delivery_tasks",filter:"branch_id=eq."+branchId},scheduleHfpRealtimeInboxRefresh)
-      .on("postgres_changes",{event:"*",schema:"public",table:"delivery_task_offers"},scheduleHfpRealtimeInboxRefresh)
-      .on("postgres_changes",{event:"*",schema:"public",table:"delivery_assignments"},scheduleHfpRealtimeInboxRefresh);
-    hfpRealtimeChannel=channel;
+      .on("postgres_changes",{event:"*",schema:"public",table:"orders",filter:"branch_id=eq."+branchId},scheduleFlameChickRealtimeInboxRefresh)
+      .on("postgres_changes",{event:"*",schema:"public",table:"delivery_tasks",filter:"branch_id=eq."+branchId},scheduleFlameChickRealtimeInboxRefresh)
+      .on("postgres_changes",{event:"*",schema:"public",table:"delivery_task_offers"},scheduleFlameChickRealtimeInboxRefresh)
+      .on("postgres_changes",{event:"*",schema:"public",table:"delivery_assignments"},scheduleFlameChickRealtimeInboxRefresh);
+    flameChickRealtimeChannel=channel;
     channel.subscribe(status=>{
-      if(client!==hfpRealtimeClient)return;
+      if(client!==flameChickRealtimeClient)return;
       if(status==="SUBSCRIBED"){
-        hfpRealtimeState="connected";
+        flameChickRealtimeState="connected";
         const live=$("inboxLiveText");
         if(live)live.textContent="Realtime active · event-driven updates";
-        scheduleHfpRealtimeInboxRefresh();
+        scheduleFlameChickRealtimeInboxRefresh();
       }else if(["CHANNEL_ERROR","TIMED_OUT","CLOSED"].includes(status)){
-        setHfpRealtimeFallback("Realtime disconnected · use Refresh orders");
+        setFlameChickRealtimeFallback("Realtime disconnected · use Refresh orders");
       }
     });
-    scheduleHfpRealtimeTokenRefresh();
+    scheduleFlameChickRealtimeTokenRefresh();
   }catch(e){
     console.warn("Flame Chick POS Realtime could not start.",e);
-    setHfpRealtimeFallback("Realtime unavailable · use Refresh orders");
+    setFlameChickRealtimeFallback("Realtime unavailable · use Refresh orders");
   }
 }
 
 async function loadDeliveryDispatch(){
-  const role=String(hfpStaffProfile?.role||'').toLowerCase();
-  if(!['owner','admin','manager','cashier'].includes(role)||!hfpStaffProfile?.branch_id){
+  const role=String(flameChickStaffProfile?.role||'').toLowerCase();
+  if(!['owner','admin','manager','cashier'].includes(role)||!flameChickStaffProfile?.branch_id){
     deliveryTasksByOrder.clear();dispatchRiders=[];return;
   }
-  const branchId=String(hfpStaffProfile.branch_id);
+  const branchId=String(flameChickStaffProfile.branch_id);
   const [tasks,riders]=await Promise.all([
-    hfpDirectRest('delivery_tasks',{
+    flameChickDirectRest('delivery_tasks',{
       select:'id,order_id,branch_id,status,recipient_name_snapshot,recipient_phone_snapshot,address_snapshot,area_name_snapshot,delivery_fee_snapshot,delivery_instructions_snapshot,dispatch_started_at,assigned_at,picked_up_at,out_for_delivery_at,delivered_at,failed_at,failure_reason,return_reported_at,return_confirmed_at,created_at,delivery_assignments(id,rider_user_id,status,is_current,assigned_at,accepted_at,arrived_at,picked_up_at,delivered_at,created_at,ended_at,end_reason)',
       branch_id:'eq.'+branchId,status:'in.(dispatch_pending,offering,assigned,accepted,arrived_at_restaurant,out_for_delivery,failed)',order:'created_at.asc',limit:'100'
     }),
-    hfpDirectRest('rider_profiles',{select:'user_id,rider_code,display_name,phone,availability_status,accepting_jobs,is_active,last_seen_at',branch_id:'eq.'+branchId,is_active:'eq.true',order:'display_name.asc'})
+    flameChickDirectRest('rider_profiles',{select:'user_id,rider_code,display_name,phone,availability_status,accepting_jobs,is_active,last_seen_at',branch_id:'eq.'+branchId,is_active:'eq.true',order:'display_name.asc'})
   ]);
   deliveryTasksByOrder=new Map((Array.isArray(tasks)?tasks:[]).map(task=>[String(task.order_id),task]));
   dispatchRiders=Array.isArray(riders)?riders:[];
@@ -1577,7 +1577,7 @@ function renderDeliveryDispatchAction(order){
   const latest=[...assignments].sort((a,b)=>new Date(b.assigned_at||b.created_at||0)-new Date(a.assigned_at||a.created_at||0))[0]||null;
   const activeStatuses=['assigned','accepted','arrived_at_restaurant','picked_up','out_for_delivery'];
   const current=assignments.find(x=>x.is_current===true&&activeStatuses.includes(String(x.status||'')))||null;
-  const role=String(hfpStaffProfile?.role||'').toLowerCase();
+  const role=String(flameChickStaffProfile?.role||'').toLowerCase();
   if(task.status==='failed'){
     const name=riderNameFor((current||latest)?.rider_user_id);
     const reported=Boolean(task.return_reported_at);
@@ -1615,13 +1615,13 @@ function renderDeliveryDispatchAction(order){
   return `<span class="pill pending">${esc(dispatchStatusLabel(task.status))}</span>`;
 }
 async function confirmDeliveryReturn(taskId,button){
-  const role=String(hfpStaffProfile?.role||'').toLowerCase();
+  const role=String(flameChickStaffProfile?.role||'').toLowerCase();
   if(!['owner','admin','manager'].includes(role)){showToast('Only an Flame Chick manager, admin or owner can confirm a returned delivery.');return;}
   const task=[...deliveryTasksByOrder.values()].find(x=>String(x.id)===String(taskId));
   if(!task||task.status!=='failed'||!task.return_reported_at){showToast('The rider has not yet reported the return.');return;}
   if(button)button.disabled=true;
   try{
-    await hfpDeliveryRequest('POST',null,{action:'confirm_return',delivery_task_id:taskId});
+    await flameChickDeliveryRequest('POST',null,{action:'confirm_return',delivery_task_id:taskId});
     await loadInitialOnlineInbox();
     showToast('Returned order cancelled. Rider is now available.');
   }catch(e){showToast(e?.message||'Could not confirm the returned delivery.');if(button)button.disabled=false;}
@@ -1669,9 +1669,9 @@ async function assignRiderToOrder(orderId,riderUserId,button){
     const current=assignments.find(x=>x.is_current===true)||null;
     const pendingReassignment=task.status==='assigned'&&current?.status==='assigned'&&!current.accepted_at;
     if(pendingReassignment){
-      await hfpDirectRpc('hfp_admin_reassign_delivery',{p_delivery_task_id:task.id,p_rider_user_id:riderUserId});
+      await flameChickDirectRpc('flame_chick_admin_reassign_delivery',{p_delivery_task_id:task.id,p_rider_user_id:riderUserId});
     }else{
-      await hfpDeliveryRequest('POST',null,{action:'assign',delivery_task_id:task.id,rider_user_id:riderUserId});
+      await flameChickDeliveryRequest('POST',null,{action:'assign',delivery_task_id:task.id,rider_user_id:riderUserId});
     }
     closeModal('assignRiderModal');
     await loadInitialOnlineInbox();
@@ -1682,7 +1682,7 @@ async function assignRiderToOrder(orderId,riderUserId,button){
   }finally{deliveryAssignInProgress=false;}
 }
 
-function hfpNormalizeOrder(row){
+function flameChickNormalizeOrder(row){
   const items=(row.order_items||[]).map(it=>{
     const mods=(it.order_item_modifiers||[]).map(m=>m.modifier_name_snapshot+(Number(m.unit_price_snapshot)>0?' (+Rs. '+money(m.unit_price_snapshot)+')':''));
     const comps=(it.order_item_components||[]).map(c=>c.name_snapshot+(c.variant_snapshot?' '+c.variant_snapshot:'')+(c.volume_snapshot?' '+c.volume_snapshot:''));
@@ -1820,7 +1820,7 @@ function mergeInboxOrder(o){
   inboxOrders.set(key,merged);
 }
 async function recoverOrderItems(orderId){
-  if(HFP_ORDER_API_READY)return;
+  if(FLAME_CHICK_ORDER_API_READY)return;
   const key=String(orderId||'').trim();
   if(!key) return;
   if(recoveryAttemptedOrders.has(key)) return;
@@ -1889,18 +1889,18 @@ function normalizeNewOrdersResponse(res){
 }
 
 async function fetchWebsiteOrders(cursor,limit=100){
-  const branchId=String(hfpStaffProfile?.branch_id||'');
+  const branchId=String(flameChickStaffProfile?.branch_id||'');
   if(!branchId)throw new Error('Your Flame Chick staff account is not assigned to a branch.');
-  const rows=await hfpDirectRest('orders',{
+  const rows=await flameChickDirectRest('orders',{
     select:'id,branch_id,order_number,local_order_id,source,fulfillment_type,status,customer_name,customer_phone,delivery_address,delivery_area_name_snapshot,payment_method_summary,payment_status,notes,subtotal,delivery_fee,total,placed_at,created_at,updated_at,order_items(id,line_number,quantity,product_name_snapshot,variant_label_snapshot,deal_title_snapshot,unit_price_snapshot,line_total,item_notes,order_item_modifiers(modifier_name_snapshot,unit_price_snapshot))',
     branch_id:'eq.'+branchId,status:'in.(new,accepted,preparing,ready,out_for_delivery)',order:'created_at.desc',limit:String(Math.max(1,Math.min(limit,100)))
   });
-  return {orders:(Array.isArray(rows)?rows:[]).map(hfpNormalizeOrder),nextCursor:'',hasMore:false,signalVersion:String(Date.now()),success:true};
+  return {orders:(Array.isArray(rows)?rows:[]).map(flameChickNormalizeOrder),nextCursor:'',hasMore:false,signalVersion:String(Date.now()),success:true};
 }
 
 async function loadInitialOnlineInbox(){
-  if(!HFP_ORDER_API_READY)return;
-  if(!hfpStaffSession?.access_token){$('inboxLiveText').textContent='Staff sign-in required';$('ordersMeta').textContent='Sign in with your Flame Chick staff account to see incoming orders.';inboxOrders.clear();deliveryTasksByOrder.clear();dispatchRiders=[];renderKanban();return;}
+  if(!FLAME_CHICK_ORDER_API_READY)return;
+  if(!flameChickStaffSession?.access_token){$('inboxLiveText').textContent='Staff sign-in required';$('ordersMeta').textContent='Sign in with your Flame Chick staff account to see incoming orders.';inboxOrders.clear();deliveryTasksByOrder.clear();dispatchRiders=[];renderKanban();return;}
   if(inboxInitialLoadPromise)return inboxInitialLoadPromise;
   inboxInitialLoadPromise=(async()=>{
     try{
@@ -1918,7 +1918,7 @@ async function loadInitialOnlineInbox(){
       inboxOrders.clear();
       for(const [orderId,order] of freshOrders)inboxOrders.set(orderId,order);
       try{await loadDeliveryDispatch();}catch(dispatchError){console.warn('Flame Chick dispatch board refresh failed',dispatchError);}
-      inboxLastSyncAt=Date.now();renderKanban();$('inboxLiveText').textContent=hfpRealtimeState==='connected'?'Realtime active · event-driven updates':'Connected · manual refresh available';
+      inboxLastSyncAt=Date.now();renderKanban();$('inboxLiveText').textContent=flameChickRealtimeState==='connected'?'Realtime active · event-driven updates':'Connected · manual refresh available';
     }catch(e){$('inboxLiveText').textContent='Connection problem';console.error('Flame Chick order board failed',e);renderKanban();throw e;}
   })();
   try{return await inboxInitialLoadPromise;}finally{inboxInitialLoadPromise=null;}
@@ -2016,7 +2016,7 @@ function applyDatabaseOrderStatus(order,row){
   return true;
 }
 async function readCanonicalOrderStatus(orderId){
-  const rows=await hfpDirectRest('orders',{
+  const rows=await flameChickDirectRest('orders',{
     select:'id,status,updated_at',
     id:'eq.'+String(orderId),
     limit:'1'
@@ -2053,7 +2053,7 @@ async function updateOnlineOrderStatus(orderId,status){
   renderKanban();
 
   try{
-    const result=await hfpOrderRequest('POST',null,{
+    const result=await flameChickOrderRequest('POST',null,{
       action:status==='Cancelled'?'cancel':status==='Rejected'?'reject':'update_status',
       order_id:key,to_status:toStatus,reason
     });
@@ -2066,8 +2066,8 @@ async function updateOnlineOrderStatus(orderId,status){
       statusMutationByOrder.delete(key);
       inboxOrders.set(key,liveOrder);
       renderKanban();
-      if(live&&hfpStaffSession?.access_token){
-        $('inboxLiveText').textContent=hfpRealtimeState==='connected'?'Realtime active · event-driven updates':'Connected · manual refresh available';
+      if(live&&flameChickStaffSession?.access_token){
+        $('inboxLiveText').textContent=flameChickRealtimeState==='connected'?'Realtime active · event-driven updates':'Connected · manual refresh available';
       }
       showToast((liveOrder.OrderNumber||key)+' → '+liveOrder.Status);
     }
@@ -2093,8 +2093,8 @@ async function updateOnlineOrderStatus(orderId,status){
         inboxOrders.set(key,currentOrder);
         renderKanban();
       }
-      if(live&&hfpStaffSession?.access_token){
-        $('inboxLiveText').textContent=hfpRealtimeState==='connected'?'Realtime active · event-driven updates':'Connected · manual refresh available';
+      if(live&&flameChickStaffSession?.access_token){
+        $('inboxLiveText').textContent=flameChickRealtimeState==='connected'?'Realtime active · event-driven updates':'Connected · manual refresh available';
       }
       const actual=String(currentOrder.Status||previousStatus);
       showToast(serverCommittedTarget
@@ -2109,7 +2109,7 @@ async function updateOnlineOrderStatus(orderId,status){
 }
 
 async function syncStatusUpdates(){
-  if(HFP_ORDER_API_READY)return;
+  if(FLAME_CHICK_ORDER_API_READY)return;
   if(!navigator.onLine||!db||statusSyncInProgress)return;
   statusSyncInProgress=true;
   try{
@@ -2396,16 +2396,16 @@ function setupCashierControls(){
     btn.classList.add('active'); $('paymentMethod').value=btn.dataset.pay||'Cash';
   });
   $('navNewOrder').onclick=()=>{resetNewOrderMode();showPage('new')};
-  $('navOrders').onclick=()=>{if(!hfpStaffSession?.access_token){showStaffLoginGate('Sign in to your Flame Chick staff account to receive orders.');return;}showPage('orders')};
+  $('navOrders').onclick=()=>{if(!flameChickStaffSession?.access_token){showStaffLoginGate('Sign in to your Flame Chick staff account to receive orders.');return;}showPage('orders')};
   $('navTables').onclick=()=>renderTablesModal();
   // Order History is opened from the System panel.
   $('selectTableBtn').onclick=()=>renderTablesModal();
   $('manageTablesBtn').onclick=()=>{closeModal('tablesModal');manageTables()};
   $('payCloseBtn').onclick=()=>guardedOrderAction('payCloseBtn',takePaymentAndCloseTable);
   $('refreshInboxBtn').onclick=()=>loadInitialOnlineInbox();
-  $('staffLoginBtn').onclick=()=>{if(hfpStaffSession?.access_token)hfpStaffSignOut();else showStaffLoginGate()};
-  $('staffSignInSubmit').onclick=hfpStaffSignIn;
-  $('staffLoginForm')?.addEventListener('submit',hfpStaffSignIn);
+  $('staffLoginBtn').onclick=()=>{if(flameChickStaffSession?.access_token)flameChickStaffSignOut();else showStaffLoginGate()};
+  $('staffSignInSubmit').onclick=flameChickStaffSignIn;
+  $('staffLoginForm')?.addEventListener('submit',flameChickStaffSignIn);
   updateOrderFieldsByType();
   $('orderType').onchange=()=>{
     $('orderTypeButtons')?.querySelectorAll('.type-btn').forEach(b=>b.classList.toggle('active',b.dataset.type===$('orderType').value));
@@ -2622,7 +2622,7 @@ async function init(){
     syncPending();
     syncStatusUpdates();
     updateSystemPanel();
-    if(hfpStaffSession?.access_token){startHfpRealtime();loadInitialOnlineInbox();}
+    if(flameChickStaffSession?.access_token){startFlameChickRealtime();loadInitialOnlineInbox();}
   });
   window.addEventListener('offline',()=>{
     updateNetworkStatus(); updateSystemPanel();
@@ -2652,12 +2652,12 @@ async function fetchJSON(url,opts={}){
     throw e;
   }finally{clearTimeout(timeout)}
 }
-async function fetchHfpCatalog(action){
-  return fetchJSON(HFP_CATALOG_API+'?action='+encodeURIComponent(action),{
-    timeoutMs:15000,headers:{apikey:HFP_PUBLISHABLE_KEY,Accept:'application/json'}
+async function fetchFlameChickCatalog(action){
+  return fetchJSON(FLAME_CHICK_CATALOG_API+'?action='+encodeURIComponent(action),{
+    timeoutMs:15000,headers:{apikey:FLAME_CHICK_PUBLISHABLE_KEY,Accept:'application/json'}
   });
 }
-function adaptHfpCatalog(snapshot){
+function adaptFlameChickCatalog(snapshot){
   if(!snapshot||Number(snapshot.schemaVersion)!==2)throw new Error('Unsupported Flame Chick catalog schema.');
   const required=['categories','products','productVariants','subcategories','deals','dealComponents','modifierGroups','modifiers','modifierPriceRules','modifierGroupAssignments','deliveryAreas','drinkOptions'];
   for(const k of required)if(!Array.isArray(snapshot[k]))throw new Error('Flame Chick catalog is missing '+k+'.');
@@ -2705,7 +2705,7 @@ async function ensureDeliveryAreas(){deliveryAreas=await all(STORES.deliveryArea
 async function refreshMenu(force=false){
   if(!navigator.onLine&&!force)throw new Error('Internet is offline. The last verified Flame Chick menu remains available locally.');
   $('notice').textContent='Checking Flame Chick catalog…';$('notice').className='notice';
-  const health=await fetchHfpCatalog('health');
+  const health=await fetchFlameChickCatalog('health');
   if(!health?.ok||!health.data||Number(health.data.schemaVersion)!==2)throw new Error(health?.error?.message||'Flame Chick catalog health check failed.');
   if(health.data.published!==true||!health.data.versionId)throw new Error('Flame Chick menu is not published yet.');
   const current=await get(STORES.settings,'menuVersion');
@@ -2713,11 +2713,11 @@ async function refreshMenu(force=false){
     $('notice').textContent='Flame Chick menu is up to date · '+menu.length+' variants';$('notice').className='notice ok';
     return;
   }
-  const response=await fetchHfpCatalog('catalog');
+  const response=await fetchFlameChickCatalog('catalog');
   if(!response?.ok||!response.data)throw new Error(response?.error?.message||'Flame Chick catalog download failed.');
   const snapshot=response.data;
   if(String(snapshot.versionId)!==String(health.data.versionId))throw new Error('Flame Chick menu changed during download. Refresh and try again.');
-  const adapted=adaptHfpCatalog(snapshot);
+  const adapted=adaptFlameChickCatalog(snapshot);
   if(!adapted.menu.length)throw new Error('Flame Chick catalog returned no active product variants.');
   await Promise.all([clearStore(STORES.menu),clearStore(STORES.categories),clearStore(STORES.deliveryAreas)]);
   for(const row of adapted.menu)await put(STORES.menu,row);
@@ -2814,7 +2814,7 @@ function posImageUrl(row){
   if(/^https?:\/\//i.test(path))return path;
   const encoded=path.split('/').map(encodeURIComponent).join('/');
   if(/^(products|categories|deals)\/[0-9a-f-]{36}\//i.test(path)){
-    return HFP_SUPABASE_URL+'/storage/v1/object/public/flame-chick-media/'+encoded;
+    return FLAME_CHICK_SUPABASE_URL+'/storage/v1/object/public/flame-chick-media/'+encoded;
   }
   if(/^images\//i.test(path)){
     return 'https://adkrxfnawdiljhjaavnj.supabase.co/storage/v1/object/public/flame-chick-media/'+encoded;
@@ -2840,7 +2840,7 @@ function renderDealCard(deal){
   const imagePath=String(deal.ImagePath||'').trim();
   let src='';
   if(imagePath&&/^(deals\/[A-Za-z0-9._-]+|deals\/[0-9a-f-]{36}\/[A-Za-z0-9._-]+)\.(?:webp|jpe?g|png)$/i.test(imagePath)){
-    if(/^[0-9a-f-]{36}\//i.test(imagePath.slice(6)))src=HFP_SUPABASE_URL+'/storage/v1/object/public/flame-chick-media/'+imagePath.split('/').map(encodeURIComponent).join('/');
+    if(/^[0-9a-f-]{36}\//i.test(imagePath.slice(6)))src=FLAME_CHICK_SUPABASE_URL+'/storage/v1/object/public/flame-chick-media/'+imagePath.split('/').map(encodeURIComponent).join('/');
     else src='https://adkrxfnawdiljhjaavnj.supabase.co/storage/v1/object/public/flame-chick-media/'+imagePath.split('/').map(encodeURIComponent).join('/');
   }
   const art=src?'<div class="item-thumb"><img src="'+esc(src)+'" alt="'+esc(deal.Title||'Deal')+'" loading="lazy" decoding="async" onerror="this.parentElement.classList.add(String.fromCharCode(110,111,45,112,104,111,116,111));this.remove()"></div>':'<div class="item-thumb no-photo"><span>🎁</span></div>';
@@ -3607,7 +3607,7 @@ async function saveLocalOrder(){
   await updateSyncBox();
   if(type==='Delivery'){
     try{
-      const synced=await hfpCreatePosDeliveryOrder(order);
+      const synced=await flameChickCreatePosDeliveryOrder(order);
       order={...synced,checkoutPending:false,updatedAt:new Date().toISOString(),syncStatus:'synced',status:'Pending',orderSource:'POS'};
       await put(STORES.orders,order);
       await del(STORES.queue,order.localOrderId);
@@ -3633,7 +3633,7 @@ async function saveLocalOrder(){
   showToast('Order saved locally — confirm receipt to finish');
 }
 async function reconcileLocalOrderOnServer(localOrderId){
-  if(!HFP_ORDER_API_READY)return null;
+  if(!FLAME_CHICK_ORDER_API_READY)return null;
   const key=String(localOrderId||'').trim();
   if(!key || !navigator.onLine)return null;
   try{
@@ -3657,7 +3657,7 @@ async function reconcileLocalOrderOnServer(localOrderId){
  * affected.
  */
 async function reconcileLocalOrderByLegacyFingerprint(order){
-  if(!HFP_ORDER_API_READY)return null;
+  if(!FLAME_CHICK_ORDER_API_READY)return null;
   if(!order || !navigator.onLine || !Array.isArray(order.items))return null;
   try{
     const serverRows=await fetchServerHistory('POS',200);
@@ -3701,8 +3701,8 @@ async function reconcileLocalOrderByLegacyFingerprint(order){
 }
 
 async function syncPending(){
-  if(HFP_ORDER_API_READY){await syncPendingPosDeliveryOrders();return;}
-  if(HFP_ORDER_API_READY){await updateSyncBox();if($('syncText'))$('syncText').textContent='Local POS orders are saved on this device. Cloud sync is not enabled. Website orders are handled in Online Orders.';return}
+  if(FLAME_CHICK_ORDER_API_READY){await syncPendingPosDeliveryOrders();return;}
+  if(FLAME_CHICK_ORDER_API_READY){await updateSyncBox();if($('syncText'))$('syncText').textContent='Local POS orders are saved on this device. Cloud sync is not enabled. Website orders are handled in Online Orders.';return}
   if(!navigator.onLine || !db){await updateSyncBox();return}
   if(syncInProgress)return;
   syncInProgress=true;
@@ -3838,13 +3838,13 @@ async function syncPending(){
     }
   }finally{syncInProgress=false;}
 }
-function hfpIsPosDeliveryOrder(order){
+function flameChickIsPosDeliveryOrder(order){
   if(!order||typeof order!=='object')return false;
   const source=String(order.orderSource??order.OrderSource??'pos').trim().toLowerCase();
   const fulfillment=String(order.fulfillmentType??order.FulfillmentType??'').trim().toLowerCase();
   return (!source||source==='pos')&&fulfillment==='delivery';
 }
-function hfpIsTerminalLocalOrder(order){
+function flameChickIsTerminalLocalOrder(order){
   return ['delivered','collected','served','completed','cancelled','canceled','rejected','merged'].includes(String(order?.status??order?.Status??'').trim().toLowerCase());
 }
 async function syncPendingPosDeliveryOrders(){
@@ -3854,7 +3854,7 @@ async function syncPendingPosDeliveryOrders(){
     if($('syncText'))$('syncText').textContent='Connect to the internet to send pending POS delivery orders.';
     return;
   }
-  if(!hfpStaffSession?.access_token){
+  if(!flameChickStaffSession?.access_token){
     await updateSyncBox();
     if($('syncText'))$('syncText').textContent='Sign in to Flame Chick staff access to send pending POS delivery orders.';
     return;
@@ -3869,7 +3869,7 @@ async function syncPendingPosDeliveryOrders(){
 
     const candidates=[];
     for(const [id,row] of localById){
-      if(!hfpIsPosDeliveryOrder(row)||hfpIsTerminalLocalOrder(row))continue;
+      if(!flameChickIsPosDeliveryOrder(row)||flameChickIsTerminalLocalOrder(row))continue;
       const queued=queuedById.has(id);
       const state=String(row.syncStatus||'').trim().toLowerCase();
       const needsSend=queued||row.checkoutPending===true||['pending','failed','syncing'].includes(state);
@@ -3901,7 +3901,7 @@ async function syncPendingPosDeliveryOrders(){
       await put(STORES.queue,order);
       if($('syncText'))$('syncText').textContent='Sending '+(index+1)+' / '+batch.length+'…';
       try{
-        const synced=await hfpCreatePosDeliveryOrder(order,{refreshBoard:false});
+        const synced=await flameChickCreatePosDeliveryOrder(order,{refreshBoard:false});
         const saved={...synced,checkoutPending:false,syncStatus:'synced',syncAttempts:0,lastSyncError:'',nextSyncAt:0,updatedAt:new Date().toISOString()};
         await put(STORES.orders,saved);
         await del(STORES.queue,candidate.id);
@@ -3946,7 +3946,7 @@ async function updateSystemPanel(){
     $('dbSizeText').textContent=(ord.length+menu.length+categories.length)+' records';
     $('cloudMiniDot').className='mini-dot '+(navigator.onLine?'ok':'bad'); $('cloudStatusText').textContent=navigator.onLine?'Internet available · Online Orders will test the API':'Offline — local mode';
   }catch(e){console.debug('system panel update',e.message)}
-  if(HFP_ORDER_API_READY){$('workerStatusText').textContent='Supabase API';$('workerDetailText').textContent=hfpStaffSession?.access_token?'Staff session available · order board connected':'Staff sign-in required for order board';return}
+  if(FLAME_CHICK_ORDER_API_READY){$('workerStatusText').textContent='Supabase API';$('workerDetailText').textContent=flameChickStaffSession?.access_token?'Staff session available · order board connected':'Staff sign-in required for order board';return}
   try{
     const wh=await fetchJSON(API_URL+'?action=workerHealth');
     if(wh&&wh.success){
@@ -3967,7 +3967,7 @@ async function showQueue(){
         const st=String(o.syncStatus||'pending').toLowerCase();
         const cls=st==='synced'?'synced':st==='failed'?'failed':'pending';
         const when=o.lastSyncAttemptAt?new Date(o.lastSyncAttemptAt).toLocaleTimeString():'—';
-        const action=HFP_ORDER_API_READY&&hfpIsPosDeliveryOrder(o)&&!o.serverOrderId&&!hfpIsTerminalLocalOrder(o)
+        const action=FLAME_CHICK_ORDER_API_READY&&flameChickIsPosDeliveryOrder(o)&&!o.serverOrderId&&!flameChickIsTerminalLocalOrder(o)
           ?'<button type="button" class="btn primary" data-retry-pos-delivery="'+esc(o.localOrderId)+'">Send to Online Orders</button>'
           :'';
         return '<tr><td class="mono">'+esc(o.localOrderId)+'</td><td>Rs. '+money(o.total)+'</td><td><span class="pill '+cls+'">'+esc(o.syncStatus||'pending')+'</span></td><td>'+esc(Number(o.syncAttempts)||0)+'</td><td>'+esc(when)+'</td><td>'+esc(o.lastSyncError||'')+'</td><td>'+action+'</td></tr>';
@@ -4094,7 +4094,7 @@ async function returnReceiptToOrder(){
   }
   $('orderType').value=order.fulfillmentType||'Takeaway';$('orderTypeButtons').querySelectorAll('.type-btn').forEach(b=>b.classList.toggle('active',b.dataset.type===($('orderType').value)));$('customerName').value=order.customerName||'';$('phone').value=order.phone||'';$('address').value=order.address||'';$('area').value=order.area||'';$('notes').value=order.notes||'';$('paymentMethod').value=order.paymentMethod||'Cash';updateOrderFieldsByType();cart=(order.items||[]).map(x=>({...x}));renderCart();$('placeBtn').textContent='UPDATE ORDER';$('payCloseBtn').style.display='none';showPage('new');closeModal('receiptModal');showToast(String(order.fulfillmentType||'').toLowerCase()==='delivery'&&!order.serverOrderId?'Delivery returned to POS for editing · not sent online yet':'Back to Order — edit and update');
 }
-function hfpBuildPosDeliveryOrderPayload(order){
+function flameChickBuildPosDeliveryOrderPayload(order){
   if(!order||!String(order.localOrderId||'').trim())throw new Error('The local order ID is missing. Save the delivery order again.');
   const customerName=String(order.customerName||'').trim();
   const customerPhone=String(order.phone||'').trim();
@@ -4159,13 +4159,13 @@ function hfpBuildPosDeliveryOrderPayload(order){
   };
 }
 
-async function hfpCreatePosDeliveryOrder(order,options={}){
+async function flameChickCreatePosDeliveryOrder(order,options={}){
   const refreshBoard=options?.refreshBoard!==false;
   if(order?.serverOrderId)return order;
   if(!navigator.onLine)throw new Error('Internet is required to send this delivery order to Online Orders. The receipt is still open and nothing has been submitted.');
-  if(!hfpStaffSession?.access_token)throw new Error('Please sign in with your Flame Chick staff account before sending a POS delivery order to Online Orders.');
-  const payload=hfpBuildPosDeliveryOrderPayload(order);
-  const result=await hfpOrderRequest('POST',null,payload);
+  if(!flameChickStaffSession?.access_token)throw new Error('Please sign in with your Flame Chick staff account before sending a POS delivery order to Online Orders.');
+  const payload=flameChickBuildPosDeliveryOrderPayload(order);
+  const result=await flameChickOrderRequest('POST',null,payload);
   const remote=result?.order;
   if(!remote?.id)throw new Error('The order API did not confirm the POS delivery order. The receipt is still open; retry safely.');
 
@@ -4202,7 +4202,7 @@ async function finalizeReceiptOrder(order){
 
   if(isDelivery){
     try{
-      finalized=await hfpCreatePosDeliveryOrder(current);
+      finalized=await flameChickCreatePosDeliveryOrder(current);
     }catch(e){
       const message=String(e?.message||'Could not send the delivery order to Online Orders.');
       const status=$('receiptStatusText');
@@ -4282,14 +4282,14 @@ async function openLocalOrderDetails(localOrderId){
 }
 async function retryLocalOrderSync(localOrderId){
   const order=await get(STORES.orders,localOrderId);if(!order)return;
-  if(HFP_ORDER_API_READY){
-    if(!hfpIsPosDeliveryOrder(order)){
+  if(FLAME_CHICK_ORDER_API_READY){
+    if(!flameChickIsPosDeliveryOrder(order)){
       showToast('Takeaway and dine-in orders stay local; only delivery orders are sent to Online Orders.');
       return;
     }
     if(!navigator.onLine){showToast('Connect to the internet before retrying this delivery order.');return;}
-    if(!hfpStaffSession?.access_token){showStaffLoginGate('Sign in to send this POS delivery order to Online Orders.');showToast('Staff sign-in is required to retry this delivery.');return;}
-    if(hfpIsTerminalLocalOrder(order)){showToast('This local order is already closed and will not be submitted.');return;}
+    if(!flameChickStaffSession?.access_token){showStaffLoginGate('Sign in to send this POS delivery order to Online Orders.');showToast('Staff sign-in is required to retry this delivery.');return;}
+    if(flameChickIsTerminalLocalOrder(order)){showToast('This local order is already closed and will not be submitted.');return;}
     if(order.serverOrderId){
       await del(STORES.queue,order.localOrderId);
       await loadInitialOnlineInbox();
@@ -4303,7 +4303,7 @@ async function retryLocalOrderSync(localOrderId){
     await put(STORES.orders,order);
     await put(STORES.queue,order);
     try{
-      const synced=await hfpCreatePosDeliveryOrder(order);
+      const synced=await flameChickCreatePosDeliveryOrder(order);
       await put(STORES.orders,{...synced,checkoutPending:false,syncStatus:'synced',syncAttempts:0,lastSyncError:'',updatedAt:new Date().toISOString()});
       await del(STORES.queue,order.localOrderId);
       showToast('Delivery order sent to Online Orders.');
@@ -4394,17 +4394,17 @@ function renderHistoryRows(rows){
   $('historyBody').querySelectorAll('.local-order-card').forEach(card=>card.onclick=()=>openHistoryOrderDetails(card.dataset.historyId,card.dataset.historySource));
 }
 async function fetchServerHistory(source,limit=100){
-  if(!HFP_ORDER_API_READY||!hfpStaffSession?.access_token)return [];
-  const branchId=String(hfpStaffProfile?.branch_id||'');
+  if(!FLAME_CHICK_ORDER_API_READY||!flameChickStaffSession?.access_token)return [];
+  const branchId=String(flameChickStaffProfile?.branch_id||'');
   if(!branchId)throw new Error('Your Flame Chick staff account is not assigned to a branch.');
-  const rows=await hfpDirectRest('orders',{
+  const rows=await flameChickDirectRest('orders',{
     // History cards and receipt previews need summary fields, not internal snapshots or nested deal-component trees.
     select:"id,branch_id,order_number,local_order_id,source,fulfillment_type,status,customer_name,customer_phone,delivery_address,delivery_area_name_snapshot,table_number_snapshot,subtotal,discount_amount,delivery_fee,total,payment_status,payment_method_summary,notes,placed_at,created_at,updated_at,order_items(id,line_number,quantity,product_name_snapshot,variant_label_snapshot,deal_title_snapshot,unit_price_snapshot,line_total,order_item_modifiers(modifier_name_snapshot,unit_price_snapshot))",
     branch_id:'eq.'+branchId,
     order:'created_at.desc',
     limit:String(Math.max(1,Math.min(limit,100)))
   });
-  const normalized=(Array.isArray(rows)?rows:[]).map(hfpNormalizeOrder).map(normalizeHistoryOrder).filter(Boolean);
+  const normalized=(Array.isArray(rows)?rows:[]).map(flameChickNormalizeOrder).map(normalizeHistoryOrder).filter(Boolean);
   const wanted=String(source||'').toLowerCase();
   return normalized.filter(o=>!wanted||String(o.orderSource||'').toLowerCase()===(wanted==='website'?'website':'pos'));
 }
@@ -4622,7 +4622,7 @@ orderFieldIds.forEach(id=>{
     focusNextOrderField(id);
   });
 });
-document.addEventListener('DOMContentLoaded',async()=>{loadHfpStaffSession();showStaffLoginGate();bindStaticControls();await restoreHfpStaffSession();await init();if(hfpStaffSession?.access_token){await startHfpRealtime();await loadInitialOnlineInbox();await syncPending();}else{showStaffLoginGate();}});
+document.addEventListener('DOMContentLoaded',async()=>{loadFlameChickStaffSession();showStaffLoginGate();bindStaticControls();await restoreFlameChickStaffSession();await init();if(flameChickStaffSession?.access_token){await startFlameChickRealtime();await loadInitialOnlineInbox();await syncPending();}else{showStaffLoginGate();}});
 </script>
 </body>
 </html>

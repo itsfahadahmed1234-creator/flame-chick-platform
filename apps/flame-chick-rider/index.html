@@ -421,7 +421,7 @@ async function startRiderRealtime(){
     riderRealtimeClient=client;
     await client.realtime.setAuth(session.access_token);
     const riderId=String(user.id);
-    const channel=client.channel("hfp-rider-ops-"+riderId);
+    const channel=client.channel("flame-chick-rider-ops-"+riderId);
     // Rider-specific subscriptions only: branch-wide task subscriptions multiply
     // every delivery update by every connected rider in the branch.
     channel
