@@ -187,97 +187,113 @@ BEGIN
     RAISE EXCEPTION 'CATALOG_MODIFIER_PRODUCT_ID_REQUIRED' USING ERRCODE = '22023';
   END IF;
 
-  SELECT a.actor_user_id, a.restaurant_id
-    INTO v_actor, v_restaurant
+  SELECT a.actor_user_id,a.restaurant_id
+    INTO v_actor,v_restaurant
   FROM app_private.flame_chick_catalog_actor() AS a;
-
   IF v_actor IS NULL THEN
-    RAISE EXCEPTION 'CATALOG_ADMIN_FORBIDDEN' USING ERRCODE = '42501';
+    RAISE EXCEPTION 'CATALOG_ADMIN_FORBIDDEN' USING ERRCODE='42501';
   END IF;
 
-  IF NOT EXISTS (
+  IF NOT EXISTS(
     SELECT 1 FROM public.products AS p
-    WHERE p.id = p_product_id AND p.restaurant_id = v_restaurant
+    WHERE p.id=p_product_id AND p.restaurant_id=v_restaurant
   ) THEN
-    RAISE EXCEPTION 'CATALOG_PRODUCT_NOT_FOUND' USING ERRCODE = 'P0002';
+    RAISE EXCEPTION 'CATALOG_PRODUCT_NOT_FOUND' USING ERRCODE='P0002';
   END IF;
 
   SELECT s.revision INTO v_revision
   FROM public.catalog_draft_state AS s
-  WHERE s.restaurant_id = v_restaurant;
+  WHERE s.restaurant_id=v_restaurant;
 
+  WITH assignments AS MATERIALIZED (
+    SELECT
+      a.id AS assignment_id,a.legacy_id,a.is_active,a.sort_order,
+      a.modifier_group_id,
+      g.name_en AS group_name_en,g.name_ur AS group_name_ur,
+      g.standalone_only,g.selection_mode,g.min_select,g.max_select,
+      g.is_active AS group_is_active,g.sort_order AS group_sort_order
+    FROM public.modifier_group_assignments AS a
+    JOIN public.modifier_groups AS g
+      ON g.id=a.modifier_group_id AND g.restaurant_id=a.restaurant_id
+    WHERE a.restaurant_id=v_restaurant
+      AND a.product_id=p_product_id
+  ),
+  rule_docs AS (
+    SELECT
+      pr.modifier_id,
+      pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'id',pr.id,
+          'product_variant_id',pr.product_variant_id,
+          'size_key',pv.size_key,
+          'size_label',pv.size_label,
+          'price',pr.price,
+          'legacy_id',pr.legacy_id
+        ) ORDER BY pv.sort_order,pv.size_key,pv.id
+      ) AS price_rules
+    FROM public.modifier_price_rules AS pr
+    JOIN public.product_variants AS pv
+      ON pv.id=pr.product_variant_id
+     AND pv.restaurant_id=pr.restaurant_id
+     AND pv.product_id=pr.product_id
+    WHERE pr.restaurant_id=v_restaurant
+      AND pr.product_id=p_product_id
+    GROUP BY pr.modifier_id
+  ),
+  option_docs AS (
+    SELECT
+      m.modifier_group_id,
+      pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'id',m.id,
+          'legacy_id',m.legacy_id,
+          'name_en',m.name_en,
+          'name_ur',m.name_ur,
+          'price_mode',m.price_mode,
+          'fixed_price',m.fixed_price,
+          'sort_order',m.sort_order,
+          'is_active',m.is_active,
+          'price_rules',COALESCE(rd.price_rules,'[]'::jsonb)
+        ) ORDER BY m.sort_order,m.id
+      ) AS modifiers
+    FROM public.modifiers AS m
+    JOIN assignments AS a ON a.modifier_group_id=m.modifier_group_id
+    LEFT JOIN rule_docs AS rd ON rd.modifier_id=m.id
+    WHERE m.restaurant_id=v_restaurant
+    GROUP BY m.modifier_group_id
+  )
   SELECT COALESCE(
     pg_catalog.jsonb_agg(
       pg_catalog.jsonb_build_object(
-        'assignment_id', a.id,
-        'legacy_id', a.legacy_id,
-        'is_active', a.is_active,
-        'sort_order', a.sort_order,
-        'modifier_group', pg_catalog.jsonb_build_object(
-          'id', g.id,
-          'name_en', g.name_en,
-          'name_ur', g.name_ur,
-          'standalone_only', g.standalone_only,
-          'selection_mode', g.selection_mode,
-          'min_select', g.min_select,
-          'max_select', g.max_select,
-          'is_active', g.is_active
+        'assignment_id',a.assignment_id,
+        'legacy_id',a.legacy_id,
+        'is_active',a.is_active,
+        'sort_order',a.sort_order,
+        'modifier_group',pg_catalog.jsonb_build_object(
+          'id',a.modifier_group_id,
+          'name_en',a.group_name_en,
+          'name_ur',a.group_name_ur,
+          'standalone_only',a.standalone_only,
+          'selection_mode',a.selection_mode,
+          'min_select',a.min_select,
+          'max_select',a.max_select,
+          'is_active',a.group_is_active
         ),
-        'modifiers', COALESCE((
-          SELECT pg_catalog.jsonb_agg(
-            pg_catalog.jsonb_build_object(
-              'id', m.id,
-              'name_en', m.name_en,
-              'name_ur', m.name_ur,
-              'price_mode', m.price_mode,
-              'fixed_price', m.fixed_price,
-              'sort_order', m.sort_order,
-              'is_active', m.is_active,
-              'price_rules', COALESCE((
-                SELECT pg_catalog.jsonb_agg(
-                  pg_catalog.jsonb_build_object(
-                    'id', pr.id,
-                    'product_variant_id', pr.product_variant_id,
-                    'size_key', pv.size_key,
-                    'size_label', pv.size_label,
-                    'price', pr.price,
-                    'legacy_id', pr.legacy_id
-                  ) ORDER BY pv.sort_order, pv.size_key, pv.id
-                )
-                FROM public.modifier_price_rules AS pr
-                JOIN public.product_variants AS pv
-                  ON pv.id = pr.product_variant_id
-                 AND pv.product_id = pr.product_id
-                 AND pv.restaurant_id = pr.restaurant_id
-                WHERE pr.restaurant_id = v_restaurant
-                  AND pr.product_id = p_product_id
-                  AND pr.modifier_group_id = g.id
-                  AND pr.modifier_id = m.id
-              ), '[]'::jsonb)
-            ) ORDER BY m.sort_order, m.id
-          )
-          FROM public.modifiers AS m
-          WHERE m.restaurant_id = v_restaurant
-            AND m.modifier_group_id = g.id
-        ), '[]'::jsonb)
-      ) ORDER BY a.sort_order, g.sort_order, g.id
+        'modifiers',COALESCE(o.modifiers,'[]'::jsonb)
+      ) ORDER BY a.sort_order,a.group_sort_order,a.modifier_group_id
     ),
     '[]'::jsonb
   )
   INTO v_items
-  FROM public.modifier_group_assignments AS a
-  JOIN public.modifier_groups AS g
-    ON g.id = a.modifier_group_id
-   AND g.restaurant_id = a.restaurant_id
-  WHERE a.restaurant_id = v_restaurant
-    AND a.product_id = p_product_id;
+  FROM assignments AS a
+  LEFT JOIN option_docs AS o ON o.modifier_group_id=a.modifier_group_id;
 
   RETURN pg_catalog.jsonb_build_object(
-    'ok', true,
-    'entity_type', 'modifier_assignments',
-    'product_id', p_product_id,
-    'draft_revision', COALESCE(v_revision, 0),
-    'items', v_items
+    'ok',true,
+    'entity_type','modifier_assignments',
+    'product_id',p_product_id,
+    'draft_revision',COALESCE(v_revision,0),
+    'items',v_items
   );
 END
 $function$;
