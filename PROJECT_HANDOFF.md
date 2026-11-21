@@ -1721,3 +1721,18 @@ The schema must preserve historical catalog/order snapshots when current product
 Candidate covers typed variants, exact variant-scoped modifier pricing, branch timezone override, schedule sets/windows, deal collections/deals/component groups/options, branch deal availability, draft revision, append-only audit, immutable publication snapshots and current pointer. New public tables are RLS-enabled, postgres-owned and explicitly revoked from app roles. No menu data or catalog command functions are included.
 
 The migration was prepared using read-only live schema facts and contains strict preflight checks. **It has not been applied and is not yet declared production-ready.** Required next step is a clean disposable Supabase local migration-chain run, then security/ACL/FK-index/tenant-isolation/immutability tests and DTO reconciliation. Production remains untouched.
+
+
+### Menu V1 schema migration applied to pre-launch Production project (2026-11-21)
+
+- Project: \`adkrxfnawdiljhjaavnj\` (Mumbai, Free).
+- Git source: \`supabase/migrations/20261121120553_flame_chick_menu_v1_catalog.sql\`.
+- Supabase migration ledger version: \`20261121125542\`, name \`flame_chick_menu_v1_catalog\`.
+- Post-apply QA: 11 new tables exist; all postgres-owned; RLS enabled; zero policies; no anon/authenticated/service_role CRUD privileges; no missing child-side FK indexes; append-only audit/publication UPDATE/DELETE/TRUNCATE protections verified.
+- Exact variant modifier pricing conversion is in place: \`modifier_price_rules.product_variant_id\` required; old \`size_key\` removed.
+- Branch timezone override is in place and falls back to restaurant timezone.
+- No restaurant/branch/menu/deal/staff/Auth seed data inserted.
+- No catalog command, pricing or public catalog functions created yet.
+- Detailed QA and remaining blockers: \`docs/handoffs/2026-11-21-menu-v1-migration-candidate-review.md\`.
+
+The migration was applied successfully to the existing pre-launch project, not to a running customer system. The schema foundation is ready for the next implementation phase, but Admin catalog editing, pricing, publication, schedules and public catalog delivery are not yet operational. Replace Admin direct REST writes and reconcile the public catalog DTO before enabling the catalog UI.
