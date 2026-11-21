@@ -1590,3 +1590,8 @@ Five candidate tables: `public.user_profiles`, `public.user_roles`, `public.staf
 Disposable DDL-only and behavioral rollback tests passed. They covered bootstrap, actor checks, role conflicts, multi-branch role assignments, cross-tenant branch rejection, last-Owner guard and transfer, profile deactivation, invitation target consistency, Auth email confirmation, duplicate open invitations, audit immutability, and TRUNCATE denial. Every test was rolled back. Follow-up Production state: 0 Auth users, 0 restaurants, 0 branches, 0 Batch 3 tables; migration history unchanged (baseline, Batch 1, Batch 2 only).
 
 **Remaining gate:** true parallel two-session testing of concurrent last-Owner changes has not been performed; run in isolated staging before Production approval. The Staff Admin API, JWT actor derivation, invitation orchestration, projections and exact command grants are later work. **Batch 3 has NOT been applied. Separate explicit owner approval is required.** No app source or Vercel settings/deployments changed.
+
+
+## Next catalog implementation handoff
+
+The core catalog schema and all 15 FK indexes are applied and independently verified in Production. The next work is the secure Admin/Owner catalog authoring API, not enabling the legacy Admin direct REST writes. See `docs/handoffs/2026-11-21-secure-catalog-authoring-api.md` for the source audit, Production state, command boundaries, publication design, and security stop-gates. The catalog UI remains disabled; no catalog rows are seeded and no catalog Edge Function is deployed.
