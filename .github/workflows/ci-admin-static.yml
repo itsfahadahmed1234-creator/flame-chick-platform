@@ -1,0 +1,50 @@
+name: Flame Chick Admin Static Checks
+
+on:
+  push:
+    branches:
+      - work/production-source-audit
+    paths:
+      - "apps/flame-chick-admin/**"
+      - ".github/workflows/ci-admin-static.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check apps/flame-chick-admin/app.js
+          node --check apps/flame-chick-admin/accept-invitation.js
+
+      - name: Verify static page assets and invitation wiring
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, existsSync } from "node:fs";
+          const root = "apps/flame-chick-admin/";
+          const admin = readFileSync(root + "index.html", "utf8");
+          const invite = readFileSync(root + "accept-invitation.html", "utf8");
+          const inviteJs = readFileSync(root + "accept-invitation.js", "utf8");
+          for (const file of ["config.js", "app.js", "styles.css", "assets/flame-chick-mark.svg", "accept-invitation.html", "accept-invitation.js"]) {
+            if (!existsSync(root + file)) throw new Error("Missing Admin asset: " + file);
+          }
+          if (!admin.includes('href="accept-invitation.html"')) throw new Error("Admin sign-in does not link to invitation acceptance.");
+          if (!invite.includes('src="accept-invitation.js"')) throw new Error("Invitation page script is not linked.");
+          if (!inviteJs.includes('action: "accept_invitation"')) throw new Error("Invitation page does not invoke the acceptance action.");
+          if (!inviteJs.includes('auth/v1/user')) throw new Error("Invitation page does not verify the authenticated user.");
+          console.log("Admin static assets and invitation wiring checks passed.");
+          NODE

@@ -62,7 +62,7 @@ GitHub Actions secrets and variables are configured by the repository owner/main
 
 The workflow existing does not mean an app is production-ready. Current app documentation records:
 - Production schema/menu/backend migrations are not yet fully complete and verified.
-- Staff Admin Edge Function is not deployed, and invitation acceptance route is outstanding.
+- Staff Admin Edge Function is not deployed. The Admin invitation acceptance page is implemented, but its Auth redirect/origin configuration and new-user/existing-user live tests remain outstanding.
 - Admin dashboard, orders, menu, deals, delivery, media and settings APIs are incomplete; those panels remain disabled.
 - POS needs schema/menu, branch/staff-role setup and controlled checkout/dispatch end-to-end testing.
 - Rider needs Production onboarding/Auth/role/profile setup and full assignment-to-return workflow testing.
@@ -83,7 +83,7 @@ Enable one preview gate only after its app-specific review. Keep Vercel SSO prot
 
 - Four new Vercel projects exist and were verified in the intended Hobby team.
 - No Git integration is connected to those projects.
-- No deployment has been made.
+- No deployment has been made. The invitation acceptance page is source-complete but not live-tested against Production Auth.
 - No Vercel token, GitHub Environment secret, repository variable, or app environment variable has been created by this setup.
 - Four workflow files have been committed to `work/production-source-audit` with deploy-enable variables absent by default.
 - Existing Vercel projects and the existing `befahad1234-cmyk` GitHub connection were not changed.

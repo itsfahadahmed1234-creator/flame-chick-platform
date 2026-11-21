@@ -1,3 +1,29 @@
+## 2026-11-21 — Batch 4 staff invitation acceptance UI implemented
+
+**Source commit:** `0eac38d99286f289f188ef8130e6fe74e15dddd2` on `work/production-source-audit`.
+
+Added:
+- `apps/flame-chick-admin/accept-invitation.html` and `accept-invitation.js`.
+- Admin sign-in link to the acceptance page and invitation dialog guidance.
+- New-user path: reads the Supabase Auth invite session from the redirect fragment, removes token material from the address bar, verifies the authenticated and confirmed user, requires a 12-character password, updates the Auth password, then calls the authenticated `accept_invitation` command.
+- Existing-user path: sign-in using the exact confirmed email and password, then calls the same database acceptance command. The browser does not submit a user ID, email identity claim, role or branch assignment to the acceptance RPC.
+- Retry activation after password update if the database activation request fails.
+- Admin app README and deployment notes updated.
+
+The applied database command remains the authority for exact confirmed-email matching, invitation expiry, active inviter authority, role-conflict checks, branch availability, role assignment and audit. Production migration history was rechecked and remains at the existing 10 applied migrations; no database changes were made.
+
+**Not yet live-tested:** Production currently has no restaurant, branch, Auth users or staff records; the Staff Admin Edge Function is not deployed; exact Admin origin and invite redirect have not been selected/configured. Therefore no email was sent and no invitation was accepted. The page must not be described as end-to-end production verified yet.
+
+### Next safe steps
+1. Run the new Admin static CI checks and fix any syntax/path failures.
+2. Confirm the final Admin HTTPS origin. Add the acceptance URL to Supabase Auth allowed redirect URLs and set the exact `FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS` and `FLAME_CHICK_STAFF_INVITE_REDIRECT_URL` values.
+3. Configure the Edge Function publishable/secret key environment variables securely, then deploy the Staff Admin Edge Function after reviewing the exact settings.
+4. Bootstrap the first Admin using the documented postgres-only procedure; then create a test branch and test both new-user and existing-user invitation paths, expiry, wrong-email rejection, issuer deactivation and retry/idempotency.
+5. Keep the Vercel preview gate disabled until the app-specific review passes.
+
+No Auth users, invitation emails, staff roles, restaurant/branch seeds, Edge Function deployment, Vercel deployment, environment variables or production domains were created by this UI change.
+
+---
 ## 2026-11-20 — Batch 2 applied to Flame Chick Production
 
 **Owner approval:** explicit approval received in chat before execution.
@@ -139,7 +165,7 @@ External encrypted schema dump was not created; user explicitly accepted proceed
 Batch 1 is complete. Continue with remaining Stage 3 design/source consistency: resolve outstanding business/schema decisions, complete field-level table and API mapping, then separately review Batch 2/3 migration design. Do not start website security audit until immediately before attaching website to DB. No application deployment, Vercel changes, Auth/Storage/Edge Function work, or business table creation was performed in this Batch 1 action.
 # Flame Chick Platform — Project Handoff
 
-**Last updated:** 2026-11-20 (Batch 2 applied and verified in Production; POS fulfilment/offline-sync source review recorded; Batch 1 applied and verified)  
+**Last updated:** 2026-11-21 (Batch 4 Admin staff invitation acceptance UI implemented; four Vercel preview workflows and project setup documented; Production Edge Function remains undeployed)  
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  

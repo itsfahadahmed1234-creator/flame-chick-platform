@@ -39,3 +39,18 @@ Batch 4 database commands and invitation workflow are applied and behaviorally t
 - config.toml sets verify_jwt=true only for Staff Admin; catalog/order/delivery settings unchanged.
 - Required before deployment: FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS and FLAME_CHICK_STAFF_INVITE_REDIRECT_URL. Confirm these are set and verified before deployment.
 - No Edge Function deployed; no secrets set; no invitations sent; no Auth users, restaurant, branch or staff accounts created; no Admin bootstrap; no Admin UI or Vercel changes.
+
+## 2026-11-21 — Admin invitation acceptance page added
+
+Source commit: `0eac38d99286f289f188ef8130e6fe74e15dddd2`.
+
+Added `apps/flame-chick-admin/accept-invitation.html` and `accept-invitation.js`, plus a link from Admin sign-in and guidance in the invitation dialog.
+
+The page supports:
+- New invited user: handles the Supabase Auth invite redirect session, strips token-bearing URL fragment from history, checks the authenticated user's confirmed email, collects a 12+ character password, updates the Auth password, then calls the authenticated Staff Admin `accept_invitation` action.
+- Existing confirmed Auth user: signs in with email/password on the page and invokes the same action; the database derives identity from `auth.uid()` and matches the exact confirmed email to the pending invitation.
+- Activation retry if password update succeeds but the invitation RPC fails.
+
+No role or branch data is trusted from the browser. The applied database command continues to enforce expiry, exact email, active inviter, role conflict and branch availability, and writes the role/audit records.
+
+**QA boundary:** source has been committed, but live Auth flow has not been tested. Production still has no restaurant/branch/Auth user rows; Staff Admin Edge Function remains undeployed; exact Admin origin, invite redirect URL and Auth allowed-redirect entry remain unconfigured. No invitations were sent and no Production data changed.
