@@ -1688,3 +1688,22 @@ This is the detailed proposed table/column/FK contract for the next migration ca
 - RPC command boundary, pricing rules and migration QA gates.
 
 The contract deliberately excludes generic coupon/stacking engine, inventory, allergens, nested deals and GST for this menu-first V1. It is design-only and does not authorize Production DDL.
+
+
+### Current vs upcoming menu comparison completed (2026-11-21)
+
+**Comparison handoff:** \`docs/handoffs/2026-11-21-current-vs-upcoming-menu-reconciliation.md\`
+**Comparison commit:** \`26521d44e003804ea72f9140e0ef6f2500611698\`.
+
+Both supplied menu images are now the source references for transition planning:
+- Current published menu is the compatibility baseline.
+- Upcoming menu is the target catalog, subject to final owner approval.
+
+The comparison records all visible current products/prices/descriptions, upcoming products/prices/TBD entries, price deltas, products not shown in the upcoming image, new categories, six deals, and unresolved deal choices. In particular:
+- Current menu shows Classic Chick, B-B-Q Wrap and six flavoured drinks not shown in the upcoming menu. Do not retire them until the Owner confirms.
+- Upcoming menu adds Whole Chicken Broast flavours, Flame Beef, Flame Fish, Shakes and six structured offers.
+- Existing Platter composition is visible only on the current menu; do not assume unchanged target composition.
+- Current image explicitly states prices are exclusive of applicable GST; upcoming image does not repeat this. GST remains deferred pending explicit confirmation of target display and checkout policy. Do not silently infer inclusive/exclusive status.
+- TBD remains NULL, and no guessed component choices, weekdays, drink volume or recipe data may be seeded.
+
+The schema must preserve historical catalog/order snapshots when current products are archived or prices change. No Production DDL, menu seed or deployment occurred during this comparison.
