@@ -5,7 +5,6 @@ import vm from "node:vm";
 
 const files = ["apps/flame-chick-pos/index.html", "apps/flame-chick-rider/index.html"];
 const source = files.map((file) => ({ file, html: readFileSync(file, "utf8") }));
-const stripDataImages = (value) => value.replace(/data:image\\/[^;]+;base64,[A-Za-z0-9+/=]+/g, "");
 
 test("POS and Rider source use Flame Chick identifiers only", () => {
   const all = source.map((x) => x.html).join("\n");
