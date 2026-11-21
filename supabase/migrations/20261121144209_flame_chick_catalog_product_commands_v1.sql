@@ -210,7 +210,8 @@ DECLARE
   v_variant_legacy_id text;
   v_size_key text;
   v_size_label text;
-  v_price numeric(12,2);
+  v_price numeric;
+  v_raw_num numeric;
   v_sort integer;
   v_variant_active boolean;
   v_variant_available boolean;
@@ -258,16 +259,6 @@ BEGIN
   EXCEPTION WHEN invalid_text_representation THEN
     RAISE EXCEPTION 'CATALOG_PRODUCT_ID_INVALID' USING ERRCODE = '22023';
   END;
-
-  IF v_id IS NOT NULL THEN
-    SELECT p.* INTO v_product
-    FROM public.products AS p
-    WHERE p.id = v_id AND p.restaurant_id = v_restaurant
-    FOR UPDATE;
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'CATALOG_PRODUCT_NOT_FOUND' USING ERRCODE = 'P0002';
-    END IF;
-  END IF;
 
   -- Validate the complete optional variant patch before taking the draft lock
   -- or changing any row. The full command still executes atomically.
@@ -394,6 +385,16 @@ BEGIN
             DETAIL = pg_catalog.format('current_revision=%s', v_revision);
   END IF;
 
+  IF v_id IS NOT NULL THEN
+    SELECT p.* INTO v_product
+    FROM public.products AS p
+    WHERE p.id = v_id AND p.restaurant_id = v_restaurant
+    FOR UPDATE;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'CATALOG_PRODUCT_NOT_FOUND' USING ERRCODE = 'P0002';
+    END IF;
+  END IF;
+
   IF p_payload ? 'category_id' THEN
     BEGIN
       v_category_id := NULLIF(p_payload->>'category_id', '')::uuid;
@@ -516,10 +517,14 @@ BEGIN
       RAISE EXCEPTION 'CATALOG_PRODUCT_SORT_ORDER_INVALID' USING ERRCODE = '22023';
     END IF;
     BEGIN
-      v_sort_order := (p_payload->>'sort_order')::integer;
+      v_raw_num := (p_payload->>'sort_order')::numeric;
     EXCEPTION WHEN numeric_value_out_of_range OR invalid_text_representation THEN
       RAISE EXCEPTION 'CATALOG_PRODUCT_SORT_ORDER_INVALID' USING ERRCODE = '22023';
     END;
+    IF pg_catalog.scale(v_raw_num) <> 0 OR v_raw_num < 0 OR v_raw_num > 2147483647 THEN
+      RAISE EXCEPTION 'CATALOG_PRODUCT_SORT_ORDER_INVALID' USING ERRCODE = '22023';
+    END IF;
+    v_sort_order := v_raw_num::integer;
   ELSIF v_id IS NOT NULL THEN
     v_sort_order := v_product.sort_order;
   ELSE
@@ -657,13 +662,14 @@ BEGIN
           v_price := NULL;
         ELSE
           BEGIN
-            v_price := (v_variant_json->>'price')::numeric;
+            v_raw_num := (v_variant_json->>'price')::numeric;
           EXCEPTION WHEN numeric_value_out_of_range OR invalid_text_representation THEN
             RAISE EXCEPTION 'CATALOG_VARIANT_PRICE_INVALID' USING ERRCODE = '22023';
           END;
-          IF v_price < 0 OR pg_catalog.scale(v_price) > 2 OR v_price > 9999999999.99 THEN
+          IF v_raw_num < 0 OR pg_catalog.scale(v_raw_num) > 2 OR v_raw_num > 9999999999.99 THEN
             RAISE EXCEPTION 'CATALOG_VARIANT_PRICE_INVALID' USING ERRCODE = '22023';
           END IF;
+          v_price := v_raw_num;
         END IF;
       ELSIF v_variant_exists THEN
         v_price := v_variant.price;
@@ -672,10 +678,14 @@ BEGIN
       END IF;
 
       IF v_variant_json ? 'sort_order' THEN
-        BEGIN v_sort := (v_variant_json->>'sort_order')::integer;
+        BEGIN v_raw_num := (v_variant_json->>'sort_order')::numeric;
         EXCEPTION WHEN numeric_value_out_of_range OR invalid_text_representation THEN
           RAISE EXCEPTION 'CATALOG_VARIANT_SORT_ORDER_INVALID' USING ERRCODE = '22023';
         END;
+        IF pg_catalog.scale(v_raw_num) <> 0 OR v_raw_num < 0 OR v_raw_num > 2147483647 THEN
+          RAISE EXCEPTION 'CATALOG_VARIANT_SORT_ORDER_INVALID' USING ERRCODE = '22023';
+        END IF;
+        v_sort := v_raw_num::integer;
       ELSIF v_variant_exists THEN v_sort := v_variant.sort_order;
       ELSE v_sort := 0;
       END IF;
@@ -695,10 +705,14 @@ BEGIN
         IF v_variant_json->'pack_quantity' = 'null'::jsonb THEN
           v_pack_quantity := NULL;
         ELSE
-          BEGIN v_pack_quantity := (v_variant_json->>'pack_quantity')::integer;
+          BEGIN v_raw_num := (v_variant_json->>'pack_quantity')::numeric;
           EXCEPTION WHEN numeric_value_out_of_range OR invalid_text_representation THEN
             RAISE EXCEPTION 'CATALOG_VARIANT_PACK_QUANTITY_INVALID' USING ERRCODE = '22023';
           END;
+          IF pg_catalog.scale(v_raw_num) <> 0 OR v_raw_num < 1 OR v_raw_num > 2147483647 THEN
+            RAISE EXCEPTION 'CATALOG_VARIANT_PACK_QUANTITY_INVALID' USING ERRCODE = '22023';
+          END IF;
+          v_pack_quantity := v_raw_num::integer;
         END IF;
       ELSIF v_variant_exists THEN v_pack_quantity := v_variant.pack_quantity;
       ELSE v_pack_quantity := NULL;
