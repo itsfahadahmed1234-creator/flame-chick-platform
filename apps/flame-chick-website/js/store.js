@@ -1,14 +1,14 @@
-/* HFP store: fulfillment + cart primitives (catalog era, Phase 2C).
+/* Flame Chick store: fulfillment + cart primitives (catalog era, Phase 2C).
    Cart is session-scoped and versioned; every restore revalidates
-   selections against the verified catalog (HfpPricing.parseCart).
-   All totals come from the single pricing engine (HfpPricing.priceCart). */
+   selections against the verified catalog (FlameChickPricing.parseCart).
+   All totals come from the single pricing engine (FlameChickPricing.priceCart). */
 let cart=[],deliveryAreasData=[];
-const HFP_CART_KEY='pizza_bite_cart_v1';
+const FLAME_CHICK_CART_KEY='flame_chick_cart_v1';
 /* ===== Fulfillment State ===== */
-let fulfillmentType=sessionStorage.getItem('pizza_bite_fulfillment_type')||'Delivery';
+let fulfillmentType=sessionStorage.getItem('flame_chick_fulfillment_type_v1')||'Delivery';
 function selectFulfillment(type){
   fulfillmentType=type;
-  sessionStorage.setItem('pizza_bite_fulfillment_type',type);
+  sessionStorage.setItem('flame_chick_fulfillment_type_v1',type);
   document.getElementById('fulfillmentGate').classList.add('hidden');
   updateFulfillmentUI();
 }
@@ -20,7 +20,7 @@ function toggleFulfillmentDropdown(){
 }
 function setFulfillment(type){
   fulfillmentType=type;
-  sessionStorage.setItem('pizza_bite_fulfillment_type',type);
+  sessionStorage.setItem('flame_chick_fulfillment_type_v1',type);
   document.getElementById('ffDropdown').classList.remove('open');
   document.querySelector('.ff-trigger').classList.remove('open');
   updateFulfillmentUI();
@@ -30,12 +30,12 @@ function hasDeliveryAreas(){
 }
 function updateFulfillmentUI(){
   const label=document.getElementById('ffTriggerLabel');
-  if(label)label.textContent=(typeof HFP_I18N!=='undefined')?HFP_I18N.t('fulfillment.'+fulfillmentType):fulfillmentType;
+  if(label)label.textContent=(typeof FLAME_CHICK_I18N!=='undefined')?FLAME_CHICK_I18N.t('fulfillment.'+fulfillmentType):fulfillmentType;
   document.querySelectorAll('.ff-option').forEach(b=>{
     const id=b.getAttribute('data-ff')||fulfillmentType;
     b.classList.toggle('active',id===fulfillmentType);
     const keep=b.querySelector('svg');
-    const text=(typeof HFP_I18N!=='undefined')?HFP_I18N.t('fulfillment.'+id):id;
+    const text=(typeof FLAME_CHICK_I18N!=='undefined')?FLAME_CHICK_I18N.t('fulfillment.'+id):id;
     if(b.dataset.ffLabel!==text){
       b.innerHTML='';
       if(keep)b.appendChild(keep);
@@ -105,17 +105,17 @@ function dealLineKey(dealId,choices){
 function storeCart(){
   try{
     const ctx=(typeof PCTX!=='undefined')?PCTX:null;
-    if(ctx)sessionStorage.setItem(HFP_CART_KEY,HfpPricing.serializeCart(ctx,cart));
+    if(ctx)sessionStorage.setItem(FLAME_CHICK_CART_KEY,FlameChickPricing.serializeCart(ctx,cart));
   }catch(e){/* storage full/blocked: cart keeps working in memory */}
 }
 function restoreStoredCart(ctx){
   let raw=null;
-  try{raw=sessionStorage.getItem(HFP_CART_KEY);}catch(e){raw=null;}
+  try{raw=sessionStorage.getItem(FLAME_CHICK_CART_KEY);}catch(e){raw=null;}
   if(raw==null)return{lines:cart.slice(),dropped:[],versionChanged:false,changed:false,restored:false};
-  const res=HfpPricing.parseCart(ctx,raw);
+  const res=FlameChickPricing.parseCart(ctx,raw);
   cart=res.lines;
   res.restored=true;
-  try{sessionStorage.setItem(HFP_CART_KEY,HfpPricing.serializeCart(ctx,cart));}catch(e){}
+  try{sessionStorage.setItem(FLAME_CHICK_CART_KEY,FlameChickPricing.serializeCart(ctx,cart));}catch(e){}
   return res;
 }
 
@@ -153,19 +153,19 @@ function engineContext(){
 function currentDeliveryFee(){
   const ctx=engineContext();
   if(!ctx)return 0;
-  return HfpPricing.deliveryFeeFor(ctx,{fulfillment:fulfillmentType,areaFee:selectedAreaFee()});
+  return FlameChickPricing.deliveryFeeFor(ctx,{fulfillment:fulfillmentType,areaFee:selectedAreaFee()});
 }
 function cartFoodDiscount(subtotal){return 0}
 
 /* ===== Totals: one engine for cart, sticky bar, checkout and WhatsApp ===== */
 function totals(){
   const ctx=engineContext();
-  if(!ctx||!HfpPricing)return{subtotal:0,delivery:0,discount:0,deliveryKnown:true,total:0,lines:[],issues:[]};
-  const res=HfpPricing.priceCart(ctx,cart,{fulfillment:fulfillmentType,areaFee:selectedAreaFee()});
+  if(!ctx||!FlameChickPricing)return{subtotal:0,delivery:0,discount:0,deliveryKnown:true,total:0,lines:[],issues:[]};
+  const res=FlameChickPricing.priceCart(ctx,cart,{fulfillment:fulfillmentType,areaFee:selectedAreaFee()});
   return{subtotal:res.subtotal,delivery:res.deliveryFee,discount:0,deliveryKnown:true,total:res.total,lines:res.lines,issues:res.issues};
 }
 function validateCartForCheckout(){
   const ctx=engineContext();
   if(!ctx)return{ok:false,items:[{key:null,code:'NO_CATALOG',message:'Menu data is not ready yet.'}]};
-  return HfpPricing.validateCart(ctx,cart,{fulfillment:fulfillmentType,areaFee:selectedAreaFee()});
+  return FlameChickPricing.validateCart(ctx,cart,{fulfillment:fulfillmentType,areaFee:selectedAreaFee()});
 }

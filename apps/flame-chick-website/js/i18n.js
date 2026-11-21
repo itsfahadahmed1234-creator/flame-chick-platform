@@ -1,13 +1,13 @@
-/* HFP Phase 2D — central localization dictionary + language switcher.
+/* Flame Chick Phase 2D — central localization dictionary + language switcher.
    Default language is English (never changes Phase 2C behaviour).
    Urdu strings are DRAFT — OWNER REVIEW REQUIRED. Automated tests do NOT
    prove translation accuracy.
    Catalog NameUr/DescriptionUr/TitleUr fields are honored when non-empty;
    empty Urdu catalog fields keep the safe English fallback (never invented). */
-var HFP_I18N = (function () {
+var FLAME_CHICK_I18N = (function () {
   'use strict';
 
-  var LANG_KEY = 'pizza_bite_lang';
+  var LANG_KEY = 'flame_chick_lang_v1';
   var current = 'en';
 
   /* ===== English source dictionary (keys are stable identifiers) ===== */
@@ -18,20 +18,20 @@ var HFP_I18N = (function () {
     'hours.delivery': 'Delivery hours',
     'hours.restaurant': 'Restaurant hours',
     /* Landing */
-    'brand.name': 'PIZZA BITE',
-    'brand.short': 'Pizza Bite',
+    'brand.name': 'FLAME CHICK',
+    'brand.short': 'Flame Chick',
     'landing.header.menu': 'MENU',
-    'landing.hero.support': 'Freshly prepared pizzas, burgers and more — made hot and fresh in Waisa.',
+    'landing.hero.support': 'Freshly prepared favourites, made fresh for every order.',
     'landing.hero.cta': 'MENU',
-    'landing.hero.accent': 'PIZZA',
-    'landing.hero.main': 'BITE',
-    'landing.hero.imageAlt': 'Pizza Bite fresh food and deals',
+    'landing.hero.accent': 'FLAME',
+    'landing.hero.main': 'CHICK',
+    'landing.hero.imageAlt': 'Flame Chick fresh food and deals',
     'landing.gate.subtitle': 'What are you having today?',
-    'landing.about.heading': 'About Pizza Bite',
-    'landing.about.desc': 'A local favourite in Waisa — serving fresh pizzas, juicy burgers and loaded favourites made to order.',
-    'landing.about.extAlt': 'Pizza Bite deal selection',
-    'landing.about.intAlt': 'Pizza Bite meal deal',
-    'landing.why.heading': 'The Pizza Bite Difference',
+    'landing.about.heading': 'About Flame Chick',
+    'landing.about.desc': 'A local favourite — serving freshly prepared meals made to order.',
+    'landing.about.extAlt': 'Flame Chick deal selection',
+    'landing.about.intAlt': 'Flame Chick meal deal',
+    'landing.why.heading': 'The Flame Chick Difference',
     'landing.why.madeFresh': 'Made Fresh',
     'landing.why.clearPrices': 'Clear Prices',
     'landing.why.quickService': 'Quick Service',
@@ -61,7 +61,7 @@ var HFP_I18N = (function () {
     'landing.cta.button': 'ORDER NOW',
     /* Footer contact number renders from js/config.js PHONE_DISPLAY via
        landingDefaults().footer.contact — dictionary keeps the brand only. */
-    'landing.footer.contact': 'Pizza Bite',
+    'landing.footer.contact': 'Flame Chick',
     /* Fulfillment */
     'fulfillment.Delivery': 'Delivery',
     'fulfillment.Takeaway': 'Takeaway',
@@ -80,7 +80,7 @@ var HFP_I18N = (function () {
     'cart.item': 'item',
     'cart.viewCart': 'View Cart',
     /* Menu hero */
-    'menu.hero.eyebrow': 'Pizza Bite',
+    'menu.hero.eyebrow': 'Flame Chick',
     'menu.hero.title1': 'Your Next',
     'menu.hero.title2': 'Favourite Meal',
     'menu.hero.desc': 'Fresh pizzas, juicy burgers, loaded shawarmas and more — made hot and fresh when you order.',
@@ -159,7 +159,7 @@ var HFP_I18N = (function () {
     'checkout.notes': 'Order Notes',
     'checkout.notesPh': 'Optional instructions',
     'checkout.sendWA': 'Place Order',
-    'checkout.secure': '🔒 Your order is submitted securely to Pizza Bite · Cash on Delivery',
+    'checkout.secure': '🔒 Your order is submitted securely to Flame Chick · Cash on Delivery',
     'checkout.proceed': 'Proceed to Checkout →',
     'checkout.secureShort': '🔒 Secure checkout · Cash on Delivery',
     'checkout.resolveIssues': 'Please resolve these before sending your order:',
@@ -186,7 +186,7 @@ var HFP_I18N = (function () {
     'na.retry': 'Try again',
     /* Success + WA fallback */
     'success.title': 'Order Received!',
-    'success.body': 'Thank you. Pizza Bite has received your order and will contact you if any details need confirmation.',
+    'success.body': 'Thank you. Flame Chick has received your order and will contact you if any details need confirmation.',
     'success.help': 'Need help? Call us: ',
     'success.done': 'Done',
     'waFallback.title': 'Send your order on WhatsApp',
@@ -266,7 +266,7 @@ var HFP_I18N = (function () {
     'landing.cta.button': 'ابھی آرڈر کریں',
     /* Footer contact number renders from js/config.js PHONE_DISPLAY via
        landingDefaults().footer.contact — dictionary keeps the brand only. */
-    'landing.footer.contact': 'Pizza Bite',
+    'landing.footer.contact': 'Flame Chick',
     'fulfillment.Delivery': 'ڈیلیوری',
     'fulfillment.Takeaway': 'ٹیک اوے',
     'nav.cart': 'کارٹ',
@@ -480,8 +480,8 @@ var HFP_I18N = (function () {
     current = lang;
     try { localStorage.setItem(LANG_KEY, lang); } catch (e) { /* ignore */ }
     applyDomLanguage();
-    if (!(opts && opts.silent) && typeof window !== 'undefined' && typeof window.onHfpLanguageChange === 'function') {
-      window.onHfpLanguageChange(lang);
+    if (!(opts && opts.silent) && typeof window !== 'undefined' && typeof window.onFlameChickLanguageChange === 'function') {
+      window.onFlameChickLanguageChange(lang);
     }
     return lang;
   }
@@ -566,4 +566,4 @@ var HFP_I18N = (function () {
   };
 })();
 
-if (typeof module !== 'undefined' && module.exports) module.exports = HFP_I18N;
+if (typeof module !== 'undefined' && module.exports) module.exports = FLAME_CHICK_I18N;

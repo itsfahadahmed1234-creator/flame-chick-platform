@@ -4,7 +4,7 @@
    WA_PHONE/PHONE_DISPLAY below are the SINGLE AUTHORITATIVE SOURCE for the
    Flame Chick contact destination for this branded showcase — see the note above
    window.WA_PHONE. */
-var HFP_CONFIG = {
+var FLAME_CHICK_CONFIG = {
   /* Flame Chick Supabase catalog Edge Function. Public read-only catalog endpoint. */
   apiBase: 'https://adkrxfnawdiljhjaavnj.supabase.co/functions/v1/flame-chick-catalog',
   orderApiBase: 'https://adkrxfnawdiljhjaavnj.supabase.co/functions/v1/flame-chick-order-api',

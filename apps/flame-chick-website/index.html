@@ -1037,13 +1037,13 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
     el.send.disabled = true;
     el.note.textContent = 'Checking the live Flame Chick menu…';
 
-    if (!window.HfpCatalog || !window.HFP_CONFIG) {
+    if (!window.FlameChickCatalog || !window.FLAME_CHICK_CONFIG) {
       catalogError = 'The Flame Chick catalogue connection is not available.';
       el.note.textContent = catalogError + ' Refresh the page and try again.';
       return;
     }
 
-    window.HfpCatalog.load().then(function (result) {
+    window.FlameChickCatalog.load().then(function (result) {
       if (!result || result.state !== 'ready' || !result.snapshot) {
         throw new Error((result && result.error && result.error.message) || 'The live menu is unavailable.');
       }
@@ -1177,11 +1177,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
       try { sessionStorage.setItem('flame_chick_pending_order_v1', JSON.stringify({ fingerprint: stable, payload: payload })); } catch (e) {}
     }
 
-    var response = await fetch(window.HFP_CONFIG.orderApiBase, {
+    var response = await fetch(window.FLAME_CHICK_CONFIG.orderApiBase, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': window.HFP_CONFIG.publishableKey
+        'apikey': window.FLAME_CHICK_CONFIG.publishableKey
       },
       body: JSON.stringify(payload),
       cache: 'no-store'

@@ -1,4 +1,4 @@
-/* HFP Website — Menu Hero Promotional Slider.
+/* Flame Chick Website — Menu Hero Promotional Slider.
    Replaces the static hero food image with an auto-advancing,
    manually navigable banner slider. Falls back to the current hero
    when no banners are configured. Only enabled slides from the
@@ -402,7 +402,7 @@
     }
   }
 
-  global.HfpHeroSlider = { init: init, destroy: destroy };
+  global.FlameChickHeroSlider = { init: init, destroy: destroy };
 
   if (global.addEventListener) global.addEventListener('resize', applyAllFits);
 

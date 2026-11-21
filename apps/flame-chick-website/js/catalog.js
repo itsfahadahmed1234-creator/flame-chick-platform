@@ -1,4 +1,4 @@
-/* HFP catalog loader (Phase 2B).
+/* Flame Chick catalog loader (Phase 2B).
    Flow: health -> published? -> version-aware cache -> catalog fetch ->
    envelope + snapshot validation -> view-model.
    States resolved by load(): {state:'ready'|'unpublished'|'error', ...}.
@@ -332,7 +332,7 @@
 
   function load(deps) {
     deps = deps || {};
-    var conf = deps.config || (typeof HFP_CONFIG !== 'undefined' ? HFP_CONFIG : null);
+    var conf = deps.config || (typeof FLAME_CHICK_CONFIG !== 'undefined' ? FLAME_CHICK_CONFIG : null);
     if (!conf || !conf.apiBase) {
       return Promise.reject(new Error('Flame Chick catalog API is missing.'));
     }
@@ -463,5 +463,5 @@
   };
 
   if (typeof module === 'object' && module.exports) module.exports = api;
-  if (root) root.HfpCatalog = api;
+  if (root) root.FlameChickCatalog = api;
 })(typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : this));

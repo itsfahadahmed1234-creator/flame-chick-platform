@@ -1,4 +1,4 @@
-/* HFP single pricing engine.
+/* Flame Chick single pricing engine.
    Pure functions: catalog indexing, variant/modifier/deal line pricing,
    cart totals, cart revalidation and WhatsApp order-message construction.
    No DOM, no storage, no network. Used identically by cart summary,
@@ -329,7 +329,7 @@ function makeOrderRef(now) {
   var rand = '';
   var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   for (var i = 0; i < 4; i++) rand += chars.charAt(Math.floor(Math.random() * chars.length));
-  return 'HFP-' + yy + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '-' + rand;
+  return 'FC-' + yy + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '-' + rand;
 }
 
 function lineMessageLines(priced) {
@@ -359,7 +359,7 @@ function buildOrderMessage(ctx, order) {
   var ful = order.fulfillment || cart.fulfillment || 'Delivery';
   var cust = order.customer || {};
   var L = [];
-  L.push('🍽️ NEW ORDER — ' + (ctx.settings.restaurant_name || 'Pizza Bite').toUpperCase());
+  L.push('🍽️ NEW ORDER — ' + (ctx.settings.restaurant_name || 'Flame Chick').toUpperCase());
   L.push('━━━━━━━━━━');
   L.push('Order: ' + (order.ref || '—'));
   L.push('Type: ' + (String(ful).toLowerCase() === 'takeaway' ? '🛍️ Takeaway' : '🛵 Delivery'));
@@ -468,7 +468,7 @@ function parseCart(ctx, raw) {
   return { lines: kept, dropped: dropped, versionChanged: versionChanged, changed: versionChanged || dropped.length > 0, reason: null };
 }
 
-var HfpPricing = {
+var FlameChickPricing = {
   FORMAT_LOCALE: FORMAT_LOCALE,
   WA_MAX_URL_LENGTH: WA_MAX_URL_LENGTH,
   buildCatalog: buildCatalog,
@@ -499,6 +499,6 @@ var HfpPricing = {
   parseCart: parseCart
 };
 
-if (typeof module !== 'undefined' && module.exports) module.exports = HfpPricing;
-root.HfpPricing = HfpPricing;
+if (typeof module !== 'undefined' && module.exports) module.exports = FlameChickPricing;
+root.FlameChickPricing = FlameChickPricing;
 })(typeof window !== 'undefined' ? window : globalThis);
