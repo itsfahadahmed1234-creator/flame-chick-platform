@@ -1,0 +1,1 @@
+Apply only forward migration 20261121140000_flame_chick_catalog_commands_v1_qa_fixes.sql after checking that 20261121133607 is already applied and no other migration is pending.
