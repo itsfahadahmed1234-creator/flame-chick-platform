@@ -1636,3 +1636,39 @@ This is design-only. No new Production tables, migrations, RPCs, Edge Functions,
 ### Next stage
 
 Prepare a review-only migration candidate on the working branch from the design contract, including deal/promotion/schedule entities and publication integration. Then run isolated/rollback-only structural, pricing, schedule, security and concurrency tests. Review the exact migration and recovery plan before any separate request for Production approval. Keep Admin catalog/deal/promotion UI disabled until secure commands and publication are complete.
+
+
+## 2026-11-21 — Menu-specific live schema reconciliation
+
+**Source of truth:** uploaded upcoming Flame Chick menu and detailed read-only reconciliation at \`docs/handoffs/2026-11-21-menu-schema-reconciliation.md\`.
+**Architecture update:** \`docs/architecture/flame-chick-menu-driven-catalog-v1.md\`.
+**Reconciliation commit:** \`bfacf5f015bdb2d6710437cd49554e3ef18addc3\`.
+**Menu architecture update commit:** \`1a12c1c5989dc6a23fb86142b7068f7492e4806d\`.
+
+Read-only inspection reconfirmed Production ACTIVE_HEALTHY, PostgreSQL 17.12, Mumbai ap-south-1, and 12 applied migrations including catalog foundation and FK indexes. The 11 catalog tables remain empty and deny-by-default with prior verified ownership/RLS/ACL/index posture. No SQL write, seed, deployment, or config change occurred.
+
+### Existing schema that should be reused
+- \`categories.category_kind\` already distinguishes \`menu\` and \`deal\`; do not add it again.
+- \`product_variants.price\` is nullable NUMERIC(12,2); NULL must remain TBD, distinct from explicit zero.
+- \`drink_options.volume_ml\` exists and is nullable; do not invent regular beverage volume.
+- Branch product/variant availability overlays already exist.
+- \`restaurants.timezone\` exists as IANA timezone.
+
+### Required menu-specific schema work before authoring
+1. Typed variant metadata for portion/flavour/pack/volume and an explicit standalone-sellable vs deal-only distinction. Retain a one-dimensional variant model; no generic multi-axis variant matrix is required for this menu.
+2. Replace modifier price rule authoritative key \`product_id + size_key\` with exact \`product_variant_id\` and same-tenant/product composite FK.
+3. Add normalized deal collections, deal records, component groups and exact variant allowlist options; add branch deal availability. The six printed offer rows are individual deals; Flame Hour and Kids Deals are collection headings.
+4. Add reusable schedule sets/windows, overnight/effective-date logic and optional branch timezone override. Flame Hour 3 PM–5 PM is known, weekdays are not; publication must wait for weekday configuration.
+5. Add draft revision, append-only audit, immutable compiled publication snapshots and atomic current pointer.
+
+### Confirmed source blockers
+- Public catalog Edge Function references missing \`deals\` and \`deal_components\`, reads mutable authoring tables, omits \`category_kind\`, and converts NULL variant prices to zero. It must not be deployed as production catalog until corrected.
+- Admin app contains direct REST CRUD, legacy-ID deal category classification and sequential writes to the old deal-component shape. Replace with authenticated atomic commands; never loosen table grants/RLS for compatibility.
+- Existing product variant Admin editor treats all variants as generic sizes; update it for menu-driven typed variant forms.
+- Modifier price rules are currently selected by \`size_key\`; exact variant UUID must become authoritative.
+
+### Menu facts still unresolved
+Flame Hour weekdays; eligible drinks/burgers for each deal; intended Flame Feast 1L drink; exact six-piece nugget choice; Fries/Juice products and deal-only status; Whole Chicken Broast flavour representation; Platter contents; regular drink volume. Do not invent these or seed guesses. TBD prices remain NULL.
+
+### Next stage
+Prepare a single review-only migration candidate for variant metadata, exact variant-scoped modifier pricing, deal collections/deals/component groups/options, schedules, branch deal availability, draft revision/audit and immutable publication snapshots/pointer. Then add schema/pricing/schedule/role/concurrency golden tests and reconcile the Admin/public catalog DTOs. Keep catalog/deal Admin UI disabled. Do not apply Production DDL, seed menu data, deploy functions or Vercel until a separate review and explicit owner approval.
