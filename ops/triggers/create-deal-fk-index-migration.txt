@@ -1,0 +1,1 @@
+Create an empty forward-only migration scaffold for the four missing deal-table child-side FK indexes identified by the Production Performance Advisor. Use Supabase CLI v3.2.0 and do not connect to or change Supabase.
