@@ -1,3 +1,62 @@
+# CURRENT IMPLEMENTATION STATUS — 2026-11-21 (latest)
+
+## Modifier command layer applied and authenticated QA passed
+
+Working branch: `work/production-source-audit`
+Supabase project: `adkrxfnawdiljhjaavnj` (Mumbai, Free plan)
+
+Latest catalog command migrations applied:
+- `20261121133607_flame_chick_catalog_commands_v1`
+- `20261121140000_flame_chick_catalog_commands_v1_qa_fixes`
+- `20261121144209_flame_chick_catalog_product_commands_v1`
+- `20261121145500_flame_chick_catalog_product_commands_v1_qa_fixes`
+- `20261121150452_flame_chick_catalog_modifier_commands_v1`
+
+Modifier migration workflow:
+https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44917875677
+
+### Available modifier database commands
+- `public.flame_chick_catalog_modifier_draft_read(uuid,integer)`
+- `public.flame_chick_catalog_modifier_assignment_draft_read(uuid)`
+- `public.flame_chick_catalog_modifier_group_upsert(jsonb,bigint,uuid)`
+- `public.flame_chick_catalog_modifier_assignment_upsert(jsonb,bigint,uuid)`
+
+These are authenticated SECURITY INVOKER wrappers. Private internals are postgres-owned SECURITY DEFINER with empty search_path. Actor scope is derived from `auth.uid()` and active restaurant-wide Admin/Owner membership. No direct application-role table CRUD/read has been granted.
+
+### Modifier command design
+- Group + options are one atomic aggregate; product assignment + exact-variant price rules are a second aggregate.
+- Supports FREE, FIXED and BY_SIZE modifier pricing.
+- Selection mode and min/max are validated against existing constraints.
+- Exact `product_variant_id` is used for BY_SIZE pricing; no text size-key mapping.
+- FREE/FIXED rules are rejected; BY_SIZE rules must reference a modifier in the exact group and variant on the assigned product.
+- A BY_SIZE option cannot switch pricing mode while exact price rows exist. Admin must explicitly remove the rows first.
+- Patch semantics preserve omitted modifier options and omitted price rules; archive options with `is_active=false`, explicitly remove price rules using `remove_price_rules`.
+- Draft can be incomplete; publish/quote validation later must reject missing required choice/rule paths.
+- Product assignment reader uses set-based aggregates for options and exact-variant price rows.
+- New index `modifier_groups_restaurant_id_id_idx(restaurant_id,id)` supports the tenant-scoped keyset group page.
+
+### Modifier QA
+Authenticated transaction QA passed for category/product prerequisites, group and options creation with FREE/FIXED/BY_SIZE, exact Regular/Large variant price rules, idempotent assignment replay, set-based product assignment read, blocking BY_SIZE mode change while old prices exist, explicit removal and subsequent mode transition, modifier draft read and direct table read denial.
+
+A test revealed the first rule-removal validation ran before restaurant actor resolution. Fixed before applying migration; then the full suite passed. All temporary fixtures were in explicit transactions and rolled back. Independently verified zero temporary users, restaurant rows, categories, products, variants, modifier groups/options/assignments/rules, audit rows and idempotency rows.
+
+### Live security / performance verification
+- New internal functions are postgres-owned SECURITY DEFINER with empty search_path.
+- Public wrappers are SECURITY INVOKER, authenticated EXECUTE only; anon and service_role denied.
+- Authenticated has no direct modifier table reads/writes and no idempotency ledger read.
+- Security Advisor: 30 INFO RLS-enabled/no-policy findings (intentional deny-by-default; do not add broad policies).
+- Performance Advisor: 47 INFO unused-index findings; expected for empty pre-launch tables. Do not drop supporting FK/query indexes before representative workload.
+
+### Next implementation phase
+Implement deal collections/deals/component groups/eligible exact product variant commands, using V1 pricing treatments INCLUDED, SURCHARGE and STANDALONE. Then implement comprehensive publication compiler validation (including modifier group selection bounds, active options, assignment and BY_SIZE exact rule completeness), then the single catalog Edge Function router and Admin UI integration. Keep Admin direct REST writes and catalog UI disabled until fully tested.
+
+No Edge Function has been deployed. No menu or staff data seeded.
+
+## Mandatory SQL standard
+Follow `docs/standards/sql-engineering-long-term-reliability.md` for all future migrations and functions: database-enforced invariants, atomic transactions, idempotency, revision checks, same-transaction audit, minimal grants, empty search_path for SECURITY DEFINER, bounded reads, justified indexes and append-only migrations.
+
+---
+
 # CURRENT IMPLEMENTATION STATUS — 2026-11-21 (latest; supersedes older status below)
 
 ## Product/variant authoring command layer applied and tested
