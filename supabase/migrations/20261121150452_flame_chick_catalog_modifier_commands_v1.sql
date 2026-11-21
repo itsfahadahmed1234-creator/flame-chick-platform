@@ -1003,17 +1003,6 @@ BEGIN
       EXCEPTION WHEN invalid_text_representation THEN
         RAISE EXCEPTION 'CATALOG_MODIFIER_REMOVE_RULE_VALUE_INVALID' USING ERRCODE='22023';
       END;
-      IF NOT EXISTS(
-        SELECT 1 FROM public.modifiers AS m
-        WHERE m.id=v_modifier_id AND m.restaurant_id=v_restaurant
-          AND m.modifier_group_id=v_group_id
-      ) OR NOT EXISTS(
-        SELECT 1 FROM public.product_variants AS pv
-        WHERE pv.id=v_variant_id AND pv.restaurant_id=v_restaurant
-          AND pv.product_id=v_product_id
-      ) THEN
-        RAISE EXCEPTION 'CATALOG_MODIFIER_REMOVE_RULE_TARGET_MISMATCH' USING ERRCODE='23514';
-      END IF;
       v_key:=v_modifier_id::text||':'||v_variant_id::text;
       IF v_key=ANY(v_seen_remove_keys) OR v_key=ANY(v_seen_keys) THEN
         RAISE EXCEPTION 'CATALOG_MODIFIER_REMOVE_RULE_DUPLICATED_OR_CONFLICTS' USING ERRCODE='22023';
@@ -1176,6 +1165,13 @@ BEGIN
           AND m.modifier_group_id=v_group_id
       ) THEN
         RAISE EXCEPTION 'CATALOG_MODIFIER_REMOVE_RULE_OPTION_MISMATCH' USING ERRCODE='23514';
+      END IF;
+      IF NOT EXISTS(
+        SELECT 1 FROM public.product_variants AS pv
+        WHERE pv.id=v_variant_id AND pv.restaurant_id=v_restaurant
+          AND pv.product_id=v_product_id
+      ) THEN
+        RAISE EXCEPTION 'CATALOG_MODIFIER_REMOVE_RULE_VARIANT_MISMATCH' USING ERRCODE='23514';
       END IF;
       DELETE FROM public.modifier_price_rules AS pr
       WHERE pr.restaurant_id=v_restaurant
