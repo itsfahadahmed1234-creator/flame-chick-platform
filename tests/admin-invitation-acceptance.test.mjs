@@ -1,4 +1,4 @@
-import test from "node:test";
+// Exercises the real acceptance-page script against a minimal browser/Auth test harness.\nimport test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
