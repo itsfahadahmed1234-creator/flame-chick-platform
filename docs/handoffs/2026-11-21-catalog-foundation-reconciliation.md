@@ -116,3 +116,10 @@ Deals/deal components/curated choice groups and schedules remain a separate phas
 The working branch now contains `.github/workflows/repair-flame-chick-catalog-ledger.yml`. It is a narrowly scoped push-trigger workflow that runs only from `work/production-source-audit` when the dedicated one-time trigger file changes. It pins Supabase CLI v3.2.0, checks the configured project ref and exact already-applied migration file, inspects the remote migration ledger, repairs only `20261121061000` with `--status applied --yes --remote=<project-ref>`, then verifies the list. No SQL migration is executed and no `db push` is used.
 
 Required GitHub Actions repository secrets, which the connected GitHub tool cannot inspect or create: `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`. Keep them in GitHub Actions Secrets only, never in repository files or chat. The one-time trigger is held until those secrets are configured. Current Supabase CLI v3 uses `--remote` (not deprecated `--linked`) and defaults database commands to local unless a remote target is specified.
+
+
+## Latest workflow run
+
+GitHub Actions run [44890673291](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44890673291) executed the guarded workflow and stopped at the credential pre-check. Both required secrets were empty: `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`. CLI install/link/repair steps were skipped, so no Supabase database action ran. The migration ledger remains unchanged.
+
+Owner must add these two Actions repository secrets at https://github.com/itsfahadahmed1234-creator/flame-chick-platform/settings/secrets/actions, then update `ops/triggers/repair-catalog-ledger.txt` to retrigger. Never disclose secrets in chat or commit them.
