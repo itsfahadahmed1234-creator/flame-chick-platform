@@ -1,4 +1,28 @@
 
+## 2026-11-21 — Flame Chick-only runtime source cleanup
+
+**Source commits:** `b7fb2bb38cb37a395a93810864f85a9ae5d925c3`, `45d279f35d59be90f5238ed4095a9a3d8e6983f7`, `4c07607e712e1ebdbb374444086d5e1096f072c5`, `c66dc7656756189b47b7728e913c6012bf7415a3`, `dfc034d3944fd552bc66216e7897a259645ae431`, `6b591f1fe3bfb5c5c9f762231ec6a3843799cee3`, `d6f6182c2c16b12bf7860f391d71ca73c2cfd56c`, `173b7f26593bc75d1baac1b73f2a6071f3b5486b`.
+
+Completed source hygiene:
+- Removed the inactive `apps/flame-chick-website/js/app.js` file. It was not referenced by the active storefront entrypoint and contained historical HFP/Pizza Bite settings and staging URLs.
+- Rewrote the Website README without references to the retired storefront implementation.
+- Rebranded active website module globals and callbacks to Flame Chick names; replaced old language/cart/fulfilment storage keys with Flame Chick keys; changed order reference prefix to `FC-`; updated visible brand copy and removed the legacy Waisa location claim.
+- Replaced Admin-generated legacy `PB*` IDs with Flame Chick prefixes (`FC-PROD`, `FC-VAR`, `FC-CAT`, `FC-SUB`, `FC-DEAL`, `FC-SLIDE`).
+- Renamed local POS/Admin/Rider HFP-prefixed identifiers to Flame Chick names; Rider Realtime channel now uses `flame-chick-rider-ops-`.
+- Verified the active Admin, Website, POS and Rider runtime files contain no Pizza Bite branding or HFP identifiers (base64 image data is excluded from semantic checks).
+
+Static CI results:
+- [Admin static checks passed](https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44881645889).
+- [Website static checks passed](https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44881563119).
+- [POS and Rider static checks passed](https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44881805138).
+
+Important compatibility note: the source rename of `flame_chick_admin_dashboard` and `flame_chick_admin_reassign_delivery` does not create those database RPCs. The related Admin dashboard and POS delivery-reassignment server contracts still need implementation and QA before those operations can be enabled.
+
+No database migration, Production data change, Edge Function deployment, Vercel deployment, secret configuration, or domain assignment was performed.
+
+---
+
+
 ### Admin invitation acceptance CI — passed
 
 - Workflow: [Flame Chick Admin Static Checks](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44881008259).
