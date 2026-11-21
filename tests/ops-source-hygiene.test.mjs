@@ -23,7 +23,7 @@ test("POS and Rider inline JavaScript parses", () => {
       const tagEnd = chunk.indexOf(">");
       if (tagEnd < 0) continue;
       const attrs = chunk.slice(0, tagEnd);
-      if (/\\bsrc=/i.test(attrs)) continue;
+      if (attrs.toLowerCase().includes("src=")) continue;
       const close = chunk.indexOf("</script>", tagEnd + 1);
       if (close < 0) continue;
       const code = chunk.slice(tagEnd + 1, close).trim();
