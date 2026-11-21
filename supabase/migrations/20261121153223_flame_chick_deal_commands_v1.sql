@@ -799,6 +799,7 @@ BEGIN
 
  FOR v_group_json IN SELECT x.value FROM pg_catalog.jsonb_array_elements(p_payload->'groups') x(value)
  LOOP
+  v_group_id:=NULL;
   v_variant_seen:=ARRAY[]::uuid[];
   IF pg_catalog.jsonb_typeof(v_group_json)<>'object'
      OR EXISTS(
@@ -1383,7 +1384,7 @@ BEGIN
   FOR v_remove IN SELECT x.value FROM pg_catalog.jsonb_array_elements(p_payload->'remove_window_ids') x(value)
   LOOP
    IF pg_catalog.jsonb_typeof(v_remove)<>'string' THEN RAISE EXCEPTION 'SCHEDULE_WINDOW_REMOVE_ID_INVALID' USING ERRCODE='22023'; END IF;
-   BEGIN v_remove_id:=v_remove::text::uuid;
+   BEGIN v_remove_id:=(v_remove #>> '{}')::uuid;
    EXCEPTION WHEN invalid_text_representation THEN RAISE EXCEPTION 'SCHEDULE_WINDOW_REMOVE_ID_INVALID' USING ERRCODE='22023'; END;
    IF v_remove_id=ANY(v_seen) THEN RAISE EXCEPTION 'SCHEDULE_WINDOW_REMOVE_DUPLICATED' USING ERRCODE='22023'; END IF;
    v_seen:=pg_catalog.array_append(v_seen,v_remove_id);
