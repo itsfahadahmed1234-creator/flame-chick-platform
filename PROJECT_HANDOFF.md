@@ -1595,3 +1595,44 @@ Disposable DDL-only and behavioral rollback tests passed. They covered bootstrap
 ## Next catalog implementation handoff
 
 The core catalog schema and all 15 FK indexes are applied and independently verified in Production. The next work is the secure Admin/Owner catalog authoring API, not enabling the legacy Admin direct REST writes. See `docs/handoffs/2026-11-21-secure-catalog-authoring-api.md` for the source audit, Production state, command boundaries, publication design, and security stop-gates. The catalog UI remains disabled; no catalog rows are seeded and no catalog Edge Function is deployed.
+
+
+---
+
+## CURRENT OVERRIDE — 2026-11-21: combo deals and time-based offers design
+
+This section supersedes earlier statements that deal structures and schedules were still awaiting domain design.
+
+Owner agreed to extend the menu foundation for combo deals, customer-selected components, scheduled offers and broader promotions. Reviewed design committed at:
+
+- `docs/architecture/catalog-deals-promotions-scheduling-v1.md`
+- Design commit: `0f7c026b4d1a6a7e6b330698f98b0de0746a831e`
+- Updated secure catalog handoff commit: `174fd8b1a3dbacbe2fa4a1c901a75de5103d7049`
+
+### Approved design scope
+
+- First-class combo/deal entities, purchasable deal variants, component groups, exact product-variant allowlists, quantities, required/optional choices and explicit per-choice pricing.
+- Fixed-price bundles and base-plus-selected-items bundles; included, fixed surcharge and selected variant price treatments.
+- Existing product modifier groups remain available within deal components (e.g. crust, spice, toppings, sauces).
+- Separate promotion domain for percentage, fixed amount and fixed price discounts, target scopes, Website/POS channels, coupons, branch scope and deterministic stacking.
+- Reusable schedules with explicit IANA timezone, multiple weekday windows, overnight windows, effective dates, one-off date/time windows, branch override/fallback and clear boundary semantics.
+- Database-time runtime schedule evaluation; no cron jobs toggling deal active flags.
+- Immutable publication snapshots include deal/promotion/schedule definitions; checkout re-evaluates eligibility and all prices server-side.
+- Historical order receipt snapshots preserve exact deal selections, modifiers and discounts after later catalog changes.
+
+### Safety and exclusions
+
+- No direct app-role table grants or permissive policies; RLS remains deny-by-default.
+- Admin/Owner only authoring; verified actor from JWT and server-side membership.
+- Atomic aggregate writes, expected draft revision, idempotency and append-only audit.
+- No client-calculated prices or discounts; missing price rules are never treated as free.
+- Promotion usage caps require a future atomic order-linked redemption ledger; do not expose them before order transaction integration.
+- GST remains deferred. Inventory, allergens, BOGO, loyalty, referral and customer-segment promotions are not included in this slice.
+
+### Current execution truth
+
+This is design-only. No new Production tables, migrations, RPCs, Edge Functions, UI changes, seed data or deployments have been made. Production remains at the previously verified 11 empty catalog tables and 15 FK indexes, all catalog tables deny-by-default. Continue on `work/production-source-audit`; do not touch main, create a Supabase branch, upgrade the plan or apply Production DDL.
+
+### Next stage
+
+Prepare a review-only migration candidate on the working branch from the design contract, including deal/promotion/schedule entities and publication integration. Then run isolated/rollback-only structural, pricing, schedule, security and concurrency tests. Review the exact migration and recovery plan before any separate request for Production approval. Keep Admin catalog/deal/promotion UI disabled until secure commands and publication are complete.
