@@ -128,7 +128,7 @@ DECLARE
   v_last_id uuid;
   v_limit integer;
 BEGIN
-  IF p_entity_type IS NULL OR p_entity_type NOT IN ('categories', 'subcategories') THEN
+  IF p_entity_type NOT IN ('categories', 'subcategories') THEN
     RAISE EXCEPTION 'CATALOG_READ_ENTITY_INVALID' USING ERRCODE = '22023';
   END IF;
   IF p_limit IS NULL OR p_limit < 1 OR p_limit > 100 THEN
@@ -163,27 +163,25 @@ BEGIN
     )
     SELECT
       COALESCE(
-        (
-          SELECT pg_catalog.jsonb_agg(
-            pg_catalog.jsonb_build_object(
-              'id', s.id,
-              'category_kind', s.category_kind,
-              'legacy_id', s.legacy_id,
-              'name_en', s.name_en,
-              'name_ur', s.name_ur,
-              'sort_order', s.sort_order,
-              'is_active', s.is_active,
-              'created_at', s.created_at,
-              'updated_at', s.updated_at
-            ) ORDER BY s.id
-          )
-          FROM selected AS s
+        pg_catalog.jsonb_agg(
+          pg_catalog.jsonb_build_object(
+            'id', s.id,
+            'category_kind', s.category_kind,
+            'legacy_id', s.legacy_id,
+            'name_en', s.name_en,
+            'name_ur', s.name_ur,
+            'sort_order', s.sort_order,
+            'is_active', s.is_active,
+            'created_at', s.created_at,
+            'updated_at', s.updated_at
+          ) ORDER BY s.id
         ),
         '[]'::jsonb
       ),
       (SELECT pg_catalog.count(*) > p_limit FROM page),
       (SELECT x.id FROM selected AS x ORDER BY x.id DESC LIMIT 1)
-    INTO v_items, v_has_more, v_last_id;
+    INTO v_items, v_has_more, v_last_id
+    FROM selected AS s;
 
   ELSE
     WITH page AS (
@@ -200,27 +198,25 @@ BEGIN
     )
     SELECT
       COALESCE(
-        (
-          SELECT pg_catalog.jsonb_agg(
-            pg_catalog.jsonb_build_object(
-              'id', s.id,
-              'category_id', s.category_id,
-              'legacy_id', s.legacy_id,
-              'name_en', s.name_en,
-              'name_ur', s.name_ur,
-              'sort_order', s.sort_order,
-              'is_active', s.is_active,
-              'created_at', s.created_at,
-              'updated_at', s.updated_at
-            ) ORDER BY s.id
-          )
-          FROM selected AS s
+        pg_catalog.jsonb_agg(
+          pg_catalog.jsonb_build_object(
+            'id', s.id,
+            'category_id', s.category_id,
+            'legacy_id', s.legacy_id,
+            'name_en', s.name_en,
+            'name_ur', s.name_ur,
+            'sort_order', s.sort_order,
+            'is_active', s.is_active,
+            'created_at', s.created_at,
+            'updated_at', s.updated_at
+          ) ORDER BY s.id
         ),
         '[]'::jsonb
       ),
       (SELECT pg_catalog.count(*) > p_limit FROM page),
       (SELECT x.id FROM selected AS x ORDER BY x.id DESC LIMIT 1)
-    INTO v_items, v_has_more, v_last_id;
+    INTO v_items, v_has_more, v_last_id
+    FROM selected AS s;
   END IF;
 
   RETURN pg_catalog.jsonb_build_object(
@@ -294,7 +290,7 @@ DECLARE
   v_category public.categories%ROWTYPE;
   v_subcategory public.subcategories%ROWTYPE;
 BEGIN
-  IF p_action IS NULL OR p_action NOT IN ('category_upsert', 'subcategory_upsert') THEN
+  IF p_action NOT IN ('category_upsert', 'subcategory_upsert') THEN
     RAISE EXCEPTION 'CATALOG_COMMAND_INVALID' USING ERRCODE = '22023';
   END IF;
   IF p_request_id IS NULL OR p_expected_revision IS NULL OR p_expected_revision < 0 THEN
