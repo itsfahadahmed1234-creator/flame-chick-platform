@@ -1,3 +1,68 @@
+# CURRENT IMPLEMENTATION STATUS — 2026-11-21 (latest; supersedes older status below)
+
+## Product/variant authoring command layer applied and tested
+
+Working branch: `work/production-source-audit`
+Supabase project: `adkrxfnawdiljhjaavnj` (Mumbai, Free plan)
+
+Latest applied catalog migrations:
+- `20261121125542_flame_chick_menu_v1_catalog`
+- `20261121133607_flame_chick_catalog_commands_v1`
+- `20261121140000_flame_chick_catalog_commands_v1_qa_fixes`
+- `20261121144209_flame_chick_catalog_product_commands_v1`
+- `20261121145500_flame_chick_catalog_product_commands_v1_qa_fixes`
+
+Successful application workflows:
+- Product/variant commands: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44915515192
+- Product command forward QA correction: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44915684114
+
+### Available catalog database commands now
+- `public.flame_chick_catalog_draft_read(text,uuid,integer)`
+- `public.flame_chick_catalog_category_upsert(jsonb,bigint,uuid)`
+- `public.flame_chick_catalog_subcategory_upsert(jsonb,bigint,uuid)`
+- `public.flame_chick_catalog_product_draft_read(uuid,integer)`
+- `public.flame_chick_catalog_product_upsert(jsonb,bigint,uuid)`
+
+These are authenticated SECURITY INVOKER wrappers. Internal command/read functions are postgres-owned SECURITY DEFINER with empty search_path. Admin/Owner authority is derived from `auth.uid()` and active restaurant-wide membership. No application role has direct catalog table CRUD or idempotency-ledger table access.
+
+### Product/variant semantics
+- One atomic product + supplied variant upsert command; strict allowlisted bounded payload.
+- Same-restaurant menu category and matching optional subcategory validation.
+- Existing variant upserts by same-product variant ID or normalized size_key.
+- Omitted variant arrays leave all variants unchanged; supplied arrays patch only the listed variants. No silent deletion. Set is_active=false to archive explicitly.
+- Supports standard, portion, flavour, pack and volume variant kinds.
+- Pack requires quantity and unit; non-pack rejects pack metadata.
+- NULL price = unpriced/TBD; numeric zero = explicit zero. Uses NUMERIC(12,2) semantics.
+- Image/storage metadata is intentionally not in the command yet; separate secure storage-aware command required.
+
+### Authenticated transaction QA passed
+Temporary test auth user, restaurant, profile and Admin role were created only inside explicit transactions and rolled back. Tests passed for category creation, product + variants creation, zero vs NULL price, same-request replay, changed-payload idempotency-key rejection, null variants rejection, duplicate variant ID rejection, stale revision conflict, bounded draft read, partial variant patch preserving omitted variants, no duplicate revision on replay, direct table-write denial and direct product_variant SELECT denial.
+
+Independent post-test counts: zero temporary Auth users, restaurants, categories, subcategories, products, variants, draft states, catalog audit rows or idempotency rows.
+
+Unauthenticated command/draft-read tests also reject with `CATALOG_ADMIN_FORBIDDEN`.
+
+### Advisor results
+- Security Advisor: 30 INFO RLS-enabled/no-policy findings. These are intentional deny-by-default controls; do not create broad policies to clear the INFO notices.
+- Performance Advisor: 52 INFO unused-index findings. Expected before business data/workload exists; do not drop indexes based on empty-project usage counters.
+
+### Not yet ready for Admin or deployment
+- Owner positive and Manager/Cashier/Rider explicit denial tests remain to be added.
+- Modifier group/assignment/exact variant price-rule authoring commands remain.
+- Deal, component group and deal choice commands remain.
+- Image upload metadata command remains.
+- Publication compiler, publish and rollback commands remain.
+- Edge Function router not yet deployed; Admin catalog direct REST writes not yet replaced; catalog UI must remain disabled.
+- No menu, restaurant, branch, staff or catalog rows have been seeded.
+
+### Next work
+Implement modifier group/option/assignment and exact `product_variant_id` price-rule commands. Then implement deal/component commands and full publication validation. Build the catalog Edge Function router and Admin integration only after those commands and role tests are complete. Keep the existing project/branch/Free plan; no additional Supabase project or paid upgrade.
+
+## SQL reliability standard remains mandatory
+See `docs/standards/sql-engineering-long-term-reliability.md`. Preserve atomic commands, exact actor authorization, idempotency, revision checks, same-transaction audit, append-only migrations, bounded reads, least-privilege grants and Free-tier-aware query patterns.
+
+---
+
 # CRITICAL CURRENT STATUS — 2026-11-21 (read before continuing)
 
 ## Verified GitHub repository identity
