@@ -6,6 +6,11 @@
 
 BEGIN;
 
+-- Page by restaurant + UUID without scanning every tenant's groups.
+CREATE INDEX IF NOT EXISTS modifier_groups_restaurant_id_id_idx
+  ON public.modifier_groups (restaurant_id, id);
+
+
 DO $preflight$
 BEGIN
   IF current_user <> 'postgres' OR session_user <> 'postgres' THEN
@@ -916,6 +921,15 @@ BEGIN
     RAISE EXCEPTION 'CATALOG_MODIFIER_ASSIGNMENT_TARGET_REQUIRED' USING ERRCODE='22023';
   END IF;
 
+  IF (p_payload ? 'id' AND p_payload->'id'<>'null'::jsonb AND pg_catalog.jsonb_typeof(p_payload->'id')<>'string')
+     OR (p_payload ? 'modifier_group_id' AND pg_catalog.jsonb_typeof(p_payload->'modifier_group_id')<>'string')
+     OR (p_payload ? 'product_id' AND pg_catalog.jsonb_typeof(p_payload->'product_id')<>'string')
+     OR (p_payload ? 'legacy_id' AND p_payload->'legacy_id'<>'null'::jsonb AND pg_catalog.jsonb_typeof(p_payload->'legacy_id')<>'string')
+     OR (p_payload ? 'is_active' AND pg_catalog.jsonb_typeof(p_payload->'is_active')<>'boolean')
+     OR (p_payload ? 'sort_order' AND pg_catalog.jsonb_typeof(p_payload->'sort_order')<>'number') THEN
+    RAISE EXCEPTION 'CATALOG_MODIFIER_ASSIGNMENT_FIELD_TYPE_INVALID' USING ERRCODE='22023';
+  END IF;
+
   IF p_payload ? 'price_rules' THEN
     IF pg_catalog.jsonb_typeof(p_payload->'price_rules') IS DISTINCT FROM 'array' THEN
       RAISE EXCEPTION 'CATALOG_MODIFIER_PRICE_RULES_ARRAY_INVALID' USING ERRCODE='22023';
@@ -932,6 +946,11 @@ BEGIN
            WHERE k.key<>ALL(ARRAY['modifier_id','product_variant_id','legacy_id','price'])
          ) THEN
         RAISE EXCEPTION 'CATALOG_MODIFIER_PRICE_RULE_FIELDS_INVALID' USING ERRCODE='22023';
+      END IF;
+      IF pg_catalog.jsonb_typeof(v_rule->'modifier_id')<>'string'
+         OR pg_catalog.jsonb_typeof(v_rule->'product_variant_id')<>'string'
+         OR pg_catalog.jsonb_typeof(v_rule->'price')<>'number' THEN
+        RAISE EXCEPTION 'CATALOG_MODIFIER_PRICE_RULE_VALUE_INVALID' USING ERRCODE='22023';
       END IF;
       BEGIN
         v_modifier_id:=(v_rule->>'modifier_id')::uuid;
@@ -973,6 +992,10 @@ BEGIN
            WHERE k.key<>ALL(ARRAY['modifier_id','product_variant_id'])
          ) THEN
         RAISE EXCEPTION 'CATALOG_MODIFIER_REMOVE_RULE_FIELDS_INVALID' USING ERRCODE='22023';
+      END IF;
+      IF pg_catalog.jsonb_typeof(v_remove->'modifier_id')<>'string'
+         OR pg_catalog.jsonb_typeof(v_remove->'product_variant_id')<>'string' THEN
+        RAISE EXCEPTION 'CATALOG_MODIFIER_REMOVE_RULE_VALUE_INVALID' USING ERRCODE='22023';
       END IF;
       BEGIN
         v_modifier_id:=(v_remove->>'modifier_id')::uuid;
