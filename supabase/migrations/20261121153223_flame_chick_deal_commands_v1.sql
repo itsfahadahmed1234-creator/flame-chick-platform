@@ -799,6 +799,7 @@ BEGIN
 
  FOR v_group_json IN SELECT x.value FROM pg_catalog.jsonb_array_elements(p_payload->'groups') x(value)
  LOOP
+  v_variant_seen:=ARRAY[]::uuid[];
   IF pg_catalog.jsonb_typeof(v_group_json)<>'object'
      OR EXISTS(
       SELECT 1 FROM pg_catalog.jsonb_object_keys(v_group_json) k(key)
@@ -927,7 +928,7 @@ BEGIN
      SELECT o.* INTO v_option_row FROM public.deal_component_options o
      WHERE o.id=v_option_id AND o.restaurant_id=v_context.restaurant_id
        AND o.deal_id=v_deal_id AND o.component_group_id=v_group_id FOR UPDATE;
-     IF NOT FOUND THEN RAI      EXCEPTION 'DEAL_COMPONENT_OPTION_NOT_FOUND' USING ERRCODE='P0002'; END IF;
+     IF NOT FOUND THEN RAISE EXCEPTION 'DEAL_COMPONENT_OPTION_NOT_FOUND' USING ERRCODE='P0002'; END IF;
      IF v_variant_id IS NULL THEN v_variant_id:=v_option_row.product_variant_id; END IF;
     ELSE
      SELECT o.* INTO v_option_row FROM public.deal_component_options o
@@ -1455,10 +1456,17 @@ BEGIN
  IF v_context.replay_response IS NOT NULL THEN RETURN pg_catalog.jsonb_set(v_context.replay_response,'{idempotent}','true'::jsonb,true); END IF;
  BEGIN v_id:=NULLIF(p_payload->>'id','')::uuid; v_deal:=(p_payload->>'deal_id')::uuid; v_schedule:=(p_payload->>'schedule_set_id')::uuid;
  EXCEPTION WHEN invalid_text_representation THEN RAISE EXCEPTION 'DEAL_SCHEDULE_ASSIGNMENT_ID_INVALID' USING ERRCODE='22023'; END;
+ IF v_id IS NOT NULL THEN
+  SELECT a.* INTO v_row FROM public.deal_schedule_assignments a
+  WHERE a.id=v_id AND a.restaurant_id=v_context.restaurant_id AND a.deal_id=v_deal
+  FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'DEAL_SCHEDULE_ASSIGNMENT_NOT_FOUND' USING ERRCODE='P0002'; END IF;
+ END IF;
  IF p_payload ? 'branch_id' THEN
   IF p_payload->'branch_id'='null'::jsonb THEN v_branch:=NULL;
   ELSE BEGIN v_branch:=(p_payload->>'branch_id')::uuid;
        EXCEPTION WHEN invalid_text_representation THEN RAISE EXCEPTION 'DEAL_SCHEDULE_BRANCH_ID_INVALID' USING ERRCODE='22023'; END; END IF;
+ ELSIF v_id IS NOT NULL THEN v_branch:=v_row.branch_id;
  ELSE v_branch:=NULL; END IF;
  IF NOT EXISTS(SELECT 1 FROM public.deals d WHERE d.id=v_deal AND d.restaurant_id=v_context.restaurant_id)
   OR NOT EXISTS(SELECT 1 FROM public.catalog_schedule_sets s WHERE s.id=v_schedule AND s.restaurant_id=v_context.restaurant_id) THEN
