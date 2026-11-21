@@ -22,6 +22,7 @@ async function db(path,opt){if(S.session&&S.session.expires_at&&Date.now()>Numbe
 function managedMediaPath(path){return /^(products|categories|deals)\/[0-9a-f-]{36}\/[^/]+\.(?:jpg|jpeg|png|webp)$/i.test(String(path||""));}
 function imageLeaf(path){const p=String(path||"");return p.split("/").pop()||"No image";}
 function fileExtension(path){const m=String(path||"").toLowerCase().match(/\.([a-z0-9]+)$/);return m?m[1]:null;}
+function legacyCode(prefix){const suffix=crypto.randomUUID?crypto.randomUUID().replace(/-/g,"").slice(0,10).toUpperCase():Math.random().toString(36).slice(2,12).toUpperCase();return prefix+Date.now().toString(36).toUpperCase()+"-"+suffix;}
 async function storageUpload(kind,id,file){
  if(!file||!file.size)return null;
  if(!["products","categories","deals"].includes(kind))throw Error("Unsupported image type.");
@@ -474,7 +475,7 @@ async function clearSiteImage(key){if(!window.confirm("Use the website built-in 
 function wireSiteMedia(box){box.querySelectorAll("[data-site-upload]").forEach(input=>input.onchange=async()=>{const file=input.files&&input.files[0];if(!file)return;input.disabled=true;try{await replaceSiteImage(input.dataset.siteUpload,file);}catch(e){toast(e.message,true);}finally{input.disabled=false;input.value="";}});box.querySelectorAll("[data-site-restore]").forEach(b=>b.onclick=async()=>{b.disabled=true;try{await restoreSiteImage(b.dataset.siteRestore);}catch(e){toast(e.message,true);}finally{b.disabled=false;}});box.querySelectorAll("[data-site-clear]").forEach(b=>b.onclick=async()=>{b.disabled=true;try{await clearSiteImage(b.dataset.siteClear);}catch(e){toast(e.message,true);}finally{b.disabled=false;}});}
 function currentSlides(){const row=setting("menu_hero_banners"),v=row&&row.value_json||{};return Array.isArray(v.slides)?v.slides.slice():[];}
 async function saveSlides(slides){const row=setting("menu_hero_banners"),value=Object.assign({},row&&row.value_json||{},{slides});await saveSettingObject("menu_hero_banners",value);}
-async function uploadNewSliderSlide(file){const slides=currentSlides();if(slides.length>=10)throw Error("The slider supports up to 10 images.");const up=await siteStorageUpload("menu-slides",file,"banner");slides.push({id:"PB-"+(crypto.randomUUID?crypto.randomUUID():Date.now()),ext:up.ext,url:up.url,path:up.path,kind:"custom",enabled:true,alt:"Flame Chick promotion"});await saveSlides(slides);renderSiteMedia();toast("Slider image added.");}
+async function uploadNewSliderSlide(file){const slides=currentSlides();if(slides.length>=10)throw Error("The slider supports up to 10 images.");const up=await siteStorageUpload("menu-slides",file,"banner");slides.push({id:legacyCode("FC-SLIDE-"),ext:up.ext,url:up.url,path:up.path,kind:"custom",enabled:true,alt:"Flame Chick promotion"});await saveSlides(slides);renderSiteMedia();toast("Slider image added.");}
 async function replaceSliderSlide(id,file){const slides=currentSlides(),i=slides.findIndex(s=>String(s.id)===String(id));if(i<0)throw Error("Slider image not found.");const up=await siteStorageUpload("menu-slides",file,"banner-"+String(id).replace(/[^A-Za-z0-9_-]/g,"-")),old=slides[i];slides[i]=Object.assign({},old,{previous:old.path?{path:old.path,url:old.url,ext:old.ext}:old.previous||null,path:up.path,url:up.url,ext:up.ext,kind:"custom"});await saveSlides(slides);if(old.previous&&old.previous.path)try{await siteStorageRemove(old.previous.path);}catch(e){toast("Old slider backup cleanup needs attention.",true);}renderSiteMedia();toast("Slider image replaced.");}
 async function restoreSliderSlide(id){const slides=currentSlides(),i=slides.findIndex(s=>String(s.id)===String(id));if(i<0||!slides[i].previous||!slides[i].previous.url)throw Error("No slider backup is available.");const current=slides[i],backup=current.previous;slides[i]=Object.assign({},current,{path:backup.path,url:backup.url,ext:backup.ext,previous:current.path?{path:current.path,url:current.url,ext:current.ext}:null});await saveSlides(slides);renderSiteMedia();toast("Slider backup restored.");}
 function wireSliderManager(box){box.querySelectorAll("[data-slide-restore]").forEach(b=>b.onclick=async()=>{b.disabled=true;try{await restoreSliderSlide(b.dataset.slideRestore);}catch(e){toast(e.message,true);}finally{b.disabled=false;}});box.querySelectorAll("[data-slide-replace]").forEach(input=>input.onchange=async()=>{const file=input.files&&input.files[0];if(!file)return;input.disabled=true;try{await replaceSliderSlide(input.dataset.slideReplace,file);}catch(e){toast(e.message,true);}finally{input.disabled=false;input.value="";}});box.querySelectorAll("[data-slide-toggle]").forEach(b=>b.onclick=async()=>{const slides=currentSlides(),s=slides.find(x=>String(x.id)===String(b.dataset.slideToggle));if(!s)return;s.enabled=s.enabled===false;try{await saveSlides(slides);renderSiteMedia();}catch(e){toast(e.message,true);}});box.querySelectorAll("[data-slide-up],[data-slide-down]").forEach(b=>b.onclick=async()=>{const slides=currentSlides(),i=slides.findIndex(x=>String(x.id)===String(b.dataset.slideUp||b.dataset.slideDown)),j=i+(b.hasAttribute("data-slide-up")?-1:1);if(i<0||j<0||j>=slides.length)return;[slides[i],slides[j]]=[slides[j],slides[i]];try{await saveSlides(slides);renderSiteMedia();}catch(e){toast(e.message,true);}});box.querySelectorAll("[data-slide-remove]").forEach(b=>b.onclick=async()=>{if(!window.confirm("Remove this slider image?"))return;const slides=currentSlides(),i=slides.findIndex(x=>String(x.id)===String(b.dataset.slideRemove));if(i<0)return;const removed=slides.splice(i,1)[0];try{await saveSlides(slides);if(removed.path)try{await siteStorageRemove(removed.path);}catch(e){toast("Slider removed; current image cleanup failed.",true);}if(removed.previous&&removed.previous.path)try{await siteStorageRemove(removed.previous.path);}catch(e){toast("Slider removed; backup cleanup failed.",true);}renderSiteMedia();toast("Slider image removed.");}catch(e){toast(e.message,true);}});const add=$("addSliderImage");if(add)add.onchange=async()=>{const file=add.files&&add.files[0];if(!file)return;add.disabled=true;try{await uploadNewSliderSlide(file);}catch(e){toast(e.message,true);}finally{add.disabled=false;add.value="";}};}
@@ -556,7 +557,7 @@ function editProduct(id){
   let pid=id;
   if(p)await db("products?id=eq."+id,{method:"PATCH",body,prefer:"return=minimal"});
   else{
-   const legacy="PB-"+Date.now().toString(36).toUpperCase();
+   const legacy=legacyCode("FC-PROD-");
    const created=await db("products",{method:"POST",body:Object.assign({},body,{restaurant_id:S.restaurant.id,legacy_id:legacy}),prefer:"return=representation"});
    pid=created&&created[0]&&created[0].id;
    if(!pid)throw Error("Product was saved but its ID was not returned.");
@@ -565,7 +566,7 @@ function editProduct(id){
    const keep=preserveExistingVariantRows?null:(activeVs[0]||null);
    const singleBody={size_label:"Regular",size_key:"REGULAR",price:priceRows[0].price,sort_order:1,is_active:true,is_available:true};
    if(keep)await db("product_variants?id=eq."+keep.id,{method:"PATCH",body:singleBody,prefer:"return=minimal"});
-   else await db("product_variants",{method:"POST",body:Object.assign({},singleBody,{product_id:pid,legacy_id:"PBV-"+Date.now().toString(36).toUpperCase()+"-1"}),prefer:"return=minimal"});
+   else await db("product_variants",{method:"POST",body:Object.assign({},singleBody,{product_id:pid,legacy_id:legacyCode("FC-VAR-")+"-1"}),prefer:"return=minimal"});
    for(const oldVariant of activeVs){
     if(preserveExistingVariantRows||!keep||oldVariant.id!==keep.id)await db("product_variants?id=eq."+oldVariant.id,{method:"PATCH",body:{is_active:false,is_available:false},prefer:"return=minimal"});
    }
@@ -577,7 +578,7 @@ function editProduct(id){
     const row=priceRows[i];
     const v={size_label:row.label,size_key:row.key,price:row.price,sort_order:i+1,is_active:true,is_available:true};
     if(row.id)await db("product_variants?id=eq."+row.id,{method:"PATCH",body:v,prefer:"return=minimal"});
-    else await db("product_variants",{method:"POST",body:Object.assign({},v,{product_id:pid,legacy_id:"PBV-"+Date.now().toString(36).toUpperCase()+"-"+(i+1)}),prefer:"return=minimal"});
+    else await db("product_variants",{method:"POST",body:Object.assign({},v,{product_id:pid,legacy_id:legacyCode("FC-VAR-")+"-"+(i+1)}),prefer:"return=minimal"});
    }
   }
   const f=fd.get("image_file");if(f&&f.size)await replaceImage("products",pid,f,p||{});
@@ -638,7 +639,7 @@ function editCategory(id){
   if(!b.name_en)throw Error("Category name is required.");
   let cid=id;
   if(c)await db("categories?id=eq."+id,{method:"PATCH",body:b,prefer:"return=minimal"});
-  else{let legacy="PBC-"+Date.now().toString(36).toUpperCase(),created=await db("categories",{method:"POST",body:Object.assign({},b,{restaurant_id:S.restaurant.id,legacy_id:legacy}),prefer:"return=representation"});cid=created&&created[0]&&created[0].id;if(!cid)throw Error("Category was saved but its ID was not returned.");}
+  else{let legacy=legacyCode("FC-CAT-"),created=await db("categories",{method:"POST",body:Object.assign({},b,{restaurant_id:S.restaurant.id,legacy_id:legacy}),prefer:"return=representation"});cid=created&&created[0]&&created[0].id;if(!cid)throw Error("Category was saved but its ID was not returned.");}
   const f=fd.get("image_file");if(f&&f.size)await replaceImage("categories",cid,f,c||{});
  });
  wireImageRollback("categories",id);
@@ -650,7 +651,7 @@ function editSubcategory(id){
   const body={name_en:String(fd.get("name_en")||"").trim(),name_ur:String(fd.get("name_ur")||"").trim()||null,category_id:fd.get("category_id"),sort_order:Number(fd.get("sort_order")||0),is_active:fd.has("active")};
   if(!body.name_en||!body.category_id)throw Error("Subcategory name and parent category are required.");
   if(s)await db("subcategories?id=eq."+id,{method:"PATCH",body,prefer:"return=minimal"});
-  else await db("subcategories",{method:"POST",body:Object.assign({},body,{legacy_id:"PBS-"+Date.now().toString(36).toUpperCase()}),prefer:"return=minimal"});
+  else await db("subcategories",{method:"POST",body:Object.assign({},body,{legacy_id:legacyCode("FC-SUB-")}),prefer:"return=minimal"});
  });
 }
 function dealComponentRowHtml(i){
@@ -717,7 +718,7 @@ function editDeal(id){
     if(!Array.isArray(opts)||!opts.length)throw Error("No active drink option uses volume key "+c.volume_key+". Check drink options before saving.");
    }
   }
-  const legacy="PB-DL-"+Date.now().toString(36).toUpperCase();
+  const legacy=legacyCode("FC-DEAL-");
   let made=await db("deals",{method:"POST",body:Object.assign({},body,{restaurant_id:S.restaurant.id,legacy_id:legacy,metadata:{deal_type:catName(body.category_id)},is_active:false,is_available:false}),prefer:"return=representation"});
   const did=made&&made[0]&&made[0].id;if(!did)throw Error("Deal draft could not be created.");
   try{

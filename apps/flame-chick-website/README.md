@@ -4,8 +4,7 @@ Static customer storefront for Flame Chick.
 
 - Entrypoint: `index.html`
 - CSS: `css/styles.css`
-- Active browser scripts: `js/config.js` and `js/catalog.js`, plus the inline scripts in `index.html`
-- Legacy JavaScript files: retained in `js/` for reference, but not loaded by the current storefront entrypoint. In particular, `js/app.js` is inactive and contains historical HFP/Pizza Bite settings and HFP staging image URLs; do not add it to the production page without a full review.
+- Active browser scripts: `js/config.js`, `js/catalog.js`, `js/hero-slider.js`, `js/i18n.js`, `js/pricing.js`, `js/staging-guard.js`, and `js/store.js`, plus the inline scripts in `index.html`.
 - Brand assets: `assets/`
 - Media: `media/f/` (59-frame scroll sequence), `media/products/` (11 product images), `media/hero.jpg`, and `media/hero.mp4`
 - Supabase: Production project `adkrxfnawdiljhjaavnj`, Mumbai `ap-south-1`
