@@ -1,3 +1,44 @@
+# CURRENT IMPLEMENTATION STATUS — 2026-11-21 (latest; draft/live menu isolation enforced)
+
+## Hard rule: draft catalog can never become the live website menu by accident
+
+The editable catalog and the customer-visible catalog are separate data paths:
+- Admin/Owner authoring commands mutate only mutable draft tables and increment `catalog_draft_state.revision`.
+- The website read path returns only the immutable row selected by `catalog_current_publication`.
+- A missing pointer returns `published=false` with a NULL snapshot. The website Edge Function converts this to `CATALOG_NOT_PUBLISHED` (HTTP 404); it never reconstructs a response from draft tables.
+- Publication history has database triggers that reject UPDATE, DELETE and TRUNCATE. A new menu must create a new publication version; it must not edit an old snapshot.
+- Public reads verify that the snapshot schema version and SHA-256 match publication metadata. A mismatch fails closed.
+- Only `service_role` can execute the public-read RPC. It cannot directly SELECT the publication or current-pointer tables. `anon` and `authenticated` cannot execute the RPC.
+- The catalog Edge Function source now calls only `public.flame_chick_catalog_public_read(text)` and does not query mutable catalog tables. It remains undeployed; Supabase reports zero deployed Edge Functions.
+- Current Production state: zero catalog publication rows, zero current-publication pointers and zero draft-state rows. Thus the new read path serves no menu until a first successful publication.
+
+### Applied publication-read migration
+- `20261121155900_flame_chick_catalog_public_snapshot_read_v1`
+- Guarded workflow: https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44922905879
+- Edge Function static checks: https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44922820111
+
+### Publish and website-switch rules — mandatory next stage
+1. Build a full catalog compiler/validator. It must validate products, variants, modifiers, deals, price completeness, component selection ranges, variant-option maps, schedule windows, timezones and branch availability before publication.
+2. In one database transaction, lock the restaurant's draft revision, compile the snapshot at that exact revision, compute SHA-256 of PostgreSQL `snapshot::text` encoded as UTF-8, insert a new immutable `catalog_publications` row and atomically switch `catalog_current_publication`. If any step fails, the previous pointer remains untouched.
+3. Reject a publish attempt if the draft revision changed during compilation or if any validation fails. Never publish a partial snapshot.
+4. Rollback changes only the current pointer to a previously validated immutable publication; it never edits publication history.
+5. Test that edits made after publication do not change the currently served snapshot, a failed publish leaves the old pointer intact, and rollback restores the previous snapshot exactly.
+6. Keep the existing live Website data source untouched until the snapshot compiler, publish/rollback commands, golden tests and public Edge Function integration all pass. Website switching is a separately verified release action—not a side effect of saving a draft.
+7. Keep Admin draft reads private. Do not expose a preview URL or public query parameter that reads arbitrary draft revisions. Any future Admin preview must be authenticated and separate from the customer catalog endpoint.
+8. Cache keys must include publication identity/hash (and, when branch overlays are added, the branch availability revision). A cache must never be keyed only by restaurant slug.
+
+### Rollback-only QA already passed
+- No pointer for an active restaurant returned `published=false`, with a NULL snapshot.
+- A valid temporary immutable publication returned the exact stored snapshot and verified checksum.
+- Incrementing the draft revision after publication left the live snapshot and publication identity unchanged.
+- Attempts to update publication history were rejected by the existing immutability trigger.
+- All test fixtures were rolled back. No real menu, live pointer or publication row was created.
+
+### Current production website status
+The new Supabase catalog Edge Function is not deployed, and no Vercel/Website switch was made by this work. Therefore the existing running website remains on its previous data source until the separate, tested cutover. Draft records in the new catalog cannot flow to it.
+
+---
+
 # CURRENT IMPLEMENTATION STATUS — 2026-11-21 (latest; deal builder commands applied)
 
 ## Deal-builder schema, commands and FK indexes now applied
