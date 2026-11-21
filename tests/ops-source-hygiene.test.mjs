@@ -8,7 +8,7 @@ const source = files.map((file) => ({ file, html: readFileSync(file, "utf8") }))
 const stripDataImages = (value) => value.replace(/data:image\\/[^;]+;base64,[A-Za-z0-9+/=]+/g, "");
 
 test("POS and Rider source use Flame Chick identifiers only", () => {
-  const all = source.map((x) => stripDataImages(x.html)).join("\n");
+  const all = source.map((x) => x.html).join("\n");
   const retiredBrand = ["Pizza", "Bite"].join(" ");
   const retiredGlobal = ["H", "F", "P"].join("");
   assert.equal(all.toLowerCase().includes(retiredBrand.toLowerCase()), false);
