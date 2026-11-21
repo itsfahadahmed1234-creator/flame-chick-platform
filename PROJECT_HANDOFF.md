@@ -1,4 +1,23 @@
 
+## 2026-11-21 — Catalog/API source reconciliation prepared
+
+**Source commit:** `3f657ec491847ac91eade96fa78d4a834695aeb8` (catalog contract reconciliation); Edge Function source commit `eae8ac03c88ef0fec2ad6660cd3e5951a2389a44`.
+
+Completed:
+- Renamed the remaining HFP-prefixed order/delivery RPC names and error/comment strings in Edge Function source to `flame_chick_*` names.
+- Updated `flame-chick-catalog` to prefer the current `SUPABASE_SECRET_KEYS` environment map, with `SUPABASE_SECRET_KEY` and legacy `SUPABASE_SERVICE_ROLE_KEY` fallback.
+- Updated the database/application contract map to the new function names and explicitly distinguished implemented Staff Admin RPCs from order/delivery/dashboard RPCs that still need SQL implementations.
+- Removed retired storefront brand references from the source consistency audit.
+- Updated menu design decision status to reflect owner-approved curated deal choices, explicit surcharges, Admin/Owner publish authority, shared base catalog/prices and branch availability overlays.
+- Added `docs/architecture/catalog-authoring-v1-reconciliation.md` defining a source-compatible base catalog schema scope and security requirements.
+
+Important: RPC renaming is not implementation. The order, website rate-limit and delivery RPCs are not present in the applied migrations; related APIs must not be deployed/enabled until those SQL commands are implemented and tested. The catalog Edge Function is still read-only and not deployed.
+
+No Production schema or data changes were made. The next database work is to prepare the catalog authoring migration and authenticated draft-command API; apply only after separate review/approval. Keep GST deferred and the full Website security audit as a later stop-gate.
+
+---
+
+
 ## 2026-11-21 — Flame Chick-only runtime source cleanup
 
 **Source commits:** `b7fb2bb38cb37a395a93810864f85a9ae5d925c3`, `45d279f35d59be90f5238ed4095a9a3d8e6983f7`, `4c07607e712e1ebdbb374444086d5e1096f072c5`, `c66dc7656756189b47b7728e913c6012bf7415a3`, `dfc034d3944fd552bc66216e7897a259645ae431`, `6b591f1fe3bfb5c5c9f762231ec6a3843799cee3`, `d6f6182c2c16b12bf7860f391d71ca73c2cfd56c`, `173b7f26593bc75d1baac1b73f2a6071f3b5486b`.
