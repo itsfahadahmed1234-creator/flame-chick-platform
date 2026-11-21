@@ -386,8 +386,8 @@ BEGIN
   -- their current value on update and use defaults on insert.
   IF NOT (p_payload ? 'name_en')
      OR pg_catalog.jsonb_typeof(p_payload->'name_en') <> 'string'
-     OR pg_catalog.char_length(pg_catalog.btrim(p_payload->>'name_en')) NOT BETWEEN 1
-       AND CASE WHEN p_action = 'category_upsert' THEN 120 ELSE 120 END THEN
+     OR pg_catalog.char_length(pg_catalog.btrim(p_payload->>'name_en')) < 1
+     OR pg_catalog.char_length(pg_catalog.btrim(p_payload->>'name_en')) > 120 THEN
     RAISE EXCEPTION 'CATALOG_NAME_EN_INVALID' USING ERRCODE = '22023';
   END IF;
   v_name_en := pg_catalog.btrim(p_payload->>'name_en');
