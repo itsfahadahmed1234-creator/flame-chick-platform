@@ -1,3 +1,66 @@
+# CRITICAL CURRENT STATUS — 2026-11-21 (read before continuing)
+
+## Catalog foundation: applied in Production, migration ledger pending
+
+Production project `adkrxfnawdiljhjaavnj` (Mumbai, PostgreSQL 17.12, Free plan) currently contains the catalog authoring foundation. The migration DDL was executed directly as `postgres` on 2026-11-21 and committed to Git as `supabase/migrations/20261121061000_flame_chick_catalog_authoring_foundation.sql`. This direct application bypassed the Supabase migration tracker. The actual Supabase migration ledger still contains only the previous ten applied versions and does NOT contain `20261121061000`.
+
+**Never rerun the catalog foundation DDL against the current Production project.** Its preflight deliberately rejects existing catalog relations.
+
+The supported one-time reconciliation is the official Supabase CLI command from a linked project, after reviewing local/remote version lists and confirming schema parity:
+
+```bash
+supabase migration repair --status applied 20261121061000
+supabase migration list
+```
+
+The repair command updates migration history only; it does not rerun the SQL. Do not manually edit `supabase_migrations.schema_migrations`. This chat's connected Supabase tools do not expose the CLI repair command and the container has no Supabase CLI/login context, so the ledger repair is still **pending**. Do not run `supabase db push` until repair and list reconciliation are complete.
+
+## Live catalog state verified
+
+Eleven public tables exist, owned by `postgres`, RLS enabled, with zero policies, no direct table grants to `anon`, `authenticated` or `service_role`, no Realtime publication entries, and zero rows:
+`categories`, `subcategories`, `products`, `product_variants`, `modifier_groups`, `modifiers`, `modifier_group_assignments`, `modifier_price_rules`, `drink_options`, `branch_product_availability`, `branch_variant_availability`.
+
+No rows exist in restaurants, branches or catalog tables. No menu, prices, product, branch or restaurant data was seeded.
+
+The only intended private schema USAGE grant for an application role is `authenticated` on `app_private`, required by Batch 4's Staff Admin invoker wrapper. `anon` and `service_role` do not have `app_private` USAGE. Catalog trigger function `app_private.flame_chick_catalog_touch_updated_at()` is invoker-security, owned by postgres, fixed search_path `pg_catalog`, and has direct EXECUTE revoked from application roles.
+
+## Catalog QA and advisor results
+
+Disposable behavioral QA passed in a separate explicit transaction and rolled back. It checked:
+- NULL variant price remains distinct from explicit zero.
+- Product cannot reference a deal category.
+- Cross-restaurant category/subcategory and branch/product/variant references are rejected.
+- Size-based modifier price rules require a corresponding real variant and modifier-group assignment.
+- Invalid selection-mode bounds and inconsistent FREE/fixed-price settings are rejected.
+- Negative product prices and invalid drink volumes are rejected.
+- All temporary QA rows were rolled back; independent follow-up count queries confirmed zero rows.
+
+Security Advisor: 18 INFO findings, all `rls_enabled_no_policy`; this matches the deliberate deny-by-default setup across new and earlier foundation tables. Do not add permissive policies just to silence the information-only lint.
+Performance Advisor: 15 INFO findings for catalog child-side foreign keys missing covering indexes, plus 17 INFO unused-index findings (expected on an empty project; do not prune before usage exists).
+Health Advisor: zero findings.
+
+## Next staged migration
+
+`supabase/migrations/20261121062000_flame_chick_catalog_fk_indexes.sql` is committed to `work/production-source-audit`. It creates the 15 targeted FK covering indexes reported by Performance Advisor, without changing privileges, policies, RLS or rows. It is **staged only and NOT applied**. Apply it only after migration version 20261121061000 is repaired/recorded and the migration list is aligned.
+
+## Catalog implementation still pending
+
+- The Admin app still has direct PostgREST catalog CRUD; do not enable it against zero-grant tables.
+- Public catalog Edge Function still reads mutable base tables and has not been adapted to immutable publication snapshots, explicit category_kind, branch overlays or product-scoped modifier price rules.
+- Still needed: Admin/Owner-only atomic draft commands, append-only actor audit, draft revision concurrency, media validation/publication, immutable catalog publication snapshot/checksum/current pointer, publish validation, rollback, and matching Admin UI/DTO changes.
+- Deals/deal components/curated deal choice groups and deal schedules remain deferred to a separate reconciled design slice.
+- GST/tax remains deferred.
+
+## Important working constraints
+
+- Continue on `work/production-source-audit`; do not touch main or existing older projects.
+- Run database migrations as `current_user = postgres` and `session_user = postgres`, never `supabase_admin`.
+- No Supabase database branches, no paid upgrades, and no direct editing of internal migration ledger tables.
+- Keep all application catalog tables deny-by-default until reviewed server commands and public immutable snapshot read path are implemented.
+- Read this section and `docs/handoffs/2026-11-21-catalog-foundation-reconciliation.md` before resuming.
+
+---
+
 
 ## 2026-11-21 — Catalog/API source reconciliation prepared
 
