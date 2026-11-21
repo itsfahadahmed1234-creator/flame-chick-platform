@@ -13,8 +13,8 @@ Production project `adkrxfnawdiljhjaavnj` (Mumbai, PostgreSQL 17.12, Free plan) 
 The supported one-time reconciliation is the official Supabase CLI command from a linked project, after reviewing local/remote version lists and confirming schema parity:
 
 ```bash
-supabase migration repair 20261121061000 --status applied --linked
-supabase migration list --linked
+supabase migration repair 20261121061000 --status applied
+supabase migration list
 ```
 
 The repair command updates migration history only; it does not rerun the SQL. Do not manually edit `supabase_migrations.schema_migrations`. This chat's connected Supabase tools do not expose the CLI repair command and the container has no Supabase CLI/login context, so the ledger repair is still **pending**. Do not run `supabase db push` until repair and list reconciliation are complete.
