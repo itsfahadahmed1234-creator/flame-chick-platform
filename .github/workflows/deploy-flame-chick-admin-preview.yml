@@ -52,10 +52,15 @@ jobs:
         working-directory: apps/flame-chick-admin
         run: |
           set -euo pipefail
-          deployment_url="$(vercel deploy --yes --target=preview)"
+          deploy_output="$(vercel deploy --yes --target=preview 2>&1)"
+          printf '%s\n' "$deploy_output"
+          deployment_url="$(printf '%s\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\.vercel\.app' | tail -n 1 || true)"
+          if [ -z "$deployment_url" ]; then
+            echo "Could not extract a Vercel preview URL from the CLI output." >&2
+            exit 1
+          fi
           DEPLOYMENT_URL="$deployment_url" node --input-type=module -e '
             const value = (process.env.DEPLOYMENT_URL ?? "").trim();
-            if (!value) throw new Error("Vercel CLI did not return a deployment URL");
             const url = new URL(value);
             if (url.protocol !== "https:" || !url.hostname.endsWith(".vercel.app")) {
               throw new Error("Deployment URL is not a Vercel HTTPS preview URL");
@@ -66,8 +71,8 @@ jobs:
           {
             echo "### Flame Chick Admin preview deployment"
             echo "- URL: $deployment_url"
-            echo "- Vercel project: `prj_139YvQ8CHvwSXsZ2xrno5x55STfz`"
-            echo "- Commit: `${GITHUB_SHA}`"
+            echo "- Vercel project: ${VERCEL_PROJECT_ID}"
+            echo "- Commit: ${GITHUB_SHA}"
             echo "- Target: preview only"
           } >> "$GITHUB_STEP_SUMMARY"
         env:
