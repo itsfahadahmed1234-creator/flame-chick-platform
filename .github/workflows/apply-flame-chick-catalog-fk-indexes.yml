@@ -81,7 +81,7 @@ jobs:
       - name: Apply the single reviewed FK-index migration
         run: |
           set -euo pipefail
-          supabase db push --remote="${SUPABASE_PROJECT_REF}"
+          supabase db push --yes --remote="${SUPABASE_PROJECT_REF}"
 
       - name: Verify migration history after push
         run: |
