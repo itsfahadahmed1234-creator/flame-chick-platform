@@ -123,3 +123,19 @@ Required GitHub Actions repository secrets, which the connected GitHub tool cann
 GitHub Actions run [44890673291](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44890673291) executed the guarded workflow and stopped at the credential pre-check. Both required secrets were empty: `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`. CLI install/link/repair steps were skipped, so no Supabase database action ran. The migration ledger remains unchanged.
 
 Owner must add these two Actions repository secrets at https://github.com/itsfahadahmed1234-creator/flame-chick-platform/settings/secrets/actions, then update `ops/triggers/repair-catalog-ledger.txt` to retrigger. Never disclose secrets in chat or commit them.
+
+
+## Catalog foundation and FK-index migrations reconciled in Production
+
+Both catalog migrations are now correctly represented in the Production migration ledger:
+- `20261121061000_flame_chick_catalog_authoring_foundation`
+- `20261121062000_flame_chick_catalog_fk_indexes`
+
+The first migration's SQL had already been applied before its ledger record was repaired using the official Supabase CLI v3 workflow. The repair changed migration history only; it did not rerun DDL.
+
+The FK-index migration was then applied through the official Supabase CLI v3 `db push` workflow after a dry-run confirmed that `20261121062000_flame_chick_catalog_fk_indexes.sql` was the only pending migration. The workflow uses explicit `--remote=<project-ref>`, pinned CLI v3.2.0, the repository Actions secrets, and a non-interactive `--yes` confirmation after the dry-run gate.
+
+GitHub Actions run [44892500555](https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44892500555) completed successfully. Independent Supabase verification confirms migration versions `20261121061000` and `20261121062000` are recorded, all 15 expected indexes exist in `public`, and all 15 are owned by `postgres`. No catalog business rows were inserted. The index migration did not alter RLS, policies, grants or Realtime publication.
+
+Next: build secure Admin/Owner catalog command APIs, immutable published catalog snapshots, audit/revision controls, and migrate Admin UI away from direct table writes. Keep public catalog reads separate from authenticated writes. Do not seed live menu data until the catalog UI and command validation are ready.
+
