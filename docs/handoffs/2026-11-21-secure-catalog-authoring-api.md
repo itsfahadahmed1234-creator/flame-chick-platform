@@ -2,7 +2,7 @@
 
 Date: 2026-11-21
 Branch: `work/production-source-audit`
-Status: source audit complete; implementation not yet started
+Status: source audit complete; combo/deal/promotion/scheduling design documented; implementation not yet started
 Production project: `adkrxfnawdiljhjaavnj` (Mumbai, Free)
 
 ## Verified Production state
@@ -56,7 +56,7 @@ Batch 4 provides `public.flame_chick_staff_admin_command` as an authenticated pu
 6. Implement Edge Function Admin POST using user's Bearer JWT to call authenticated RPC; CORS exact origin allowlist; strict payload size/type/field allowlists; never accept client-supplied actor identity.
 7. Keep public catalog GET separate and snapshot-only. Keep secret key server-side, no public direct table access.
 8. Migrate Admin reads/writes in a disabled UI path; use server draft-read commands and aggregate mutations. Keep nav disabled until all routes and tests pass.
-9. Keep deal schema, deal choice groups, schedules, delivery areas, restaurant settings, image lifecycle and storage cleanup as explicitly separated domain decisions. Do not pretend these are covered by the 11-table core schema.
+9. Implement the approved deal/combo, schedule and promotion domain from `docs/architecture/catalog-deals-promotions-scheduling-v1.md`; do not treat these as covered by the 11-table core schema. Keep delivery areas, restaurant settings, image lifecycle and storage cleanup as separate domains.
 10. Add tests for role denial (Manager/Cashier/Rider), tenant crossing, stale revision, concurrent edit serialization, request replay, partial write rollback, archived-reference protection, NULL-vs-zero pricing, image ownership/path validation, publication immutability and rollback pointer.
 
 ## Non-negotiable safeguards
@@ -69,3 +69,22 @@ Batch 4 provides `public.flame_chick_staff_admin_command` as an authenticated pu
 - Never hard-delete a product/variant referenced by orders or deals; archive instead.
 - No seed rows until first Admin bootstrap and menu authoring flow are ready.
 - No deployment or live Admin enablement before tests and explicit readiness review.
+
+## 2026-11-21 — Owner-approved combo, deal and time-based offer design
+
+The owner agreed that the catalog must support combo deals, curated customer choices, time-based deals and broader promotions safely. Design contract committed:
+
+- `docs/architecture/catalog-deals-promotions-scheduling-v1.md`
+- Design commit: `0f7c026b4d1a6a7e6b330698f98b0de0746a831e`
+
+The design defines:
+- First-class `deals`, `deal_variants`, `deal_component_groups`, `deal_component_options`, per-deal-variant option pricing/allowlists, and branch deal availability.
+- Fixed-price bundles and base-plus-selected-items bundles; included, fixed-surcharge and add-variant-price treatments; quantities, min/max choices, exact product-variant references, and product-level modifiers within deal components.
+- A separate promotions domain for percentage, fixed amount and fixed price discounts, typed targets (whole order/product/category/deal), Website/POS channels, coupons, branch scope, deterministic stacking and future transactional redemption limits.
+- Reusable schedule sets with IANA timezone, weekly multiple windows, overnight windows, effective dates, one-off timestamp windows, explicit branch override/fallback semantics and start-inclusive/end-exclusive boundaries.
+- Runtime evaluation using database time; no cron-based active-flag flipping. Checkout always re-evaluates availability and prices server-side.
+- Immutable published catalog inclusion, branch availability overlays, order receipt snapshots and a broad behavioral/security QA matrix.
+
+Important design exclusions: GST remains deferred. Inventory, allergens, BOGO, loyalty, referrals, customer segmentation and payment-method-specific promotions are not silently claimed as implemented. Promotion usage caps remain unavailable until an atomic order-linked redemption ledger exists.
+
+No Production database changes were made. No migration candidate, tables, RPCs, Edge Functions, UI, seed rows or deployments were created. The 11 existing catalog tables remain empty and deny-by-default. Next work: translate the reviewed domain contract into a migration candidate on the working branch, then run isolated/rollback-only schema and behavior tests before requesting a separate Production approval.
