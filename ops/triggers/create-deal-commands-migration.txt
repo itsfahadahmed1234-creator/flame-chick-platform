@@ -1,0 +1,1 @@
+Create an empty timestamped migration scaffold for Flame Chick deal-builder command APIs using Supabase CLI v3.2.0. Do not connect to or change Supabase.
