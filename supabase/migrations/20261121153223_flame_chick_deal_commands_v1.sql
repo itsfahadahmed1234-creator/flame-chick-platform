@@ -5,6 +5,12 @@
 
 BEGIN;
 
+-- Tenant-scoped UUID keyset indexes for bounded deal and schedule library reads.
+CREATE INDEX IF NOT EXISTS deals_restaurant_collection_id_idx
+  ON public.deals (restaurant_id, collection_id, id);
+CREATE INDEX IF NOT EXISTS catalog_schedule_sets_restaurant_id_id_idx
+  ON public.catalog_schedule_sets (restaurant_id, id);
+
 DO $preflight$
 BEGIN
   IF current_user <> 'postgres' OR session_user <> 'postgres' THEN
@@ -1231,7 +1237,7 @@ DECLARE
  v_kind text; v_weekday integer; v_local_start time; v_local_end time; v_all_day boolean;
  v_starts timestamptz; v_ends timestamptz; v_from date; v_to date; v_num numeric;
  v_seen uuid[]:=ARRAY[]::uuid[]; v_remove jsonb; v_remove_id uuid;
- v_before jsonb; v_after jsonb; v_count integer:=0; v_ts text;
+ v_before jsonb; v_after jsonb; v_count integer:=0;
 BEGIN
  IF EXISTS(SELECT 1 FROM pg_catalog.jsonb_object_keys(p_payload) k(key)
    WHERE k.key<>ALL(ARRAY['id','name','timezone','is_active','windows','remove_window_ids'])) THEN
@@ -1347,11 +1353,7 @@ BEGIN
     v_starts:=NULL; v_ends:=NULL;
    ELSE
     v_weekday:=NULL; v_local_start:=NULL; v_local_end:=NULL; v_all_day:=false; v_from:=NULL; v_to:=NULL;
-    IF v_window ? 'starts_at' THEN v_ts:=v_window->>'starts_at';
-    ELSIF v_window_id IS NOT NULL THEN v_ts:=v_window_row.starts_at::text; ELSE v_ts:=NULL; END IF;
-    IF v_window ? 'ends_at' THEN v_ts:=v_window->>'ends_at';
-    ELSIF v_window_id IS NOT NULL THEN v_ts:=v_window_row.ends_at::text; ELSE v_ts:=NULL; END IF;
-    -- Parse each explicitly below (preserving offsets supplied by caller).
+    -- Parse each timestamp explicitly, preserving caller-supplied UTC offsets.
     IF v_window ? 'starts_at' THEN
       IF (v_window->>'starts_at') !~ '(Z|[+-][0-9]{2}(:?[0-9]{2})?)$' THEN RAISE EXCEPTION 'SCHEDULE_ONE_OFF_OFFSET_REQUIRED' USING ERRCODE='22023'; END IF;
       v_starts:=(v_window->>'starts_at')::timestamptz;
@@ -1476,6 +1478,15 @@ BEGIN
  IF v_branch IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.branches b WHERE b.id=v_branch AND b.restaurant_id=v_context.restaurant_id) THEN
   RAISE EXCEPTION 'DEAL_SCHEDULE_BRANCH_MISMATCH' USING ERRCODE='23503';
  END IF;
+ IF v_branch IS NOT NULL AND NOT EXISTS(
+  SELECT 1 FROM public.branches b
+  JOIN public.catalog_schedule_sets s ON s.id=v_schedule AND s.restaurant_id=v_context.restaurant_id
+  JOIN public.restaurants r ON r.id=v_context.restaurant_id
+  WHERE b.id=v_branch AND b.restaurant_id=v_context.restaurant_id
+    AND s.timezone=COALESCE(b.timezone,r.timezone)
+ ) THEN
+  RAISE EXCEPTION 'DEAL_BRANCH_SCHEDULE_TIMEZONE_MISMATCH' USING ERRCODE='23514';
+ END IF;
  IF v_id IS NOT NULL THEN
   SELECT a.* INTO v_row FROM public.deal_schedule_assignments a
   WHERE a.id=v_id AND a.restaurant_id=v_context.restaurant_id AND a.deal_id=v_deal FOR UPDATE;
@@ -1595,6 +1606,145 @@ $function$;
 ALTER FUNCTION public.flame_chick_catalog_deal_branch_availability_upsert(jsonb,bigint,uuid) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.flame_chick_catalog_deal_branch_availability_upsert(jsonb,bigint,uuid) FROM PUBLIC,anon,service_role;
 GRANT EXECUTE ON FUNCTION public.flame_chick_catalog_deal_branch_availability_upsert(jsonb,bigint,uuid) TO authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Bounded deal list read within one selected collection
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION app_private.flame_chick_catalog_deal_list_read_internal(
+  p_collection_id uuid,
+  p_after_id uuid DEFAULT NULL,
+  p_limit integer DEFAULT 25
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path=''
+AS $function$
+DECLARE
+  v_actor uuid;
+  v_restaurant uuid;
+  v_revision bigint;
+  v_items jsonb;
+  v_has_more boolean;
+  v_last_id uuid;
+BEGIN
+  IF p_collection_id IS NULL OR p_limit IS NULL OR p_limit<1 OR p_limit>50 THEN
+    RAISE EXCEPTION 'DEAL_LIST_READ_ARGUMENT_INVALID' USING ERRCODE='22023';
+  END IF;
+  SELECT a.actor_user_id,a.restaurant_id INTO v_actor,v_restaurant
+  FROM app_private.flame_chick_catalog_actor() a;
+  IF v_actor IS NULL THEN RAISE EXCEPTION 'CATALOG_ADMIN_FORBIDDEN' USING ERRCODE='42501'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.deal_collections c WHERE c.id=p_collection_id AND c.restaurant_id=v_restaurant) THEN
+    RAISE EXCEPTION 'DEAL_COLLECTION_NOT_FOUND' USING ERRCODE='P0002';
+  END IF;
+  SELECT s.revision INTO v_revision FROM public.catalog_draft_state s WHERE s.restaurant_id=v_restaurant;
+
+  WITH page AS MATERIALIZED (
+    SELECT d.* FROM public.deals d
+    WHERE d.restaurant_id=v_restaurant AND d.collection_id=p_collection_id
+      AND (p_after_id IS NULL OR d.id>p_after_id)
+    ORDER BY d.id LIMIT p_limit+1
+  ),
+  picked AS MATERIALIZED (SELECT * FROM page ORDER BY id LIMIT p_limit)
+  SELECT
+    COALESCE((
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'id',d.id,'collection_id',d.collection_id,'legacy_id',d.legacy_id,
+          'title',d.title,'title_ur',d.title_ur,
+          'description_en',d.description_en,'description_ur',d.description_ur,
+          'featured',d.featured,'sort_order',d.sort_order,'is_active',d.is_active,
+          'is_available',d.is_available,
+          'variant_count',(SELECT count(*) FROM public.deal_variants dv WHERE dv.restaurant_id=v_restaurant AND dv.deal_id=d.id),
+          'active_variant_count',(SELECT count(*) FROM public.deal_variants dv WHERE dv.restaurant_id=v_restaurant AND dv.deal_id=d.id AND dv.is_active)
+        ) ORDER BY d.id
+      ) FROM picked d
+    ),'[]'::jsonb),
+    (SELECT count(*)>p_limit FROM page),
+    (SELECT d.id FROM picked d ORDER BY d.id DESC LIMIT 1)
+  INTO v_items,v_has_more,v_last_id;
+
+  RETURN pg_catalog.jsonb_build_object(
+    'ok',true,'entity_type','deals','collection_id',p_collection_id,
+    'draft_revision',COALESCE(v_revision,0),'items',v_items,
+    'has_more',COALESCE(v_has_more,false),
+    'next_cursor',CASE WHEN v_has_more THEN pg_catalog.to_jsonb(v_last_id) ELSE 'null'::jsonb END
+  );
+END
+$function$;
+
+ALTER FUNCTION app_private.flame_chick_catalog_deal_list_read_internal(uuid,uuid,integer) OWNER TO postgres;
+REVOKE ALL ON FUNCTION app_private.flame_chick_catalog_deal_list_read_internal(uuid,uuid,integer)
+ FROM PUBLIC,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION app_private.flame_chick_catalog_deal_list_read_internal(uuid,uuid,integer) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.flame_chick_catalog_deal_list_read(
+ p_collection_id uuid,p_after_id uuid DEFAULT NULL,p_limit integer DEFAULT 25
+)
+RETURNS jsonb LANGUAGE sql SECURITY INVOKER SET search_path=''
+AS $function$
+ SELECT app_private.flame_chick_catalog_deal_list_read_internal(p_collection_id,p_after_id,p_limit)
+$function$;
+
+ALTER FUNCTION public.flame_chick_catalog_deal_list_read(uuid,uuid,integer) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.flame_chick_catalog_deal_list_read(uuid,uuid,integer) FROM PUBLIC,anon,service_role;
+GRANT EXECUTE ON FUNCTION public.flame_chick_catalog_deal_list_read(uuid,uuid,integer) TO authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Bounded reusable schedule-set list
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION app_private.flame_chick_catalog_schedule_set_read_internal(
+ p_after_id uuid DEFAULT NULL,p_limit integer DEFAULT 25
+)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=''
+AS $function$
+DECLARE v_actor uuid;v_restaurant uuid;v_revision bigint;v_items jsonb;v_has_more boolean;v_last_id uuid;
+BEGIN
+ IF p_limit IS NULL OR p_limit<1 OR p_limit>50 THEN RAISE EXCEPTION 'SCHEDULE_SET_READ_LIMIT_INVALID' USING ERRCODE='22023'; END IF;
+ SELECT a.actor_user_id,a.restaurant_id INTO v_actor,v_restaurant FROM app_private.flame_chick_catalog_actor() a;
+ IF v_actor IS NULL THEN RAISE EXCEPTION 'CATALOG_ADMIN_FORBIDDEN' USING ERRCODE='42501'; END IF;
+ SELECT s.revision INTO v_revision FROM public.catalog_draft_state s WHERE s.restaurant_id=v_restaurant;
+ WITH page AS MATERIALIZED (
+  SELECT s.* FROM public.catalog_schedule_sets s
+  WHERE s.restaurant_id=v_restaurant AND (p_after_id IS NULL OR s.id>p_after_id)
+  ORDER BY s.id LIMIT p_limit+1
+ ),
+ picked AS MATERIALIZED (SELECT * FROM page ORDER BY id LIMIT p_limit)
+ SELECT
+  COALESCE((
+   SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+    'id',s.id,'name',s.name,'timezone',s.timezone,'is_active',s.is_active,
+    'window_count',(SELECT count(*) FROM public.catalog_schedule_windows w WHERE w.restaurant_id=v_restaurant AND w.schedule_set_id=s.id),
+    'created_at',s.created_at,'updated_at',s.updated_at
+   ) ORDER BY s.id) FROM picked s
+  ),'[]'::jsonb),
+  (SELECT count(*)>p_limit FROM page),
+  (SELECT s.id FROM picked s ORDER BY s.id DESC LIMIT 1)
+ INTO v_items,v_has_more,v_last_id;
+ RETURN pg_catalog.jsonb_build_object(
+  'ok',true,'entity_type','catalog_schedule_sets','draft_revision',COALESCE(v_revision,0),
+  'items',v_items,'has_more',COALESCE(v_has_more,false),
+  'next_cursor',CASE WHEN v_has_more THEN pg_catalog.to_jsonb(v_last_id) ELSE 'null'::jsonb END
+ );
+END
+$function$;
+
+ALTER FUNCTION app_private.flame_chick_catalog_schedule_set_read_internal(uuid,integer) OWNER TO postgres;
+REVOKE ALL ON FUNCTION app_private.flame_chick_catalog_schedule_set_read_internal(uuid,integer)
+ FROM PUBLIC,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION app_private.flame_chick_catalog_schedule_set_read_internal(uuid,integer) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.flame_chick_catalog_schedule_set_read(
+ p_after_id uuid DEFAULT NULL,p_limit integer DEFAULT 25
+)
+RETURNS jsonb LANGUAGE sql SECURITY INVOKER SET search_path=''
+AS $function$
+ SELECT app_private.flame_chick_catalog_schedule_set_read_internal(p_after_id,p_limit)
+$function$;
+
+ALTER FUNCTION public.flame_chick_catalog_schedule_set_read(uuid,integer) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.flame_chick_catalog_schedule_set_read(uuid,integer) FROM PUBLIC,anon,service_role;
+GRANT EXECUTE ON FUNCTION public.flame_chick_catalog_schedule_set_read(uuid,integer) TO authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Bounded deal detail read (one deal, including variant pricing mappings)
@@ -1767,6 +1917,8 @@ BEGIN
   'public.flame_chick_catalog_schedule_set_upsert(jsonb,bigint,uuid)',
   'public.flame_chick_catalog_deal_schedule_assignment_upsert(jsonb,bigint,uuid)',
   'public.flame_chick_catalog_deal_branch_availability_upsert(jsonb,bigint,uuid)',
+  'public.flame_chick_catalog_deal_list_read(uuid,uuid,integer)',
+  'public.flame_chick_catalog_schedule_set_read(uuid,integer)',
   'public.flame_chick_catalog_deal_detail_read(uuid)',
   'public.flame_chick_catalog_schedule_detail_read(uuid)'
  ] LOOP
@@ -1790,6 +1942,8 @@ BEGIN
   'app_private.flame_chick_catalog_schedule_set_upsert_internal(jsonb,bigint,uuid)',
   'app_private.flame_chick_catalog_deal_schedule_assignment_upsert_internal(jsonb,bigint,uuid)',
   'app_private.flame_chick_catalog_deal_branch_availability_upsert_internal(jsonb,bigint,uuid)',
+  'app_private.flame_chick_catalog_deal_list_read_internal(uuid,uuid,integer)',
+  'app_private.flame_chick_catalog_schedule_set_read_internal(uuid,integer)',
   'app_private.flame_chick_catalog_deal_detail_read_internal(uuid)',
   'app_private.flame_chick_catalog_schedule_detail_read_internal(uuid)'
  ] LOOP
