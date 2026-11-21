@@ -161,14 +161,11 @@ Role permissions (who may edit prices, publish, archive or roll back) must be sp
 Do not invent these business rules:
 
 - Whether flavors are product variants, modifier options, or separate products for each menu family.
-- Whether combo choices are limited to category/subcategory or curated explicit lists.
-- Whether customers may customize, substitute or add extra items within bundles, and how surcharges work.
-- Whether scheduled deals recur daily, on selected weekdays, or only on dated campaigns.
-- Whether schedules apply restaurant-wide or per branch.
+- **Resolved:** V1 deal choices are curated explicit allowlists, with fixed items and choice groups; each permitted choice has an explicit non-negative surcharge (including intentional zero). Free-text substitutions and category-wide dynamic pools are not allowed.
+- **Still open:** whether scheduled deals recur daily, on selected weekdays or only on dated campaigns; timezone/overnight overlap behavior; and whether schedules apply restaurant-wide or per branch.
 - Whether stock/quantity limits, allergens, dietary labels or discount handling are needed. GST/tax is deferred from the initial schema by owner decision.
 - Whether items/deals are dine-in-only, delivery-only, takeaway-only or available across channels.
-- Who may draft, approve, publish, change prices and roll back.
-- Whether website and POS always share one published catalog or need branch/channel variations.
+- **Resolved:** Admin and Owner may draft, change prices, publish and roll back with actor attribution. V1 website and POS share one restaurant-wide base catalog and base prices; branch-specific availability overlays are separate. Branch-specific prices are out of scope.
 
 The supplied picture does not answer these questions.
 

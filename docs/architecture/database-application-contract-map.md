@@ -76,15 +76,15 @@ It is not a final SQL schema. All identifiers and API request fields must be che
 
 - For website orders, rate-limit check is performed before order creation.
 - For non-website sources, verifies a staff Auth user and an allowed staff role before order creation.
-- Calls hfp_create_order for order creation and hfp_update_order_status for staff state changes.
+- Calls flame_chick_create_order for order creation and flame_chick_update_order_status for staff state changes.
 - The database RPC must remain the source of truth for product/deal availability, price, selection validation, delivery fee, idempotency and branch authorization.
 - Production order RPC must validate the explicit delivery selection type and resolve fees from server-side records only.
 
 ### flame-chick-delivery-api
 
 - Validates rider role/profile for presence and rider-scoped actions.
-- Calls hfp_manage_delivery for manager/staff dispatch and delivery lifecycle commands.
-- Calls hfp_accept_delivery_offer / hfp_decline_delivery_offer for rider offer decisions.
+- Calls flame_chick_manage_delivery for manager/staff dispatch and delivery lifecycle commands.
+- Calls flame_chick_accept_delivery_offer / flame_chick_decline_delivery_offer for rider offer decisions.
 - Manages rider push subscriptions through privileged server operations.
 - Reads delivery tasks, offers, assignments, order summaries and rider profiles.
 - Production must keep every action role-checked and branch-scoped, with idempotent transitions and strict validation of task/offer ownership.
@@ -93,7 +93,7 @@ It is not a final SQL schema. All identifiers and API request fields must be che
 
 - Uses verified actor identity and service-side operations.
 - Resolves branch ownership and checks owner role before inviting users or changing role activation.
-- Uses hfp_manage_staff_role for role assignment and activation.
+- Uses `flame_chick_staff_admin_command` for role assignment, invitation acceptance and activation; system-only recovery actions use `flame_chick_staff_admin_system_command`.
 - Production must not treat client-supplied branch/user/role identity as authoritative; service function derives actor from verified Auth and verifies branch membership.
 
 ## 4. Database domain map
@@ -213,3 +213,11 @@ Payment records use append-only collection/refund events; returned orders do not
 
 Static customer drop-off pin is private and optional; it is not live tracking. See customer-dropoff-pin-data-contract-v1.md and its ERD/authorization addendum.
 
+
+## Source identifier reconciliation — 2026-11-21
+
+Runtime Edge Function and POS/Admin source identifiers have been renamed to Flame Chick-specific names. This is a source-contract cleanup only.
+
+**Implemented in current SQL migrations:** Staff Admin command RPCs (`flame_chick_staff_admin_command` and `flame_chick_staff_admin_system_command`) are present in the applied Batch 4 migrations.
+
+**Not yet implemented in SQL:** `flame_chick_create_order`, `flame_chick_update_order_status`, `flame_chick_check_website_order_rate_limit`, delivery lifecycle/push RPCs, `flame_chick_admin_dashboard`, and `flame_chick_admin_reassign_delivery`. These are planned names in source and must be implemented and tested in their respective database batches before enabling the corresponding UI/API paths. Do not interpret a source rename as a deployed backend capability.

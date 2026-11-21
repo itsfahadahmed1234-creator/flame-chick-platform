@@ -187,7 +187,7 @@ Observed current names include:
 Decision for schema implementation:
 - Preserve the names/semantics needed by existing clients initially unless there is a compelling security/integrity reason to change them.
 - Where a rename or normalization is needed, introduce a versioned adapter and coordinated Preview rollout; do not create a new database with generic names while the current app expects legacy columns.
-- Do not copy Pizza Bite/HFP-specific identifiers into new business concepts without checking whether they are internal compatibility contracts.
+- Do not copy retired demo-era identifiers into new business concepts without checking whether they are internal compatibility contracts.
 - Current Admin direct REST CRUD is multi-step and may partially succeed. Production should route compound changes through atomic server commands and preserve Admin-compatible response DTOs during migration.
 
 ## 7. Order and order-history schema mismatch
