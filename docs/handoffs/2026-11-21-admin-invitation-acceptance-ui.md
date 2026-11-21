@@ -69,3 +69,11 @@ No SQL migration or production database mutation was made by this source update.
 - Static page assets, login link, acceptance page script and acceptance action checks passed.
 - The first CI attempt failed only because the test asserted a literal `/auth/v1/user` string while the page correctly calls the shared `authRequest("user", "GET")` helper. The assertion was corrected and the rerun passed.
 - This is static source validation only; it does not replace live Supabase Auth integration tests.
+
+### Admin invitation acceptance CI — passed
+
+- Workflow: [Flame Chick Admin Static Checks](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44881008259).
+- Both Admin JavaScript files pass `node --check`.
+- Five automated behavior tests pass: new invite/password activation, existing confirmed account acceptance, unconfirmed-email rejection, password mismatch rejection, and retry after failed activation.
+- Static asset and page/script wiring checks pass.
+- This validates the browser logic with mocked Auth/Edge Function responses. Live Production Auth and Edge Function integration remain untested because the function/origin/redirect are not configured and Production has no staff fixtures.

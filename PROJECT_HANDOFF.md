@@ -1,4 +1,12 @@
 
+### Admin invitation acceptance CI — passed
+
+- Workflow: [Flame Chick Admin Static Checks](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44881008259).
+- Both Admin JavaScript files pass `node --check`.
+- Five automated behavior tests pass: new invite/password activation, existing confirmed account acceptance, unconfirmed-email rejection, password mismatch rejection, and retry after failed activation.
+- Static asset and page/script wiring checks pass.
+- This validates the browser logic with mocked Auth/Edge Function responses. Live Production Auth and Edge Function integration remain untested because the function/origin/redirect are not configured and Production has no staff fixtures.
+
 ### Admin static CI verification — passed
 
 - Workflow run: [Flame Chick Admin Static Checks #2](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44880704883).
