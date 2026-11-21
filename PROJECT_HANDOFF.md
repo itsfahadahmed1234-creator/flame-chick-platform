@@ -4,6 +4,14 @@
 
 The connected private repository is `itsfahadahmed1234-creator/flame-chick-platform` (note the exact owner spelling, including `ahmed`). Earlier 404s were caused by using the wrong owner slug; subsequent repository and branch reads now succeed.
 
+## Guarded migration-ledger repair workflow prepared (2026-11-21)
+
+A GitHub Actions workflow was committed at `.github/workflows/repair-flame-chick-catalog-ledger.yml` on the working branch. It is restricted to `work/production-source-audit` and one dedicated trigger file, targets only Production project `adkrxfnawdiljhjaavnj`, pins Supabase CLI v3.2.0, verifies the exact checked-in migration file, inspects the remote migration list, repairs only version `20261121061000` as applied, then lists migrations again. It does not execute migration SQL or run `db push`.
+
+The workflow requires two GitHub Actions repository secrets: `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`. GitHub connector tooling cannot inspect or create repository secrets, and the container has no existing CLI or credentials. The one-time trigger is therefore intentionally withheld until the owner adds those two secrets. Do not store credentials in repository files or share them in chat.
+
+Supabase CLI v3 changed database commands to default local; the workflow explicitly uses `--remote=<project-ref>` and `--yes` per current v3 documentation. The correct pinned stable release selected is v3.2.0. Official docs: https://supabase.com/docs/guides/local-development/cli/migrating-to-v3 and https://supabase.com/docs/reference/cli/supabase-migration-repair.
+
 ## Catalog foundation: applied in Production, migration ledger pending
 
 Production project `adkrxfnawdiljhjaavnj` (Mumbai, PostgreSQL 17.12, Free plan) currently contains the catalog authoring foundation. The migration DDL was executed directly as `postgres` on 2026-11-21 and committed to Git as `supabase/migrations/20261121061000_flame_chick_catalog_authoring_foundation.sql`. This direct application bypassed the Supabase migration tracker. The actual Supabase migration ledger still contains only the previous ten applied versions and does NOT contain `20261121061000`.
