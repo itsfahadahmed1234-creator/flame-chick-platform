@@ -30,6 +30,7 @@ jobs:
         run: |
           node --check apps/flame-chick-admin/app.js
           node --check apps/flame-chick-admin/accept-invitation.js
+          node --test tests/admin-invitation-acceptance.test.mjs
 
       - name: Verify static page assets and invitation wiring
         run: |
