@@ -48,7 +48,8 @@ function createHarness({ hash = "", search = "", fetchHandler }) {
     calls.push({ url: String(url), options });
     return fetchHandler(String(url), options, calls.length);
   };
-  for (const id of ["passwordForm", "newPassword", "confirmPassword", "passwordError", "passwordSubmit", "retryAcceptButton", "signinForm", "signinEmail", "signinPassword", "signinError", "signinSubmit", "successRole", "successMessage", "globalError"]) document.getElementById(id);\n  vm.runInNewContext(source, {
+  for (const id of ["passwordForm", "newPassword", "confirmPassword", "passwordError", "passwordSubmit", "retryAcceptButton", "signinForm", "signinEmail", "signinPassword", "signinError", "signinSubmit", "successRole", "successMessage", "globalError"]) document.getElementById(id);
+  vm.runInNewContext(source, {
     window, document, history, fetch, URL, URLSearchParams,
     String, Number, Math, Date, Promise, Error, console
   });
