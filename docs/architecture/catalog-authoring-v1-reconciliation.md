@@ -2,7 +2,7 @@
 
 Date: 2026-11-21
 Branch: `work/production-source-audit`
-Status: design reconciliation; no SQL migration applied
+Status: core schema and FK-index migrations applied to Production; Admin commands/publication still pending
 
 ## Goal
 
@@ -66,8 +66,18 @@ The current catalog Edge Function already reads these table names and field fami
 
 ## Current status
 
-- Production still has no catalog business tables or seeded menu data.
+- Production has the 11-table core catalog foundation and 15 FK indexes; all catalog tables remain empty with RLS enabled and no direct app-role grants.
 - The current `flame-chick-catalog` Edge Function remains public read-only and is not deployed.
 - The function source now supports the new `SUPABASE_SECRET_KEYS` environment map with legacy service-role fallback.
 - Order and delivery Edge Function RPC names have been renamed to Flame Chick-specific planned names; their SQL RPC implementations are not yet present in the applied migrations.
-- No database or Vercel changes were made by this reconciliation.
+- Production changes are limited to the reviewed core catalog foundation migration and its FK-index migration; no business rows, catalog commands, publication snapshots, Edge Function deployments, or Vercel changes have been made.
+
+
+## Production implementation status (2026-11-21)
+
+- Applied migrations: `20261121061000_flame_chick_catalog_authoring_foundation` and `20261121062000_flame_chick_catalog_fk_indexes`.
+- Verified in Production: 11/11 catalog tables exist, are owned by `postgres`, have RLS enabled, have zero policies, zero Realtime entries and zero direct grants to `anon`, `authenticated` or `service_role`. All 15 reviewed FK indexes exist and are owned by `postgres`.
+- All 11 catalog tables remain empty. No catalog data has been seeded.
+- Existing Admin UI is not enabled. Its source still contains direct PostgREST mutations for categories, subcategories, products, variants, deals, deal components, delivery areas, restaurant settings and image metadata. These requests are incompatible with the deliberate zero-grant catalog boundary and must be replaced before enabling the Admin catalog modules.
+- The current public catalog Edge Function still reconstructs a schema-v2 response from mutable tables and expects additional tables not included in this foundation (deals, deal components, delivery areas, restaurant settings). It must not be deployed as the production public catalog until immutable publication snapshots and all dependent domains are implemented.
+- Next phase: introduce a single authenticated catalog command surface, Admin/Owner role checks from verified `auth.uid()` and `public.user_roles`, tenant resolution from server-side state, expected draft revision, transactional aggregate writes, append-only actor audit, and immutable publication snapshot/pointer. Keep public catalog GET isolated to the published pointer. Do not expose table grants or policies to make the old Admin REST code work.
