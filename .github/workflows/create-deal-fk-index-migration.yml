@@ -1,0 +1,55 @@
+name: Create Flame Chick deal FK index migration scaffold
+
+on:
+  push:
+    branches:
+      - work/production-source-audit
+    paths:
+      - "ops/triggers/create-deal-fk-index-migration.txt"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: flame-chick-deal-fk-index-migration-scaffold
+  cancel-in-progress: false
+
+jobs:
+  scaffold:
+    if: github.ref == 'refs/heads/work/production-source-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: Install pinned Supabase CLI
+        run: |
+          set -euo pipefail
+          npm install --global "supabase@3.2.0"
+          supabase --version
+      - name: Generate timestamped migration
+        id: migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase migration new flame_chick_deal_builder_fk_indexes
+          mapfile -t files < <(find supabase/migrations -maxdepth 1 -type f -name '*_flame_chick_deal_builder_fk_indexes.sql' -print | sort)
+          test "${#files[@]}" -eq 1
+          file="${files[0]}"
+          version="$(basename "${file}" | cut -d_ -f1)"
+          [[ "${version}" =~ ^[0-9]{14}$ ]]
+          test "${version}" -gt "20261121153223"
+          test ! -s "${file}"
+          echo "file=${file}" >> "${GITHUB_OUTPUT}"
+      - name: Commit empty scaffold
+        env:
+          MIGRATION_FILE: ${{ steps.migration.outputs.file }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- "${MIGRATION_FILE}"
+          git commit -m "chore(db): scaffold deal FK index migration"
+          git push origin HEAD:work/production-source-audit
