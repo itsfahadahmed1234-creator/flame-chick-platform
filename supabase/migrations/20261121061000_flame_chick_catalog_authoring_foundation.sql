@@ -619,6 +619,7 @@ DECLARE
   v_name text;
   v_role text;
   v_privilege text;
+  v_has_rows boolean;
   v_tables text[] := ARRAY[
     'categories', 'subcategories', 'products', 'product_variants',
     'modifier_groups', 'modifiers', 'modifier_group_assignments',
@@ -670,7 +671,10 @@ BEGIN
     END IF;
 
     EXECUTE pg_catalog.format('SELECT EXISTS (SELECT 1 FROM public.%I)', v_name)
-      INTO STRICT v_name; -- replaced below by a direct count-free check
+      INTO v_has_rows;
+    IF v_has_rows THEN
+      RAISE EXCEPTION 'Catalog verification failed: public.% unexpectedly contains seed rows', v_name;
+    END IF;
   END LOOP;
 
   IF has_schema_privilege('anon','app_private','USAGE')
