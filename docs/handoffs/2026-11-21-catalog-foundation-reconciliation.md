@@ -15,11 +15,11 @@ The catalog foundation SQL has been executed directly in Production as the `post
 
 Supabase documentation: https://supabase.com/docs/reference/cli/supabase-migration-repair
 
-After reviewing `supabase migration list`, confirming exact schema parity, and linking the correct project, run:
+After reviewing `supabase migration list --linked`, confirming exact schema parity, and linking the correct project, run:
 
 ```bash
-supabase migration repair --status applied 20261121061000
-supabase migration list
+supabase migration repair 20261121061000 --status applied --linked
+supabase migration list --linked
 ```
 
 This official CLI command inserts the missing migration-history record without re-running schema SQL. Do not use raw SQL against `supabase_migrations.schema_migrations`. Do not rerun the 20261121061000 migration; it will fail its existing-relation preflight. Do not run `supabase db push` before local and remote migration lists match.
