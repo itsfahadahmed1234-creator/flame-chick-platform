@@ -31,3 +31,11 @@ test("Staff Admin continues to use its dedicated command RPCs", () => {
   assert.match(sources["flame-chick-staff-admin"], /flame_chick_staff_admin_command/);
   assert.match(sources["flame-chick-staff-admin"], /flame_chick_staff_admin_system_command/);
 });
+
+test("Staff Admin relies on gateway JWT validation plus database actor authorization", () => {
+  const config = readFileSync("supabase/config.toml", "utf8");
+  assert.match(config, /\[functions\.flame-chick-staff-admin\][\s\S]*?verify_jwt\s*=\s*true/);
+  assert.match(sources["flame-chick-staff-admin"], /flame_chick_staff_admin_command/);
+  assert.doesNotMatch(sources["flame-chick-staff-admin"], /async function requireUser\s*\(/);
+  assert.match(sources["flame-chick-staff-admin"], /if\(!t\)throw new ApiError\("STAFF_AUTH_REQUIRED"/);
+});
