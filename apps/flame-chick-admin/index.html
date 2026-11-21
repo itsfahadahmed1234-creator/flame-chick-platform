@@ -25,12 +25,12 @@
         <div class="mobile-brand"><img src="assets/flame-chick-mark.svg" alt=""><strong>Flame Chick</strong></div>
         <span class="eyebrow">WELCOME BACK</span>
         <h2>Sign in to continue</h2>
-        <p class="muted">Use your Flame Chick owner or manager account.</p>
+        <p class="muted">Use your Flame Chick Admin or Owner account.</p>
         <label>Email address<input id="email" name="email" type="email" autocomplete="username" required placeholder="you@example.com"></label>
         <label>Password<input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Your password"></label>
         <div id="loginError" class="error-text" role="alert"></div>
         <button class="btn btn-primary btn-wide" type="submit" id="loginButton">Sign in <span>→</span></button>
-        <p class="login-note"><span class="lock-dot"></span> Secure sign-in · Owner, admin or manager access only</p>
+        <p class="login-note"><span class="lock-dot"></span> Secure sign-in · Admin and Owner access only</p>
       </form>
     </div>
   </section>
@@ -43,15 +43,15 @@
       </a>
       <div class="nav-label">WORKSPACE</div>
       <nav class="side-nav" aria-label="Main navigation">
-        <button class="nav-item active" data-page="dashboard"><span class="nav-icon">◫</span>Dashboard</button>
-        <button class="nav-item" data-page="orders"><span class="nav-icon">▣</span>Orders</button>
-        <button class="nav-item" data-page="menu"><span class="nav-icon">▤</span>Menu & products</button>
-        <button class="nav-item" data-page="categories"><span class="nav-icon">▦</span>Categories</button>
-        <button class="nav-item" data-page="deals"><span class="nav-icon">✳</span>Deals & offers</button>
-        <button class="nav-item" data-page="delivery"><span class="nav-icon">⌁</span>Delivery areas</button>
-        <button class="nav-item" data-page="staff"><span class="nav-icon">♙</span>Staff & riders</button>
-        <button class="nav-item" data-page="media"><span class="nav-icon">▧</span>Website images</button>
-        <button class="nav-item" data-page="settings"><span class="nav-icon">⚙</span>Website settings</button>
+        <button class="nav-item active" data-page="dashboard" disabled title="Awaiting its secure production API"><span class="nav-icon">◫</span>Dashboard</button>
+        <button class="nav-item" data-page="orders" disabled title="Awaiting its secure production API"><span class="nav-icon">▣</span>Orders</button>
+        <button class="nav-item" data-page="menu" disabled title="Awaiting its secure production API"><span class="nav-icon">▤</span>Menu & products</button>
+        <button class="nav-item" data-page="categories" disabled title="Awaiting its secure production API"><span class="nav-icon">▦</span>Categories</button>
+        <button class="nav-item" data-page="deals" disabled title="Awaiting its secure production API"><span class="nav-icon">✳</span>Deals & offers</button>
+        <button class="nav-item" data-page="delivery" disabled title="Awaiting its secure production API"><span class="nav-icon">⌁</span>Delivery areas</button>
+        <button class="nav-item active" data-page="staff"><span class="nav-icon">♙</span>Staff & riders</button>
+        <button class="nav-item" data-page="media" disabled title="Awaiting its secure production API"><span class="nav-icon">▧</span>Website images</button>
+        <button class="nav-item" data-page="settings" disabled title="Awaiting its secure production API"><span class="nav-icon">⚙</span>Website settings</button>
       </nav>
       <div class="sidebar-bottom">
         <div class="backend-state"><span class="state-dot"></span><div><b>Database connected</b><small>Supabase · secured session</small></div></div>
@@ -156,22 +156,15 @@
       </section>
 
       <section class="page" id="page-staff" hidden>
-        <div class="page-intro">
-          <div><h2>Staff & riders</h2><p class="muted">Invite Flame Chick team members and manage their branch roles. Passwords are set by each person from their invitation email.</p></div>
-          <button class="btn btn-primary" id="inviteStaffButton">＋ Invite team member</button>
+        <div class="page-intro"><div><h2>Staff & riders</h2><p class="muted">Manage restaurant-wide Admin/Owner access and branch-scoped Manager, Cashier and Rider access.</p></div><button class="btn btn-primary" id="inviteStaffButton">＋ Invite team member</button></div>
+        <div id="staffPageNote" class="data-note">Loading secured staff records…</div>
+        <div class="surface"><div class="surface-head"><div><h3>Staff roles</h3><p class="muted">Each branch assignment is separately auditable. Deactivation preserves accounts and order history.</p></div></div>
+          <div class="table-wrap"><table><thead><tr><th>TEAM MEMBER</th><th>ROLE</th><th>BRANCH SCOPE</th><th>ACCOUNT / ROLE STATUS</th><th></th></tr></thead><tbody id="staffTable"><tr><td colspan="5" class="empty-cell">Loading staff…</td></tr></tbody></table></div>
         </div>
-        <div id="staffPageNote" class="data-note">Role changes are audited. Deactivation preserves the Auth account and all historical orders. Riders with active deliveries cannot be deactivated or changed to another role.</div>
-        <div class="surface">
-          <div class="table-wrap">
-            <table><thead><tr><th>TEAM MEMBER</th><th>ROLE</th><th>ACCOUNT</th><th>RIDER STATUS</th><th></th></tr></thead>
-              <tbody id="staffTable"><tr><td colspan="5" class="empty-cell">Open this page to load team members…</td></tr></tbody>
-            </table>
-          </div>
+        <div class="surface staff-invitation-surface"><div class="surface-head"><div><h3>Invitations</h3><p class="muted">Retry Finalize does not send a second email.</p></div></div>
+          <div class="table-wrap"><table><thead><tr><th>INVITEE</th><th>ROLE</th><th>BRANCH SCOPE</th><th>STATUS</th><th></th></tr></thead><tbody id="staffInvitations"><tr><td colspan="5" class="empty-cell">No invitations loaded.</td></tr></tbody></table></div>
         </div>
-        <div class="staff-audit-wrap">
-          <div class="section-head"><div><h3>Recent staff activity</h3><p class="muted">Latest invitation and role changes for this branch.</p></div></div>
-          <div id="staffAudit" class="staff-audit-list"><div class="empty-state">No staff activity loaded.</div></div>
-        </div>
+        <div class="staff-audit-wrap"><div class="section-head"><div><h3>Recent staff activity</h3><p class="muted">Role assignments, deactivations and invitation actions.</p></div></div><div id="staffAudit" class="staff-audit-list"><div class="empty-state">No staff activity loaded.</div></div></div>
       </section>
 
       <section class="page" id="page-settings" hidden>
@@ -213,20 +206,16 @@
   <dialog id="staffDialog" class="editor-dialog staff-dialog">
     <form id="staffForm" method="dialog">
       <div class="dialog-head"><div><span class="eyebrow">TEAM ACCESS</span><h2 id="staffDialogTitle">Invite team member</h2></div><button type="button" class="close-btn" id="staffDialogClose" aria-label="Close">×</button></div>
-      <div class="dialog-body">
-        <div class="form-grid">
-          <label>Full name<input id="staffFullName" name="full_name" required maxlength="120"></label>
-          <label>Work email<input id="staffEmail" name="email" type="email" required maxlength="254"></label>
-          <label>Phone (optional)<input id="staffPhone" name="phone" type="tel" maxlength="40"></label>
-          <label>Branch<select id="staffBranch" name="branch_id" required></select></label>
-          <label class="full-field">Role<select id="staffRoleSelect" name="role" required>
-            <option value="cashier">Cashier</option><option value="kitchen">Kitchen</option><option value="rider">Rider</option>
-            <option value="manager">Manager</option><option value="admin">Admin</option><option value="owner">Owner</option>
-          </select></label>
-        </div>
-        <p class="data-note">New team members receive an email invitation and choose their own password. Existing Supabase accounts are linked instead of creating a duplicate. The invitation/setup link opens the public account-setup screen; staff then sign in through the POS.</p>
-        <div id="staffFormError" class="error-text" role="alert"></div>
+      <div class="dialog-body"><div class="form-grid">
+        <label>Display name<input id="staffFullName" name="display_name" required maxlength="120"></label>
+        <label>Work email<input id="staffEmail" name="email" type="email" required maxlength="254"></label>
+        <label>Phone (optional)<input id="staffPhone" name="phone" type="tel" maxlength="32"></label>
+        <label>Role<select id="staffRoleSelect" name="role_key" required><option value="cashier">Cashier</option><option value="rider">Rider</option><option value="manager">Manager</option><option value="admin">Admin</option><option value="owner">Owner</option></select></label>
+        <label class="full-field" id="staffBranchField">Branch access<select id="staffBranch" name="branch_ids" multiple size="4"></select><small class="subtle-line" id="staffBranchHint">Select every active branch this person should access.</small></label>
+        <label class="full-field">Reason for access / change<input id="staffReason" name="reason" maxlength="500" required></label>
       </div>
+      <p class="data-note">New invitations are sent by the secured Staff Admin service. Existing accounts are not enumerated or linked automatically: the invited user must sign in with the exact confirmed email and accept the invitation. Admin and Owner are restaurant-wide; Manager, Cashier and Rider require one or more branches.</p>
+      <div id="staffFormError" class="error-text" role="alert"></div></div>
       <div class="dialog-actions"><button type="button" class="btn btn-outline" id="staffDialogCancel">Cancel</button><button type="submit" class="btn btn-primary" id="staffDialogSave">Send invitation</button></div>
     </form>
   </dialog>

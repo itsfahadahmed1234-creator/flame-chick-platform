@@ -330,3 +330,14 @@ td b{color:#2d2926;font-size:11px}
 @media(max-width:1250px){.dashboard-metric-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.weekly-metric-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.dashboard-range-switch,.rush-range-switch{max-width:520px}.site-media-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:850px){.dashboard-welcome,.sales-overview-head,.rush-head{flex-direction:column;align-items:stretch}.dashboard-updated{justify-items:start}.dashboard-top-grid,.dashboard-bottom-grid{grid-template-columns:1fr}.sales-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.rush-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-range-switch,.rush-range-switch{justify-content:flex-start;max-width:none}}
 @media(max-width:600px){.dashboard-metric-grid,.weekly-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-metric-grid .metric-value,.weekly-metric-grid .metric-value{font-size:20px}.dashboard-section-head,.media-section-head{align-items:flex-start}.site-media-grid{grid-template-columns:1fr}.slider-media-row{grid-template-columns:24px 70px minmax(100px,1fr)}.slider-thumb{width:70px}.slider-row-actions{grid-column:2/-1;justify-content:flex-start}.comparison-row{grid-template-columns:1fr 1fr}.rush-chart{gap:3px}.rush-bar-col>small{font-size:8px}}
+
+/* Batch 4 Staff Admin alignment */
+.nav-item:disabled{opacity:.38;cursor:not-allowed;pointer-events:none}
+.staff-invitation-surface{margin-top:20px}
+.staff-dialog #staffBranch{min-height:116px;padding:8px}
+.staff-dialog #staffBranch option{padding:7px}
+.staff-dialog #staffBranchHint{display:block;margin-top:6px;color:var(--muted);font-size:11px}
+.staff-dialog [hidden]{display:none!important}
+.staff-actions{min-width:150px}
+.staff-actions button{margin:3px 5px}
+@media(max-width:720px){.staff-actions{min-width:0}.staff-invitation-surface .table-wrap{overflow-x:auto}}
