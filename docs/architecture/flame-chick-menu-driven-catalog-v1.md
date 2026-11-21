@@ -294,3 +294,20 @@ Critical compatibility defects confirmed in current source:
 - Existing Admin UI performs direct REST CRUD, uses legacy category IDs to identify deals, and writes old deal component rows sequentially. Replace with authenticated atomic commands; do not grant direct table access.
 
 The unresolved menu details and required golden tests are enumerated in the reconciliation handoff. No Production changes were performed by the inspection.
+
+
+## 13. Current and upcoming menu comparison (2026-11-21)
+
+See the full source-based comparison in \`docs/handoffs/2026-11-21-current-vs-upcoming-menu-reconciliation.md\`.
+
+The current menu is the compatibility baseline; the upcoming menu is the target, pending final Owner approval. The catalog must preserve current products and old prices/descriptions in historical snapshots while allowing target products to be activated and old items to be archived without deletion.
+
+Additional requirements confirmed by the current menu:
+- Flavoured drinks are currently separate product entries; bottled water and cold drinks have regular and 1.5L options.
+- Current Burger includes Classic Chick; current Wrap includes B-B-Q Wrap; current menu lists six flavoured drinks. These are not shown in the upcoming menu, but must not be retired until confirmed.
+- Current Platter composition is listed (Classic Nuggets, Injected Nuggets, Fire Wings, Injected Wings, Fries & Dips); upcoming menu does not repeat it, so do not assume the composition is unchanged.
+- Current broast descriptions include piece/bun/fries/dip quantities. Preserve as current historical copy; upcoming descriptions are not supplied in the new image.
+- Upcoming menu introduces Whole Chicken Broast flavours, Flame Beef, Flame Fish, Shakes, and six deal offers. Exact component choices for deals remain unconfirmed.
+- Current image says prices are exclusive of applicable GST; upcoming image does not state tax treatment. GST implementation remains deferred until the Owner confirms target customer-facing display and checkout behavior.
+
+No menu seeds or Production changes were made by this comparison.
