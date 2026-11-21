@@ -6,6 +6,7 @@ on:
       - work/production-source-audit
     paths:
       - "apps/flame-chick-admin/**"
+      - "tests/admin-invitation-acceptance.test.mjs"
       - ".github/workflows/ci-admin-static.yml"
 
 permissions:
