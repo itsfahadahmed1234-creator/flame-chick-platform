@@ -1,3 +1,5 @@
 One-time trigger for the reviewed catalog FK-index migration 20261121062000.
 Target project is hard-coded as Flame Chick Production adkrxfnawdiljhjaavnj.
 Workflow dry-runs and refuses to proceed unless this is the only pending migration.
+
+Retry after adding the CLI non-interactive confirmation flag; dry-run previously proved this is the sole pending migration.
