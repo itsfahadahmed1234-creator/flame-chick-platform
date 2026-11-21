@@ -12,6 +12,7 @@ function readKeyMap(name: string): Record<string, string> {
     return {};
   }
 }
+// Prefer the current Supabase secret-key map; legacy service-role env is migration fallback.
 const SECRET_KEY_MAP = readKeyMap("SUPABASE_SECRET_KEYS");
 const DATABASE_KEY = String(
   SECRET_KEY_MAP.default ??
