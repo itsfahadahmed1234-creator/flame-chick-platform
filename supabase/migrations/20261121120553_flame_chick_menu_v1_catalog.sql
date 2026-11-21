@@ -180,6 +180,9 @@ ALTER TABLE public.modifier_price_rules
 CREATE INDEX modifier_price_rules_variant_lookup_idx
   ON public.modifier_price_rules (restaurant_id, product_variant_id, modifier_id);
 
+CREATE INDEX modifier_price_rules_variant_fk_idx
+  ON public.modifier_price_rules (product_variant_id, restaurant_id, product_id);
+
 COMMENT ON COLUMN public.modifier_price_rules.product_variant_id IS
   'Exact sellable product variant for this modifier price; do not resolve pricing by a reusable size label/key.';
 
@@ -488,6 +491,9 @@ CREATE INDEX deal_component_groups_deal_sort_idx
 
 CREATE INDEX deal_component_groups_deal_fk_idx
   ON public.deal_component_groups (deal_id, restaurant_id);
+
+CREATE INDEX deal_component_groups_group_fk_idx
+  ON public.deal_component_options (component_group_id, deal_id, restaurant_id);
 
 CREATE TABLE public.deal_component_options (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
