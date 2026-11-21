@@ -145,6 +145,12 @@ CREATE UNIQUE INDEX deal_variants_restaurant_deal_key_uidx
 CREATE INDEX deal_variants_restaurant_deal_active_sort_idx
   ON public.deal_variants (restaurant_id, deal_id, is_active, sort_order);
 
+-- The FK below is deliberately composite. Add its referenced unique key
+-- before creating the child mapping table (PostgreSQL requires this at DDL time).
+ALTER TABLE public.deal_component_options
+  ADD CONSTRAINT deal_component_options_id_deal_restaurant_key
+  UNIQUE (id, deal_id, restaurant_id);
+
 -- Each deal-variant maps only the explicitly allowed options from its own
 -- deal's component groups. A missing mapping means the option is not allowed.
 -- Pricing is per selected component unit:
@@ -251,12 +257,6 @@ CREATE INDEX deal_schedule_assignments_schedule_fk_idx
 CREATE INDEX deal_schedule_assignments_branch_lookup_idx
   ON public.deal_schedule_assignments (restaurant_id, branch_id, deal_id, is_active)
   WHERE branch_id IS NOT NULL;
-
--- Strengthen the option-side composite key so the variant map FK proves
--- the option belongs to the same deal and restaurant as its deal variant.
-ALTER TABLE public.deal_component_options
-  ADD CONSTRAINT deal_component_options_id_deal_restaurant_key
-  UNIQUE (id, deal_id, restaurant_id);
 
 -- The collection schedule remains a fallback only. The deal-specific
 -- assignment takes precedence; a branch-specific assignment takes precedence
