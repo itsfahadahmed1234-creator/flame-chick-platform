@@ -43,7 +43,7 @@ BEGIN
       USING ERRCODE='22023';
   END IF;
 
-  -- Read only restaurant identity, the current pointer and immutable history.
+  -- Snapshot SHA-256 is the digest of PostgreSQL's canonical jsonb::text form.\n  -- The compiler must use this exact encoding before publication.\n  -- Read only restaurant identity, the current pointer and immutable history.
   -- Mutable category/product/deal/modifier/draft tables are never consulted.
   SELECT
     r.is_active,
@@ -100,7 +100,74 @@ BEGIN
      OR v_draft_revision IS NULL
      OR v_draft_revision<0
      OR v_snapshot_sha256 IS NULL
-     OR v_snapshot_sha256 !~ '^[0-9a-f]{64}$'
+     OR v_snapshot_sha256 !~ '^[0-9a-f]{64}
+     OR v_pricing_engine_version IS NULL
+     OR pg_catalog.btrim(v_pricing_engine_version)=''
+  THEN
+    RAISE EXCEPTION 'CATALOG_CURRENT_PUBLICATION_INVALID'
+      USING ERRCODE='55000';
+  END IF;
+
+  RETURN pg_catalog.jsonb_build_object(
+    'published',true,
+    'publicationId',v_publication_id,
+    'publicationNumber',v_publication_number,
+    'draftRevision',v_draft_revision,
+    'schemaVersion',v_schema_version,
+    'pricingEngineVersion',v_pricing_engine_version,
+    'snapshotSha256',v_snapshot_sha256,
+    'publishedAt',v_published_at,
+    'snapshot',v_snapshot
+  );
+END
+$function$;
+
+ALTER FUNCTION public.flame_chick_catalog_public_read(text) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.flame_chick_catalog_public_read(text)
+  FROM PUBLIC,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION public.flame_chick_catalog_public_read(text)
+  TO service_role;
+
+COMMENT ON FUNCTION public.flame_chick_catalog_public_read(text) IS
+  'Server-only public catalog read. Returns only the snapshot selected by catalog_current_publication; no mutable draft-table fallback exists.';
+
+DO $verify$
+DECLARE
+  v_signature regprocedure := 'public.flame_chick_catalog_public_read(text)'::regprocedure;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_proc AS p
+    WHERE p.oid=v_signature
+      AND pg_catalog.pg_get_userbyid(p.proowner)='postgres'
+      AND p.prosecdef
+      AND p.proconfig @> ARRAY['search_path=""']
+  ) THEN
+    RAISE EXCEPTION 'CATALOG_PUBLIC_READ_FUNCTION_SECURITY_INVALID';
+  END IF;
+
+  IF NOT pg_catalog.has_function_privilege('service_role',v_signature,'EXECUTE')
+     OR pg_catalog.has_function_privilege('anon',v_signature,'EXECUTE')
+     OR pg_catalog.has_function_privilege('authenticated',v_signature,'EXECUTE')
+      THEN
+    RAISE EXCEPTION 'CATALOG_PUBLIC_READ_FUNCTION_GRANTS_INVALID';
+  END IF;
+
+  IF pg_catalog.has_table_privilege('service_role','public.catalog_publications','SELECT')
+     OR pg_catalog.has_table_privilege('service_role','public.catalog_current_publication','SELECT')
+     OR pg_catalog.has_table_privilege('anon','public.catalog_publications','SELECT')
+     OR pg_catalog.has_table_privilege('authenticated','public.catalog_publications','SELECT') THEN
+    RAISE EXCEPTION 'CATALOG_PUBLICATION_TABLE_GRANTS_MUST_REMAIN_CLOSED';
+  END IF;
+END;
+$verify$;
+
+COMMIT;
+
+     OR v_snapshot_sha256 IS DISTINCT FROM pg_catalog.encode(
+          extensions.digest(pg_catalog.convert_to(v_snapshot::text,'UTF8'),'sha256'),
+          'hex'
+        )
      OR v_published_at IS NULL
      OR v_pricing_engine_version IS NULL
      OR pg_catalog.btrim(v_pricing_engine_version)=''
@@ -150,7 +217,7 @@ BEGIN
   IF NOT pg_catalog.has_function_privilege('service_role',v_signature,'EXECUTE')
      OR pg_catalog.has_function_privilege('anon',v_signature,'EXECUTE')
      OR pg_catalog.has_function_privilege('authenticated',v_signature,'EXECUTE')
-     OR pg_catalog.has_function_privilege('PUBLIC',v_signature,'EXECUTE') THEN
+      THEN
     RAISE EXCEPTION 'CATALOG_PUBLIC_READ_FUNCTION_GRANTS_INVALID';
   END IF;
 
