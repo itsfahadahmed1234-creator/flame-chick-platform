@@ -62,3 +62,12 @@ The successful fixture transaction explicitly ended in ROLLBACK. Post-rollback c
 **Not applied to Production.** This candidate and review are not approval to apply it. Separate explicit approval is required before a permanent migration.
 
 No external encrypted backup artifact was created. No app source, Vercel settings/deployments/domains, API keys, environment variables or exposed-schema settings were changed.
+
+
+## 2026-11-21 concurrency regression result
+
+The last-active-Owner concurrency test was run three times against the existing project using disposable synthetic fixtures. Each trial held the exact per-restaurant advisory transaction lock in a third session, then launched two separate competing Owner-deactivation SQL requests. In all three trials, one UPDATE committed, the other was rejected with `LAST_ACTIVE_OWNER_PROTECTED` (SQLSTATE 23514), and exactly one active Owner remained. The trigger function is VOLATILE; its internal count statement behaved correctly under the tested READ COMMITTED lock-wait pattern. The earlier suspicion of a stale-snapshot race was withdrawn.
+
+After the trials, all temporary Batch 3 relations and functions plus synthetic Auth users and restaurants were removed. Final checks showed zero Auth users/restaurants/branches, zero Batch 3 relations/functions/migration entries/Realtime entries, and no migration-history changes. The detailed procedure and limitation notes are in `docs/drafts/batch3_last_owner_concurrency_test.md`.
+
+Batch 3 remains a candidate only. No permanent migration was applied. Separate explicit approval is required for that step.
