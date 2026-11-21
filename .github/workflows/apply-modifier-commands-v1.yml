@@ -1,0 +1,101 @@
+name: Apply Flame Chick modifier commands V1
+
+on:
+  push:
+    branches:
+      - work/production-source-audit
+    paths:
+      - "ops/triggers/apply-modifier-commands-v1.txt"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flame-chick-production-modifier-commands-v1
+  cancel-in-progress: false
+
+jobs:
+  apply-modifier-commands:
+    if: github.ref == 'refs/heads/work/production-source-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SUPABASE_PROJECT_REF: adkrxfnawdiljhjaavnj
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - name: Check out reviewed working branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Validate target and modifier migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${SUPABASE_ACCESS_TOKEN}"
+          test -n "${SUPABASE_DB_PASSWORD}"
+          configured_ref="$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' supabase/config.toml | head -n 1)"
+          test "${configured_ref}" = "${SUPABASE_PROJECT_REF}"
+          migration="supabase/migrations/20261121150452_flame_chick_catalog_modifier_commands_v1.sql"
+          test -s "${migration}"
+          grep -q "flame_chick_catalog_modifier_group_upsert_internal" "${migration}"
+          grep -q "flame_chick_catalog_modifier_assignment_upsert_internal" "${migration}"
+          grep -q "flame_chick_catalog_modifier_assignment_draft_read_internal" "${migration}"
+          grep -q "SET search_path = ''" "${migration}"
+          grep -q "modifier_groups_restaurant_id_id_idx" "${migration}"
+          test "$(grep -c '^BEGIN;$' "${migration}")" -eq 1
+          test "$(grep -c '^COMMIT;$' "${migration}")" -eq 1
+      - name: Install pinned Supabase CLI
+        run: |
+          set -euo pipefail
+          npm install --global "supabase@3.2.0"
+          supabase --version
+      - name: Link project and verify expected migration history
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "${SUPABASE_PROJECT_REF}"
+          supabase migration list --remote="${SUPABASE_PROJECT_REF}" | tee /tmp/migrations-before.txt
+          for version in 20261121125542 20261121133607 20261121140000 20261121144209 20261121145500; do
+            awk -F'|' -v version="${version}" '$2 ~ version { found=1 } END { exit(found ? 0 : 1) }' /tmp/migrations-before.txt || {
+              echo "::error::Expected historical migration missing: ${version}"
+              exit 1
+            }
+          done
+          if awk -F'|' '$2 ~ /20261121150452/ { found=1 } END { exit(found ? 0 : 1) }' /tmp/migrations-before.txt; then
+            echo "::error::Modifier command migration already recorded remotely; refusing duplicate push."
+            exit 1
+          fi
+      - name: Dry-run and require only modifier migration pending
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase db push --dry-run --remote="${SUPABASE_PROJECT_REF}" 2>&1 | tee /tmp/db-push-dry-run.txt
+          grep -q "20261121150452" /tmp/db-push-dry-run.txt
+          for version in \
+            20261119125153 20261120154413 20261120164125 \
+            20261121043115 20261121043149 20261121053647 \
+            20261121053712 20261121053829 20261121054852 \
+            20261121055722 20261121061000 20261121062000 \
+            20261121125542 20261121133607 20261121140000 \
+            20261121144209 20261121145500; do
+            if grep -q "${version}" /tmp/db-push-dry-run.txt; then
+              echo "::error::Unexpected historical migration pending: ${version}"
+              exit 1
+            fi
+          done
+      - name: Apply single modifier command migration
+        run: |
+          set -euo pipefail
+          supabase db push --yes --remote="${SUPABASE_PROJECT_REF}"
+      - name: Verify remote migration ledger
+        run: |
+          set -euo pipefail
+          supabase migration list --remote="${SUPABASE_PROJECT_REF}" | tee /tmp/migrations-after.txt
+          awk -F'|' '$2 ~ /20261121150452/ { found=1 } END { exit(found ? 0 : 1) }' /tmp/migrations-after.txt
+          {
+            echo "### Flame Chick modifier command V1"
+            echo "- Project: ${SUPABASE_PROJECT_REF}"
+            echo "- Migration: 20261121150452"
+            echo "- Applied as the only pending migration after a clean dry-run."
+            echo "- Commit: ${GITHUB_SHA}"
+          } >> "${GITHUB_STEP_SUMMARY}"
