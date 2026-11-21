@@ -360,19 +360,18 @@ LANGUAGE sql
 SECURITY INVOKER
 SET search_path = ''
 AS $function$
-  SELECT pg_catalog.jsonb_set(
-    app_private.flame_chick_catalog_draft_read_internal(
+  WITH result AS (
+    SELECT app_private.flame_chick_catalog_draft_read_internal(
       p_entity_type, p_after_id, p_limit
-    ),
+    ) AS value
+  )
+  SELECT pg_catalog.jsonb_set(
+    result.value,
     '{items}',
-    COALESCE(
-      app_private.flame_chick_catalog_draft_read_internal(
-        p_entity_type, p_after_id, p_limit
-      )->'items',
-      '[]'::jsonb
-    ),
+    COALESCE(result.value->'items', '[]'::jsonb),
     true
   )
+  FROM result
 $function$;
 ALTER FUNCTION public.flame_chick_catalog_draft_read(text, uuid, integer) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.flame_chick_catalog_draft_read(text, uuid, integer)
