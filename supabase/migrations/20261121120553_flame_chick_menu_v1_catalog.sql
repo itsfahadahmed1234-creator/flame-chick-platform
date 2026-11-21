@@ -384,6 +384,9 @@ CREATE TABLE public.deal_collections (
 CREATE INDEX deal_collections_restaurant_category_sort_idx
   ON public.deal_collections (restaurant_id, category_id, is_active, sort_order);
 
+CREATE INDEX deal_collections_category_fk_idx
+  ON public.deal_collections (category_id, restaurant_id, category_kind);
+
 CREATE INDEX deal_collections_schedule_fk_idx
   ON public.deal_collections (schedule_set_id, restaurant_id);
 
