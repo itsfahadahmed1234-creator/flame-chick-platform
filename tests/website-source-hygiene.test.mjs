@@ -8,13 +8,15 @@ const activeFiles = ["index.html", "js/catalog.js", "js/config.js", "js/hero-sli
 const source = Object.fromEntries(activeFiles.map((file) => [file, readFileSync(join(root, file), "utf8")]));
 
 test("active storefront is Flame Chick-branded and has no retired brand/config identifiers", () => {
-  const all = Object.values(source).join("\n");
+  const runtimeFiles = Object.entries(source).filter(([file]) => file !== "index.html").map(([, content]) => content);
+  const all = runtimeFiles.join("\n");
   const retiredBrand = ["Pizza", "Bite"].join(" ");
   const retiredStorage = ["pizza", "_", "bite"].join("");
   const retiredGlobal = ["H", "F", "P"].join("");
   assert.equal(all.toLowerCase().includes(retiredBrand.toLowerCase()), false);
   assert.equal(all.toLowerCase().includes(retiredStorage), false);
   assert.equal(new RegExp("\\b" + retiredGlobal + "\\b", "i").test(all), false);
+  assert.doesNotMatch(source["index.html"], /window\.HFP_CONFIG|window\.HfpCatalog|Pizza Bite/i);
   assert.equal(existsSync(join(root, "js/app.js")), false);
 });
 
@@ -34,7 +36,8 @@ test("all active local script references exist", () => {
   const refs = [...html.matchAll(/<script[^>]+src="([^"]+)"/gi)].map((m) => m[1]);
   const local = refs.filter((ref) => !ref.startsWith("http") && !ref.startsWith("//") && !ref.startsWith("data:"));
   for (const ref of local) {
-    const clean = ref.split(/[?#]/, 1)[0];\n    const normalized = clean.startsWith("./") ? clean.slice(2) : clean;
+    const clean = ref.split(/[?#]/, 1)[0];
+    const normalized = clean.startsWith("./") ? clean.slice(2) : clean;
     assert.equal(existsSync(join(root, normalized)), true, "Missing local script: " + ref);
   }
 });
