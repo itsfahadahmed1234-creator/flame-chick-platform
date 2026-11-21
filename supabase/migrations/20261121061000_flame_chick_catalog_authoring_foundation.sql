@@ -1,5 +1,7 @@
 -- Flame Chick Catalog Authoring Foundation V1
--- REVIEW CANDIDATE ONLY. Not applied to Production.
+-- PRODUCTION DDL IS PRESENT. Applied directly on 2026-11-21 before the migration-history record was repaired.
+-- Do not execute this file against the current Production project again.
+-- Supabase migration ledger repair for version 20261121061000 remains pending.
 -- Expected migration identity: current_user = postgres AND session_user = postgres.
 --
 -- Scope:
@@ -20,6 +22,8 @@
 --     but RLS is enabled and direct privileges are revoked from PUBLIC and all
 --     Supabase application roles.
 --   * No public policies, views, RPCs, Realtime publication entries, or seed rows.
+--   * Live parity verified on 2026-11-21: all 11 tables owned by postgres, RLS on,
+--     zero policies, zero direct table grants to app roles, no Realtime, zero rows.
 --   * app_private USAGE is intentionally present for authenticated because Batch 4
 --     routes the staff-admin public invoker wrapper to one explicitly granted private
 --     function. No other private functions/tables are granted by this migration.
