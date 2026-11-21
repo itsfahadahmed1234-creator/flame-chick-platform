@@ -1,0 +1,1 @@
+Apply only migration 20261121155900_flame_chick_catalog_public_snapshot_read_v1.sql to the Flame Chick Mumbai project. Require all prior catalog/deal migrations recorded and this migration to be the only pending migration. It creates only a service_role-executable SECURITY DEFINER RPC that reads the active immutable publication; it does not seed data or deploy the Edge Function.
