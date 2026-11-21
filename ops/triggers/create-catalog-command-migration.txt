@@ -1,0 +1,1 @@
+Create catalog command migration scaffold using Supabase CLI v3.2.0. This one-time trigger creates an empty migration only; it does not access the database.
