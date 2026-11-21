@@ -1050,6 +1050,9 @@ DECLARE
  v_treatment text; v_surcharge numeric; v_num numeric;
  v_max_qty integer; v_sort integer; v_active boolean;
  v_row public.deal_variant_component_options%ROWTYPE;
+ v_group_repeat boolean;
+ v_group_max integer;
+ v_group_option_max integer;
  v_before jsonb; v_after jsonb;
  v_seen uuid[]:=ARRAY[]::uuid[];
 BEGIN
@@ -1153,6 +1156,23 @@ BEGIN
     v_max_qty:=v_num::integer;
    END IF;
   ELSIF v_map_id IS NOT NULL THEN v_max_qty:=v_row.max_quantity_per_deal; ELSE v_max_qty:=NULL; END IF;
+
+  SELECT g.allow_repeat_option,g.max_units,g.max_units_per_option
+    INTO v_group_repeat,v_group_max,v_group_option_max
+  FROM public.deal_component_options o
+  JOIN public.deal_component_groups g
+    ON g.id=o.component_group_id AND g.deal_id=o.deal_id AND g.restaurant_id=o.restaurant_id
+  WHERE o.id=v_option_id AND o.deal_id=v_deal AND o.restaurant_id=v_context.restaurant_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'DEAL_VARIANT_MAP_COMPONENT_GROUP_NOT_FOUND' USING ERRCODE='23503';
+  END IF;
+  IF v_max_qty IS NOT NULL AND (
+    v_max_qty>v_group_max
+    OR (v_group_option_max IS NOT NULL AND v_max_qty>v_group_option_max)
+    OR (NOT v_group_repeat AND v_max_qty>1)
+  ) THEN
+    RAISE EXCEPTION 'DEAL_VARIANT_MAP_QUANTITY_EXCEEDS_COMPONENT_GROUP' USING ERRCODE='23514';
+  END IF;
 
   IF v_map ? 'sort_order' THEN
    BEGIN v_num:=(v_map->>'sort_order')::numeric;
@@ -1486,6 +1506,14 @@ BEGIN
     AND s.timezone=COALESCE(b.timezone,r.timezone)
  ) THEN
   RAISE EXCEPTION 'DEAL_BRANCH_SCHEDULE_TIMEZONE_MISMATCH' USING ERRCODE='23514';
+ END IF;
+ IF v_branch IS NULL AND NOT EXISTS(
+  SELECT 1 FROM public.catalog_schedule_sets s
+  JOIN public.restaurants r ON r.id=v_context.restaurant_id
+  WHERE s.id=v_schedule AND s.restaurant_id=v_context.restaurant_id
+    AND s.timezone=r.timezone
+ ) THEN
+  RAISE EXCEPTION 'DEAL_GLOBAL_SCHEDULE_TIMEZONE_MISMATCH' USING ERRCODE='23514';
  END IF;
  IF v_id IS NOT NULL THEN
   SELECT a.* INTO v_row FROM public.deal_schedule_assignments a
