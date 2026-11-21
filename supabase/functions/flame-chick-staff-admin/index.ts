@@ -1,330 +1,98 @@
-// Flame Chick staff administration API.
-// Auth Admin operations are server-side only; never ship the service-role key to the browser.
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const ADMIN_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const SECRET_KEYS = (() => {
-  try {
-    const v = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}");
-    return v && typeof v === "object" && !Array.isArray(v) ? v as Record<string,string> : {};
-  } catch { return {} as Record<string,string>; }
-})();
-const SERVICE_KEY = ADMIN_KEY || String(SECRET_KEYS.default ?? Object.values(SECRET_KEYS)[0] ?? "");
-const PUBLIC_KEYS = [
-  "sb_publishable_89MQIj_drF15IrF05ZLt0w_txUjPMxy",
-  ...Object.values((() => {
-    try {
-      const v = JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "{}");
-      return v && typeof v === "object" && !Array.isArray(v) ? v as Record<string,string> : {};
-    } catch { return {} as Record<string,string>; }
-  })()),
-  Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-].map(String).filter(Boolean);
-
-const RESTAURANT_SLUG = "flame-chick";
-const INVITE_REDIRECT = Deno.env.get("FLAME_CHICK_RIDER_PORTAL_URL") ?? "";
-// This endpoint uses explicit API-key + Supabase user-JWT validation and does not use cookies.
-// Allow browser previews and the eventual dedicated Flame Chick Admin origin; authorization remains server-enforced.
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "apikey, authorization, x-client-info, content-type",
-  "Access-Control-Max-Age": "86400",
-  "Vary": "Origin",
-};
-
-function json(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...CORS, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
-  });
+// Flame Chick Staff Admin API — Batch 4.
+const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").replace(/\/+$/,"");
+function readKey(jsonName:string,fallback:string[]):string{
+ try{const x=JSON.parse(Deno.env.get(jsonName)??"{}");const v=x?.default;if(typeof v==="string"&&v)return Deno.env.get(v)??v;}catch{}
+ for(const n of fallback){const v=Deno.env.get(n);if(v)return v;}return "";
 }
-function isObject(v: unknown): v is Record<string, any> {
-  return !!v && typeof v === "object" && !Array.isArray(v);
+const PUBLIC_KEY=readKey("SUPABASE_PUBLISHABLE_KEYS",["SUPABASE_PUBLISHABLE_KEY","SUPABASE_ANON_KEY"]);
+const SECRET_KEY=readKey("SUPABASE_SECRET_KEYS",["SUPABASE_SECRET_KEY","SUPABASE_SERVICE_ROLE_KEY"]);
+const ORIGINS=new Set((Deno.env.get("FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS")??"").split(",").map(x=>x.trim()).filter(Boolean));
+const REDIRECT=(Deno.env.get("FLAME_CHICK_STAFF_INVITE_REDIRECT_URL")??"").trim();
+type Obj=Record<string,unknown>;
+class ApiError extends Error{constructor(public code:string,public status:number,message:string){super(message);}}
+const obj=(x:unknown):x is Obj=>!!x&&typeof x==="object"&&!Array.isArray(x);
+function response(body:Obj,status:number,origin:string|null):Response{
+ const h=new Headers({"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","Vary":"Origin"});
+ if(origin&&ORIGINS.has(origin)){h.set("Access-Control-Allow-Origin",origin);h.set("Access-Control-Allow-Methods","GET, POST, OPTIONS");h.set("Access-Control-Allow-Headers","apikey, authorization, content-type, x-client-info");h.set("Access-Control-Max-Age","600");}
+ return new Response(JSON.stringify(body),{status,headers:h});
 }
-function uuid(v: unknown): string | null {
-  const s = String(v ?? "");
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s) ? s : null;
+function fail(e:unknown,origin:string|null):Response{
+ if(e instanceof ApiError)return response({ok:false,error:{code:e.code,message:e.message}},e.status,origin);
+ return response({ok:false,error:{code:"STAFF_API_ERROR",message:"The staff request could not be completed."}},500,origin);
 }
-function text(v: unknown, max = 180): string {
-  return String(v ?? "").trim().slice(0, max);
+function parse(s:string):unknown{try{return JSON.parse(s);}catch{return null;}}
+async function body(r:Response):Promise<unknown>{const s=await r.text();return s?parse(s):null;}
+function token(req:Request):string{const h=req.headers.get("authorization")??"";return h.startsWith("Bearer ")?h.slice(7).trim():"";}
+async function requireUser(req:Request):Promise<void>{
+ const t=token(req);if(!PUBLIC_KEY||!t)throw new ApiError("STAFF_AUTH_REQUIRED",401,"Sign in with your Flame Chick staff account.");
+ const r=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:PUBLIC_KEY,Authorization:"Bearer "+t,Accept:"application/json"},cache:"no-store"});
+ const u=await body(r);if(!r.ok||!obj(u)||typeof u.id!=="string")throw new ApiError("STAFF_AUTH_REQUIRED",401,"Your sign-in session is invalid or expired.");
 }
-async function serviceFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  return await fetch(SUPABASE_URL + path, {
-    ...init,
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: "Bearer " + SERVICE_KEY,
-      Accept: "application/json",
-      ...(init.headers ?? {}),
-    },
-    cache: "no-store",
-  });
+function rpcErr(x:unknown):ApiError{
+ const v=obj(x)?x:{};const raw=String(v.message??v.details??"");const code=raw.split(":")[0].trim().match(/^[A-Z0-9_]{3,80}$/)?.[0]??"STAFF_COMMAND_FAILED";
+ const status=/FORBIDDEN|DENIED|AUTH_REQUIRED/.test(code)?403:/NOT_FOUND/.test(code)?404:/INVALID|REQUIRED|PROTECTED|CONFLICT|EXPIRED|UNAVAILABLE|ALREADY/.test(code)?400:500;
+ return new ApiError(code,status,"Your staff action was not accepted.");
 }
-async function serviceRows(path: string): Promise<any[]> {
-  const r = await serviceFetch("/rest/v1/" + path);
-  const raw = await r.text();
-  if (!r.ok) throw new Error("DATABASE_READ_FAILED: " + raw.slice(0, 350));
-  const data = raw ? JSON.parse(raw) : [];
-  if (!Array.isArray(data)) throw new Error("DATABASE_BAD_RESPONSE");
-  return data;
+async function userRpc(t:string,action:string,payload:Obj={}):Promise<unknown>{
+ const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/flame_chick_staff_admin_command",{method:"POST",headers:{apikey:PUBLIC_KEY,Authorization:"Bearer "+t,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({p_action:action,p_payload:payload}),cache:"no-store"});
+ const x=await body(r);if(!r.ok)throw rpcErr(x);return x;
 }
-async function serviceRpc(name: string, body: unknown): Promise<any> {
-  const r = await serviceFetch("/rest/v1/rpc/" + name, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const raw = await r.text();
-  let data: any = null;
-  try { data = raw ? JSON.parse(raw) : null; } catch { data = raw; }
-  if (!r.ok) {
-    const message = String(data?.message ?? data?.details ?? data?.hint ?? raw ?? "Role action failed");
-    throw new Error(message);
-  }
-  return data;
+async function systemRpc(action:string,payload:Obj):Promise<unknown>{
+ if(!SECRET_KEY)throw new ApiError("STAFF_ADMIN_NOT_CONFIGURED",503,"Staff invitations are not configured.");
+ const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/flame_chick_staff_admin_system_command",{method:"POST",headers:{apikey:SECRET_KEY,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({p_action:action,p_payload:payload}),cache:"no-store"});
+ const x=await body(r);if(!r.ok)throw rpcErr(x);return x;
 }
-async function authUserFromToken(token: string, apiKey: string): Promise<{id:string,email?:string}|null> {
-  if (!token) return null;
-  const r = await fetch(SUPABASE_URL + "/auth/v1/user", {
-    headers: { apikey: apiKey, Authorization: "Bearer " + token, Accept: "application/json" },
-    cache: "no-store",
-  });
-  if (!r.ok) return null;
-  const u = await r.json();
-  return isObject(u) && typeof u.id === "string" ? { id: u.id, email: u.email } : null;
+function redirectOk():boolean{try{const u=new URL(REDIRECT);return u.protocol==="https:"&&ORIGINS.has(u.origin);}catch{return false;}}
+function duplicate(status:number,x:unknown):boolean{if(![400,409,422].includes(status))return false;const v=obj(x)?x:{};const s=[v.code,v.error,v.msg,v.message,v.error_description].filter(y=>typeof y==="string").join(" ").toLowerCase();return /already.?registered|already.?exists|user.?exists|email.?exists/.test(s);}
+async function sendInvite(email:string,name:string,phone:string|null):Promise<{kind:"sent";id:string}|{kind:"existing"}>{
+ if(!SECRET_KEY||!redirectOk())throw new ApiError("STAFF_INVITE_NOT_CONFIGURED",503,"The secure invitation destination is not configured.");
+ const r=await fetch(SUPABASE_URL+"/auth/v1/invite?redirect_to="+encodeURIComponent(REDIRECT),{method:"POST",headers:{apikey:SECRET_KEY,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({email,data:{display_name:name,...(phone?{phone}:{})}}),cache:"no-store"});
+ const x=await body(r);if(!r.ok){if(duplicate(r.status,x))return{kind:"existing"};throw new ApiError("AUTH_INVITATION_FAILED",502,"Supabase Auth could not send the invitation. Retry from Staff Admin.");}
+ const u=obj(x)&&obj(x.user)?x.user:x;if(!obj(u)||typeof u.id!=="string")throw new ApiError("AUTH_INVITATION_RESPONSE_INVALID",502,"The invitation response was incomplete. Check its status before retrying.");
+ return{kind:"sent",id:u.id};
 }
-async function requireActor(req: Request): Promise<{id:string,email?:string}|null> {
-  const apiKey = req.headers.get("apikey") ?? "";
-  if (!PUBLIC_KEYS.includes(apiKey)) return null;
-  const auth = req.headers.get("authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-  return await authUserFromToken(token, apiKey);
+async function invite(t:string,b:Obj):Promise<Obj>{
+ const email=String(b.email??"").trim().toLowerCase(),name=String(b.display_name??"").trim(),phone=b.phone==null||String(b.phone).trim()===""?null:String(b.phone).trim();
+ const role=String(b.role_key??"").trim().toLowerCase(),requestId=String(b.request_id??"").trim(),reason=String(b.reason??"Staff invitation").trim(),branches=Array.isArray(b.branch_ids)?b.branch_ids:[];
+ if(!requestId)throw new ApiError("STAFF_REQUEST_ID_REQUIRED",400,"A request ID is required for safe retries.");
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254)throw new ApiError("STAFF_EMAIL_INVALID",400,"Enter a valid email address.");
+ if(!name||name.length>120)throw new ApiError("STAFF_NAME_REQUIRED",400,"Enter the staff member's name.");
+ if(phone&&(phone.length<7||phone.length>32))throw new ApiError("STAFF_PHONE_INVALID",400,"Enter a valid phone number or leave it blank.");
+ if(!["admin","owner","manager","cashier","rider"].includes(role))throw new ApiError("STAFF_ROLE_INVALID",400,"Choose a supported staff role.");
+ const begun=await userRpc(t,"begin_invitation",{email,display_name:name,phone,role_key:role,branch_ids:branches,request_id:requestId,reason});
+ if(!obj(begun)||typeof begun.invitation_id!=="string")throw new ApiError("STAFF_INVITATION_CREATE_FAILED",500,"The invitation could not be prepared.");
+ const id=begun.invitation_id,status=String(begun.status??"pending"),authId=typeof begun.auth_user_id==="string"?begun.auth_user_id:null;
+ if(status==="sent"||status==="accepted")return{ok:true,invitation_id:id,status,idempotent:true};
+ if(authId)return{ok:true,invitation_id:id,status:"sent",recovered:true,result:await systemRpc("complete_invitation",{invitation_id:id,auth_user_id:authId})};
+ let sent:{kind:"sent";id:string}|{kind:"existing"};
+ try{sent=await sendInvite(email,name,phone);}catch(e){try{await systemRpc("fail_invitation",{invitation_id:id,failure_code:"AUTH_PROVIDER_ERROR"});}catch{}throw e;}
+ if(sent.kind==="existing")return{ok:true,invitation_id:id,status:"pending",existing_account:true,message:"This email already has an account. Its owner must sign in with the confirmed email and accept the invitation."};
+ try{return{ok:true,invitation_id:id,status:"sent",result:await systemRpc("complete_invitation",{invitation_id:id,auth_user_id:sent.id})};}
+ catch{try{await systemRpc("fail_invitation",{invitation_id:id,auth_user_id:sent.id,failure_code:"AUTH_FINALIZATION_FAILED"});}catch{}throw new ApiError("STAFF_INVITATION_FINALIZATION_PENDING",503,"The Auth invitation exists but needs database recovery. Use Retry Finalize before sending again.");}
 }
-async function branchAndRestaurant(branchId: string): Promise<{id:string;name:string}|null> {
-  const restaurants = await serviceRows("restaurants?slug=eq." + RESTAURANT_SLUG + "&is_active=eq.true&select=id&limit=1");
-  const restaurantId = restaurants[0]?.id;
-  if (!restaurantId) return null;
-  const branches = await serviceRows(
-    "branches?id=eq." + branchId +
-    "&restaurant_id=eq." + restaurantId +
-    "&is_active=eq.true&select=id,name,branch_code&limit=1"
-  );
-  return branches[0] ? { id: String(branches[0].id), name: String(branches[0].name ?? "Branch") } : null;
+async function post(req:Request,t:string):Promise<Obj>{
+ const raw=await req.text();if(raw.length>16000)throw new ApiError("REQUEST_TOO_LARGE",413,"The request is too large.");
+ const b=parse(raw);if(!obj(b))throw new ApiError("INVALID_JSON",400,"A valid JSON object is required.");
+ const a=String(b.action??"").trim().toLowerCase();
+ if(a==="invite")return await invite(t,b);
+ if(a==="accept_invitation")return{ok:true,result:await userRpc(t,a,{})};
+ if(a==="retry_finalize"){
+  const id=String(b.invitation_id??"");const pending=await userRpc(t,a,{invitation_id:id});
+  if(!obj(pending)||typeof pending.auth_user_id!=="string"){if(obj(pending)&&pending.already_finalized===true)return{ok:true,result:pending};throw new ApiError("STAFF_FINALIZE_NOT_AVAILABLE",400,"This invitation is not ready for finalization.");}
+  return{ok:true,result:await systemRpc("complete_invitation",{invitation_id:id,auth_user_id:pending.auth_user_id})};
+ }
+ if(["assign_role","deactivate_role","cancel_invitation"].includes(a)){const p:Obj={...b};delete p.action;return{ok:true,result:await userRpc(t,a,p)};}
+ throw new ApiError("STAFF_ACTION_INVALID",400,"Choose a supported Staff Admin action.");
 }
-async function activeRole(actorId: string, branchId: string): Promise<string|null> {
-  const rows = await serviceRows(
-    "user_roles?user_id=eq." + actorId +
-    "&or=(branch_id.is.null,branch_id.eq." + branchId +
-    ")&is_active=eq.true&select=role&limit=10"
-  );
-  return rows.some(x => x.role === "owner") ? "owner" :
-    rows.some(x => x.role === "admin") ? "admin" :
-    rows.some(x => x.role === "manager") ? "manager" : null;
-}
-async function listAuthUsers(): Promise<any[]> {
-  if (!SERVICE_KEY) throw new Error("AUTH_ADMIN_NOT_CONFIGURED");
-  const all: any[] = [];
-  for (let page = 1; page <= 10; page++) {
-    const r = await fetch(SUPABASE_URL + "/auth/v1/admin/users?page=" + page + "&per_page=1000", {
-      headers: { apikey: SERVICE_KEY, Authorization: "Bearer " + SERVICE_KEY, Accept: "application/json" },
-      cache: "no-store",
-    });
-    const raw = await r.text();
-    if (!r.ok) throw new Error("AUTH_USER_LIST_FAILED: " + raw.slice(0, 300));
-    const data = raw ? JSON.parse(raw) : {};
-    const users = Array.isArray(data) ? data : Array.isArray(data.users) ? data.users : [];
-    all.push(...users);
-    if (users.length < 1000) break;
-  }
-  return all;
-}
-async function handleList(actor: {id:string}, url: URL): Promise<Response> {
-  const restaurantRows = await serviceRows("restaurants?slug=eq." + RESTAURANT_SLUG + "&is_active=eq.true&select=id&limit=1");
-  const restaurantId = String(restaurantRows[0]?.id ?? "");
-  if (!restaurantId) return json({ ok:false, error:{code:"TENANT_NOT_FOUND",message:"Flame Chick tenant is not active."} },404);
-  const branches = await serviceRows(
-    "branches?restaurant_id=eq." + restaurantId + "&is_active=eq.true&select=id,name,branch_code&order=created_at.asc"
-  );
-  const branchId = uuid(url.searchParams.get("branch_id")) ?? String(branches[0]?.id ?? "");
-  if (!branchId) return json({ ok:false, error:{code:"BRANCH_NOT_FOUND",message:"No active branch was found."} },404);
-  const branch = await branchAndRestaurant(branchId);
-  if (!branch) return json({ ok:false, error:{code:"BRANCH_INVALID",message:"That branch is not part of Flame Chick."} },400);
-  const role = await activeRole(actor.id, branchId);
-  if (!role) return json({ ok:false, error:{code:"STAFF_ADMIN_FORBIDDEN",message:"An active Flame Chick owner, admin or manager role is required."} },403);
-
-  const [roleRows, authUsers, auditRows] = await Promise.all([
-    serviceRows("user_roles?branch_id=eq." + branchId + "&select=id,user_id,branch_id,role,is_active,created_at,created_by&order=created_at.asc"),
-    listAuthUsers(),
-    role === "owner" || role === "admin" || role === "manager"
-      ? serviceRows("staff_role_audit?branch_id=eq." + branchId + "&select=id,created_at,action,old_role,new_role,old_is_active,new_is_active,details,actor_user_id,target_user_id&order=created_at.desc&limit=100")
-      : Promise.resolve([]),
-  ]);
-  const ids = [...new Set(roleRows.map(x => String(x.user_id)))];
-  const inIds = ids.length ? "in.(" + ids.join(",") + ")" : "eq.00000000-0000-0000-0000-000000000000";
-  const [profiles, riderProfiles] = await Promise.all([
-    serviceRows("user_profiles?id=" + inIds + "&select=id,full_name,phone,is_active"),
-    serviceRows("rider_profiles?branch_id=eq." + branchId + "&user_id=" + inIds + "&select=user_id,rider_code,display_name,phone,availability_status,is_active"),
-  ]);
-  const authById = new Map(authUsers.map(u => [String(u.id), u]));
-  const profileById = new Map(profiles.map(p => [String(p.id), p]));
-  const riderById = new Map(riderProfiles.map(p => [String(p.user_id), p]));
-  const members = roleRows.map(row => {
-    const u = authById.get(String(row.user_id)) ?? {};
-    const p = profileById.get(String(row.user_id)) ?? {};
-    const rider = riderById.get(String(row.user_id)) ?? null;
-    return {
-      role_id: row.id,
-      user_id: row.user_id,
-      branch_id: row.branch_id,
-      role: row.role,
-      is_active: row.is_active === true,
-      created_at: row.created_at,
-      full_name: p.full_name ?? u.user_metadata?.full_name ?? "",
-      phone: p.phone ?? rider?.phone ?? "",
-      email: u.email ?? "",
-      email_confirmed: !!u.email_confirmed_at,
-      invited_at: u.invited_at ?? null,
-      last_sign_in_at: u.last_sign_in_at ?? null,
-      profile_active: p.is_active !== false,
-      rider: rider ? {
-        rider_code: rider.rider_code,
-        display_name: rider.display_name,
-        availability_status: rider.availability_status,
-        is_active: rider.is_active === true,
-      } : null,
-    };
-  });
-  return json({ ok:true, role, branch, branches, members, audit:auditRows });
-}
-async function findAuthUserByEmail(email: string): Promise<any|null> {
-  const users = await listAuthUsers();
-  return users.find(u => String(u.email ?? "").toLowerCase() === email.toLowerCase()) ?? null;
-}
-async function inviteAuthUser(email: string, fullName: string, phone: string): Promise<any> {
-  if (!ADMIN_KEY) throw new Error("AUTH_ADMIN_NOT_CONFIGURED");
-  if (!INVITE_REDIRECT) throw new Error("AUTH_INVITE_REDIRECT_NOT_CONFIGURED");
-  const url = SUPABASE_URL + "/auth/v1/invite?redirect_to=" + encodeURIComponent(INVITE_REDIRECT);
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { apikey: ADMIN_KEY, Authorization: "Bearer " + ADMIN_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify({ email, data: { full_name: fullName, phone } }),
-    cache: "no-store",
-  });
-  const raw = await r.text();
-  let data: any = {};
-  try { data = raw ? JSON.parse(raw) : {}; } catch {}
-  if (!r.ok) throw new Error("AUTH_INVITE_FAILED: " + String(data.msg ?? data.message ?? data.error_description ?? raw).slice(0, 260));
-  const user = data.user ?? data;
-  if (!user?.id) throw new Error("AUTH_INVITE_BAD_RESPONSE");
-  return user;
-}
-async function handlePost(req: Request, actor: {id:string}): Promise<Response> {
-  let body: any;
-  try {
-    const raw = await req.text();
-    if (raw.length > 12000) return json({ok:false,error:{code:"REQUEST_TOO_LARGE",message:"Request is too large."}},413);
-    body = JSON.parse(raw);
-  } catch { return json({ok:false,error:{code:"INVALID_JSON",message:"A valid JSON request body is required."}},400); }
-  if (!isObject(body)) return json({ok:false,error:{code:"INVALID_REQUEST",message:"Request body must be an object."}},400);
-  const action = text(body.action,40).toLowerCase();
-  const branchId = uuid(body.branch_id);
-  if (!branchId) return json({ok:false,error:{code:"BRANCH_REQUIRED",message:"Choose a branch."}},400);
-  const branch = await branchAndRestaurant(branchId);
-  if (!branch) return json({ok:false,error:{code:"BRANCH_INVALID",message:"That branch is not part of Flame Chick."}},400);
-  const actorRole = await activeRole(actor.id, branchId);
-  if (actorRole !== "owner") return json({ok:false,error:{code:"OWNER_REQUIRED",message:"Only the Flame Chick owner can invite or change team roles."}},403);
-
-  if (action === "invite") {
-    const email = text(body.email,254).toLowerCase();
-    const fullName = text(body.full_name,120);
-    const phone = text(body.phone,40);
-    const role = text(body.role,20).toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ok:false,error:{code:"EMAIL_INVALID",message:"Enter a valid email address."}},400);
-    if (!fullName) return json({ok:false,error:{code:"NAME_REQUIRED",message:"Enter the staff member's full name."}},400);
-    if (!["owner","admin","manager","cashier","kitchen","rider"].includes(role)) return json({ok:false,error:{code:"ROLE_INVALID",message:"Choose a supported role."}},400);
-    let authUser = await findAuthUserByEmail(email);
-    let invitationSent = false;
-    if (!authUser) {
-      try {
-        authUser = await inviteAuthUser(email, fullName, phone);
-        invitationSent = true;
-      } catch (error) {
-        return json({ok:false,error:{code:"INVITE_FAILED",message:String((error as Error).message).replace(/^AUTH_INVITE_FAILED:\s*/,"")}},400);
-      }
-    }
-    try {
-      const result = await serviceRpc("hfp_manage_staff_role", {
-        p_payload: {
-          action:"assign",
-          actor_user_id:actor.id,
-          target_user_id:authUser.id,
-          branch_id:branchId,
-          role,
-          full_name:fullName,
-          phone,
-          invitation_sent:invitationSent,
-        },
-      });
-      return json({
-        ok:true,
-        invitation_sent:invitationSent,
-        existing_auth_user:!invitationSent,
-        email,
-        email_confirmed:!!authUser.email_confirmed_at,
-        user_id:authUser.id,
-        result,
-        message: invitationSent
-          ? "Invitation sent. The team member can set their own password using the email link."
-          : "This email already has a Supabase Auth account. Its Flame Chick role has been linked; do not send a duplicate invitation.",
-      });
-    } catch (error) {
-      return json({
-        ok:false,
-        invitation_sent:invitationSent,
-        auth_user_created:invitationSent,
-        existing_auth_user:!invitationSent,
-        user_id:authUser.id,
-        error:{code:"ROLE_SAVE_FAILED",message:String((error as Error).message)},
-      },400);
-    }
-  }
-
-  if (action === "set_active") {
-    const targetId = uuid(body.user_id);
-    const roleId = uuid(body.role_id);
-    if (!targetId || !roleId || typeof body.is_active !== "boolean") {
-      return json({ok:false,error:{code:"ROLE_FIELDS_REQUIRED",message:"Select a role and active state."}},400);
-    }
-    const result = await serviceRpc("hfp_manage_staff_role", {
-      p_payload: {
-        action:"set_active",
-        actor_user_id:actor.id,
-        target_user_id:targetId,
-        role_id:roleId,
-        branch_id:branchId,
-        is_active:body.is_active,
-      },
-    });
-    return json({ok:true,result});
-  }
-  return json({ok:false,error:{code:"ACTION_INVALID",message:"Choose invite or set_active."}},400);
-}
-
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok",{status:200,headers:CORS});
-  if (!SUPABASE_URL || !SERVICE_KEY || PUBLIC_KEYS.length === 0) return json({ok:false,error:{code:"CONFIG_MISSING",message:"Staff administration is not configured."}},503);
-  if (req.method !== "GET" && req.method !== "POST") return json({ok:false,error:{code:"METHOD_NOT_ALLOWED",message:"GET or POST only."}},405);
-  const actor = await requireActor(req);
-  if (!actor) return json({ok:false,error:{code:"STAFF_AUTH_REQUIRED",message:"Sign in with a Flame Chick staff account."}},401);
-  try {
-    if (req.method === "GET") return await handleList(actor,new URL(req.url));
-    return await handlePost(req,actor);
-  } catch (error) {
-    const message = String((error as Error)?.message ?? "Staff request failed");
-    const code = message.split(":")[0].match(/^[A-Z0-9_]{3,64}$/)?.[0] ?? "STAFF_API_ERROR";
-    const status = /OWNER_REQUIRED|FORBIDDEN|DENIED/.test(code) ? 403 :
-      /NOT_FOUND/.test(code) ? 404 :
-      /INVALID|REQUIRED|PROTECTED|HAS_ACTIVE/.test(code) ? 400 : 500;
-    return json({ok:false,error:{code,message:message.split(":").slice(1).join(":").trim()||message}},status);
-  }
+Deno.serve(async(req:Request)=>{
+ const origin=req.headers.get("origin");
+ if(origin&&!ORIGINS.has(origin))return response({ok:false,error:{code:"ORIGIN_NOT_ALLOWED",message:"This application origin is not allowed."}},403,null);
+ if(req.method==="OPTIONS"){if(!origin||!ORIGINS.has(origin))return response({ok:false,error:{code:"ORIGIN_NOT_ALLOWED",message:"This origin is not allowed."}},403,null);return response({ok:true},200,origin);}
+ try{
+  if(!SUPABASE_URL||!PUBLIC_KEY)throw new ApiError("STAFF_ADMIN_NOT_CONFIGURED",503,"Staff Admin is not configured.");
+  if(req.method!=="GET"&&req.method!=="POST")throw new ApiError("METHOD_NOT_ALLOWED",405,"Use GET or POST.");
+  await requireUser(req);const t=token(req);
+  if(req.method==="GET"){const x=await userRpc(t,"list",{});return response(obj(x)?x:{ok:true,result:x},200,origin);}
+  return response(await post(req,t),200,origin);
+ }catch(e){return fail(e,origin);}
 });
