@@ -1,0 +1,1 @@
+Apply only migration 20261121144209_flame_chick_catalog_product_commands_v1.sql to the Flame Chick Mumbai build project. Verify remote history includes 20261121125542, 20261121133607 and 20261121140000; require this to be the only pending migration.
