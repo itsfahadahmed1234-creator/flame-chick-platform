@@ -1,3 +1,5 @@
 Apply only migration 20261121133607_flame_chick_catalog_commands_v1.sql to the Flame Chick Mumbai build project. The workflow must verify the remote ledger, dry-run exactly one pending migration, and abort on drift.
 
 Re-run after reconciling the repository's already-applied menu V1 migration filename to remote version 20261121125542. This is not a schema change.
+
+Retry after correcting workflow guard to check only the remote migration column; the prior guard falsely matched the local pending filename.
