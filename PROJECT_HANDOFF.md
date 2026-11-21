@@ -1736,3 +1736,45 @@ The migration was prepared using read-only live schema facts and contains strict
 - Detailed QA and remaining blockers: \`docs/handoffs/2026-11-21-menu-v1-migration-candidate-review.md\`.
 
 The migration was applied successfully to the existing pre-launch project, not to a running customer system. The schema foundation is ready for the next implementation phase, but Admin catalog editing, pricing, publication, schedules and public catalog delivery are not yet operational. Replace Admin direct REST writes and reconcile the public catalog DTO before enabling the catalog UI.
+
+
+### Secure Edge API, POS/Rider Realtime and Free-tier architecture (2026-11-21)
+
+Architecture baseline: \`docs/architecture/edge-api-realtime-free-tier-v1.md\`.
+
+Verified:
+- Supabase org \`Flamechic\` is Free; project \`adkrxfnawdiljhjaavnj\` is ACTIVE_HEALTHY, Mumbai, Postgres 17.12.
+- Zero Edge Functions deployed.
+- Current order/delivery/rider tables are absent. The current catalog function references legacy tables/columns and must not be deployed.
+- Realtime publication currently has no business tables; no \`realtime.messages\` policies exist.
+- Existing POS subscriptions include unfiltered delivery offer/assignment listeners. Rider has user-filtered Postgres Changes. Both are legacy and must be replaced/secured before launch.
+- Supabase documented Free allowances: 500k Edge Function invocations/month, 2m Realtime messages/month, 200 peak Realtime connections, 5 GB egress, 500 MB DB size/project, 1 GB Storage, 50k MAU. See architecture doc links and monitor actual organization usage.
+
+Implementation already made:
+- Removed redundant \`/auth/v1/user\` round-trip from Staff Admin function; it remains \`verify_jwt=true\`, and database command independently derives \`auth.uid()\` and enforces Admin/Owner.
+- Commit: \`6e21262ce052189e196332db464014b02435b3fc\`.
+- Added CI assertion for this contract: \`95f56d26f2124b42992c7c49107d6ed828082d8a\`.
+- Static CI run: https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44907048541 (check final status before claiming green).
+
+Architecture decisions:
+- Keep four domain functions (catalog, order, delivery, staff-admin), not per-action functions.
+- User JWT + publishable key for authenticated calls; secret key only server-side.
+- DB RPC is authoritative for role/branch/tenant checks, pricing, idempotency and status transitions.
+- Guest website create only unauthenticated; atomic website-only rate limiting.
+- POS private branch topic, rider private per-user topic; minimal event payloads with IDs/version only; clients refetch authorized data.
+- Prefer transactional outbox + private Broadcast for operational events; no unfiltered Postgres Changes.
+- Rider Presence is ephemeral; no 120-second Edge Function heartbeat. Persist only explicit availability preference and real lifecycle changes.
+- No frequent polling; bounded paginated snapshots on reconnect.
+- Do not enable Realtime until private channel authorization policies and project private-only settings are configured.
+
+Next implementation order:
+1. Shared API helpers and endpoint contracts.
+2. Catalog Admin/Owner command RPCs + immutable publication compiler; adapt public catalog.
+3. Order schema and atomic quote/submit/status RPCs.
+4. Delivery/rider schema and atomic commands.
+5. Private Realtime authorization + outbox publisher.
+6. Migrate POS/Rider/Admin clients away from direct sensitive table access.
+7. Role/branch/rider isolation, idempotency, race, reconnect and Free-tier usage QA.
+8. Deploy only after source/schema contracts align.
+
+Do not deploy any current draft Edge Function yet; order/delivery tables and RPCs do not exist. No new business schema was applied in this architecture phase.
