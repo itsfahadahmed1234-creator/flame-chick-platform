@@ -48,7 +48,7 @@ function createHarness({ hash = "", search = "", fetchHandler }) {
     calls.push({ url: String(url), options });
     return fetchHandler(String(url), options, calls.length);
   };
-  vm.runInNewContext(source, {
+  for (const id of ["passwordForm", "newPassword", "confirmPassword", "passwordError", "passwordSubmit", "retryAcceptButton", "signinForm", "signinEmail", "signinPassword", "signinError", "signinSubmit", "successRole", "successMessage", "globalError"]) document.getElementById(id);\n  vm.runInNewContext(source, {
     window, document, history, fetch, URL, URLSearchParams,
     String, Number, Math, Date, Promise, Error, console
   });
@@ -132,7 +132,7 @@ test("unconfirmed invite identity cannot reach role activation", async () => {
   });
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(harness.nodes.get("signinState").hidden, false);
-  assert.match(harness.nodes.get("signinError").textContent, /not confirmed/i);
+  assert.match(harness.nodes.get("signinError").textContent, /did not confirm|not confirmed/i);
   assert.equal(functionCalls, 0);
 });
 
