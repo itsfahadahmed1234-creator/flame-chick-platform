@@ -18,6 +18,20 @@ The one-time trigger file `ops/triggers/repair-catalog-ledger.txt` was committed
 
 Required owner action: add repository Actions secrets named exactly `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` at https://github.com/itsfahadahmed1234-creator/flame-chick-platform/settings/secrets/actions . Use a Supabase Personal Access Token for the first and the existing database password for the second. Do not paste either value in chat or commit them to the repository. After both secrets exist, retrigger by updating `ops/triggers/repair-catalog-ledger.txt`; verify GitHub Actions and the Supabase migration list before proceeding to the FK-index migration.
 
+## Catalog foundation and FK-index migrations reconciled in Production
+
+Both catalog migrations are now correctly represented in the Production migration ledger:
+- `20261121061000_flame_chick_catalog_authoring_foundation`
+- `20261121062000_flame_chick_catalog_fk_indexes`
+
+The first migration's SQL had already been applied before its ledger record was repaired using the official Supabase CLI v3 workflow. The repair changed migration history only; it did not rerun DDL.
+
+The FK-index migration was then applied through the official Supabase CLI v3 `db push` workflow after a dry-run confirmed that `20261121062000_flame_chick_catalog_fk_indexes.sql` was the only pending migration. The workflow uses explicit `--remote=<project-ref>`, pinned CLI v3.2.0, the repository Actions secrets, and a non-interactive `--yes` confirmation after the dry-run gate.
+
+GitHub Actions run [44892500555](https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44892500555) completed successfully. Independent Supabase verification confirms migration versions `20261121061000` and `20261121062000` are recorded, all 15 expected indexes exist in `public`, and all 15 are owned by `postgres`. No catalog business rows were inserted. The index migration did not alter RLS, policies, grants or Realtime publication.
+
+Next: build secure Admin/Owner catalog command APIs, immutable published catalog snapshots, audit/revision controls, and migrate Admin UI away from direct table writes. Keep public catalog reads separate from authenticated writes. Do not seed live menu data until the catalog UI and command validation are ready.
+
 ## Catalog foundation: applied in Production, migration ledger pending
 
 Production project `adkrxfnawdiljhjaavnj` (Mumbai, PostgreSQL 17.12, Free plan) currently contains the catalog authoring foundation. The migration DDL was executed directly as `postgres` on 2026-11-21 and committed to Git as `supabase/migrations/20261121061000_flame_chick_catalog_authoring_foundation.sql`. This direct application bypassed the Supabase migration tracker. The actual Supabase migration ledger still contains only the previous ten applied versions and does NOT contain `20261121061000`.
