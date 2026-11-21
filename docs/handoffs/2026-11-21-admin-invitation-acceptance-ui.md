@@ -61,3 +61,11 @@ If password update succeeds but activation fails, page retains the in-memory ses
 9. Keep Vercel preview enablement disabled until the Admin app-specific readiness review passes.
 
 No SQL migration or production database mutation was made by this source update.
+
+### Admin static CI verification — passed
+
+- Workflow run: [Flame Chick Admin Static Checks #2](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44880704883).
+- `node --check` passed for both `apps/flame-chick-admin/app.js` and `accept-invitation.js`.
+- Static page assets, login link, acceptance page script and acceptance action checks passed.
+- The first CI attempt failed only because the test asserted a literal `/auth/v1/user` string while the page correctly calls the shared `authRequest("user", "GET")` helper. The assertion was corrected and the rerun passed.
+- This is static source validation only; it does not replace live Supabase Auth integration tests.
