@@ -1,0 +1,1 @@
+Apply only migration 20261121154711_flame_chick_deal_builder_fk_indexes.sql to the Flame Chick Mumbai project. Require 20261121153223 and all prior catalog migrations recorded, and require this to be the only pending migration.
