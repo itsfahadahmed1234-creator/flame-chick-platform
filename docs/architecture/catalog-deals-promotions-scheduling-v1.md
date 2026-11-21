@@ -2,7 +2,7 @@
 
 Date: 2026-11-21
 Branch: `work/production-source-audit`
-Status: owner-approved design direction; design only — no Production DDL or data changes
+Status: owner-approved design direction; deal schema and command migrations applied to the empty Production project; no menu/staff data inserted; publication/runtime and app integration remain pending
 Production project: `adkrxfnawdiljhjaavnj` (Mumbai, Free)
 
 ## 1. Objective and boundary
@@ -11,7 +11,7 @@ Extend the existing catalog so the Admin panel can author ordinary fast-food men
 
 The design must support common Pakistani fast-food patterns: burger and drink combos, pizza meals, choose-your-own bundles, family deals, multiple included sides/drinks, size upgrades, paid add-ons, time-limited lunch or evening deals, weekday offers, date-specific campaigns, coupon discounts and branch-specific availability.
 
-This document is a reviewed domain contract, not executable migration SQL. It does not authorize a Production schema change, seed data, deployment or Admin UI enablement.
+This document is the reviewed domain contract and implementation reference. The deal schema and Admin/Owner command layer described below have now been applied to the empty Production project. This does not authorize menu seeding, public API release, Edge Function deployment or Admin UI enablement.
 
 ## 2. Existing foundation — keep and extend
 
@@ -229,3 +229,38 @@ GST/tax remains deferred. Inventory, stock depletion, allergens, loyalty, referr
 ## Current implementation truth
 
 Production still has only the previously verified 11-table catalog foundation and 15 FK indexes. All catalog tables are empty, owned by `postgres`, RLS-enabled, have no policies/direct app-role table grants and are not in Realtime. No deal, schedule, promotion, catalog command or publication tables have been created. This document records the design direction only.
+
+
+---
+
+## 18. Implementation status — 2026-11-21
+
+The following deal-builder schema and command migrations are now applied on `work/production-source-audit` to Production project `adkrxfnawdiljhjaavnj` (Mumbai, Free):
+
+- `20261121152231_flame_chick_deal_builder_schema_v1`
+- `20261121153223_flame_chick_deal_commands_v1`
+- `20261121154711_flame_chick_deal_builder_fk_indexes`
+
+### Implemented data model adjustments
+
+- Added `deal_variants` so Regular/Family/etc deal prices are not forced into one legacy `deals.bundle_price`.
+- Added `deal_variant_component_options` as the authoritative allowed-option and pricing-treatment map for each deal variant. Treatments are INCLUDED, SURCHARGE and STANDALONE, with explicit per-unit surcharge and per-variant quantity cap.
+- Retained legacy `deals.bundle_price` and old component-option pricing fields for DTO/source compatibility only; new deal commands do not use them as pricing source.
+- Added IANA `timezone` to `catalog_schedule_sets`, backfilled from restaurant timezone, and validated through a database trigger.
+- Added `deal_schedule_assignments` for deal-wide and branch-specific schedule overrides. Active branch-specific assignment overrides active deal-wide assignment; active deal-wide assignment overrides collection fallback. Inactive assignments fall through.
+- Branch-specific schedule timezone must equal branch timezone (or restaurant timezone when branch override is absent); global deal assignment timezone must equal restaurant timezone.
+- Branch deal availability remains a separate boolean override.
+
+### Implemented command APIs
+
+Admin/Owner-only wrappers now support collection create/edit/read, deal create/edit with variants, component-group and exact product-variant option authoring, per-deal-variant option allow-list/pricing maps, schedule-set/window authoring and explicit window removal, deal schedule assignments, branch availability, bounded collection/deal/schedule list reads, and deal/schedule detail reads.
+
+All mutation APIs share the existing actor resolver, per-restaurant catalog draft revision lock, SHA-256 idempotency ledger and same-transaction append-only actor audit. Public wrappers are SECURITY INVOKER and authenticated-only. Internal command/read functions are postgres-owned SECURITY DEFINER with empty search_path. No direct table CRUD/read grants are exposed to app roles.
+
+### Publication/runtime still pending
+
+The migration intentionally does not seed a single deal or schedule. Draft authoring allows incomplete variants/options. Publication compiler must enforce all active group min/max constraints, complete eligible mappings for required choice groups, treatment compatibility, variant/price presence, product/variant tenant and sellability, quantity limits, and schedule/branch effective windows before creating an immutable versioned snapshot. Runtime quote logic must use only the published snapshot, not the mutable draft tables.
+
+The exact public DTO and the single catalog Edge Function router are still pending. Existing Admin direct-REST writes remain disabled. No Edge Function or Admin catalog module is enabled by this implementation.
+
+Detailed migration and QA record: `docs/handoffs/2026-11-21-deal-builder-command-implementation.md`.
