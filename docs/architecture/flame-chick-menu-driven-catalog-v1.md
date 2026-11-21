@@ -268,3 +268,29 @@ Next:
 6. Request separate owner approval before any Production schema application.
 
 No Production schema/data changes, Edge Function deployments, Vercel deployments, or menu seeding are authorized by this document.
+
+
+## 12. Live schema reconciliation (2026-11-21)
+
+The follow-up read-only Production inspection is recorded in \`docs/handoffs/2026-11-21-menu-schema-reconciliation.md\`. It confirms:
+- Existing \`categories.category_kind\` already distinguishes \`menu\` and \`deal\`; do not add it again.
+- Existing product variant price is nullable \`numeric(12,2)\`; keep NULL distinct from explicit zero.
+- Existing drink option has nullable \`volume_ml\`; do not invent the regular beverage volume.
+- Existing branch product/variant availability overlays and restaurant IANA timezone are present.
+- No deals, deal component, schedule, branch-deal availability, catalog draft/audit or immutable publication structures exist in Production.
+
+Menu-first schema changes now required before authoring:
+1. Typed variant metadata for portion/flavour/pack/volume and explicit standalone-sellable vs deal-only variant eligibility. Preserve the current one-dimensional variant model; no generic multidimensional variant matrix for this menu.
+2. Replace modifier price-rule \`product_id + size_key\` as authoritative scope with exact \`product_variant_id\` and a tenant/product composite FK.
+3. Add normalized deal collections, deal records, required component groups, exact variant allowlist options and branch deal availability. The six printed offer rows are individual deals; Flame Hour and Kids Deals are collections/headings.
+4. Add reusable schedule sets/windows, including weekdays, multiple windows, overnight/effective-date behavior and optional branch timezone override. Attach Flame Hour schedule to its collection; weekdays remain unconfigured until confirmed.
+5. Add draft revision, append-only audit, immutable compiled publication snapshots and an atomic current-publication pointer.
+
+Critical compatibility defects confirmed in current source:
+- Public catalog Edge Function reads missing \`deals\` and \`deal_components\` tables and mutable authoring rows; it is not safe to deploy as production catalog.
+- It converts nullable variant prices using \`Number(price) || 0\`; this must preserve NULL to avoid treating TBD as free.
+- It does not select/emit explicit \`category_kind\`.
+- It reads modifier prices by \`size_key\`; adapt to exact variant ID.
+- Existing Admin UI performs direct REST CRUD, uses legacy category IDs to identify deals, and writes old deal component rows sequentially. Replace with authenticated atomic commands; do not grant direct table access.
+
+The unresolved menu details and required golden tests are enumerated in the reconciliation handoff. No Production changes were performed by the inspection.
