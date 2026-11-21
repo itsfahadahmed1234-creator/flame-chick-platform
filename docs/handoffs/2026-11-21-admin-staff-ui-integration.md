@@ -2,7 +2,8 @@
 Date: 2026-11-21
 Repository: itsfahadahmed1234-creator/flame-chick-platform
 Branch: work/production-source-audit
-Base commit: 974ba2e6d5da567fa8216bbfca9a5f76a1c39a20
+Batch 4 UI integration commit: 4a9ded5ea699e994e01ac0fdd2a05d21d6c5a33d
+Follow-up staff refresh commit: 11688f8a2388f7020cc65fca1298ea2d8f1b44b8
 Supabase project: adkrxfnawdiljhjaavnj (Flame Chick Production, Mumbai, Free plan)
 
 ## Scope
@@ -28,7 +29,7 @@ Updated only the existing static Admin app's Staff & riders screen and authentic
 - Applied DB migration extends the list response with actor_role and restaurant metadata.
 
 ## Applied migration
-- 20261121055722_flame_chick_admin_staff_context
+- 20261121055722_flame_chick_admin_staff_context (canonical SQL stored at `supabase/migrations/20261121055722_flame_chick_admin_staff_context.sql`)
 
 ## Deployment boundary / next work
 - Staff Admin Edge Function remains undeployed; origin, redirect and key secrets remain unconfigured.
@@ -38,6 +39,6 @@ Updated only the existing static Admin app's Staff & riders screen and authentic
 - No Auth users, restaurant, branches, staff roles or invitations were created. No secrets set, no function deployed and no Vercel deployment started.
 
 ## Verification still required
-- JS syntax check and DOM ID consistency check on the committed source.
+- Full browser runtime and JavaScript syntax/build validation; source has been read back from GitHub, but the static app has no local build command configured.
 - Cross-check UI actions against Edge Function and SQL payloads.
 - Runtime testing after deployment/configuration and provisioning of an Admin/Owner plus active restaurant/branch.
