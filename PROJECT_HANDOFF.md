@@ -1707,3 +1707,17 @@ The comparison records all visible current products/prices/descriptions, upcomin
 - TBD remains NULL, and no guessed component choices, weekdays, drink volume or recipe data may be seeded.
 
 The schema must preserve historical catalog/order snapshots when current products are archived or prices change. No Production DDL, menu seed or deployment occurred during this comparison.
+
+
+### Menu V1 migration candidate prepared (2026-11-21)
+
+**Migration:** \`supabase/migrations/20261121120553_flame_chick_menu_v1_catalog.sql\`
+**Migration scaffold workflow:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44902193577 (success; pinned Supabase CLI v3.2.0; no DB credentials).
+**Candidate SQL commit:** \`d4ea1d292aa326859167b49034f4dff30941e248\`
+**FK index follow-up:** \`1550cbfab89584948c8daa9004804061c1dd70d9\`
+**Review handoff:** \`docs/handoffs/2026-11-21-menu-v1-migration-candidate-review.md\`
+**Review handoff commit:** \`35006a01d96b6fd371841c67a33a1abb694a668b\`.
+
+Candidate covers typed variants, exact variant-scoped modifier pricing, branch timezone override, schedule sets/windows, deal collections/deals/component groups/options, branch deal availability, draft revision, append-only audit, immutable publication snapshots and current pointer. New public tables are RLS-enabled, postgres-owned and explicitly revoked from app roles. No menu data or catalog command functions are included.
+
+The migration was prepared using read-only live schema facts and contains strict preflight checks. **It has not been applied and is not yet declared production-ready.** Required next step is a clean disposable Supabase local migration-chain run, then security/ACL/FK-index/tenant-isolation/immutability tests and DTO reconciliation. Production remains untouched.
