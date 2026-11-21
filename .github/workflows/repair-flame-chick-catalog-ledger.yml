@@ -1,0 +1,90 @@
+name: Repair Flame Chick catalog migration history
+
+on:
+  push:
+    branches:
+      - work/production-source-audit
+    paths:
+      - "ops/triggers/repair-catalog-ledger.txt"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flame-chick-production-catalog-ledger-repair
+  cancel-in-progress: false
+
+jobs:
+  repair-catalog-ledger:
+    if: github.ref == 'refs/heads/work/production-source-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SUPABASE_PROJECT_REF: adkrxfnawdiljhjaavnj
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+    steps:
+      - name: Check out the reviewed working branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Validate required secrets and migration identity
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${SUPABASE_ACCESS_TOKEN}" ]]; then
+            echo "::error::Missing repository Actions secret SUPABASE_ACCESS_TOKEN."
+            exit 1
+          fi
+          if [[ -z "${SUPABASE_DB_PASSWORD}" ]]; then
+            echo "::error::Missing repository Actions secret SUPABASE_DB_PASSWORD."
+            exit 1
+          fi
+
+          configured_ref="$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' supabase/config.toml | head -n 1)"
+          if [[ "${configured_ref}" != "${SUPABASE_PROJECT_REF}" ]]; then
+            echo "::error::supabase/config.toml project_id does not match the hard-coded Production project."
+            exit 1
+          fi
+
+          migration_file="supabase/migrations/20261121061000_flame_chick_catalog_authoring_foundation.sql"
+          test -s "${migration_file}"
+          grep -q "PRODUCTION DDL IS PRESENT" "${migration_file}"
+          grep -q "Do not execute this file against the current Production project again" "${migration_file}"
+
+          echo "Target project: ${SUPABASE_PROJECT_REF}"
+          echo "Target repair: 20261121061000 (catalog foundation only)"
+          echo "Migration file present; no schema SQL will be executed."
+
+      - name: Install pinned stable Supabase CLI
+        run: |
+          set -euo pipefail
+          npm install --global "supabase@3.2.0"
+          supabase --version
+
+      - name: Link and inspect Production migration history
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "${SUPABASE_PROJECT_REF}"
+          supabase migration list --remote="${SUPABASE_PROJECT_REF}"
+
+      - name: Repair only the already-applied catalog migration record
+        run: |
+          set -euo pipefail
+          supabase migration repair 20261121061000 --status applied --yes --remote="${SUPABASE_PROJECT_REF}"
+
+      - name: Verify migration list after repair
+        run: |
+          set -euo pipefail
+          supabase migration list --remote="${SUPABASE_PROJECT_REF}"
+
+          {
+            echo "### Flame Chick catalog migration-history repair"
+            echo "- Project: ${SUPABASE_PROJECT_REF}"
+            echo "- Repaired version: 20261121061000"
+            echo "- Operation: migration ledger only; no catalog DDL or rows changed"
+            echo "- Commit: ${GITHUB_SHA}"
+          } >> "${GITHUB_STEP_SUMMARY}"
