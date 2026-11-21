@@ -298,6 +298,7 @@ CREATE TABLE public.catalog_schedule_windows (
     CHECK (
       (
         window_kind = 'WEEKLY'
+        AND weekday_iso IS NOT NULL
         AND weekday_iso BETWEEN 1 AND 7
         AND starts_at IS NULL
         AND ends_at IS NULL
@@ -793,6 +794,14 @@ CREATE TRIGGER catalog_audit_log_immutable
 CREATE TRIGGER catalog_publications_immutable
   BEFORE UPDATE OR DELETE ON public.catalog_publications
   FOR EACH ROW EXECUTE FUNCTION app_private.flame_chick_reject_catalog_history_mutation();
+
+CREATE TRIGGER catalog_audit_log_no_truncate
+  BEFORE TRUNCATE ON public.catalog_audit_log
+  FOR EACH STATEMENT EXECUTE FUNCTION app_private.flame_chick_reject_catalog_history_mutation();
+
+CREATE TRIGGER catalog_publications_no_truncate
+  BEFORE TRUNCATE ON public.catalog_publications
+  FOR EACH STATEMENT EXECUTE FUNCTION app_private.flame_chick_reject_catalog_history_mutation();
 
 -- ---------------------------------------------------------------------------
 -- 9. Ownership, RLS and privileges
