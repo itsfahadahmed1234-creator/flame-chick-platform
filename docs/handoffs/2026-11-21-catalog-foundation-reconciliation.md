@@ -109,3 +109,10 @@ Deals/deal components/curated choice groups and schedules remain a separate phas
 - No database branch creation, paid plan upgrades, production menu seeds or deployment until reviewed.
 - Keep application table grants revoked until authenticated server commands and public published-snapshot reads are fully tested.
 - Preserve existing commits and separate `befahad1234-cmyk` project context; do not transfer or disconnect GitHub accounts.
+
+
+## Guarded CLI repair workflow prepared
+
+The working branch now contains `.github/workflows/repair-flame-chick-catalog-ledger.yml`. It is a narrowly scoped push-trigger workflow that runs only from `work/production-source-audit` when the dedicated one-time trigger file changes. It pins Supabase CLI v3.2.0, checks the configured project ref and exact already-applied migration file, inspects the remote migration ledger, repairs only `20261121061000` with `--status applied --yes --remote=<project-ref>`, then verifies the list. No SQL migration is executed and no `db push` is used.
+
+Required GitHub Actions repository secrets, which the connected GitHub tool cannot inspect or create: `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`. Keep them in GitHub Actions Secrets only, never in repository files or chat. The one-time trigger is held until those secrets are configured. Current Supabase CLI v3 uses `--remote` (not deprecated `--linked`) and defaults database commands to local unless a remote target is specified.
