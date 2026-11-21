@@ -1,3 +1,5 @@
 One-time operator trigger for migration version 20261121061000.
 Target is hard-coded in the guarded workflow: Flame Chick Production adkrxfnawdiljhjaavnj.
 This file contains no credentials. The workflow only repairs the migration history record and never reruns catalog DDL.
+
+Retriggered for one-time ledger repair after repository secrets were configured. Timestamp: 2026-11-21T10:00:00Z
