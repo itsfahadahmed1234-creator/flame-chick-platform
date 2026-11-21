@@ -31,6 +31,7 @@
         <div id="loginError" class="error-text" role="alert"></div>
         <button class="btn btn-primary btn-wide" type="submit" id="loginButton">Sign in <span>→</span></button>
         <p class="login-note"><span class="lock-dot"></span> Secure sign-in · Admin and Owner access only</p>
+        <p class="muted" style="text-align:center;font-size:12px;margin-top:14px">Have a staff invitation? <a href="accept-invitation.html" style="color:var(--red);font-weight:700;text-decoration:none">Accept it here</a>.</p>
       </form>
     </div>
   </section>
@@ -214,7 +215,7 @@
         <label class="full-field" id="staffBranchField">Branch access<select id="staffBranch" name="branch_ids" multiple size="4"></select><small class="subtle-line" id="staffBranchHint">Select every active branch this person should access.</small></label>
         <label class="full-field">Reason for access / change<input id="staffReason" name="reason" maxlength="500" required></label>
       </div>
-      <p class="data-note">New invitations are sent by the secured Staff Admin service. Existing accounts are not enumerated or linked automatically: the invited user must sign in with the exact confirmed email and accept the invitation. Admin and Owner are restaurant-wide; Manager, Cashier and Rider require one or more branches.</p>
+      <p class="data-note">New invitations are sent by the secured Staff Admin service. Existing accounts are not enumerated or linked automatically: the invited user must open <a href="accept-invitation.html" target="_blank" rel="noopener">the invitation acceptance page</a>, then sign in with the exact confirmed email. Admin and Owner are restaurant-wide; Manager, Cashier and Rider require one or more branches.</p>
       <div id="staffFormError" class="error-text" role="alert"></div></div>
       <div class="dialog-actions"><button type="button" class="btn btn-outline" id="staffDialogCancel">Cancel</button><button type="submit" class="btn btn-primary" id="staffDialogSave">Send invitation</button></div>
     </form>

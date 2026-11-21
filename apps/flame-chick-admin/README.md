@@ -21,3 +21,14 @@ The Staff Admin Edge Function is not deployed by this source update. Before enab
 5. Complete secure backend APIs for dashboard, orders, menu, deals, delivery, media and settings. Those navigation items remain disabled until their APIs and data contracts are ready.
 
 No secret keys belong in this app. Do not enable the remaining modules by restoring direct browser table access.
+
+
+## Staff invitation acceptance
+
+The static invitation acceptance page is `/accept-invitation.html`.
+
+- New invited accounts arrive from Supabase Auth's Invite User email with an `invite` session in the URL fragment. The page immediately removes the fragment from browser history, checks the authenticated user and confirmed email, asks the user to set a password, then calls the Staff Admin function's `accept_invitation` action.
+- Existing confirmed Auth accounts whose email already exists use the same page's sign-in form. The database command matches the authenticated user's exact confirmed email to a pending invitation; it does not accept a caller-supplied email or invitation ID.
+- The Staff Admin database command remains responsible for invitation expiry, issuer authority, role conflict checks, branch assignments and audit. The browser does not assign roles.
+- The function must have the final Admin origin in `FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS` and the exact HTTPS acceptance URL in `FLAME_CHICK_STAFF_INVITE_REDIRECT_URL`. Add that URL to Supabase Auth's allowed redirect URLs. Do this only after the final Admin domain is selected.
+- Before live use, verify the Supabase Invite User email template still uses the standard confirmation link flow, then test a new email and an already-existing confirmed account. No secrets belong in this page.

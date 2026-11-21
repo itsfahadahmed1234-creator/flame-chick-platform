@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#171717">
+  <title>Flame Chick | Accept Staff Invitation</title>
+  <link rel="icon" type="image/svg+xml" href="assets/flame-chick-mark.svg">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body{min-height:100vh;background:radial-gradient(circle at 85% 12%,rgba(216,155,37,.10),transparent 26%),var(--paper)}
+    .invite-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 18px}
+    .invite-brand{display:flex;align-items:center;gap:12px;margin-bottom:26px;text-decoration:none;color:var(--ink);font:800 18px Manrope,sans-serif}
+    .invite-brand img{width:42px;height:42px}
+    .invite-card{width:min(480px,100%);background:#fff;border:1px solid var(--line);border-radius:20px;padding:34px;box-shadow:0 16px 50px rgba(31,24,18,.07)}
+    .invite-card h1{font:800 28px/1.18 Manrope,sans-serif;letter-spacing:-.8px;margin:0 0 10px}
+    .invite-lead{color:#777;line-height:1.65;margin:0 0 24px}
+    .invite-field{display:flex;flex-direction:column;gap:8px;margin:16px 0;font-size:12px;font-weight:700;color:#555}
+    .invite-field input{height:48px}
+    .invite-button{width:100%;min-height:48px;margin-top:8px}
+    .invite-error{background:#fff0f1;border:1px solid #f3c8cc;color:#9d1926;border-radius:10px;padding:11px 13px;font-size:12px;line-height:1.55;margin:14px 0}
+    .invite-info{background:#f8f6f2;border:1px solid var(--line);color:#68615b;border-radius:10px;padding:12px 13px;font-size:12px;line-height:1.6;margin:14px 0}
+    .invite-success{background:#eaf7f0;border:1px solid #c6e8d7;color:#176345;border-radius:10px;padding:14px;font-size:13px;line-height:1.65;margin:16px 0}
+    .invite-footer{font-size:10px;color:#9a938c;margin-top:22px;text-align:center;letter-spacing:.8px}
+    .invite-actions{display:flex;flex-direction:column;gap:10px;margin-top:20px}
+    .invite-text-link{display:inline-block;text-align:center;color:var(--red);font-size:12px;font-weight:700;text-decoration:none;margin-top:18px}
+    .invite-text-link:hover{text-decoration:underline}
+    .invite-email{font-weight:700;color:#39322d;overflow-wrap:anywhere}
+    .invite-card .muted{font-size:12px}
+    @media(max-width:520px){.invite-card{padding:26px 21px}.invite-card h1{font-size:25px}}
+  </style>
+</head>
+<body>
+  <main class="invite-wrap">
+    <a class="invite-brand" href="index.html"><img src="assets/flame-chick-mark.svg" alt=""><span>Flame Chick</span></a>
+    <section class="invite-card" aria-labelledby="pageTitle">
+      <span class="eyebrow">TEAM ACCESS</span>
+      <div id="loadingState">
+        <h1 id="pageTitle">Checking your invitation</h1>
+        <p class="invite-lead">Please keep this page open while we securely verify your invitation.</p>
+      </div>
+      <section id="inviteState" hidden>
+        <h1 id="inviteTitle">Finish setting up your access</h1>
+        <p class="invite-lead">Your invitation link has been verified. Set a private password to activate the staff access assigned to your email.</p>
+        <p class="muted">Invitation email: <span class="invite-email" id="inviteEmail"></span></p>
+        <form id="passwordForm" novalidate>
+          <label class="invite-field">Create password
+            <input id="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+          </label>
+          <label class="invite-field">Confirm password
+            <input id="confirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+          </label>
+          <p class="muted">Use at least 12 characters. Do not reuse a password from another service.</p>
+          <p id="passwordError" class="invite-error" role="alert" hidden></p>
+          <button id="passwordSubmit" class="btn btn-primary invite-button" type="submit">Set password and activate access</button>
+        </form>
+        <button id="retryAcceptButton" class="btn btn-outline invite-button" type="button" hidden>Retry activation</button>
+      </section>
+      <section id="signinState" hidden>
+        <h1>Accept an existing invitation</h1>
+        <p class="invite-lead">Already have a confirmed Flame Chick account? Sign in with the exact email address that received the staff invitation. Your access will be activated only if a valid invitation exists for that email.</p>
+        <form id="signinForm" novalidate>
+          <label class="invite-field">Email address
+            <input id="signinEmail" type="email" autocomplete="username" maxlength="254" required>
+          </label>
+          <label class="invite-field">Password
+            <input id="signinPassword" type="password" autocomplete="current-password" maxlength="128" required>
+          </label>
+          <p id="signinError" class="invite-error" role="alert" hidden></p>
+          <button id="signinSubmit" class="btn btn-primary invite-button" type="submit">Sign in and accept invitation</button>
+        </form>
+        <p class="invite-info">New staff members should use the secure invitation link sent to their email. Existing-account users can sign in here when the Admin invitation screen reports that the email already has an account.</p>
+      </section>
+      <section id="successState" hidden>
+        <h1>Invitation accepted</h1>
+        <div class="invite-success" role="status">
+          <strong id="successRole">Your staff access is active.</strong>
+          <p id="successMessage" style="margin:7px 0 0">Your access was activated securely. You can now sign in to the portal assigned to your role.</p>
+        </div>
+        <p class="invite-lead">Use the portal address provided by your Flame Chick administrator. This page does not store your password or keep your sign-in session.</p>
+        <div class="invite-actions">
+          <a class="btn btn-primary invite-button" href="index.html">Go to Admin sign-in</a>
+        </div>
+      </section>
+      <p id="globalError" class="invite-error" role="alert" hidden></p>
+      <a class="invite-text-link" href="index.html">Return to Admin sign-in</a>
+    </section>
+    <footer class="invite-footer">FLAME CHICK · SECURE STAFF INVITATION</footer>
+  </main>
+  <script src="config.js"></script>
+  <script src="accept-invitation.js"></script>
+</body>
+</html>

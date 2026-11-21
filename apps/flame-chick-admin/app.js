@@ -216,7 +216,7 @@ async function saveStaffForm(e){
  btn.disabled=true;btn.textContent="Saving…";$("staffFormError").textContent="";
  try{
   const result=mode==="scope"?await staffApi("POST",null,{action:"assign_role",target_user_id:$("staffDialog").dataset.targetUserId,role_key,branch_ids,reason,request_id:staffRequestId()}):await staffApi("POST",null,{action:"invite",display_name,email,phone:phone||null,role_key,branch_ids,reason,request_id:staffRequestId()});
-  $("staffDialog").close();toast(result.existing_account?"Invitation recorded. The existing user must sign in with the confirmed email and accept it.":mode==="scope"?"Branch access added.":"Invitation request submitted.");await loadStaff();
+  $("staffDialog").close();toast(result.existing_account?"Invitation recorded. Ask the existing user to open the acceptance link on Admin sign-in and sign in with the exact confirmed email.":mode==="scope"?"Branch access added.":"Invitation request submitted.");await loadStaff();
  }catch(error){$("staffFormError").textContent=error.message;toast(error.message,true);}
  finally{btn.disabled=false;btn.textContent=$("staffDialog").dataset.mode==="scope"?"Add access":"Send invitation";}
 }
