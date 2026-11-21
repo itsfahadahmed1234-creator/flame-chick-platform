@@ -32,7 +32,7 @@ The Vercel team ID is used as `VERCEL_ORG_ID`; project IDs are pinned in their c
 
 Each workflow:
 - Runs only on `work/production-source-audit`.
-- Watches only its app folder for push-triggered runs and supports manual dispatch on that branch.
+- Watches only its app folder for push-triggered runs. Manual dispatch is intentionally omitted while the workflow files remain on this non-default working branch.
 - Has an explicit fail-closed repository Actions variable gate.
 - Uses the shared GitHub Environment `flame-chick-preview`.
 - Uses pinned GitHub Actions and Vercel CLI `65.17.0`.

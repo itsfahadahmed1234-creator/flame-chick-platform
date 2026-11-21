@@ -1,7 +1,6 @@
 name: Deploy Flame Chick POS Preview
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - work/production-source-audit

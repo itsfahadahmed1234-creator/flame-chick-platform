@@ -17,7 +17,7 @@ Four GitHub Actions workflows were added for the four separately created Vercel 
 
 The workflows:
 - Are limited to `work/production-source-audit`.
-- Watch only their app's folder for push triggers and support manual dispatch on that branch.
+- Watch only their app's folder for push triggers. Manual dispatch is intentionally omitted while the workflows remain on this non-default working branch.
 - Deploy from each app's own static root.
 - Use the existing Vercel Hobby team ID and the matching project ID.
 - Use pinned GitHub Actions and Vercel CLI `65.17.0`.
