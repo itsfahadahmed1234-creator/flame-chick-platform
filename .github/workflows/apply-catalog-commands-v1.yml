@@ -60,8 +60,8 @@ jobs:
           supabase link --project-ref "${SUPABASE_PROJECT_REF}"
           supabase migration list --remote="${SUPABASE_PROJECT_REF}" | tee /tmp/migrations-before.txt
           grep -q "20261121125542" /tmp/migrations-before.txt
-          if grep -q "20261121133607" /tmp/migrations-before.txt; then
-            echo "::error::Catalog command migration is already recorded; refusing duplicate application."
+          if awk -F'|' '$2 ~ /20261121133607/ { found=1 } END { exit(found ? 0 : 1) }' /tmp/migrations-before.txt; then
+            echo "::error::Catalog command migration is already recorded remotely; refusing duplicate application."
             exit 1
           fi
 
