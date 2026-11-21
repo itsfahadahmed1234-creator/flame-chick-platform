@@ -1,0 +1,1 @@
+Apply only migration 20261121152231_flame_chick_deal_builder_schema_v1.sql to the Flame Chick Mumbai project. Require all prior catalog command migrations including modifier commands in the remote ledger and require this migration to be the only pending migration.
