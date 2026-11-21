@@ -1,3 +1,96 @@
+# CURRENT IMPLEMENTATION STATUS — 2026-11-21 (latest; deal builder commands applied)
+
+## Deal-builder schema, commands and FK indexes now applied
+
+Working branch: `work/production-source-audit`
+Supabase project: `adkrxfnawdiljhjaavnj` (Mumbai, Free plan)
+
+### Applied migrations
+- `20261121152231_flame_chick_deal_builder_schema_v1`
+- `20261121153223_flame_chick_deal_commands_v1`
+- `20261121154711_flame_chick_deal_builder_fk_indexes`
+
+The deal command migration is recorded in the remote ledger and all public/private function signatures and grants were checked in Production. The four missing child-side composite FK indexes identified by the Performance Advisor are now applied.
+
+### New deal data model
+- `deal_variants`: separate purchasable variants (e.g. Regular/Family) per deal with `FIXED_BUNDLE` or `BASE_PLUS_SELECTED_ITEMS`, optional draft `base_price`, label and active/sort fields.
+- `deal_variant_component_options`: explicit per-deal-variant allow-list of component options, with `INCLUDED`, `SURCHARGE`, or `STANDALONE` treatment, per-option surcharge and variant-level quantity cap. No mapping means that choice is not allowed for that deal variant.
+- Existing `deals.bundle_price` and old `deal_component_options.pricing_treatment/unit_surcharge/max_quantity_per_deal` are retained for compatibility, but the new command layer does not use them as the pricing source. The new variant and variant-option mapping rows are canonical.
+- A FIXED_BUNDLE deal variant cannot use STANDALONE treatment. BASE_PLUS_SELECTED_ITEMS supports standalone product-variant price, explicit surcharge, or included choice.
+- Variant option quantity caps cannot exceed their component group's maximum or repeat policy.
+- Existing exact menu `product_variant_id` references are enforced by composite FKs; component options cannot point to a different restaurant/deal/product combination.
+
+### Schedule and branch behavior
+- `catalog_schedule_sets.timezone` is now required, backfilled from restaurant timezone for any existing rows, and validated as an IANA timezone.
+- Weekly windows support overnight ranges (e.g. 20:00–02:00), optional effective dates, and all-day windows; one-off windows use timestamptz and command inputs must include an explicit UTC offset.
+- Windows are patched by ID and removed only through an explicit `remove_window_ids` list.
+- Deal schedule assignment precedence is branch-specific deal assignment, then deal-wide assignment, then collection fallback. Inactive assignments fall back to the next applicable scope.
+- Branch-specific assignments require schedule timezone to match branch timezone (falling back to restaurant timezone). Global deal assignments require restaurant timezone.
+- Branch deal availability remains a separate override from time scheduling; it does not replace the schedule evaluator.
+- No cron job or Realtime subscription was added for schedule evaluation.
+
+### New public database command/read wrappers
+- `public.flame_chick_catalog_deal_collection_read(uuid,integer)`
+- `public.flame_chick_catalog_deal_collection_upsert(jsonb,bigint,uuid)`
+- `public.flame_chick_catalog_deal_list_read(uuid,uuid,integer)`
+- `public.flame_chick_catalog_deal_detail_read(uuid)`
+- `public.flame_chick_catalog_deal_upsert(jsonb,bigint,uuid)`
+- `public.flame_chick_catalog_deal_components_upsert(jsonb,bigint,uuid)`
+- `public.flame_chick_catalog_deal_variant_options_upsert(jsonb,bigint,uuid)`
+- `public.flame_chick_catalog_schedule_set_read(uuid,integer)`
+- `public.flame_chick_catalog_schedule_detail_read(uuid)`
+- `public.flame_chick_catalog_schedule_set_upsert(jsonb,bigint,uuid)`
+- `public.flame_chick_catalog_deal_schedule_assignment_upsert(jsonb,bigint,uuid)`
+- `public.flame_chick_catalog_deal_branch_availability_upsert(jsonb,bigint,uuid)`
+
+All public wrappers are SECURITY INVOKER with empty search_path and EXECUTE for authenticated only. Private command/read internals are postgres-owned SECURITY DEFINER with empty search_path. Shared command helpers centralize actor resolution, per-restaurant revision lock, SHA-256 idempotency replay and same-transaction append-only audit. Actor scope is still active restaurant-wide Admin/Owner only.
+
+### Performance indexes added after Advisor review
+- `deal_schedule_assignments_branch_fk_idx(branch_id,restaurant_id)`
+- `deal_schedule_assignments_deal_fk_idx(deal_id,restaurant_id)`
+- `deal_variant_component_options_variant_fk_idx(deal_variant_id,deal_id,restaurant_id)`
+- `deal_variants_deal_fk_idx(deal_id,restaurant_id)`
+
+Additional deal and schedule keyset-read indexes:
+- `deals_restaurant_collection_id_idx(restaurant_id,collection_id,id)`
+- `catalog_schedule_sets_restaurant_id_id_idx(restaurant_id,id)`
+
+### QA completed — every fixture rolled back
+- Executed the schema and command migrations inside rollback-only transactions before application.
+- Authenticated Admin created a deal collection, menu product, Regular/Large product variants, weekly overnight and one-off schedule windows, a Regular FIXED_BUNDLE variant and Family BASE_PLUS_SELECTED_ITEMS variant.
+- Created component groups with the same exact variant reused in separate groups; same-variant use is only deduplicated within one group.
+- Mapped Regular to INCLUDED/SURCHARGE and Family to STANDALONE/SURCHARGE.
+- Verified FIXED_BUNDLE cannot use STANDALONE.
+- Verified same-request/same-payload replay and changed-payload request-ID reuse rejection.
+- Verified explicit schedule window removal.
+- Verified a branch schedule update with omitted branch_id preserves its existing branch scope.
+- Verified branch/global schedule timezone mismatch rejection and valid Asia/Karachi matching.
+- Verified component variant quantity caps cannot exceed the component-group repeat/quantity rules.
+- Verified bounded collection/deal/schedule list reads and one-deal/schedule detail reads.
+- Verified direct deal table read denied and authenticated Cashier role cannot execute catalog authoring commands.
+- Temporary Admin/Cashier/Auth, restaurant, branch, categories, product, deal and schedule fixtures were all rolled back.
+
+Post-test Production counts are zero for menu/deal/staff test rows, catalog draft states, catalog audit rows and idempotency rows. No actual menu records or staff users were seeded.
+
+### Live Advisor state
+- Security Advisor: 33 INFO `rls_enabled_no_policy` notices. These are intentional deny-by-default tables; do not create broad RLS policies to clear the notices.
+- Performance Advisor: 43 INFO unused-index notices remain because this is an empty pre-launch project. The Advisor no longer reports unindexed deal-builder FKs after the four FK indexes above. Do not drop the other query/FK indexes based on zero-workload counters.
+
+### Still not implemented / not enabled
+- Publication compiler and validation for deals, variants, modifiers, base prices, missing required choices, exact eligible options, product/variant active/priced state, schedules and branch overrides.
+- Runtime schedule evaluator and quote/pricing integration using an immutable published snapshot.
+- Golden deal-pricing tests covering fixed bundle, base-plus-selected choices, component quantities, modifiers, promotions and refund allocations.
+- Catalog Edge Function router and service-side payload/rate limits.
+- Admin UI integration; direct REST writes and catalog Admin modules remain disabled.
+- Edge Function not deployed; no order/checkout pricing uses the new deal model yet.
+- Explicit Owner positive and Manager/Rider role matrix tests remain outstanding; the shared actor resolver only returns active restaurant-wide Admin/Owner roles.
+- GST remains deferred.
+
+### Next implementation stage
+Build the publication compiler and exhaustive static validation against the full menu/deal graph. It should reject incomplete published deal variants, invalid selection bounds, unavailable/non-menu product variants, missing prices where required, treatment/mode mismatches, missing allowed option maps, quantity-cap conflicts, and invalid schedule/branch timezone or date-window configuration. Compile a deterministic immutable snapshot with version/checksum and atomic current-publication pointer. Keep public menu reads on published snapshot only. Only after quote/publication tests pass should the single catalog Edge Function router and Admin UI be enabled.
+
+---
+
 # CURRENT IMPLEMENTATION STATUS — 2026-11-21 (latest)
 
 ## Modifier command layer applied and authenticated QA passed
