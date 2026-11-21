@@ -492,9 +492,6 @@ CREATE INDEX deal_component_groups_deal_sort_idx
 CREATE INDEX deal_component_groups_deal_fk_idx
   ON public.deal_component_groups (deal_id, restaurant_id);
 
-CREATE INDEX deal_component_groups_group_fk_idx
-  ON public.deal_component_options (component_group_id, deal_id, restaurant_id);
-
 CREATE TABLE public.deal_component_options (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   restaurant_id uuid NOT NULL,
@@ -545,6 +542,9 @@ CREATE TABLE public.deal_component_options (
 CREATE INDEX deal_component_options_group_sort_idx
   ON public.deal_component_options
   (restaurant_id, deal_id, component_group_id, is_active, sort_order);
+
+CREATE INDEX deal_component_options_group_fk_idx
+  ON public.deal_component_options (component_group_id, deal_id, restaurant_id);
 
 CREATE INDEX deal_component_options_product_fk_idx
   ON public.deal_component_options (product_id, restaurant_id);
