@@ -345,8 +345,6 @@ DECLARE
   v_option_sort integer;
   v_option_active boolean;
   v_seen_option_ids uuid[] := ARRAY[]::uuid[];
-  v_seen_legacy_ids text[] := ARRAY[]::text[];
-  v_option_count integer := 0;
 BEGIN
   IF p_request_id IS NULL OR p_expected_revision IS NULL OR p_expected_revision < 0 THEN
     RAISE EXCEPTION 'CATALOG_MODIFIER_REQUEST_AND_REVISION_REQUIRED' USING ERRCODE = '22023';
@@ -366,6 +364,19 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'CATALOG_MODIFIER_GROUP_FIELD_NOT_ALLOWED' USING ERRCODE = '22023';
   END IF;
+  IF (p_payload ? 'legacy_id' AND p_payload->'legacy_id'<>'null'::jsonb
+      AND pg_catalog.jsonb_typeof(p_payload->'legacy_id')<>'string')
+     OR (p_payload ? 'name_en' AND pg_catalog.jsonb_typeof(p_payload->'name_en')<>'string')
+     OR (p_payload ? 'name_ur' AND p_payload->'name_ur'<>'null'::jsonb
+      AND pg_catalog.jsonb_typeof(p_payload->'name_ur')<>'string')
+     OR (p_payload ? 'standalone_only' AND pg_catalog.jsonb_typeof(p_payload->'standalone_only')<>'boolean')
+     OR (p_payload ? 'selection_mode' AND pg_catalog.jsonb_typeof(p_payload->'selection_mode')<>'string')
+     OR (p_payload ? 'min_select' AND pg_catalog.jsonb_typeof(p_payload->'min_select')<>'number')
+     OR (p_payload ? 'max_select' AND pg_catalog.jsonb_typeof(p_payload->'max_select')<>'number')
+     OR (p_payload ? 'sort_order' AND pg_catalog.jsonb_typeof(p_payload->'sort_order')<>'number')
+     OR (p_payload ? 'is_active' AND pg_catalog.jsonb_typeof(p_payload->'is_active')<>'boolean') THEN
+    RAISE EXCEPTION 'CATALOG_MODIFIER_GROUP_FIELD_TYPE_INVALID' USING ERRCODE='22023';
+  END IF;
 
   BEGIN
     v_id := NULLIF(p_payload->>'id','')::uuid;
@@ -374,15 +385,16 @@ BEGIN
   END;
 
   IF p_payload ? 'modifiers' THEN
-    IF pg_catalog.jsonb_typeof(p_payload->'modifiers') IS DISTINCT FROM 'array'
-       OR pg_catalog.jsonb_array_length(p_payload->'modifiers') > 50 THEN
+    IF pg_catalog.jsonb_typeof(p_payload->'modifiers') IS DISTINCT FROM 'array' THEN
+      RAISE EXCEPTION 'CATALOG_MODIFIERS_ARRAY_INVALID' USING ERRCODE = '22023';
+    END IF;
+    IF pg_catalog.jsonb_array_length(p_payload->'modifiers') > 50 THEN
       RAISE EXCEPTION 'CATALOG_MODIFIERS_ARRAY_INVALID' USING ERRCODE = '22023';
     END IF;
 
     FOR v_option IN
       SELECT x.value FROM pg_catalog.jsonb_array_elements(p_payload->'modifiers') AS x(value)
     LOOP
-      v_option_count := v_option_count + 1;
       IF pg_catalog.jsonb_typeof(v_option) <> 'object'
          OR EXISTS (
            SELECT 1 FROM pg_catalog.jsonb_object_keys(v_option) AS k(key)
@@ -406,6 +418,18 @@ BEGIN
         v_seen_option_ids := pg_catalog.array_append(v_seen_option_ids, v_option_id);
       END IF;
 
+      IF (v_option ? 'legacy_id' AND v_option->'legacy_id'<>'null'::jsonb
+          AND pg_catalog.jsonb_typeof(v_option->'legacy_id')<>'string')
+         OR (v_option ? 'name_en' AND pg_catalog.jsonb_typeof(v_option->'name_en')<>'string')
+         OR (v_option ? 'name_ur' AND v_option->'name_ur'<>'null'::jsonb
+          AND pg_catalog.jsonb_typeof(v_option->'name_ur')<>'string')
+         OR (v_option ? 'price_mode' AND pg_catalog.jsonb_typeof(v_option->'price_mode')<>'string')
+         OR (v_option ? 'fixed_price' AND v_option->'fixed_price'<>'null'::jsonb
+          AND pg_catalog.jsonb_typeof(v_option->'fixed_price')<>'number')
+         OR (v_option ? 'sort_order' AND pg_catalog.jsonb_typeof(v_option->'sort_order')<>'number')
+         OR (v_option ? 'is_active' AND pg_catalog.jsonb_typeof(v_option->'is_active')<>'boolean') THEN
+        RAISE EXCEPTION 'CATALOG_MODIFIER_OPTION_FIELD_TYPE_INVALID' USING ERRCODE='22023';
+      END IF;
       IF v_option ? 'legacy_id'
          AND v_option->'legacy_id' <> 'null'::jsonb
          AND pg_catalog.jsonb_typeof(v_option->'legacy_id') <> 'string' THEN
@@ -893,8 +917,10 @@ BEGIN
   END IF;
 
   IF p_payload ? 'price_rules' THEN
-    IF pg_catalog.jsonb_typeof(p_payload->'price_rules') IS DISTINCT FROM 'array'
-       OR pg_catalog.jsonb_array_length(p_payload->'price_rules')>200 THEN
+    IF pg_catalog.jsonb_typeof(p_payload->'price_rules') IS DISTINCT FROM 'array' THEN
+      RAISE EXCEPTION 'CATALOG_MODIFIER_PRICE_RULES_ARRAY_INVALID' USING ERRCODE='22023';
+    END IF;
+    IF pg_catalog.jsonb_array_length(p_payload->'price_rules')>200 THEN
       RAISE EXCEPTION 'CATALOG_MODIFIER_PRICE_RULES_ARRAY_INVALID' USING ERRCODE='22023';
     END IF;
     FOR v_rule IN
@@ -932,8 +958,10 @@ BEGIN
   END IF;
 
   IF p_payload ? 'remove_price_rules' THEN
-    IF pg_catalog.jsonb_typeof(p_payload->'remove_price_rules') IS DISTINCT FROM 'array'
-       OR pg_catalog.jsonb_array_length(p_payload->'remove_price_rules')>200 THEN
+    IF pg_catalog.jsonb_typeof(p_payload->'remove_price_rules') IS DISTINCT FROM 'array' THEN
+      RAISE EXCEPTION 'CATALOG_MODIFIER_REMOVE_RULES_ARRAY_INVALID' USING ERRCODE='22023';
+    END IF;
+    IF pg_catalog.jsonb_array_length(p_payload->'remove_price_rules')>200 THEN
       RAISE EXCEPTION 'CATALOG_MODIFIER_REMOVE_RULES_ARRAY_INVALID' USING ERRCODE='22023';
     END IF;
     FOR v_remove IN
@@ -952,6 +980,17 @@ BEGIN
       EXCEPTION WHEN invalid_text_representation THEN
         RAISE EXCEPTION 'CATALOG_MODIFIER_REMOVE_RULE_VALUE_INVALID' USING ERRCODE='22023';
       END;
+      IF NOT EXISTS(
+        SELECT 1 FROM public.modifiers AS m
+        WHERE m.id=v_modifier_id AND m.restaurant_id=v_restaurant
+          AND m.modifier_group_id=v_group_id
+      ) OR NOT EXISTS(
+        SELECT 1 FROM public.product_variants AS pv
+        WHERE pv.id=v_variant_id AND pv.restaurant_id=v_restaurant
+          AND pv.product_id=v_product_id
+      ) THEN
+        RAISE EXCEPTION 'CATALOG_MODIFIER_REMOVE_RULE_TARGET_MISMATCH' USING ERRCODE='23514';
+      END IF;
       v_key:=v_modifier_id::text||':'||v_variant_id::text;
       IF v_key=ANY(v_seen_remove_keys) OR v_key=ANY(v_seen_keys) THEN
         RAISE EXCEPTION 'CATALOG_MODIFIER_REMOVE_RULE_DUPLICATED_OR_CONFLICTS' USING ERRCODE='22023';
