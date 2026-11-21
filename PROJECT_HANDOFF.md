@@ -12,6 +12,12 @@ The workflow requires two GitHub Actions repository secrets: `SUPABASE_ACCESS_TO
 
 Supabase CLI v3 changed database commands to default local; the workflow explicitly uses `--remote=<project-ref>` and `--yes` per current v3 documentation. The correct pinned stable release selected is v3.2.0. Official docs: https://supabase.com/docs/guides/local-development/cli/migrating-to-v3 and https://supabase.com/docs/reference/cli/supabase-migration-repair.
 
+## Latest guarded repair workflow result — blocked by missing secrets
+
+The one-time trigger file `ops/triggers/repair-catalog-ledger.txt` was committed on the working branch. GitHub Actions run **44890673291** executed the workflow and stopped at the first credential pre-check because both `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` were empty. The Supabase CLI was not installed or run; no database connection was made; the repair step was skipped. Production migration ledger therefore remains at the same ten versions and catalog version `20261121061000` is still not recorded.
+
+Required owner action: add repository Actions secrets named exactly `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` at https://github.com/itsfahadahmed1234-creator/flame-chick-platform/settings/secrets/actions . Use a Supabase Personal Access Token for the first and the existing database password for the second. Do not paste either value in chat or commit them to the repository. After both secrets exist, retrigger by updating `ops/triggers/repair-catalog-ledger.txt`; verify GitHub Actions and the Supabase migration list before proceeding to the FK-index migration.
+
 ## Catalog foundation: applied in Production, migration ledger pending
 
 Production project `adkrxfnawdiljhjaavnj` (Mumbai, PostgreSQL 17.12, Free plan) currently contains the catalog authoring foundation. The migration DDL was executed directly as `postgres` on 2026-11-21 and committed to Git as `supabase/migrations/20261121061000_flame_chick_catalog_authoring_foundation.sql`. This direct application bypassed the Supabase migration tracker. The actual Supabase migration ledger still contains only the previous ten applied versions and does NOT contain `20261121061000`.
