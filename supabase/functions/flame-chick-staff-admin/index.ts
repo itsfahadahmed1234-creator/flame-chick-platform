@@ -23,11 +23,10 @@ function fail(e:unknown,origin:string|null):Response{
 function parse(s:string):unknown{try{return JSON.parse(s);}catch{return null;}}
 async function body(r:Response):Promise<unknown>{const s=await r.text();return s?parse(s):null;}
 function token(req:Request):string{const h=req.headers.get("authorization")??"";return h.startsWith("Bearer ")?h.slice(7).trim():"";}
-async function requireUser(req:Request):Promise<void>{
- const t=token(req);if(!PUBLIC_KEY||!t)throw new ApiError("STAFF_AUTH_REQUIRED",401,"Sign in with your Flame Chick staff account.");
- const r=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:PUBLIC_KEY,Authorization:"Bearer "+t,Accept:"application/json"},cache:"no-store"});
- const u=await body(r);if(!r.ok||!obj(u)||typeof u.id!=="string")throw new ApiError("STAFF_AUTH_REQUIRED",401,"Your sign-in session is invalid or expired.");
-}
+// supabase/config.toml keeps verify_jwt=true for this function. The Edge Gateway
+// validates the user JWT before the handler runs; the command RPC independently
+// derives auth.uid() and checks the active Admin/Owner role. Do not make a second
+// /auth/v1/user round trip here.
 function rpcErr(x:unknown):ApiError{
  const v=obj(x)?x:{};const raw=String(v.message??v.details??"");const code=raw.split(":")[0].trim().match(/^[A-Z0-9_]{3,80}$/)?.[0]??"STAFF_COMMAND_FAILED";
  const status=/FORBIDDEN|DENIED|AUTH_REQUIRED/.test(code)?403:/NOT_FOUND/.test(code)?404:/INVALID|REQUIRED|PROTECTED|CONFLICT|EXPIRED|UNAVAILABLE|ALREADY/.test(code)?400:500;
@@ -91,7 +90,7 @@ Deno.serve(async(req:Request)=>{
  try{
   if(!SUPABASE_URL||!PUBLIC_KEY)throw new ApiError("STAFF_ADMIN_NOT_CONFIGURED",503,"Staff Admin is not configured.");
   if(req.method!=="GET"&&req.method!=="POST")throw new ApiError("METHOD_NOT_ALLOWED",405,"Use GET or POST.");
-  await requireUser(req);const t=token(req);
+  const t=token(req);if(!t)throw new ApiError("STAFF_AUTH_REQUIRED",401,"Sign in with your Flame Chick staff account.");
   if(req.method==="GET"){const x=await userRpc(t,"list",{});return response(obj(x)?x:{ok:true,result:x},200,origin);}
   return response(await post(req,t),200,origin);
  }catch(e){return fail(e,origin);}
