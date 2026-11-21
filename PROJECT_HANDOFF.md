@@ -1,5 +1,9 @@
 # CRITICAL CURRENT STATUS — 2026-11-21 (read before continuing)
 
+## Verified GitHub repository identity
+
+The connected private repository is `itsfahadahmed1234-creator/flame-chick-platform` (note the exact owner spelling, including `ahmed`). Earlier 404s were caused by using the wrong owner slug; subsequent repository and branch reads now succeed.
+
 ## Catalog foundation: applied in Production, migration ledger pending
 
 Production project `adkrxfnawdiljhjaavnj` (Mumbai, PostgreSQL 17.12, Free plan) currently contains the catalog authoring foundation. The migration DDL was executed directly as `postgres` on 2026-11-21 and committed to Git as `supabase/migrations/20261121061000_flame_chick_catalog_authoring_foundation.sql`. This direct application bypassed the Supabase migration tracker. The actual Supabase migration ledger still contains only the previous ten applied versions and does NOT contain `20261121061000`.
@@ -9,8 +13,8 @@ Production project `adkrxfnawdiljhjaavnj` (Mumbai, PostgreSQL 17.12, Free plan) 
 The supported one-time reconciliation is the official Supabase CLI command from a linked project, after reviewing local/remote version lists and confirming schema parity:
 
 ```bash
-supabase migration repair --status applied 20261121061000
-supabase migration list
+supabase migration repair 20261121061000 --status applied --linked
+supabase migration list --linked
 ```
 
 The repair command updates migration history only; it does not rerun the SQL. Do not manually edit `supabase_migrations.schema_migrations`. This chat's connected Supabase tools do not expose the CLI repair command and the container has no Supabase CLI/login context, so the ledger repair is still **pending**. Do not run `supabase db push` until repair and list reconciliation are complete.
