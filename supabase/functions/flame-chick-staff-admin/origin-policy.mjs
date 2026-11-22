@@ -31,6 +31,7 @@ export function parseAllowedOrigins(raw) {
     const protocolAllowed = url.protocol === "https:" ||
       (url.protocol === "http:" && isLoopbackHost(url.hostname));
     if (!protocolAllowed ||
+        url.hostname.includes("*") ||
         url.username !== "" ||
         url.password !== "" ||
         url.pathname !== "/" ||
