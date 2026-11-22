@@ -596,7 +596,7 @@
       schemaEnvelope = Object.assign({}, snapshot);
       delete schemaEnvelope.databaseNow;
     }
-    exactKeys(schemaEnvelope, topSpecs, '
+    exactKeys(schemaEnvelope, topSpecs, '$', errors);
 
     validateScalar(snapshot.schemaVersion, 'integer', '$.schemaVersion', errors);
     if (snapshot.schemaVersion !== SCHEMA_VERSION) addError(errors, '$.schemaVersion', 'SCHEMA_UNSUPPORTED', 'Only catalog schema V3 is supported by this contract.');
