@@ -1,3 +1,29 @@
+
+
+## Latest stage — Staff Admin Edge Function deployed (2026-11-22)
+
+**Status: deployed; JWT verification enabled; UI/runtime integration verification still pending.**
+
+- User confirmed Supabase Auth Site URL and exact invitation redirect URL were already configured for the selected Admin domain.
+- User confirmed the two function secrets were added:
+  - `FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS=https://flamechicadmin.vercel.app`
+  - `FLAME_CHICK_STAFF_INVITE_REDIRECT_URL=https://flamechicadmin.vercel.app/accept-invitation.html`
+- Deployed `flame-chick-staff-admin` to project `adkrxfnawdiljhjaavnj`.
+- Deployment id: `ea8d70fb-5f7b-4198-9442-dedd82fdf79a`; status ACTIVE; version 1; `verify_jwt=true`.
+- Deployed source files: `index.ts` and `origin-policy.mjs` from `work/production-source-audit`.
+- Verified deployment through Supabase function details and function listing. No invocation logs were present after deployment; an end-to-end request has not yet been observed/tested.
+- Extended `tests/staff-admin-origin-policy.test.mjs` with exact production Admin origin checks. This test update is committed but a new CI run has not yet been observed.
+- Added `docs/operations/admin-auth-deployment-configuration.md` and `docs/handoffs/2026-11-22-admin-auth-domain-binding.md`.
+
+### Remaining checks / gates
+
+1. Verify browser calls from `https://flamechicadmin.vercel.app` succeed only with an authenticated Admin/Owner JWT; Website/Rider/unlisted browser origins receive no CORS allow-origin.
+2. Verify the deployed function's configured environment by exercising the safe Staff Admin list endpoint with the existing Admin session. Do not create synthetic production accounts or send real invitations as a smoke test.
+3. Complete invitation flow testing only with an approved test invitee; verify retry-finalize/idempotency and partial failure handling.
+4. Admin Vercel project `prj_139YvQ8CHvwSXsZ2xrno5x55STfz` currently has verified domain `flamechicadmin.vercel.app`, SSO enabled for all_except_custom_domains, but zero deployments and no latest deployment. Do not claim Admin UI is live. A protected preview deployment still requires a separately reviewed deployment step.
+5. Keep non-Staff Admin modules disabled; legacy direct REST CRUD/storage functions remain in the Admin JS and must not be enabled until replaced with secure APIs.
+
+No Owner account, other staff accounts, production menu data, order intake or customer Website cutover was changed. Flame Chick remains in production-build phase, not live.
 # CURRENT IMPLEMENTATION STATUS — 2026-11-22 (catalog validator fix applied and verified; pre-launch build)
 
 ## Latest stage — catalog publication validator fix
