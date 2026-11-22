@@ -250,12 +250,7 @@ BEGIN
         )
         AND (
           EXISTS (
-            SELECT 1
-            FROM public.deal_collections dc
-            JOIN public.deals d
-              ON d.collection_id=dc.id
-             AND d.restaurant_id=dc.restaurant_id
-             AND d.is_active
+            SELECT 1 FROM public.deal_collections dc
             WHERE dc.restaurant_id=s.restaurant_id
               AND dc.schedule_set_id=s.id
               AND dc.is_active
@@ -528,12 +523,7 @@ BEGIN
       WHERE s.restaurant_id=p_restaurant_id AND s.is_active
         AND (
           EXISTS (
-            SELECT 1
-            FROM public.deal_collections dc
-            JOIN public.deals d
-              ON d.collection_id=dc.id
-             AND d.restaurant_id=dc.restaurant_id
-             AND d.is_active
+            SELECT 1 FROM public.deal_collections dc
             WHERE dc.restaurant_id=s.restaurant_id
               AND dc.schedule_set_id=s.id
               AND dc.is_active
