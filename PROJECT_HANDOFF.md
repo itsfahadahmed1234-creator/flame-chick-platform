@@ -2,7 +2,7 @@
 
 ## Latest stage — catalog publication validator fix
 
-<badge>Applied and verified</badge>
+**Status: APPLIED AND VERIFIED**
 
 - Intended production-build Supabase project: `adkrxfnawdiljhjaavnj` (Flame Chick Production, Mumbai `ap-south-1`, Free).
 - Applied migration version: `20261122105821`, name `flame_chick_catalog_publication_validation_fixes_v1`.
