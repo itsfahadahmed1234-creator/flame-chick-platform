@@ -41,3 +41,14 @@ test("all active local script references exist", () => {
     assert.equal(existsSync(join(root, normalized)), true, "Missing local script: " + ref);
   }
 });
+
+test("storefront menu is hidden until a verified live catalog succeeds", () => {
+  const html = source["index.html"];
+  assert.match(html, /id="cats" hidden/);
+  assert.match(html, /id="menuRoot" hidden/);
+  assert.match(html, /id="menuContractNotice" role="status"/);
+  assert.match(html, /function fcSetMenuCatalogState\(ready, message\)/);
+  assert.match(html, /fcSetMenuCatalogState\(false,/);
+  assert.match(html, /fcSetMenuCatalogState\(true\)/);
+  assert.match(html, /published menu is unavailable or uses an unsupported format/i);
+});
