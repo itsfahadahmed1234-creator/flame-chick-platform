@@ -18,22 +18,26 @@ BEGIN
     RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_FIXTURE_REQUIRES_POSTGRES';
   END IF;
 
+  -- The migration replay's canonical seed is intentionally inactive. Activate
+  -- only the disposable fixture tenant/branch inside this transaction.
   SELECT id INTO v_restaurant_id
   FROM public.restaurants
-  WHERE slug='flame-chick' AND is_active
+  WHERE slug='flame-chick'
   LIMIT 1;
   IF v_restaurant_id IS NULL THEN
     RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RESTAURANT_NOT_READY';
   END IF;
+  UPDATE public.restaurants SET is_active=true WHERE id=v_restaurant_id;
 
   SELECT id INTO v_branch_id
   FROM public.branches
-  WHERE restaurant_id=v_restaurant_id AND is_active
+  WHERE restaurant_id=v_restaurant_id
   ORDER BY branch_code,id
   LIMIT 1;
   IF v_branch_id IS NULL THEN
-    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_ACTIVE_BRANCH_REQUIRED';
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_BRANCH_REQUIRED';
   END IF;
+  UPDATE public.branches SET is_active=true WHERE id=v_branch_id;
 
   IF EXISTS(SELECT 1 FROM public.user_roles WHERE restaurant_id=v_restaurant_id) THEN
     RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_FIXTURE_EXPECTS_EMPTY_LOCAL_STAFF';
