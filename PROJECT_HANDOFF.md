@@ -1,3 +1,23 @@
+## Latest checkpoint — V3 deal choices, component modifiers and trusted-time schedules (2026-11-22)
+
+**Status: isolated deal/schedule view-model and selection validators added; latest full Website Static Checks passed. Not connected to the Website HTML. No deployment or publication.**
+
+- Added `apps/flame-chick-website/js/catalog-v3-deal-view.js`.
+- Requires a fully validated V3 publication, explicit branch ID, explicit delivery/pickup fulfilment, and a trusted database timestamp. It deliberately does not call `Date.now()` or use the customer's device clock.
+- Deal schedule precedence matches the approved database design: branch-specific assignment, then global deal assignment, then collection fallback. If no schedule is assigned, the deal is not schedule-restricted. A referenced but missing schedule fails closed.
+- Schedule evaluation supports IANA timezones, weekly windows, all-day windows, overnight windows tied to the starting weekday, effective local dates and one-off absolute windows. Window start is inclusive and end is exclusive. Database checkout must still re-evaluate at quote/order time; browser display state is informational only.
+- Deal view-model uses exact deal variant/component-option mapping IDs, product and product-variant IDs, pricing treatment, integer minor-unit display metadata, option quantity caps and branch product/variant/deal availability. It does not compute a deal total.
+- Missing deal-variant option mapping is never treated as included/free. Unavailable component options are removed; a deal variant becomes unsatisfiable if a required group no longer has enough branch-available capacity.
+- Product modifier groups are now exposed for eligible deal component variants using the exact product-variant-specific modifier price rule. `standaloneOnly` groups are excluded from deal components. Modifier selection validator enforces assigned group IDs and min/max option counts. It does not calculate totals.
+- Added `tests/catalog-v3-deal-view.test.mjs` for timezone/window boundaries, overnight schedules, invalid/missing trusted time, schedule precedence, branch availability, exact component mappings, missing pricing maps, required choices, quantity caps, modifier mapping and selection bounds.
+- A first test run exposed a time-parser regex escaping defect; the parser was corrected and the exact boundary cases were re-run successfully. This is why the failed CI run is retained in Actions history rather than hidden.
+- Latest Website Static Checks run [45047473872](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45047473872) passed on source/test commit `0b6b56cfcbed32008614c37db5a2f623e8842dbd`: **55 tests passed, 0 failed**, syntax checks and inline Website script parsing passed. Subsequent handoff-only commit records this result.
+- The deal module and tests are not referenced by `index.html`; the hidden-menu safety gate remains unchanged. No Supabase writes, migrations, Edge Function deployment, publication, menu seed, Vercel deployment, domain change or checkout activation.
+
+**Next:** build an isolated, accessible deal/customization UI adapter around the validated deal and product modifier view-models. It must require explicit deal variant and component selections, support modifier selection per chosen component, and send only stable IDs/quantities to the future server quote API. Do not compute final totals in the browser. Then unify product/deal renderers behind the branch/fulfilment selection flow and only integrate after end-to-end tests.
+ 
+---
+
 ## Latest checkpoint — isolated V3 Website menu renderer foundation (2026-11-22)
 
 **Status: renderer/view-model and focused tests added; latest full Website Static Checks passed. It is intentionally not connected to the storefront. No deployment or catalog publication.**
