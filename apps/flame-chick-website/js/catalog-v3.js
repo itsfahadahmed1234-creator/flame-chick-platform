@@ -519,9 +519,9 @@
               (group.allowRepeatOption ? group.maxUnits : 1));
           capacity += Math.min(group.maxUnits, optionCap);
         });
-        if (mappedOptionCount === 0 || capacity < group.minUnits) {
+        if (group.minUnits > 0 && (mappedOptionCount === 0 || capacity < group.minUnits)) {
           addError(errors, 'dealVariants[' + variantIndex + ']', 'DEAL_REQUIRED_CHOICES_UNSATISFIABLE',
-            'Each deal variant needs at least one allowed option per component group and enough capacity to satisfy its minimum.');
+            'Each required component group needs allowed options with enough capacity to satisfy its minimum.');
         }
       });
     });
