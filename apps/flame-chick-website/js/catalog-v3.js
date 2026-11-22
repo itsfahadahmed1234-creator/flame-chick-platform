@@ -655,8 +655,10 @@
         !Array.isArray(snapshot.branchProductAvailability) || !findRow(snapshot.branches, 'branchId', branchId)) return false;
     var product = findRow(snapshot.products, 'productId', productId);
     if (!product || product.available !== true) return false;
-    var override = findRow(snapshot.branchProductAvailability, 'productId', productId);
-    if (override && override.branchId === branchId) return override.isAvailable === true;
+    for (var i = 0; i < snapshot.branchProductAvailability.length; i++) {
+      var override = snapshot.branchProductAvailability[i];
+      if (override.branchId === branchId && override.productId === productId) return override.isAvailable === true;
+    }
     return true;
   }
 
