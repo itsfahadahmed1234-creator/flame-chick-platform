@@ -1,86 +1,101 @@
 # Flame Chick catalog validator recovery V1
 
-Status: **prepared on `work/production-source-audit`; disposable CI rehearsal pending**  
-Scope: the two private publication helper function bodies changed by migration `20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql`.
+Status: **candidate migration applied and verified; recovery template rehearsed successfully in disposable CI**  
+Environment: intended production-build Supabase project `adkrxfnawdiljhjaavnj` (Flame Chick Production, Mumbai `ap-south-1`, Free). The customer-facing Flame Chick platform is not live.
 
-## Purpose and limits
+## Applied candidate
 
-This is a forward-only compensating migration. It restores the exact helper source bodies from the already-applied `20261122031027_flame_chick_catalog_publish_rollback_v1.sql` migration if the validator fix has already committed and must be reverted.
+- Repository migration: `supabase/migrations/20261122105821_flame_chick_catalog_publication_validation_fixes_v1.sql`
+- Supabase migration ledger version: `20261122105821`
+- Ledger name: `flame_chick_catalog_publication_validation_fixes_v1`
+- The Supabase migration tool generated this ledger timestamp when the reviewed SQL was applied. The repository filename is aligned to that exact version.
+- No compensation migration is pending or present in `supabase/migrations`.
 
-It does **not**:
-- delete, rewrite, or repair an entry in `supabase_migrations.schema_migrations`;
-- drop or rebuild tables, indexes, publications, menu data, or business rows;
-- change function signatures, owners, ACLs, execution mode, or search path;
-- roll back a catalog publication pointer (that is a separate business operation);
-- deploy an Edge Function, Website, POS, Admin or Rider app.
+The candidate replaces only the bodies of:
+- `app_private.flame_chick_catalog_publication_validate(uuid)`
+- `app_private.flame_chick_catalog_compile_snapshot(uuid,timestamptz)`
 
-The intended production Supabase project is a build environment; the customer-facing Flame Chick platform is not live. This preparation and its CI rehearsal do not connect to or modify that project.
+The candidate body SHA-256 values now verified in the intended project are:
 
-## Files
+| Helper | Applied source SHA-256 |
+| --- | --- |
+| Validator | `f179cc3b15b1d6ad5b07b90587513001bed97b752b09b13ce2d9c946e88a7750` |
+| Snapshot compiler | `1cee9543d131260f71573afc2f0a5a204422a59fa7f46ef0b24f4c2e277e3808` |
 
-- Candidate forward migration: `supabase/migrations/20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql`
-- Compensation template: `ops/recovery-migrations/catalog-publication-validation-restore-v1.sql` (intentionally outside `supabase/migrations`)
-- Candidate regression fixture: `supabase/tests/catalog_publication_validation_fixes_v1.sql`
-- Recovery verification fixture: `supabase/tests/catalog_publication_validation_recovery_v1.sql`
+Both functions remain owned by `postgres`, ACL `{postgres=X/postgres}`, `SECURITY DEFINER`, empty `search_path`, VOLATILE, non-strict, PARALLEL UNSAFE, non-leakproof, cost 100, rows 0. `anon`, `authenticated`, and `service_role` have no EXECUTE.
 
-## Guarded function fingerprints
+## Recovery template
 
-| Helper | Candidate source SHA-256 | Restored source SHA-256 |
-| --- | --- | --- |
-| `flame_chick_catalog_publication_validate(uuid)` | `f179cc3b15b1d6ad5b07b90587513001bed97b752b09b13ce2d9c946e88a7750` | `018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712` |
-| `flame_chick_catalog_compile_snapshot(uuid,timestamptz)` | `1cee9543d131260f71573afc2f0a5a204422a59fa7f46ef0b24f4c2e277e3808` | `b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2` |
+- SQL template: `ops/recovery-migrations/catalog-publication-validation-restore-v1.sql`
+- Recovery fixture: `supabase/tests/catalog_publication_validation_recovery_v1.sql`
+- CI workflow: `.github/workflows/qa-catalog-publication-validation-fixes-v1.yml`
 
-The compensation requires the exact candidate hashes, postgres ownership, ACL `{postgres=X/postgres}`, `SECURITY DEFINER`, empty `search_path`, and the expected volatility/strictness/parallel/leakproof/cost/row attributes. Any mismatch aborts before replacement. After replacement, it checks the exact original hashes and the same security metadata. The SQL is transactional; a failed preflight or postflight rolls back the replacement.
+The compensation is forward-only and transactional. It refuses to run unless both helper bodies exactly match the applied candidate hashes and the expected owner/ACL/security metadata. It restores the exact function definitions from the prior `20261122031027` migration and verifies original hashes:
 
-## CI rehearsal design
+| Helper | Restored source SHA-256 |
+| --- | --- |
+| Validator | `018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712` |
+| Snapshot compiler | `b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2` |
 
-The disposable workflow performs two complementary paths:
+**The template deliberately remains outside `supabase/migrations`.** Supabase migration pushes apply every pending migration in that folder. Keeping the reversal outside it prevents an ordinary forward push from applying both the candidate and its compensation.
 
-1. Replays the **entire ordered migration history**, including the compensation. This proves the complete schema history remains replayable and ends in the restored baseline state.
-2. In that throwaway database only, manually replays the candidate migration SQL, runs the existing rollback-only candidate behavior fixture, then manually replays the compensation SQL and runs the recovery fixture. This tests the exact upgrade → regression test → forward compensation sequence without creating/deleting migration-ledger rows.
+## CI verification
 
-The test fixture always rolls back. The workflow verifies the fixture tenant is absent and confirms the final helper source hashes and ACL/security attributes. It uses only a disposable local Supabase stack; no remote database credentials are configured.
+Latest revised workflow:
+[Run 45014790768 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45014790768)
 
-## Controlled procedure for a future application
+It:
+1. Replayed the full ordered migration history through the candidate on a disposable local Supabase stack.
+2. Ran the candidate regression fixture, which ended in `ROLLBACK`.
+3. Manually executed the compensation template and the recovery fixture.
+4. Verified the fixture tenant count was zero and the migration ledger still matched the repository migration file count.
+5. Stopped the disposable stack successfully.
 
-### Before the candidate is applied
+The workflow used no remote database credentials and did not connect to the intended Supabase project.
 
-1. Confirm the intended project ref is `adkrxfnawdiljhjaavnj` (Flame Chick Production, Mumbai, Free). Do not rely on the project display name alone.
-2. Confirm branch `work/production-source-audit` has the reviewed candidate and recovery migration, and all required CI checks are green.
-3. Inspect remote history and the proposed change target explicitly:
+## Verified project state after apply
+
+- Migration ledger: 24 entries; latest `20261122105821_flame_chick_catalog_publication_validation_fixes_v1`.
+- One restaurant and one branch.
+- Zero categories, products, deals, schedule sets or publications.
+- Zero QA fixture tenants.
+- No menu publication, customer order, or public catalog data was created.
+- No Edge Function, Admin/POS/Rider app, Website, Vercel deployment, alias, or DNS setting was changed.
+
+## Controlled recovery procedure — only if needed
+
+A recovery is a separate schema change and requires explicit approval at the time it is needed. Do not run the template directly against the hosted project.
+
+1. Stop catalog publication attempts while investigating the reason for recovery.
+2. Reconfirm project ref `adkrxfnawdiljhjaavnj`, then explicitly link the repository:
+   ```bash
+   supabase link --project-ref adkrxfnawdiljhjaavnj
+   supabase migration list
+   ```
+3. Confirm the remote ledger contains candidate version `20261122105821` and identify the latest remote migration version.
+4. Generate a **new migration timestamp newer than the latest remote ledger entry**:
+   ```bash
+   supabase migration new flame_chick_catalog_publication_validation_restore_v1
+   ```
+   Copy the reviewed SQL from `ops/recovery-migrations/catalog-publication-validation-restore-v1.sql` into that newly timestamped migration file. Do not rename or delete the already-applied candidate migration.
+5. Reconfirm the linked project ref and run:
    ```bash
    supabase migration list
    supabase db push --dry-run
    ```
-   The dry run must show **only** the intended candidate migration. If any other migration is pending, stop and reconcile it separately; `db push` applies all pending migrations.
-4. Ensure a current export/backup appropriate to the Free plan is available and that the exact pre-apply function hashes/security metadata match the original hashes above. Never treat a dashboard display label as proof of the target.
+   The dry run must show **only the new compensation migration**. If any other migration is pending, stop and reconcile it separately.
+6. Obtain explicit approval for this compensating change, then run the normal interactive `supabase db push`.
+7. Verify the new compensation version is recorded, both helper hashes match the restored values above, and the owner, ACL, SECURITY DEFINER, empty search path and no-EXECUTE restrictions remain intact.
+8. Run Supabase security/performance/health advisors and inspect any unrelated drift.
 
-### Apply candidate — separate approval gate
+## Stop conditions
 
-The candidate is not authorized by this document. Only after a separate explicit approval for the intended production Supabase project, run the normal reviewed migration release command against the exact project ref. The CLI must first be explicitly linked to project ref `adkrxfnawdiljhjaavnj` with `supabase link --project-ref adkrxfnawdiljhjaavnj`. Current Supabase CLI documentation says `db push` operates on the linked remote project by default; keep `--dry-run` for the preview and use the normal interactive `supabase db push` only after approval. Do not use `db reset --linked`.
+Do not apply the compensation if:
+- either helper source hash differs from the exact candidate hashes;
+- owner, ACL, SECURITY DEFINER, search path or execution metadata differs;
+- the candidate migration is absent from the ledger;
+- the linked project ref is uncertain;
+- another migration is pending in the same push window.
 
-Immediately re-run `supabase migration list --remote=adkrxfnawdiljhjaavnj` and verify the candidate timestamp is recorded. Inspect both helper hashes and function metadata read-only. Expected candidate hashes are the values in the table above. Also confirm application-role EXECUTE is still denied.
+A guard failure is a stop signal. Do not weaken the checks, edit migration history, or use `migration repair` to erase the candidate. Prepare a new reviewed recovery migration if helper code has changed since this template was tested.
 
-### When compensation is needed after candidate commit
-
-1. Stop any further catalog publish attempt while diagnosing the reason for rollback. The restaurant platform is not currently live, and no live menu/publication exists in the build environment.
-2. Confirm the remote ledger shows candidate `20261122035721` applied and compensation `20261122050000` pending.
-3. Run `supabase db push --dry-run --remote=adkrxfnawdiljhjaavnj`. It must show **only** `20261122050000_flame_chick_catalog_publication_validation_restore_v1`. If other migrations are pending, stop; do not push a batch unintentionally.
-4. Obtain explicit approval for the compensating change. Then apply it using the v3-targeted command: `supabase db push`.
-5. Verify remote migration history records the compensation and both helper hashes have returned to the restored values. Verify owner, ACL, `SECURITY DEFINER`, empty search path and no EXECUTE for `anon`, `authenticated` or `service_role`.
-6. Run Supabase security/performance/health advisors and inspect for unrelated drift. Keep the two migration rows in history.
-
-### Stop conditions
-
-Do **not** run this compensation when:
-- either live helper hash differs from the exact candidate hashes;
-- helper owner, ACL, SECURITY DEFINER, search path or execution attributes differ;
-- the candidate migration did not commit or is absent from the remote ledger;
-- the intended project ref is uncertain;
-- another migration is also pending in the same push window.
-
-A failed guard is a stop signal, not a reason to weaken/remove the checks. Prepare a new reviewed forward-only recovery migration for any changed helper version. Never use `migration repair` to erase the candidate, edit the migration ledger, or manually paste unreviewed SQL into the remote database.
-
-## Supabase CLI target safety
-
-The runbook explicitly links the repository to the intended project ref first, then uses `supabase migration list` and `supabase db push --dry-run` against that linked project. Supabase's current CLI documentation describes `db push` as a remote operation requiring `supabase link`; do not assume the command's target. Re-check the linked project ref immediately before any remote push. See [CLI db push](https://supabase.com/docs/reference/cli/supabase-db-push), [CLI migration list](https://supabase.com/docs/reference/cli/supabase-migration-list), and [local development workflow](https://supabase.com/docs/guides/local-development/cli-workflows).

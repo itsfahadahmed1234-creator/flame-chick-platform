@@ -7,6 +7,8 @@ on:
     paths:
       - "supabase/migrations/*.sql"
       - "supabase/tests/catalog_publication_validation_fixes_v1.sql"
+      - "supabase/tests/catalog_publication_validation_recovery_v1.sql"
+      - "ops/recovery-migrations/**"
       - ".github/workflows/qa-catalog-publication-validation-fixes-v1.yml"
       - "ops/triggers/qa-catalog-publication-validation-fixes-v1.txt"
   workflow_dispatch:
@@ -126,7 +128,7 @@ jobs:
       # The full replay above proves the append-only history ends in the restored
       # baseline. Re-run candidate -> candidate fixture -> compensation manually
       # in this disposable DB to exercise the actual forward recovery sequence.
-      # Manual psql application does not add/delete migration-ledger rows.
+      # Manual psql recovery-template execution does not add/delete migration-ledger rows.
       - name: Run candidate regression fixture against the fully replayed candidate schema
         shell: bash
         run: |

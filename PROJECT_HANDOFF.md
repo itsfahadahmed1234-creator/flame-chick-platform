@@ -1,94 +1,57 @@
-# CURRENT IMPLEMENTATION STATUS — 2026-11-22 (catalog validator final review passed; recovery package prepared)
+# CURRENT IMPLEMENTATION STATUS — 2026-11-22 (catalog validator fix applied and verified; pre-launch build)
 
-## Forward-only validator recovery — prepared; CI rehearsal running/pending
+## Latest stage — catalog publication validator fix
 
-The recovery package has now been added on `work/production-source-audit`:
+<badge>Applied and verified</badge>
 
-- Compensation template: `ops/recovery-migrations/catalog-publication-validation-restore-v1.sql` (kept outside the auto-applied migration folder)
-- Recovery verification fixture: `supabase/tests/catalog_publication_validation_recovery_v1.sql`
-- Operational runbook: `docs/architecture/catalog-validator-recovery-v1.md`
-- CI workflow updated to replay the full ordered migration history, then manually rehearse candidate → candidate regression fixture → compensation → restored-state fixture on the disposable local stack.
+- Intended production-build Supabase project: `adkrxfnawdiljhjaavnj` (Flame Chick Production, Mumbai `ap-south-1`, Free).
+- Applied migration version: `20261122105821`, name `flame_chick_catalog_publication_validation_fixes_v1`.
+- Repository file: `supabase/migrations/20261122105821_flame_chick_catalog_publication_validation_fixes_v1.sql`.
+- Working branch: `work/production-source-audit`; `main` unchanged.
+- Revised local migration-chain and recovery rehearsal: [GitHub Actions run 45014790768 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45014790768).
 
-The compensation template is intentionally stored outside `supabase/migrations` because Supabase migration pushes apply all pending files in that folder; this prevents a routine forward push from applying the reversal too. It must be copied into a fresh timestamped migration only during an approved recovery. The compensation is forward-only and transactional. It requires the exact candidate helper source hashes and the expected postgres owner, ACL, SECURITY DEFINER, empty search_path, and execution attributes. It restores the original function definitions copied from the already-applied `20261122031027` migration, then verifies the original SHA-256 hashes and restrictive metadata. It adds no persistent business schema/data and does not erase either migration-ledger entry.
+### Applied function fingerprints and security
 
-Exact helper fingerprints:
+| Helper | Applied SHA-256 |
+| --- | --- |
+| `flame_chick_catalog_publication_validate(uuid)` | `f179cc3b15b1d6ad5b07b90587513001bed97b752b09b13ce2d9c946e88a7750` |
+| `flame_chick_catalog_compile_snapshot(uuid,timestamptz)` | `1cee9543d131260f71573afc2f0a5a204422a59fa7f46ef0b24f4c2e277e3808` |
 
-| Helper | Candidate body | Restored body |
-| --- | --- | --- |
-| Validator | `f179cc3b15b1d6ad5b07b90587513001bed97b752b09b13ce2d9c946e88a7750` | `018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712` |
-| Snapshot compiler | `1cee9543d131260f71573afc2f0a5a204422a59fa7f46ef0b24f4c2e277e3808` | `b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2` |
+Both helpers remain postgres-owned, ACL `{postgres=X/postgres}`, SECURITY DEFINER, empty search_path, VOLATILE, non-strict, PARALLEL UNSAFE, non-leakproof, cost 100 and rows 0. No EXECUTE is granted to `anon`, `authenticated` or `service_role`.
 
-**Important:** an earlier GitHub Actions rehearsal passed with the compensation still inside the migration history; this was then corrected because it would have queued the reversal in an ordinary migration push. The revised workflow is being rerun with the recovery template outside the migration folder. Do not treat the revised layout as verified until that run is green. The intended production Supabase project remains untouched; neither the candidate nor compensation has been applied there. The recovery runbook requires a separate explicit approval for any future remote compensation and mandates a dry-run showing only the one intended migration.
+### Behavior fixed and tested
 
-This section supersedes the earlier catalog-validator QA status further below.
+1. Required deal groups (`min_units > 0`) require per-deal-variant option maps; optional groups may omit them.
+2. Active collection fallback schedule IDs remain valid snapshot references even without active deals. Invalid/inactive referenced schedules block publication.
+3. Unreferenced active schedule drafts do not block publication and are omitted from customer snapshots.
+4. Inactive-deal schedule assignments are ignored/omitted; active-deal timezone mismatches still block publication.
+5. Active deal assignments to inactive branches are rejected; those assignments and otherwise-unreferenced schedule sets are omitted.
+6. Existing validation for active component groups with no eligible options remains intact.
 
-## Step 2 — final Production review: PASSED
+### Recovery readiness
 
-**Candidate remains unapplied.** The validator fix has been reviewed against the live Production helper definitions, and the complete local migration-chain/regression suite is green. This is technical readiness for a separately approved migration, not authorization to apply it.
+- Recovery SQL template: `ops/recovery-migrations/catalog-publication-validation-restore-v1.sql` (outside `supabase/migrations`, so routine pushes cannot auto-apply a reversal).
+- Recovery fixture: `supabase/tests/catalog_publication_validation_recovery_v1.sql`.
+- Runbook: `docs/architecture/catalog-validator-recovery-v1.md`.
+- The revised CI run replays the full migration chain through the candidate, runs the candidate regression fixture, manually rehearses the recovery template and verifies the original function hashes/security metadata are restored. All steps and disposable stack cleanup passed.
+- Recovery remains a separate forward-only migration: only create a new timestamped migration from the template if needed, after a fresh dry-run and separate explicit approval.
 
-- Candidate: `supabase/migrations/20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql`
-- Working branch: `work/production-source-audit`
-- Final reviewed branch commit: `88c92ffed25e550d7a09cd38013a7d0db9d5cc8d`
-- GitHub Actions: [QA Flame Chick catalog publication validation fixes V1 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45012702344)
-- The successful job replayed the complete migration chain on a disposable local Supabase stack, ran the rollback-only fixture, verified the fixture tenant was absent afterward, stopped the local stack, and completed cleanup. No Production credentials or database were used by this workflow.
+### Project invariants after apply
 
-## Reviewed behavior and regression cases
+- Migration ledger: **24 entries**, latest `20261122105821_flame_chick_catalog_publication_validation_fixes_v1`.
+- One restaurant and one branch.
+- Zero categories, products, product variants, deals, schedule sets, publications and current-publication pointers.
+- Zero QA fixture tenants.
+- No menu data/publication, customer orders, Edge Functions, app deployments, Website cutover, Vercel aliases or DNS changes.
+- Flame Chick is still in the production-build phase; the customer-facing system is not live.
 
-1. **Deal component groups:** only required groups (`min_units > 0`) must have a per-deal-variant option map. Optional groups can be unmapped. Required groups remain strictly validated.
-2. **Collection fallback schedules:** an active collection's `schedule_set_id` remains a real snapshot reference even when the collection has no active deals. If that referenced schedule is inactive or invalid, publication is rejected; the compiler must not leave a dangling fallback ID.
-3. **Unused schedules:** unreferenced active schedule drafts do not block publication and are omitted from the public snapshot.
-4. **Deal assignments:** schedules for active deals are validated and compiled. Assignments belonging to inactive deals are ignored and omitted. Active-deal timezone mismatches remain publication errors.
-5. **Branch-scoped assignments:** an active deal assignment targeting an inactive branch is rejected. Its assignment and otherwise-unreferenced schedule set are excluded from the compiled snapshot.
-6. The existing rule rejecting active component groups with no options remains unchanged.
+## Remaining controlled work
 
-The regression fixture explicitly exercises optional vs required groups, active collection fallback validity, inactive fallback rejection, unreferenced schedule omission, inactive-deal assignment exclusion, active-deal timezone mismatch rejection, and inactive-branch assignment rejection/omission. The SQL fixture runs inside `BEGIN` and ends with `ROLLBACK`; the workflow separately checks that its QA tenant count is zero.
-
-## Production function security baseline verified
-
-The migration replaces only these same-signature private helper functions:
-
-- `app_private.flame_chick_catalog_publication_validate(uuid)`
-- `app_private.flame_chick_catalog_compile_snapshot(uuid,timestamptz)`
-
-Read-only Production inspection verified both current function definitions and metadata:
-
-- PostgreSQL owner: `postgres`
-- ACL: `{postgres=X/postgres}`
-- `SECURITY DEFINER = true`
-- `search_path = ""`
-- `anon`, `authenticated` and `service_role` do not have EXECUTE
-- Volatility, strictness, parallel-safety, leakproof, cost and row-estimate attributes match the guarded baseline.
-
-Exact live-source SHA-256 fingerprints, which the candidate checks before replacement:
-
-- Validator: `018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712`
-- Snapshot compiler: `b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2`
-
-The candidate checks these fingerprints and the security metadata before changing either function, captures the execution metadata, and checks it again afterward. It uses an explicit transaction, so a failed preflight or postflight aborts the entire change. No persistent table, column, index, grant, business-data row or publication is created/modified by this candidate; the temporary guard table is transaction-local.
-
-## Production invariants — rechecked after CI
-
-- Applied migration count: **23**; latest: `20261122031027_flame_chick_catalog_publish_rollback_v1`.
-- Restaurants: 1; branches: 1.
-- Categories, products, product variants, deals, schedule sets, publications and current-publication pointers: **0**.
-- QA fixture tenants: **0**.
-- Candidate validator migration is **not** in the Production migration ledger.
-- No Edge Function, Admin deployment, customer Website, Vercel alias, live menu or publication was changed.
-
-## Rollback and remaining release gates
-
-The transaction makes the migration all-or-nothing before commit. After a committed schema migration, the repository's append-only migration history must be reversed with a **new forward-only compensating migration**; it must not be removed or rewritten in the migration ledger. The forward-only compensating migration and runbook are now prepared. The updated disposable CI rehearsal must pass before the candidate is considered release-ready; see the recovery section at the top of this handoff.
-
-Production security advisor still reports expected `rls_enabled_no_policy` INFO notices under the deny-by-default model and a separate WARN that Auth leaked-password protection is disabled. Enable leaked-password protection before broad staff onboarding. The performance advisor's unused-index INFO notices are expected while the business catalog is empty; do not remove those indexes from zero-traffic statistics. Health advisor returned no findings.
-
-## Next controlled action
-
-1. Confirm the updated candidate → compensation CI rehearsal is green.
-2. Only then seek separate explicit approval before applying the candidate to the intended production Supabase project.
-3. After any approved apply, recheck migration ledger, function source fingerprints/metadata, permissions, security/performance/health advisors, and confirm the customer menu/publication state remains unchanged.
-4. Keep real-menu seeding, Admin/Edge Function deployment, Website cutover, and Vercel changes separately gated.
-
-
+1. Enable Supabase Auth leaked-password protection before broad staff onboarding.
+2. Configure exact Admin Site URL/redirect allowlist, Staff Admin function origins and server-only secret.
+3. Deploy and test Staff Admin Edge Function and protected Admin preview; keep non-Staff modules disabled until secure command APIs replace legacy direct REST operations.
+4. Continue catalog/order/delivery command API and pricing/quote engine work. The public snapshot still has empty deliveryAreas/promotions stubs; do not cut over the Website until required DTO parts are implemented and version compatibility is resolved.
+5. Keep real-menu seeding/publication, customer Website cutover, POS/Rider deployments and Vercel changes separately reviewed and approved.
 
 ## Admin identity bootstrap — completed and verified
 
@@ -109,16 +72,19 @@ Production security advisor still reports expected `rls_enabled_no_policy` INFO 
 - Source audit confirms legacy direct REST CRUD/storage operations still exist in `apps/flame-chick-admin/app.js`. Do not enable those modules or grant direct table CRUD for compatibility. Replace them with secure domain command APIs first.
 - No Vercel deployment, Auth redirect/origin change, Edge Function deployment or secret change was performed during the Admin bootstrap.
 
-## Catalog publication validation fixes — review branch only
+## Catalog publication validation fixes — applied and verified
 
+The validator/compiler fix was reviewed against the exact pre-apply function source and security metadata, passed the revised disposable CI workflow, and was applied to the intended production-build Supabase project.
+
+- Applied ledger version: `20261122105821`.
+- Repository migration: `supabase/migrations/20261122105821_flame_chick_catalog_publication_validation_fixes_v1.sql`.
 - Working branch: `work/production-source-audit`; no changes to `main`.
-- Candidate migration: `supabase/migrations/20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql`.
-- Candidate commit: `36423a0e481095f306bdd02eaf5ee6d85f31b80c`.
-- Fix A: only active-referenced schedule sets (active deal collection fallback or active assignment to an active deal) are validated and included in the public snapshot. Unreferenced active schedule drafts no longer block publication or enter customer snapshots.
-- Fix B: per-deal-variant option-map completeness is enforced only for required component groups (`min_units > 0`). Optional groups do not require a map.
-- The migration includes strict preflight and postflight guards to preserve function owner, ACL, SECURITY DEFINER and function configuration.
-- Full disposable local QA is now green; see the CI run and fixture results in the current status section at the top of this file. The candidate was included in the local replay and its targeted fixture passed.
-- The candidate has NOT been applied to Production. Production migration ledger remains unchanged.
+- CI run: [45014790768 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45014790768).
+- Post-apply read-only verification confirmed both expected function source hashes, postgres ownership, exact postgres-only ACL, SECURITY DEFINER, empty search_path, and no EXECUTE for anon/authenticated/service_role.
+- Post-apply counts: one restaurant, one branch; zero categories, products, deals, schedule sets, publications and QA tenants.
+- No menu data, publication, Edge Function, app deployment, Website cutover or Vercel configuration changed.
+
+The behavior changes and the exact helper fingerprints are documented in the detailed follow-up at `docs/handoffs/2026-11-22-admin-bootstrap-catalog-validator-follow-up.md`. Recovery SQL remains outside the automatic migration folder and must be copied to a fresh timestamped migration only if separately approved.
 
 ## Current Supabase advisor findings
 
@@ -134,7 +100,7 @@ Production security advisor still reports expected `rls_enabled_no_policy` INFO 
 
 ## Next execution order
 
-1. Review the candidate validator migration and its Production preflight, postflight, ownership and ACL assertions. Keep it unapplied until a separate explicit Production approval.
+1. Configure Auth leaked-password protection and the exact Admin Site URL/redirect allowlist before broad staff onboarding.
 2. Configure Supabase Auth leaked-password protection and the exact Site URL/redirect allowlist for the new Admin app domain.
 3. Deploy and test the Staff Admin Edge Function only after its exact origin and server-only secret settings are ready; verify Admin login, context, invitation, retry/finalize, role assignment, and denial for non-Admin actors.
 4. Deploy the Admin UI to a protected preview first, verify session handling and that all non-Staff modules stay disabled. Then separately review production access/protection.
@@ -784,7 +750,7 @@ External encrypted schema dump was not created; user explicitly accepted proceed
 Batch 1 is complete. Continue with remaining Stage 3 design/source consistency: resolve outstanding business/schema decisions, complete field-level table and API mapping, then separately review Batch 2/3 migration design. Do not start website security audit until immediately before attaching website to DB. No application deployment, Vercel changes, Auth/Storage/Edge Function work, or business table creation was performed in this Batch 1 action.
 # Flame Chick Platform — Project Handoff
 
-**Last updated:** 2026-11-21 (Batch 4 Admin staff invitation acceptance UI implemented; four Vercel preview workflows and project setup documented; Production Edge Function remains undeployed)  
+**Last updated:** 2026-11-22 (catalog publication validator fix applied and verified; pre-launch build; no customer-facing deployment)  
 **Canonical project repository:** https://github.com/itsfahadahmed1234-creator/flame-chick-platform  
 **Current working branch:** `work/production-source-audit`  
 **Default branch:** `main`  
