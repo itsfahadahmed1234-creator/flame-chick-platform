@@ -93,6 +93,16 @@ test("mutation route rejects missing/invalid idempotency and stale-revision para
   }
 });
 
+test("catalog mutation payload size is capped before it reaches PostgREST", () => {
+  const payload = { description_en: "x".repeat(66000) };
+  assert.throws(() => buildCatalogRpcCall({
+    action: "catalog_product_upsert",
+    payload,
+    expected_revision: 0,
+    request_id: requestId
+  }), /catalog request is invalid/i);
+});
+
 test("read limits and cursors are bounded and typed", () => {
   assert.deepEqual(buildCatalogRpcCall({ action: "catalog_products_list", limit: 50 }).args,
     { p_after_id: null, p_limit: 50 });
