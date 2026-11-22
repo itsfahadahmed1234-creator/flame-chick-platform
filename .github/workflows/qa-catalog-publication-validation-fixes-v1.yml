@@ -5,7 +5,7 @@ on:
     branches:
       - work/production-source-audit
     paths:
-      - "supabase/migrations/*_flame_chick_catalog_publication_validation_fixes_v1.sql"
+      - "supabase/migrations/*.sql"
       - "supabase/tests/catalog_publication_validation_fixes_v1.sql"
       - ".github/workflows/qa-catalog-publication-validation-fixes-v1.yml"
       - "ops/triggers/qa-catalog-publication-validation-fixes-v1.txt"
