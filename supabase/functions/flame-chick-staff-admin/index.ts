@@ -1,6 +1,6 @@
 // Flame Chick Staff Admin API — Batch 4.
 import { isAllowedRequestOrigin, isSafeInviteRedirect, parseAllowedOrigins, staffCorsHeaders } from "./origin-policy.mjs";
-import { buildCatalogRpcCall, isCatalogAction } from "./catalog-actions.mjs";
+import { buildCatalogRpcCall } from "./catalog-actions.mjs";
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").replace(/\/+$/,"");
 function readKey(jsonName:string,fallback:string[]):string{
  try{const x=JSON.parse(Deno.env.get(jsonName)??"{}");const v=x?.default;if(typeof v==="string"&&v)return Deno.env.get(v)??v;}catch{}
