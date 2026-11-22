@@ -47,13 +47,13 @@ BEGIN
     (v_admin,'authenticated','authenticated','qa-staff-admin-admin@example.invalid','',v_now,
       '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,false,false),
     (v_owner,'authenticated','authenticated','qa-staff-admin-owner@example.invalid','',v_now,
-      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,v_now,false,false),
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,false,false),
     (v_manager,'authenticated','authenticated','qa-staff-admin-manager@example.invalid','',v_now,
-      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,v_now,false,false),
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,false,false),
     (v_cashier,'authenticated','authenticated','qa-staff-admin-cashier@example.invalid','',v_now,
-      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,v_now,false,false),
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,false,false),
     (v_rider,'authenticated','authenticated','qa-staff-admin-rider@example.invalid','',v_now,
-      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,v_now,false,false);
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,false,false);
 
   INSERT INTO public.user_profiles(user_id,display_name,is_active)
   VALUES
