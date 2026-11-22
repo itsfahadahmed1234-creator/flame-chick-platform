@@ -49,15 +49,15 @@ The test fixture always rolls back. The workflow verifies the fixture tenant is 
 2. Confirm branch `work/production-source-audit` has the reviewed candidate and recovery migration, and all required CI checks are green.
 3. Inspect remote history and the proposed change target explicitly:
    ```bash
-   supabase migration list --remote=adkrxfnawdiljhjaavnj
-   supabase db push --dry-run --remote=adkrxfnawdiljhjaavnj
+   supabase migration list
+   supabase db push --dry-run
    ```
    The dry run must show **only** the intended candidate migration. If any other migration is pending, stop and reconcile it separately; `db push` applies all pending migrations.
 4. Ensure a current export/backup appropriate to the Free plan is available and that the exact pre-apply function hashes/security metadata match the original hashes above. Never treat a dashboard display label as proof of the target.
 
 ### Apply candidate — separate approval gate
 
-The candidate is not authorized by this document. Only after a separate explicit approval for the intended production Supabase project, run the normal reviewed migration release command against the exact project ref. With Supabase CLI v3, database commands target local by default; the explicit `--remote=adkrxfnawdiljhjaavnj` target is mandatory. For a non-interactive reviewed release command, the CLI v3 form is `supabase db push --yes --remote=adkrxfnawdiljhjaavnj`.
+The candidate is not authorized by this document. Only after a separate explicit approval for the intended production Supabase project, run the normal reviewed migration release command against the exact project ref. The CLI must first be explicitly linked to project ref `adkrxfnawdiljhjaavnj` with `supabase link --project-ref adkrxfnawdiljhjaavnj`. Current Supabase CLI documentation says `db push` operates on the linked remote project by default; keep `--dry-run` for the preview and use the normal interactive `supabase db push` only after approval. Do not use `db reset --linked`.
 
 Immediately re-run `supabase migration list --remote=adkrxfnawdiljhjaavnj` and verify the candidate timestamp is recorded. Inspect both helper hashes and function metadata read-only. Expected candidate hashes are the values in the table above. Also confirm application-role EXECUTE is still denied.
 
@@ -66,7 +66,7 @@ Immediately re-run `supabase migration list --remote=adkrxfnawdiljhjaavnj` and v
 1. Stop any further catalog publish attempt while diagnosing the reason for rollback. The restaurant platform is not currently live, and no live menu/publication exists in the build environment.
 2. Confirm the remote ledger shows candidate `20261122035721` applied and compensation `20261122050000` pending.
 3. Run `supabase db push --dry-run --remote=adkrxfnawdiljhjaavnj`. It must show **only** `20261122050000_flame_chick_catalog_publication_validation_restore_v1`. If other migrations are pending, stop; do not push a batch unintentionally.
-4. Obtain explicit approval for the compensating change. Then apply it using the v3-targeted command: `supabase db push --yes --remote=adkrxfnawdiljhjaavnj`.
+4. Obtain explicit approval for the compensating change. Then apply it using the v3-targeted command: `supabase db push`.
 5. Verify remote migration history records the compensation and both helper hashes have returned to the restored values. Verify owner, ACL, `SECURITY DEFINER`, empty search path and no EXECUTE for `anon`, `authenticated` or `service_role`.
 6. Run Supabase security/performance/health advisors and inspect for unrelated drift. Keep the two migration rows in history.
 
@@ -81,6 +81,6 @@ Do **not** run this compensation when:
 
 A failed guard is a stop signal, not a reason to weaken/remove the checks. Prepare a new reviewed forward-only recovery migration for any changed helper version. Never use `migration repair` to erase the candidate, edit the migration ledger, or manually paste unreviewed SQL into the remote database.
 
-## Supabase CLI v3 note
+## Supabase CLI target safety
 
-Since CLI v3, database commands default to the local stack; hosted-project changes require an explicit `--remote` target and `--yes` for non-interactive execution. The runbook uses this explicit form to avoid accidentally targeting a local database or the wrong linked project. See [Supabase CLI v3 migration guide](https://supabase.com/docs/guides/local-development/cli/migrating-to-v3) and [CLI reference](https://supabase.com/docs/reference/cli/supabase-db-push).
+The runbook explicitly links the repository to the intended project ref first, then uses `supabase migration list` and `supabase db push --dry-run` against that linked project. Supabase's current CLI documentation describes `db push` as a remote operation requiring `supabase link`; do not assume the command's target. Re-check the linked project ref immediately before any remote push. See [CLI db push](https://supabase.com/docs/reference/cli/supabase-db-push), [CLI migration list](https://supabase.com/docs/reference/cli/supabase-migration-list), and [local development workflow](https://supabase.com/docs/guides/local-development/cli-workflows).
