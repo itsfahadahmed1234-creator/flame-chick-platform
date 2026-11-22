@@ -365,6 +365,12 @@
         addError(errors, 'productVariants[' + i + ']', 'PACK_METADATA_INVALID', 'Only pack variants may carry pack count metadata.');
       }
     });
+    s.products.forEach(function (product, productIndex) {
+      if (!s.productVariants.some(function (variant) { return variant.productId === product.productId; })) {
+        addError(errors, 'products[' + productIndex + ']', 'PRODUCT_VARIANT_REQUIRED',
+          'Every published product must contain at least one active purchasable variant.');
+      }
+    });
     s.modifiers.forEach(function (row, i) {
       checkReference(maps.modifierGroups, row.modifierGroupId, 'modifiers[' + i + '].modifierGroupId', errors);
       if (row.priceMode === 'FIXED' && row.fixedPrice === null) addError(errors, 'modifiers[' + i + '].fixedPrice', 'FIXED_PRICE_REQUIRED', 'FIXED modifiers require a fixed price.');
@@ -372,6 +378,16 @@
     });
     s.modifierGroups.forEach(function (row, i) {
       var max = row.maxSelect, min = row.minSelect;
+      var hasActiveAssignment = s.modifierGroupAssignments.some(function (assignment) {
+        return assignment.modifierGroupId === row.modifierGroupId;
+      });
+      var activeOptionCount = s.modifiers.filter(function (modifier) {
+        return modifier.modifierGroupId === row.modifierGroupId;
+      }).length;
+      if (hasActiveAssignment && activeOptionCount < max) {
+        addError(errors, 'modifierGroups[' + i + ']', 'MODIFIER_OPTIONS_INSUFFICIENT',
+          'An assigned modifier group must expose at least maxSelect active options.');
+      }
       var valid = min <= max && max <= 50;
       if (row.selectionMode === 'ONE_OPTIONAL') valid = valid && min === 0 && max === 1;
       if (row.selectionMode === 'ONE_REQUIRED') valid = valid && min === 1 && max === 1;
@@ -436,8 +452,18 @@
       checkReference(maps.deals, row.dealId, 'dealVariants[' + i + '].dealId', errors);
       checkComposite(dealVariantKeys, row.dealId + ':' + row.variantKey, 'dealVariants[' + i + ']', errors);
     });
+    s.deals.forEach(function (deal, dealIndex) {
+      if (!s.dealVariants.some(function (variant) { return variant.dealId === deal.dealId; })) {
+        addError(errors, 'deals[' + dealIndex + ']', 'DEAL_VARIANT_REQUIRED',
+          'Every published active deal must contain at least one active purchasable deal variant.');
+      }
+    });
     s.dealComponentGroups.forEach(function (row, i) {
       checkReference(maps.deals, row.dealId, 'dealComponentGroups[' + i + '].dealId', errors);
+      if (!s.dealComponentOptions.some(function (option) { return option.componentGroupId === row.componentGroupId; })) {
+        addError(errors, 'dealComponentGroups[' + i + ']', 'DEAL_COMPONENT_OPTIONS_REQUIRED',
+          'Every published active deal component group must contain at least one active option.');
+      }
       if (row.minUnits > row.maxUnits || row.maxUnits > 100 ||
           (row.maxUnitsPerOption !== null && (row.maxUnitsPerOption < 1 || row.maxUnitsPerOption > row.maxUnits))) {
         addError(errors, 'dealComponentGroups[' + i + ']', 'COMPONENT_GROUP_BOUNDS_INVALID', 'Component group quantity bounds are inconsistent.');
@@ -614,6 +640,10 @@
     });
 
     if (snapshot.branches.length === 0) addError(errors, '$.branches', 'BRANCH_REQUIRED', 'A published catalog must contain at least one active branch.');
+    if (!snapshot.categories.some(function (row) { return row.categoryKind === 'menu'; })) {
+      addError(errors, '$.categories', 'MENU_CATEGORY_REQUIRED', 'A published catalog must contain at least one active menu category.');
+    }
+    if (snapshot.products.length === 0) addError(errors, '$.products', 'PRODUCT_REQUIRED', 'A published catalog must contain at least one active menu product.');
     if (errors.length) return { ok: false, code: 'SNAPSHOT_INVALID', errors: errors };
 
     var idKeys = {
