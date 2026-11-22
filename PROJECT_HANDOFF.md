@@ -1,3 +1,39 @@
+# CURRENT IMPLEMENTATION STATUS — 2026-11-22 (catalog validator QA follow-up)
+
+## Candidate validator behavior — tested transactionally against Production schema
+
+The candidate migration `20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql` was installed only inside explicit rollback-only SQL transactions for behavior testing; it is NOT recorded in the Supabase migration ledger and no function change persisted.
+
+Verified:
+- Optional deal component group (`min_units=0`) with a valid eligible option but no deal-variant option mapping is accepted by the candidate validator.
+- Required group (`min_units=1`) with a valid eligible option but no deal-variant option mapping continues to produce `DEAL_VARIANT_REQUIRED_GROUP_NOT_CONFIGURED`.
+- Empty schedule referenced by an active deal collection continues to produce `ACTIVE_SCHEDULE_SET_INVALID`.
+- Unreferenced active empty schedule does not block validation and is omitted from compiled schedule sets.
+- Both candidate migration installation and fixtures were rolled back together. A subsequent Production query found zero QA schedule/category/product/deal rows, zero publications, and the single expected active Admin role.
+- A first fixture against the unmodified live validator reproduced the optional-group bug, confirming the test detects the intended regression.
+
+## Disposable full migration-chain CI
+
+- Added `supabase/tests/catalog_publication_validation_fixes_v1.sql`, a rollback-only fixture covering optional vs required groups and referenced vs unreferenced schedules.
+- Added `.github/workflows/qa-catalog-publication-validation-fixes-v1.yml`, which starts a clean local Supabase stack, runs the complete `supabase db reset --local` migration chain, executes the SQL fixture, verifies the fixture tenant rolled back, and stops the local stack.
+- Added `ops/triggers/qa-catalog-publication-validation-fixes-v1.txt` to trigger the workflow.
+- Commits: fixture `b2e218015b76138395e2af3cc11530ec95117b97`; workflow `e88cbf786d950df8f0b1749b8f1cb1e1c7fd8268`; trigger `868fa469ab59fd2666eed188990d78481241a51b`.
+- This environment has no Docker daemon, so local full-chain execution is not possible here. The workflow was committed to run the full test on GitHub-hosted Ubuntu, but its run status could not be retrieved through the connected GitHub actions tools during this session. Do not treat full migration-chain QA as passed until the Actions run is inspected and green.
+- Production migration ledger remains unchanged; candidate migration has not been applied.
+
+## Production invariants rechecked
+
+- Existing migration ledger still ends at `20261122031027_flame_chick_catalog_publish_rollback_v1`.
+- No Edge Functions are deployed.
+- No publications or real menu rows were seeded.
+- Customer Website and Vercel deployments remain untouched.
+
+## Next step
+
+Inspect the GitHub Actions run for `qa-catalog-publication-validation-fixes-v1.yml`. If green, review the candidate migration one final time and run its guarded migration workflow only after a separate explicit approval. If red, repair the local migration-chain issue and rerun CI. Do not enable Admin catalog modules or customer Website paths before the API and V3 client are complete.
+
+---
+
 # CURRENT IMPLEMENTATION STATUS — 2026-11-22 (Admin bootstrap and catalog validator follow-up)
 
 ## Admin identity bootstrap — completed and verified
