@@ -1,5 +1,6 @@
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** @returns {never} */
 function invalid() {
   const error = new Error("The catalog request is invalid.");
   error.name = "CatalogRequestError";
