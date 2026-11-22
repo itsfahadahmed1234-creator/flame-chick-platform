@@ -74,6 +74,10 @@
     return Number.isFinite(Date.parse(value));
   }
 
+  function isIsoUtcDateTime(value) {
+    return typeof value === 'string' && value.endsWith('Z') && isIsoDateTime(value);
+  }
+
   function isIsoDate(value) {
     if (typeof value !== 'string' || !DATE_RE.test(value)) return false;
     var d = new Date(value + 'T00:00:00Z');
@@ -613,7 +617,7 @@
     validateScalar(snapshot.draftRevision, 'integer', '$.draftRevision', errors);
     validateScalar(snapshot.pricingEngineVersion, 'string', '$.pricingEngineVersion', errors);
     validateScalar(snapshot.snapshotSha256, 'string', '$.snapshotSha256', errors);
-    if (hasOwn(snapshot, 'databaseNow') && (typeof snapshot.databaseNow !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(snapshot.databaseNow) || !Number.isFinite(Date.parse(snapshot.databaseNow)))) {
+    if (hasOwn(snapshot, 'databaseNow') && (typeof snapshot.databaseNow !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(snapshot.databaseNow) || !isIsoUtcDateTime(snapshot.databaseNow))) {
       addError(errors, '$.databaseNow', 'DATABASE_TIME_INVALID', 'Database timestamp must be a valid UTC timestamp.');
     }
     if (typeof snapshot.snapshotSha256 !== 'string' || !SHA256_RE.test(snapshot.snapshotSha256)) {
@@ -764,6 +768,7 @@
     MAX_SNAPSHOT_BYTES: MAX_SNAPSHOT_BYTES,
     validateSnapshot: validateSnapshot,
     validateHealth: validateHealth,
+    isIsoUtcDateTime: isIsoUtcDateTime,
     minorUnits: minorUnits,
     resolveProductAvailability: resolveProductAvailability,
     resolveVariantAvailability: resolveVariantAvailability,
