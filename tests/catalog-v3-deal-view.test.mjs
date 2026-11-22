@@ -220,6 +220,20 @@ test('standalone-only product modifiers are not offered inside deals', () => {
   assert.deepEqual(groups, []);
 });
 
+test('required product modifier groups fail closed when a variant price rule is missing', () => {
+  const snapshot = createSnapshot();
+  snapshot.modifierGroups[0].minSelect = 1;
+  snapshot.modifierPriceRules = [];
+  const groups = deals.buildProductModifierGroups(snapshot, IDS.product, IDS.variant, contract, {
+    excludeStandaloneOnly: true
+  });
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].branchSatisfiable, false);
+  assert.equal(deals.validateModifierSelections(groups, {
+    [IDS.modifierGroup]: []
+  }).code, 'MODIFIER_GROUP_UNSATISFIABLE');
+});
+
 test('does not calculate or expose a browser-side deal total', () => {
   const result = build();
   const deal = result.collections[0].deals[0];
