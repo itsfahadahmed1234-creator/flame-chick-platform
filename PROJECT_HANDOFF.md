@@ -24,6 +24,37 @@ This guardrail is intentionally prominent because these identifiers are operatio
 
 ---
 
+## Latest checkpoint — Website V3 compatibility safety gate (2026-11-22)
+
+**Status: first fail-closed storefront guard implemented and its CI passed. V3 integration itself is NOT implemented; no menu is published and no deployment was created.**
+
+- Repository identity verified: `itsfahadahmed1234-creator/flame-chick-platform`.
+- Branch: `work/production-source-audit`; do not merge or push to `main`.
+- Website V3 incompatibility reconfirmed: publication compiler emits schemaVersion 3 normalized catalog. Existing `apps/flame-chick-website/js/catalog.js` validates schemaVersion 2 and expects legacy PascalCase DTO fields. Existing pricing engine `js/pricing.js` consumes legacy `dealComponents`, `SizeKey` modifier rules and a simple bundle-price deal model. V3 has deal variants, component groups/options, variant-specific pricing treatment/surcharges, schedules and branch availability. A version-number-only change or lossy V3->V2 conversion is prohibited.
+- Existing Website menu HTML is statically built from a hard-coded MENU array and then matched to live catalog by product names; this is not a safe production catalog source. The old platter mapping is also a simplified deal special case.
+- Safety change: `apps/flame-chick-website/index.html` now initially hides `#cats` and `#menuRoot`, shows an accessible status notice, and reveals the old menu only after `FlameChickCatalog.load()` reports a ready, validated catalog. Missing config or any load/validation error keeps the menu hidden. This is a temporary fail-closed guard, not the completed V3 storefront.
+- Regression guard added to `tests/website-source-hygiene.test.mjs` to require the hidden-by-default menu, status notice and both ready/failure state transitions.
+- Website static CI run [45042841555](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45042841555) — SUCCESS. JavaScript syntax, all website hygiene tests including the new fail-closed assertion, and inline script parsing passed.
+- Corresponding preview workflow [45042841520](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45042841520) — SKIPPED. No Vercel deployment was created.
+- This source change only alters the new private repo branch. It does not alter the old legacy Website deployment or live domain.
+
+### Required implementation before V3 storefront acceptance
+
+1. Define a strict versioned V3 client contract directly from the SQL snapshot compiler. Validate all required arrays, identifiers, foreign-key relationships, enum values, numeric prices, integer quantities, and snapshot metadata. Reject unknown incompatible versions and malformed/duplicate IDs.
+2. Replace hard-coded name-matched menu with dynamic category/product/variant rendering using stable database IDs. Do not silently pick the first variant. Enforce branch-specific availability and restaurant/branch website-ordering flags.
+3. Rewrite pricing engine to consume V3 normalized structures: exact productVariantId modifier-price rules; group min/max and selection modes; deal collections/variants/component groups/options; included, standalone, and surcharge treatments; max quantities/repeat rules; schedule/timezone evaluation; branch availability. Preserve NULL vs zero and avoid JS floating-point money arithmetic.
+4. Make deals fully selectable in UI and persist exact chosen variant/component IDs in cart and order payload. Reject missing/extra/invalid choices locally for UX and again server-side.
+5. Resolve delivery area/default fee and branch identity as explicit server-controlled checkout data; current V3 snapshot deliberately emits empty deliveryAreas and promotions, and old frontend fallback behavior must not be carried over as assumed configuration.
+6. Add deterministic fixtures covering all catalog entity types, valid/invalid snapshots, stale cache, unpublished catalog, unsupported schema, missing/null/zero values, disabled branch, schedule edges/timezones/DST, modifier price matrix, deal choices/surcharges, cart version changes and XSS/untrusted display text.
+7. Add property/fuzz tests for duplicate IDs, cross-restaurant/branch references, missing relationships, overflow, unsafe numeric values, huge payloads and malformed JSON. Keep cache versioned and fail closed on stale/unknown formats.
+8. Align Website order payload and Order API validation with V3 IDs and pricing; server recomputes all totals. No customer order submission until the order schema/RPC/function and idempotency/rate-limit controls are implemented and tested.
+9. Only after tests pass, request explicit approval for a controlled preview. Keep current static menu hidden until V3 path is complete. Do not publish or seed any menu, do not deploy, and do not touch the legacy site.
+
+No Supabase migration, publication, data write, Edge Function deployment, secret change, Vercel setting or Vercel deployment was performed in this checkpoint.
+
+---
+
+
 ## Latest checkpoint — runtime security and integration audit (2026-11-22)
 
 **Status: read-only audit completed. Security boundaries show expected deny-by-default behavior. No deployment or production-data mutation performed. Multiple launch-blocking integration gaps remain.**
