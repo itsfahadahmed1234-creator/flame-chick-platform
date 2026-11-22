@@ -36,7 +36,8 @@ test("Admin and Owner are restaurant-wide; Manager, Cashier and Rider remain bra
 test("public wrapper delegates to the private command function", () => {
   assert.match(isolationMigration, /ALTER FUNCTION public\.flame_chick_staff_admin_command\(text,jsonb\) SET SCHEMA app_private/);
   assert.match(isolationMigration, /REVOKE ALL ON FUNCTION app_private\.flame_chick_staff_admin_command_internal/);
-  assert.match(isolationMigration, /CREATE OR REPLACE FUNCTION public\.flame_chick_staff_admin_command/);
+  assert.match(isolationMigration, /CREATE FUNCTION public\.flame_chick_staff_admin_command/);
+  assert.match(isolationMigration, /SECURITY INVOKER SET search_path=''/);
 });
 
 test("service-only invitation finalizer uses the secret key in apikey only", () => {
