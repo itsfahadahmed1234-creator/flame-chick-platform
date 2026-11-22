@@ -174,6 +174,82 @@
     return group.allowRepeatOption ? group.maxUnits : 1;
   }
 
+  function buildProductModifierGroups(snapshot, productId, productVariantId, contract, options) {
+    options = options || {};
+    var assignments = sortByOrder(snapshot.modifierGroupAssignments.filter(function (assignment) {
+      return assignment.productId === productId;
+    }), 'assignmentId');
+    return assignments.map(function (assignment) {
+      var group = find(snapshot.modifierGroups, 'modifierGroupId', assignment.modifierGroupId);
+      if (!group || (options.excludeStandaloneOnly && group.standaloneOnly)) return null;
+      var modifiers = sortByOrder(snapshot.modifiers.filter(function (modifier) {
+        return modifier.modifierGroupId === group.modifierGroupId;
+      }), 'modifierId').map(function (modifier) {
+        var priceMinor = null;
+        if (modifier.priceMode === 'FIXED') {
+          priceMinor = contract.minorUnits(modifier.fixedPrice);
+        } else if (modifier.priceMode === 'BY_SIZE') {
+          var rule = snapshot.modifierPriceRules.find(function (item) {
+            return item.modifierId === modifier.modifierId &&
+              item.productId === productId && item.productVariantId === productVariantId;
+          });
+          if (!rule) return null;
+          priceMinor = contract.minorUnits(rule.price);
+        }
+        if (priceMinor === null) return null;
+        return {
+          id: modifier.modifierId,
+          name: modifier.nameEn,
+          nameUr: modifier.nameUr,
+          priceMode: modifier.priceMode,
+          priceMinor: priceMinor
+        };
+      }).filter(Boolean);
+      if (modifiers.length < group.minSelect) return null;
+      return {
+        id: group.modifierGroupId,
+        name: group.nameEn,
+        nameUr: group.nameUr,
+        selectionMode: group.selectionMode,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        modifiers: modifiers
+      };
+    }).filter(Boolean);
+  }
+
+  function validateModifierSelections(modifierGroups, selections) {
+    if (!Array.isArray(modifierGroups) || !isRecord(selections)) {
+      return fail('MODIFIER_SELECTION_INPUT_INVALID', 'Modifier selection input is invalid.');
+    }
+    var allowedGroupIds = Object.create(null);
+    var canonical = [];
+    for (var groupIndex = 0; groupIndex < modifierGroups.length; groupIndex++) {
+      var group = modifierGroups[groupIndex];
+      allowedGroupIds[group.id] = true;
+      var selected = selections[group.id] || [];
+      if (!Array.isArray(selected)) return fail('MODIFIER_SELECTION_GROUP_INVALID', 'Each modifier group selection must be an array.');
+      var allowed = Object.create(null);
+      group.modifiers.forEach(function (modifier) { allowed[modifier.id] = true; });
+      var seen = Object.create(null);
+      for (var i = 0; i < selected.length; i++) {
+        var modifierId = selected[i];
+        if (typeof modifierId !== 'string' || !allowed[modifierId] || seen[modifierId]) {
+          return fail('MODIFIER_SELECTION_OPTION_INVALID', 'A modifier is not allowed or is duplicated.');
+        }
+        seen[modifierId] = true;
+      }
+      if (selected.length < group.minSelect || selected.length > group.maxSelect) {
+        return fail('MODIFIER_SELECTION_BOUNDS', 'Modifier selection does not satisfy the required minimum and maximum.');
+      }
+      canonical.push({ modifierGroupId: group.id, modifierIds: selected.slice() });
+    }
+    if (Object.keys(selections).some(function (id) { return !allowedGroupIds[id]; })) {
+      return fail('MODIFIER_SELECTION_GROUP_UNKNOWN', 'A modifier group is not assigned to this product.');
+    }
+    return { ok: true, selections: canonical };
+  }
+
   function buildDealViewModel(snapshot, options, contract) {
     options = options || {};
     contract = contract || (root && root.FlameChickCatalogV3);
