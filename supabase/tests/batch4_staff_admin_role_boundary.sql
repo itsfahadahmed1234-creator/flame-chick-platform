@@ -42,10 +42,10 @@ BEGIN
   INSERT INTO auth.users(
     id,aud,role,email,encrypted_password,email_confirmed_at,
     raw_app_meta_data,raw_user_meta_data,created_at,updated_at,
-    confirmed_at,is_sso_user,is_anonymous
+    is_sso_user,is_anonymous
   ) VALUES
     (v_admin,'authenticated','authenticated','qa-staff-admin-admin@example.invalid','',v_now,
-      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,v_now,false,false),
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,false,false),
     (v_owner,'authenticated','authenticated','qa-staff-admin-owner@example.invalid','',v_now,
       '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,v_now,false,false),
     (v_manager,'authenticated','authenticated','qa-staff-admin-manager@example.invalid','',v_now,
