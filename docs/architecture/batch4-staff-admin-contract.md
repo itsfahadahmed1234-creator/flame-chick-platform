@@ -28,3 +28,31 @@ Admin/Owner are restaurant-wide. Manager/Cashier/Rider are branch-scoped. Same o
 
 ## Required environment
 SUPABASE_URL, SUPABASE_PUBLISHABLE_KEYS, SUPABASE_SECRET_KEYS (legacy fallbacks supported), FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS, FLAME_CHICK_STAFF_INVITE_REDIRECT_URL.
+
+## Deployment URL and origin gate
+
+The new Vercel project `flame-chick-admin-production` currently has the verified default domain
+`flame-chick-admin-production.vercel.app`, but Vercel SSO protection is enabled for all domains
+except custom domains and there is no deployment yet. Do not use the protected default domain or
+the legacy `flame-chick-admin.vercel.app` project as the invitation destination for staff who are
+not Vercel team members. Select and attach the intended custom Admin domain first.
+
+After the custom domain is attached and externally verified, set:
+- Supabase Auth Site URL: `https://<custom-admin-domain>/`
+- Supabase Auth Redirect URL allowlist: the exact `https://<custom-admin-domain>/accept-invitation.html` callback (plus only separately approved local development URLs)
+- `FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS=https://<custom-admin-domain>`
+- `FLAME_CHICK_STAFF_INVITE_REDIRECT_URL=https://<custom-admin-domain>/accept-invitation.html`
+
+The function now parses exact origins, rejects wildcard/path/query/credential entries, returns CORS
+headers only for allowlisted origins, and accepts invite redirects only to the exact HTTPS
+`/accept-invitation.html` page on an allowed origin. Local HTTP is supported only for explicitly
+listed loopback development origins. A missing or malformed allowlist leaves the function
+unavailable rather than weakening CORS.
+
+## Password protection and Free plan
+
+The Flamechic organization remains on the Free plan. Supabase documents leaked-password screening
+through HaveIBeenPwned as a Pro-plan-and-above Auth feature. Do not attempt to emulate it with an
+unreviewed third-party call or upgrade the plan. Until a future plan decision, retain the Admin
+invitation page's 12-character minimum, use unique passwords from a password manager, and enable
+MFA for high-privilege Admin/Owner accounts when the authentication flow is prepared for it.
