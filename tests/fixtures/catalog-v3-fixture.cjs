@@ -35,7 +35,7 @@ function createSnapshot() {
       timezone: 'Asia/Karachi'
     },
     branches: [{
-      branchId: id.branch, branchCode: 'MAIN', name: 'Main Branch',
+      branchId: id.branch, branchCode: 'main', name: 'Main Branch',
       address: null, phone: null, timezone: 'Asia/Karachi',
       websiteOrderingEnabled: true, websiteDeliveryEnabled: true, websitePickupEnabled: true
     }],
