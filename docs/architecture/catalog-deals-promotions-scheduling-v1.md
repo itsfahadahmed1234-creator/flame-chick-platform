@@ -2,7 +2,7 @@
 
 Date: 2026-11-21
 Branch: `work/production-source-audit`
-Status: owner-approved design direction; deal schema and command migrations applied to the empty Production project; no menu/staff data inserted; publication/runtime and app integration remain pending
+Status: owner-approved design direction; deal schema/commands and publish/rollback database commands applied to empty Production; no menu/staff data inserted; V3 Website, order/quote runtime, promotions and app integration remain pending
 Production project: `adkrxfnawdiljhjaavnj` (Mumbai, Free)
 
 ## 1. Objective and boundary
@@ -226,9 +226,9 @@ When orders are implemented, each purchased deal must store a server-generated i
 
 GST/tax remains deferred. Inventory, stock depletion, allergens, loyalty, referral, customer segmentation, BOGO/buy-X-get-Y, delivery fees and payment-method promotions are not silently included. They need their own typed domain rules and validation before being presented as supported.
 
-## Current implementation truth
+## Historical implementation note (superseded)
 
-Production still has only the previously verified 11-table catalog foundation and 15 FK indexes. All catalog tables are empty, owned by `postgres`, RLS-enabled, have no policies/direct app-role table grants and are not in Realtime. No deal, schedule, promotion, catalog command or publication tables have been created. This document records the design direction only.
+The following was the state before the later 2026-11-21/22 deal-builder, publication-read and publish/rollback migrations were applied: the original 11-table catalog foundation existed, while deals, schedules, commands and publication data were not yet present. See the implementation-status sections below and the linked handoff reports for the current state.
 
 
 ---
@@ -257,10 +257,54 @@ Admin/Owner-only wrappers now support collection create/edit/read, deal create/e
 
 All mutation APIs share the existing actor resolver, per-restaurant catalog draft revision lock, SHA-256 idempotency ledger and same-transaction append-only actor audit. Public wrappers are SECURITY INVOKER and authenticated-only. Internal command/read functions are postgres-owned SECURITY DEFINER with empty search_path. No direct table CRUD/read grants are exposed to app roles.
 
-### Publication/runtime still pending
+### Publication/runtime status
 
-The migration intentionally does not seed a single deal or schedule. Draft authoring allows incomplete variants/options. Publication compiler must enforce all active group min/max constraints, complete eligible mappings for required choice groups, treatment compatibility, variant/price presence, product/variant tenant and sellability, quantity limits, and schedule/branch effective windows before creating an immutable versioned snapshot. Runtime quote logic must use only the published snapshot, not the mutable draft tables.
+The publication compiler and database publish/rollback commands are now applied through migration `20261122031027_flame_chick_catalog_publish_rollback_v1`. They validate active menu/deal structure and publish a deterministic schema-V3 snapshot, then atomically change `catalog_current_publication`. Rollback restores a previous immutable publication by changing only the pointer. Failed publish and rollback-to-previous-version were tested inside a transaction that was fully rolled back.
 
-The exact public DTO and the single catalog Edge Function router are still pending. Existing Admin direct-REST writes remain disabled. No Edge Function or Admin catalog module is enabled by this implementation.
+Runtime schedule evaluation, V3 customer Website adapter, order/quote pricing against the new deal variants, delivery-area/settings structures, promotions and the full V3 Admin/public DTO are still pending. The Edge Function source reads only the immutable published snapshot and remains undeployed. The current Website catalog client validates schema V2 and must not be pointed at V3. Existing Admin direct-REST writes remain disabled.
 
 Detailed migration and QA record: `docs/handoffs/2026-11-21-deal-builder-command-implementation.md`.
+
+
+---
+
+## 19. Publication and rollback implementation status — 2026-11-22
+
+Applied migration: `20261122031027_flame_chick_catalog_publish_rollback_v1`.
+
+### Implemented database operations
+
+- `public.flame_chick_catalog_publish(bigint,uuid)` — Admin/Owner-only, expected draft revision, request idempotency, complete validation, deterministic V3 snapshot, SHA-256 metadata, immutable publication insert and atomic current-pointer switch.
+- `public.flame_chick_catalog_rollback(uuid,bigint,uuid,text)` — Admin/Owner-only, required operator reason, same-restaurant target check, immutable snapshot checksum verification and pointer-only rollback.
+- `public.flame_chick_catalog_publication_history(bigint,integer)` — bounded keyset history; metadata only, never sends stored snapshots to the Admin browser.
+- Validation and compilation are private postgres-owned SECURITY DEFINER functions with `search_path=''`. Public wrappers are SECURITY INVOKER with authenticated-only EXECUTE and actor checks restrict operation to Admin/Owner.
+- Audit and idempotency response are stored in the same transaction. Publish and rollback do not rewrite draft content.
+
+### Tests passed in a rollback-only transaction
+
+- Created a valid temporary menu via authenticated Admin catalog commands.
+- Published version 1 and replayed the same request without duplicate publication.
+- Edited the draft and published version 2.
+- Created an invalid draft (active product in inactive category); publish was rejected and version 2 remained current.
+- Rolled back to version 1 and replayed the same rollback request idempotently.
+- Verified version 1 became current, version 2 remained immutable and the newer invalid draft remained untouched.
+- Called the published-only read RPC and verified it returned the exact version-1 category/product snapshot and SHA-256.
+- Verified direct publication-table SELECT remains denied to authenticated.
+- All test records, audit rows and publication rows were rolled back.
+
+### V3 publication contract
+
+The current schema does not yet have restaurant-settings, delivery-area or promotion tables. The V3 snapshot includes only stored restaurant name/currency/timezone settings, includes branch and availability overlays and schedule definitions, and explicitly returns empty `deliveryAreas` and `promotions` arrays. Do not cut over checkout until those missing operational domains are implemented.
+
+### Old Website rollback
+
+The existing customer domain is still assigned to the verified legacy production deployment:
+- `flame-chick.vercel.app`
+- Legacy project `flamechicks`, ID `prj_ldHcRFVX0kadzR8jxVJz7pO1vPz5`
+- Production deployment `dpl_4MepX2o8ysrqsnHp7H6H7mVqznGP`, commit `6ac16abf9195926a5cc7ac153fbd94d0b29c22a2`
+
+The new `flame-chick-website-production` project has no production deployment or custom domain. If a future cutover is reverted, Vercel `assign_alias` can reassign `flame-chick.vercel.app` to the exact legacy deployment ID above. No alias reassignment or Website cutover has been performed. Detailed runbook: `docs/architecture/website-release-cutover-rollback-v1.md`.
+
+### Next release gates
+
+The Website consumer remains V2 while this publisher emits V3. Implement/test the V3 client adapter, delivery areas and settings, server-side schedule evaluation, deal quote/checkout validation and full order-to-POS path. Only then use a preview deployment and perform a separately approved customer-domain cutover.
