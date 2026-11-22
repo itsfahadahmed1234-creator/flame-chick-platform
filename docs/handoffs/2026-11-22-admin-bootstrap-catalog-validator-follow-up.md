@@ -8,6 +8,29 @@ The intended Auth user `itsfahadahmed1234@gmail.com` was created and email-confi
 
 The Admin web app is not yet operational. Its bootstrap requires the `flame-chick-staff-admin` Edge Function, which is not deployed. Exact allowed origins, invitation redirect URL and server-only secret configuration remain outstanding. The new Vercel Admin production project has not been deployed. Keep all non-Staff modules disabled: source still contains legacy direct REST CRUD/storage operations that must be replaced by secure command APIs before those modules can be enabled.
 
+## Staff Admin authorization boundary QA — implementation and live ACL audit
+
+**State: QA workflow started; runtime fixture has not yet passed. Do not mark the Admin security gate complete until run 45027267180 finishes successfully.**
+
+Read-only inspection of intended production Supabase project `adkrxfnawdiljhjaavnj` confirmed:
+- Active Flame Chick staff assignments: exactly one, the user's restaurant-wide `admin`; no Owner/Manager/Cashier/Rider identities exist yet.
+- `user_profiles`, `user_roles`, `staff_role_audit`, `app_private.staff_invitation_requests`, and `app_private.staff_invitation_branch_targets` all have RLS enabled, postgres ownership, and no direct SELECT grants to anon/authenticated/service_role.
+- `app_private` schema USAGE is granted to authenticated only; anon and service_role have no schema USAGE.
+- Public Staff Admin wrapper is SECURITY INVOKER, postgres-owned, executable by authenticated only; private implementation is SECURITY DEFINER with empty search_path and authenticated-only execute. System invitation finalizer is service_role-only.
+- Read-only function privilege scan found no anon or PUBLIC EXECUTE grants on functions in public or app_private.
+- Staff tables are not members of Supabase Realtime publication.
+- The Staff Admin command reads `auth.uid()` and accepts only an active restaurant-wide Admin/Owner. It does not trust role or actor values supplied in the JSON request body.
+
+Added disposable CI fixture `supabase/tests/batch4_staff_admin_role_boundary.sql`. It creates five synthetic Auth identities in a transaction, bootstraps a temporary Admin, assigns Owner/Manager/Cashier/Rider through the real command, verifies Admin and Owner list access, verifies all three operational roles and missing JWT are denied, tests body-level role spoofing, and checks direct grants/RLS/Realtime exposure. It ends in ROLLBACK; no fixture identity or role is intended to persist.
+
+Added `.github/workflows/qa-staff-admin-role-boundary.yml` to replay the full migration history on a disposable local Supabase stack, run the existing Batch 4 ACL/RLS assertions, run the new runtime role fixture, and verify all synthetic data is gone.
+
+- CI run: [45027267180](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45027267180)
+- Initial workflow validation caught a too-specific grep for generated role-denial markers; workflow assertion was corrected in commit `c637e8c2683108e57ecb7bb09faa2dc4fc171451`. That first run failed only at preflight marker validation, before starting the local database.
+- The corrected run passed fixture static validation and is currently at disposable Supabase startup. Runtime assertions remain pending.
+
+No Production Supabase migration, Auth settings, Edge Function deployment, Vercel deployment, secret or live data was changed. No Owner account was created.
+
 ## Admin security readiness — origin policy and plan limits
 
 The Flamechic Supabase organization remains on the Free plan. Current Supabase documentation states that leaked-password protection (HaveIBeenPwned screening) is available on Pro and above. No upgrade was made and no external password-checking substitute was added. The invitation page retains its 12-character minimum; Admin/Owner should use unique password-manager-generated passwords and enable MFA when the auth flow is ready.
