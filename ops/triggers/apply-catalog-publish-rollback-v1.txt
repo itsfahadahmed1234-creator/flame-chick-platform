@@ -1,0 +1,1 @@
+Apply only migration 20261122031027_flame_chick_catalog_publish_rollback_v1.sql to Flame Chick Mumbai Production. Require all prior catalog and published-read migrations recorded and this migration to be the only pending change. Do not seed menu data or deploy Website/Edge Functions.
