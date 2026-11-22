@@ -1,3 +1,21 @@
+## Latest checkpoint — V3 deal configurator adapter (2026-11-22)
+
+**Status: isolated accessible deal configurator and ID-only selection payload implemented; latest full Website Static Checks passed. Not wired into storefront. No deployment or publication.**
+
+- Added `apps/flame-chick-website/js/catalog-v3-deal-configurator.js`.
+- Provides explicit deal-variant selection; component group selection and quantity caps; per-instance modifier customization for repeated component items; required/maximum selection validation; and accessible fieldset/legend, labels, radio/checkbox/number controls and live status.
+- Changing deal variant resets prior component choices. Reducing a repeated component quantity removes customizations belonging to removed instances. A closure issue in repeated-item modifier event handlers was found during review and fixed using block-scoped loop binding.
+- The completion callback receives only the V3 publication/version/branch/fulfilment identifiers, deal and variant IDs, component option/product/product variant IDs, modifier group IDs and modifier IDs. It does not include names, prices, totals or browser-computed quote data. The future server quote/order API must independently validate all identifiers, current publication, availability, schedules, selection rules and authoritative prices.
+- UI renders base variant and option/modifier price labels only for display; no client-side total is calculated. The adapter requires an explicit completion callback and does not itself submit orders or call an API.
+- Added `tests/catalog-v3-deal-configurator.test.mjs` for fail-closed context, variant and component selection, quantity caps, ID-only payload shape, repeated component customizations, invalid modifier IDs, stale customizations after quantity reduction, and required rendering dependencies.
+- A first explicit run caught two test harness setup errors; corrected the tests. A subsequent review caught that the new test file was not yet in the CI test command. Updated the workflow to explicitly run it. Another regression test covers a required modifier group that cannot be satisfied due to a missing variant-specific price rule; such component options now fail closed rather than silently dropping the required group.
+- Latest Website Static Checks run [45048585722](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45048585722) passed on source/test commit `237826c15b3048118f50558b17286d6e7e5b041c`: **65 tests passed, 0 failed**, syntax checks and Website inline-script parsing passed. The handoff update is documentation-only.
+- The configurator remains unreferenced by `index.html`; the Website's hidden-menu safety gate is unchanged. No database write, migration, Edge Function deployment, menu publication/seed, Vercel deployment, domain modification or checkout activation.
+
+**Next:** implement a unified branch and fulfilment selector that consumes the published catalog, handles the one-branch case safely and requires a user choice when multiple branches exist. It must obtain trusted server time and keep delivery/pickup disabled when the selected branch does not support it. Then create a non-ordering preview integration that can render product and deal UI behind an explicit feature gate. Keep checkout closed until the server quote/order API and full integration tests exist.
+
+---
+
 ## Latest checkpoint — V3 deal choices, component modifiers and trusted-time schedules (2026-11-22)
 
 **Status: isolated deal/schedule view-model and selection validators added; latest full Website Static Checks passed. Not connected to the Website HTML. No deployment or publication.**
