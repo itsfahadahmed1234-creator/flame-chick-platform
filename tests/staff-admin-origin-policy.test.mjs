@@ -66,3 +66,35 @@ test("the production Edge Function imports and enforces the tested origin policy
   assert.match(source, /parseAllowedOrigins/);
   assert.match(source, /if\(!isAllowedRequestOrigin\(origin,ORIGINS\)\)/);
 });
+
+const productionAdminOrigin = "https://flamechicadmin.vercel.app";
+const productionAllowed = parseAllowedOrigins(productionAdminOrigin);
+
+test("production Admin origin is the sole browser origin for Staff Admin", () => {
+  assert.equal(productionAllowed.size, 1);
+  assert.equal(isAllowedRequestOrigin(productionAdminOrigin, productionAllowed), true);
+  for (const origin of [
+    "https://flamechic.vercel.app",
+    "https://flamechicrider.vercel.app",
+    "https://flame-chick-admin-production.vercel.app",
+    "https://evil.example.test"
+  ]) {
+    assert.equal(isAllowedRequestOrigin(origin, productionAllowed), false, origin);
+    assert.equal(staffCorsHeaders(origin, productionAllowed)["Access-Control-Allow-Origin"], undefined);
+  }
+});
+
+test("production invitation callback is pinned to the Admin domain", () => {
+  assert.equal(isSafeInviteRedirect(
+    productionAdminOrigin + "/accept-invitation.html",
+    productionAllowed
+  ), true);
+  assert.equal(isSafeInviteRedirect(
+    "https://flamechic.vercel.app/accept-invitation.html",
+    productionAllowed
+  ), false);
+  assert.equal(isSafeInviteRedirect(
+    "https://flamechicrider.vercel.app/accept-invitation.html",
+    productionAllowed
+  ), false);
+});
