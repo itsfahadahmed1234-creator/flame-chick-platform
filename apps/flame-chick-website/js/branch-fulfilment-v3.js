@@ -21,7 +21,7 @@
         !Array.isArray(snapshot.branches) || snapshot.branches.length === 0) {
       return fail('BRANCH_CATALOG_INVALID', 'The published catalog does not contain valid branch information.');
     }
-    if (!validDatabaseTime(databaseNow)) {
+    if (typeof contract.isIsoUtcDateTime !== 'function' || !contract.isIsoUtcDateTime(databaseNow)) {
       return fail('DATABASE_TIME_REQUIRED', 'Trusted database time is missing or invalid. Please reload the menu.');
     }
     if (!contract || typeof contract.isBranchOrderingEnabled !== 'function') {
