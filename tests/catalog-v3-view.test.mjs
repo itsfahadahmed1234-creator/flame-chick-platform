@@ -101,7 +101,7 @@ test('rejects invalid snapshots and missing validator instead of falling back to
   bad.products[0].nameEn = '<img src=x onerror=alert(1)>';
   const invalid = view.buildMenuViewModel(bad, {}, { validateSnapshot: () => ({ ok: false, code: 'SNAPSHOT_INVALID' }) });
   assert.equal(invalid.ok, false);
-  assert.equal(view.buildMenuViewModel(createSnapshot(), {}, null).code, 'CONTRACT_UNAVAILABLE');
+  assert.equal(view.buildMenuViewModel(createSnapshot(), {}, {}).code, 'CONTRACT_UNAVAILABLE');
 });
 
 test('formats integer minor units with the publication currency', () => {
