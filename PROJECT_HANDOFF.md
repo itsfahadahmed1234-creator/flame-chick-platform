@@ -24,6 +24,28 @@ This guardrail is intentionally prominent because these identifiers are operatio
 
 ---
 
+## Latest checkpoint — V3 public Website catalog client scaffold (2026-11-22)
+
+**Status: client module and focused tests added, but final CI run after test-harness corrections is not yet verified. Client is not loaded by the Website HTML and no deployment is authorized.**
+
+- Added `apps/flame-chick-website/js/catalog-v3-client.js`.
+- Client requires HTTPS API configuration, public publishable key, and the V3 validator.
+- Fetches health first; unpublished status returns a closed state without catalog fetch.
+- Fetches catalog only after valid published health metadata.
+- Validates the complete V3 snapshot and requires exact match for schema version, publication ID/number, draft revision, snapshot hash, publication timestamp and derived version ID between health and catalog.
+- Uses GET, `cache: no-store`, `redirect: error`, bounded response size (4 MiB plus bounded envelope overhead), request timeout, one retry for network/429/5xx, and no persistent browser storage cache. Permanent HTTP errors and schema/integrity failures are not retried.
+- Browser sends only the public publishable key; no Authorization bearer secret is added. Database RPC remains responsible for recomputing the PostgreSQL jsonb::text SHA-256 before the snapshot leaves the server.
+- Added `tests/catalog-v3-client.test.mjs` for success, unpublished, health transport failure, metadata mismatch, malformed envelope/schema, retry policy, oversized response, HTTPS and validator requirements.
+- Added client syntax check and client tests to `.github/workflows/ci-website-static.yml`.
+- First run `45045702129` failed on two test-harness expectations (default transient retry count and UMD global fallback in the missing-validator test). Both test setups were corrected in commit `d4efcb3d9f5b881ab48ea7a54ab9b91e6868bc05`. The rerun triggered by that commit must be inspected and confirmed successful before proceeding.
+- Current intended branch head after test corrections: `d4efcb3d9f5b881ab48ea7a54ab9b91e6868bc05`.
+
+**Still not done:** no HTML script reference to the V3 client, no dynamic menu rendering, no V3 pricing/choice/cart UI, no checkout integration, no Edge Function deployment, no database migration or publication, no Vercel deployment. Existing V2 loader and hardcoded menu path remain behind the current hidden-menu gate. Do not remove that gate or expose the menu yet.
+
+Next: confirm CI passes, then build isolated rendering/view-model tests against the real V3 fixture. Integrate only after V3 menu, variants, modifiers, deals and branch rules are fully rendered from stable database IDs and tested. Keep final order pricing exclusively server-calculated.
+
+---
+
 ## Latest checkpoint — Website database-driven catalog integration audit (2026-11-22)
 
 **Status: database-driven architecture confirmed; active V3 client integration is still pending. Do not deploy.**
