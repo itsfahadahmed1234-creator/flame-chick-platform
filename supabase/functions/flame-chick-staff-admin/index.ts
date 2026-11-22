@@ -1,4 +1,5 @@
 // Flame Chick Staff Admin API — Batch 4.
+import { isSafeInviteRedirect, parseAllowedOrigins, staffCorsHeaders } from "./origin-policy.mjs";
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").replace(/\/+$/,"");
 function readKey(jsonName:string,fallback:string[]):string{
  try{const x=JSON.parse(Deno.env.get(jsonName)??"{}");const v=x?.default;if(typeof v==="string"&&v)return Deno.env.get(v)??v;}catch{}
@@ -6,14 +7,21 @@ function readKey(jsonName:string,fallback:string[]):string{
 }
 const PUBLIC_KEY=readKey("SUPABASE_PUBLISHABLE_KEYS",["SUPABASE_PUBLISHABLE_KEY","SUPABASE_ANON_KEY"]);
 const SECRET_KEY=readKey("SUPABASE_SECRET_KEYS",["SUPABASE_SECRET_KEY","SUPABASE_SERVICE_ROLE_KEY"]);
-const ORIGINS=new Set((Deno.env.get("FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS")??"").split(",").map(x=>x.trim()).filter(Boolean));
 const REDIRECT=(Deno.env.get("FLAME_CHICK_STAFF_INVITE_REDIRECT_URL")??"").trim();
+let ORIGINS: Set<string> = new Set();
+let ORIGIN_CONFIG_VALID = false;
+try {
+ ORIGINS = parseAllowedOrigins(Deno.env.get("FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS") ?? "");
+ ORIGIN_CONFIG_VALID = true;
+} catch {
+ // Fail closed without logging the environment value.
+ ORIGINS = new Set();
+}
 type Obj=Record<string,unknown>;
 class ApiError extends Error{constructor(public code:string,public status:number,message:string){super(message);}}
 const obj=(x:unknown):x is Obj=>!!x&&typeof x==="object"&&!Array.isArray(x);
 function response(body:Obj,status:number,origin:string|null):Response{
- const h=new Headers({"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","Vary":"Origin"});
- if(origin&&ORIGINS.has(origin)){h.set("Access-Control-Allow-Origin",origin);h.set("Access-Control-Allow-Methods","GET, POST, OPTIONS");h.set("Access-Control-Allow-Headers","apikey, authorization, content-type, x-client-info");h.set("Access-Control-Max-Age","600");}
+ const h=new Headers(staffCorsHeaders(origin,ORIGINS));
  return new Response(JSON.stringify(body),{status,headers:h});
 }
 function fail(e:unknown,origin:string|null):Response{
@@ -41,7 +49,7 @@ async function systemRpc(action:string,payload:Obj):Promise<unknown>{
  const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/flame_chick_staff_admin_system_command",{method:"POST",headers:{apikey:SECRET_KEY,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({p_action:action,p_payload:payload}),cache:"no-store"});
  const x=await body(r);if(!r.ok)throw rpcErr(x);return x;
 }
-function redirectOk():boolean{try{const u=new URL(REDIRECT);return u.protocol==="https:"&&ORIGINS.has(u.origin);}catch{return false;}}
+function redirectOk():boolean{return isSafeInviteRedirect(REDIRECT,ORIGINS);}
 function duplicate(status:number,x:unknown):boolean{if(![400,409,422].includes(status))return false;const v=obj(x)?x:{};const s=[v.code,v.error,v.msg,v.message,v.error_description].filter(y=>typeof y==="string").join(" ").toLowerCase();return /already.?registered|already.?exists|user.?exists|email.?exists/.test(s);}
 async function sendInvite(email:string,name:string,phone:string|null):Promise<{kind:"sent";id:string}|{kind:"existing"}>{
  if(!SECRET_KEY||!redirectOk())throw new ApiError("STAFF_INVITE_NOT_CONFIGURED",503,"The secure invitation destination is not configured.");
@@ -88,6 +96,7 @@ Deno.serve(async(req:Request)=>{
  if(origin&&!ORIGINS.has(origin))return response({ok:false,error:{code:"ORIGIN_NOT_ALLOWED",message:"This application origin is not allowed."}},403,null);
  if(req.method==="OPTIONS"){if(!origin||!ORIGINS.has(origin))return response({ok:false,error:{code:"ORIGIN_NOT_ALLOWED",message:"This origin is not allowed."}},403,null);return response({ok:true},200,origin);}
  try{
+  if(!ORIGIN_CONFIG_VALID)throw new ApiError("STAFF_ADMIN_ORIGIN_NOT_CONFIGURED",503,"Staff Admin origin settings are not configured safely.");
   if(!SUPABASE_URL||!PUBLIC_KEY)throw new ApiError("STAFF_ADMIN_NOT_CONFIGURED",503,"Staff Admin is not configured.");
   if(req.method!=="GET"&&req.method!=="POST")throw new ApiError("METHOD_NOT_ALLOWED",405,"Use GET or POST.");
   const t=token(req);if(!t)throw new ApiError("STAFF_AUTH_REQUIRED",401,"Sign in with your Flame Chick staff account.");
