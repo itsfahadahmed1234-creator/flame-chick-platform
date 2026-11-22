@@ -24,6 +24,48 @@ This guardrail is intentionally prominent because these identifiers are operatio
 
 ---
 
+## Latest checkpoint — CI failure repairs and verification (2026-11-22)
+
+**Status: targeted CI failures repaired; all current relevant automated checks pass. This is not a production-readiness certification.**
+
+- Working branch: `work/production-source-audit`; latest verified branch HEAD at this checkpoint: `0a78a39935b598b578c272d253044ae1e439a51b`. `main` remains untouched.
+- Exact GitHub repository: `itsfahadahmed1234-creator/flame-chick-platform`.
+
+### Failures found and fixes applied
+
+1. Catalog Admin API QA failure: the workflow attempted `npm install --global deno@2.9.8`, but npm had no matching package version. Replaced this with the same pinned `denoland/setup-deno` action used by the Edge Function pipeline, pinned to Deno `2.9.8`.
+2. Edge Function TypeScript failure: TypeScript inferred that the JavaScript catalog route helper could return `undefined`. Added JSDoc `@returns {never}` to the invalid-request helper, making its always-throws contract explicit to Deno's type checker.
+
+### Verified CI results
+
+- Catalog Admin API QA: run [45041083181](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45041083181) — SUCCESS on exact HEAD `0a78a39935b598b578c272d253044ae1e439a51b`. All 7 Node contract tests passed; pinned Deno setup passed; Staff Admin Edge Function and imported catalog action router type-check passed.
+- Edge Function static checks: run [45041080371](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45041080371) — SUCCESS on `d9454c14487804ac260b1ddfe5d1ac4e1aee63e4`. All four Edge Function type checks and RPC/key contract hygiene test step passed. The only subsequent commit to HEAD changed the Catalog QA workflow file, not Edge Function source.
+- Admin static checks: run [45041080431](https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/45041080431) — SUCCESS on `d9454c14487804ac260b1ddfe5d1ac4e1aee63e4`. JavaScript syntax, invitation wiring, and bundled static contract checks passed. The only subsequent commit to HEAD changed the Catalog QA workflow file, not Admin app source.
+- Staff Admin role-boundary disposable local Supabase QA: run [45028629608](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45028629608) — SUCCESS. Full migration replay, Admin/Owner allow paths, Manager/Cashier/Rider and missing-JWT deny paths, spoof-resistance, RLS/ACL checks, and rollback cleanup passed.
+- POS/Rider static checks: run [44881805138](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44881805138) — SUCCESS. POS and Rider app source did not change after that tested commit in the current working-branch history.
+- Catalog publication validator migration-chain/recovery QA: run [45015595535](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45015595535) — SUCCESS. Full local migration replay, candidate regression fixture, compensation rehearsal and cleanup passed.
+
+Older failed attempts remain in Actions history; the successful runs above supersede them for the respective code/workflow revisions. GitHub's combined commit-status endpoint returned an empty legacy status list; the results above are from the GitHub Actions run and job-step records, not inferred from that endpoint.
+
+### Hard production boundary — do not bypass
+
+A green CI pipeline does **not** prove that a live production system is free of bugs. It only verifies the tested static contracts and disposable test scenarios. Do not claim “zero production errors” or equate passing CI with completed end-to-end validation.
+
+Still outstanding before any preview or production deployment:
+1. Review complete source/API behavior and threat boundaries, not just compile status.
+2. Deploy expanded Staff Admin/catalog code only after a separate review/approval; verify the actual deployed version and configuration.
+3. Exercise safe read-only Staff Admin/catalog requests using the existing authenticated Admin session on the exact Admin origin; verify unauthorized roles/origins, JWT failures, network failures and malformed requests fail closed.
+4. Complete catalog UI integration and DTO compatibility; publication and rollback remain unavailable in the catalog API until the Website schema-v3 contract is approved.
+5. Finish order and delivery/rider schemas and APIs; these are not operational yet. POS/Rider static checks alone do not prove live workflow readiness.
+6. Perform end-to-end Website, Admin, POS and Rider tests using non-customer test data, with explicit failure/retry/idempotency, concurrency, reconnect and recovery tests.
+7. Confirm Vercel root directories, Production Branch, build/ignore settings and environment variables through readback before creating a controlled preview.
+8. Keep all Vercel projects undeployed, no customer order intake, no menu seed/publication, no Website cutover and no changes to the legacy live site until separate explicit approval.
+
+No Supabase migrations, production database data, Edge Function deployments, Auth settings/secrets, or Vercel deployments were changed while repairing CI.
+
+---
+
+
 ## Latest checkpoint — Vercel Git connections completed (2026-11-22)
 
 **Status: all four Flame Chick Vercel project shells are linked to the intended private GitHub repository; no deployment created.**
