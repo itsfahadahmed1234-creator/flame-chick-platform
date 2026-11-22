@@ -27,7 +27,7 @@ const DATABASE_KEY = String(
   ""
 );
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
