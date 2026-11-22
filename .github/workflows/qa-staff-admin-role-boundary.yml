@@ -41,7 +41,7 @@ jobs:
           set -euo pipefail
           test -s supabase/tests/batch4_staff_admin_security.sql
           test -s supabase/tests/batch4_staff_admin_role_boundary.sql
-          for marker in STAFF_ROLE_BOUNDARY_ADMIN_ACCESS_FAILED STAFF_ROLE_BOUNDARY_OWNER_ACCESS_FAILED STAFF_ROLE_BOUNDARY_MANAGER_WAS_GRANTED_ADMIN_ACCESS STAFF_ROLE_BOUNDARY_CASHIER_WAS_GRANTED_ADMIN_ACCESS STAFF_ROLE_BOUNDARY_RIDER_WAS_GRANTED_ADMIN_ACCESS STAFF_ROLE_BOUNDARY_MISSING_JWT_WAS_ACCEPTED STAFF_ROLE_BOUNDARY_DIRECT_TABLE_PRIVILEGE; do
+          for marker in STAFF_ROLE_BOUNDARY_ADMIN_ACCESS_FAILED STAFF_ROLE_BOUNDARY_OWNER_ACCESS_FAILED STAFF_ROLE_BOUNDARY_%_WAS_GRANTED_ADMIN_ACCESS STAFF_ROLE_BOUNDARY_MISSING_JWT_WAS_ACCEPTED STAFF_ROLE_BOUNDARY_DIRECT_TABLE_PRIVILEGE; do
             grep -q "$marker" supabase/tests/batch4_staff_admin_role_boundary.sql
           done
           grep -q "ROLLBACK;" supabase/tests/batch4_staff_admin_role_boundary.sql
