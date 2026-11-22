@@ -18,26 +18,22 @@ BEGIN
     RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_FIXTURE_REQUIRES_POSTGRES';
   END IF;
 
-  -- The migration replay's canonical seed is intentionally inactive. Activate
-  -- only the disposable fixture tenant/branch inside this transaction.
-  SELECT id INTO v_restaurant_id
-  FROM public.restaurants
-  WHERE slug='flame-chick'
-  LIMIT 1;
-  IF v_restaurant_id IS NULL THEN
-    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RESTAURANT_NOT_READY';
-  END IF;
-  UPDATE public.restaurants SET is_active=true WHERE id=v_restaurant_id;
+  -- Migrations intentionally create schema only. Create a tenant and branch
+  -- with the canonical Flame Chick slug inside this disposable transaction.
+  v_restaurant_id := 'f1111111-1111-4111-8111-111111111111';
+  v_branch_id := 'f2222222-2222-4222-8222-222222222222';
 
-  SELECT id INTO v_branch_id
-  FROM public.branches
-  WHERE restaurant_id=v_restaurant_id
-  ORDER BY branch_code,id
-  LIMIT 1;
-  IF v_branch_id IS NULL THEN
-    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_BRANCH_REQUIRED';
+  IF EXISTS(SELECT 1 FROM public.restaurants WHERE slug='flame-chick')
+     OR EXISTS(SELECT 1 FROM public.restaurants WHERE id=v_restaurant_id)
+     OR EXISTS(SELECT 1 FROM public.branches WHERE id=v_branch_id) THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_FIXTURE_TENANT_ID_CONFLICT';
   END IF;
-  UPDATE public.branches SET is_active=true WHERE id=v_branch_id;
+
+  INSERT INTO public.restaurants(id,name,slug,currency_code,timezone,is_active)
+  VALUES(v_restaurant_id,'Flame Chick QA','flame-chick','PKR','Asia/Karachi',true);
+
+  INSERT INTO public.branches(id,restaurant_id,branch_code,name,is_active,timezone)
+  VALUES(v_branch_id,v_restaurant_id,'qa-main','QA Main',true,'Asia/Karachi');
 
   IF EXISTS(SELECT 1 FROM public.user_roles WHERE restaurant_id=v_restaurant_id) THEN
     RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_FIXTURE_EXPECTS_EMPTY_LOCAL_STAFF';
