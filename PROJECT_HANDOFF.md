@@ -1,3 +1,59 @@
+# CURRENT IMPLEMENTATION STATUS — 2026-11-22 (Admin bootstrap and catalog validator follow-up)
+
+## Admin identity bootstrap — completed and verified
+
+- Supabase project: `adkrxfnawdiljhjaavnj` (Flame Chick Production, Mumbai `ap-south-1`, Free).
+- Auth account: `itsfahadahmed1234@gmail.com`, Auth user ID `327528e6-ea13-4f18-bd44-f4a8c7ce636a`; email confirmed.
+- `public.user_profiles`: active profile, display name `Admin`.
+- `public.user_roles`: active restaurant-wide `admin` role for Flame Chick, `branch_id IS NULL`, assignment method `initial_bootstrap`.
+- Trigger-generated `staff_role_audit` row verified; action `activated`, actor equals the Admin user.
+- The separate Owner identity has NOT been created and must remain separate. Do not grant Owner to the Admin account.
+- Main branch remains the initial branch. No Manager, Cashier or Rider identities have been created.
+
+## Immediate Admin application readiness — not yet complete
+
+- No Supabase Edge Functions are deployed. The Admin UI calls `flame-chick-staff-admin` during bootstrap, so the panel cannot yet complete its production login/context flow.
+- The Staff Admin function source is present and `verify_jwt=true`; it still needs exact production origins, invitation redirect URL, server-only secret key configuration, deployment and role/negative-path tests.
+- New Vercel project `flame-chick-admin-production` has not been deployed; SSO deployment protection is enabled. The legacy Admin app project must not be mistaken for the new production project.
+- Admin catalog, orders, deals, delivery, media and settings modules remain disabled in the UI. This is intentional.
+- Source audit confirms legacy direct REST CRUD/storage operations still exist in `apps/flame-chick-admin/app.js`. Do not enable those modules or grant direct table CRUD for compatibility. Replace them with secure domain command APIs first.
+- No Vercel deployment, Auth redirect/origin change, Edge Function deployment or secret change was performed during the Admin bootstrap.
+
+## Catalog publication validation fixes — review branch only
+
+- Working branch: `work/production-source-audit`; no changes to `main`.
+- New additive migration candidate: `supabase/migrations/20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql`.
+- Commit: `36423a0e481095f306bdd02eaf5ee6d85f31b80c`.
+- Fix A: only active-referenced schedule sets (active deal collection fallback or active assignment to an active deal) are validated for timezone/windows and included in the public snapshot. Unreferenced active schedule drafts no longer block publication or leak into customer snapshots.
+- Fix B: missing per-variant option mappings are checked only for component groups where `min_units > 0`; optional groups can be left unmapped for a deal variant.
+- The migration includes strict PostgreSQL/session preflight checks, expected-baseline checks, and postflight checks that preserve function owner, ACL, SECURITY DEFINER flag and function configuration.
+- Rollback-only Production smoke test executed with a temporary unreferenced active schedule set; validation accepted it, snapshot omitted it, and transaction was rolled back. A follow-up query verified no temporary row remains.
+- This is partial QA, not full acceptance: optional-group behavior still needs a dedicated full fixture test; run the full migration chain on a disposable local Supabase stack and inspect function definitions/ACLs/advisors before requesting Production migration approval.
+- Migration has NOT been applied to the Production migration ledger. No production schema change resulted from this candidate.
+
+## Current Supabase advisor findings
+
+- Security advisor: no current high/critical findings. It reports INFO `rls_enabled_no_policy` for deny-by-default tables (expected: app roles intentionally have no direct table policies/grants) and WARN `auth_leaked_password_protection` because leaked-password protection is disabled. Enable this Auth setting before broad staff onboarding.
+- Performance advisor: unused-index INFO notices are expected on the empty pre-launch database; do not drop indexes based on zero-traffic statistics.
+- Health advisor returned no findings.
+- No real menu, orders, publications, delivery areas or promotions have been seeded.
+
+## Security hygiene follow-up
+
+- A previously open legacy POS browser tab exposed a credential in its URL query string. Treat that credential as compromised: rotate it if it was valid, remove the URL from browser history/screenshots/logs where possible, and never put passwords in URLs. Do not assume it was the new Admin password.
+- Never store service-role/secret keys in browser configuration or Vercel public environment variables.
+
+## Next execution order
+
+1. Complete isolated migration-chain and optional-deal-group QA; update the handoff with exact test outcomes.
+2. Configure Supabase Auth leaked-password protection and exact Site URL/redirect allowlist for the new Admin app domain.
+3. Deploy and test the Staff Admin Edge Function only after its exact origin and server-only secret settings are ready; verify Admin login, context, invitation, retry/finalize, role assignment, and denial for non-Admin actors.
+4. Deploy the Admin UI to a protected preview first, verify session handling and that all non-Staff modules stay disabled. Then separately review production access/protection.
+5. Build secure catalog, order, delivery and media APIs before enabling any corresponding Admin modules.
+6. Keep customer Website cutover, real menu seeding, production order intake and Owner/staff account creation behind their separate explicit approvals.
+
+---
+
 # CURRENT IMPLEMENTATION STATUS — 2026-11-22 (publication, rollback and legacy Website fallback)
 
 ## Hard release and rollback rule
