@@ -525,9 +525,6 @@
     if (snapshot.versionId !== 'sha256:' + snapshot.snapshotSha256) {
       addError(errors, '$.versionId', 'VERSION_ID_MISMATCH', 'versionId must be derived from snapshotSha256.');
     }
-    if (snapshot.publishedAt !== snapshot.publishedAt) {
-      addError(errors, '$.publishedAt', 'PUBLISHED_AT_MISMATCH', 'Publication timestamp does not match snapshot metadata.');
-    }
 
     TOP_ARRAYS.forEach(function (key) {
       if (!Array.isArray(snapshot[key])) addError(errors, '$.' + key, 'ARRAY_REQUIRED', 'Published V3 field must be an array.');
