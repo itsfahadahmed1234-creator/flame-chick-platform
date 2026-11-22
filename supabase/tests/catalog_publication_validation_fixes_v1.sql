@@ -28,6 +28,8 @@ DECLARE
   v_inactive_collection uuid := gen_random_uuid();
   v_inactive_deal uuid := gen_random_uuid();
   v_inactive_deal_schedule uuid := gen_random_uuid();
+  v_inactive_fallback_collection uuid := gen_random_uuid();
+  v_inactive_fallback_schedule uuid := gen_random_uuid();
   v_active_mismatch_schedule uuid := gen_random_uuid();
   v_errors jsonb;
   v_snapshot jsonb;
@@ -101,6 +103,12 @@ BEGIN
   INSERT INTO public.deal_schedule_assignments(id,restaurant_id,deal_id,branch_id,schedule_set_id,is_active)
   VALUES(gen_random_uuid(),v_restaurant,v_inactive_deal,NULL,v_inactive_deal_schedule,true);
 
+  -- An active collection fallback remains a reference even when the collection has no deals.
+  INSERT INTO public.catalog_schedule_sets(id,restaurant_id,name,is_active,timezone)
+  VALUES(v_inactive_fallback_schedule,v_restaurant,'QA Inactive Collection Fallback',false,'Asia/Karachi');
+  INSERT INTO public.deal_collections(id,restaurant_id,category_id,schedule_set_id,name_en,is_active)
+  VALUES(v_inactive_fallback_collection,v_restaurant,v_deal_category,v_inactive_fallback_schedule,'QA Inactive Fallback Collection',true);
+
   -- Conversely, an active deal's timezone-mismatched assignment must still be rejected.
   INSERT INTO public.catalog_schedule_sets(id,restaurant_id,name,is_active,timezone)
   VALUES(v_active_mismatch_schedule,v_restaurant,'QA Active Deal Mismatched Schedule',true,'UTC');
@@ -139,6 +147,13 @@ BEGIN
       AND e->>'entity_id'=v_inactive_deal_schedule::text
   ) THEN RAISE EXCEPTION 'INACTIVE_DEAL_SCHEDULE_WAS_REJECTED'; END IF;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_errors) e
+    WHERE e->>'code'='ACTIVE_DEAL_SCHEDULE_SET_INACTIVE'
+      AND e->>'entity_id'=v_inactive_fallback_collection::text
+      AND e->>'schedule_set_id'=v_inactive_fallback_schedule::text
+  ) THEN RAISE EXCEPTION 'INACTIVE_COLLECTION_FALLBACK_SCHEDULE_WAS_NOT_REJECTED'; END IF;
+
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_errors) e
     WHERE e->>'code'='DEAL_ASSIGNMENT_TIMEZONE_MISMATCH'
@@ -155,7 +170,7 @@ BEGIN
 
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_snapshot->'scheduleSets') s
-    WHERE s->>'scheduleSetId' IN (v_unreferenced_schedule::text,v_inactive_deal_schedule::text)
+    WHERE s->>'scheduleSetId' IN (v_unreferenced_schedule::text,v_inactive_deal_schedule::text,v_inactive_fallback_schedule::text)
   ) THEN RAISE EXCEPTION 'UNREFERENCED_OR_INACTIVE_DEAL_SCHEDULE_WAS_COMPILED'; END IF;
 
   IF NOT EXISTS (
