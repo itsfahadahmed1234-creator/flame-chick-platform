@@ -125,7 +125,7 @@ BEGIN
   NEW.updated_at:=pg_catalog.clock_timestamp();
   RETURN NEW;
 END
-$function$
+$function$;
 
 ALTER FUNCTION app_private.enforce_staff_invitation_request_rules() OWNER TO postgres;
 REVOKE ALL ON FUNCTION app_private.enforce_staff_invitation_request_rules() FROM PUBLIC,anon,authenticated,service_role;
@@ -636,7 +636,7 @@ BEGIN
 
   RAISE EXCEPTION 'STAFF_ADMIN_ACTION_INVALID' USING ERRCODE='22023';
 END
-$function$
+$function$;
 
 ALTER FUNCTION public.flame_chick_staff_admin_command(text,jsonb) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.flame_chick_staff_admin_command(text,jsonb) FROM PUBLIC,anon,authenticated,service_role;
@@ -754,7 +754,7 @@ BEGIN
 
   RAISE EXCEPTION 'STAFF_SYSTEM_ACTION_INVALID' USING ERRCODE='22023';
 END
-$function$
+$function$;
 
 ALTER FUNCTION public.flame_chick_staff_admin_system_command(text,jsonb) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.flame_chick_staff_admin_system_command(text,jsonb) FROM PUBLIC,anon,authenticated,service_role;
