@@ -1,7 +1,7 @@
 # Flame Chick Staff Admin API — Batch 4
 
 - Edge Function accepts a signed-in Supabase user JWT and publishable API key; platform JWT verification is enabled.
-- Handler validates the token with Auth. Normal database commands use the original user JWT so Postgres derives the actor from auth.uid().
+- Supabase Edge Gateway validates the user JWT because `verify_jwt=true`. The handler passes the original user JWT to normal database commands so Postgres derives the actor from `auth.uid()`; it does not make a redundant `/auth/v1/user` round trip.
 - No browser-supplied actor ID or role claim is trusted.
 - Only active restaurant-wide Admin and Owner roles may manage staff.
 - Service secret is used only for Auth invitations and the service-only finalizer. New sb_secret keys go in apikey only, never Authorization: Bearer.
