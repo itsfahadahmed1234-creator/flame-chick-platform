@@ -47,7 +47,7 @@ Both helpers remain postgres-owned, ACL `{postgres=X/postgres}`, SECURITY DEFINE
 
 ## Staff Admin authorization boundary QA — implementation and live ACL audit
 
-**State: QA workflow started; runtime fixture has not yet passed. Do not mark the Admin security gate complete until run 45027267180 finishes successfully.**
+**State: disposable runtime role-boundary QA passed. Admin security gate still requires Edge Function/Auth configuration and app-level integration tests.**
 
 Read-only inspection of intended production Supabase project `adkrxfnawdiljhjaavnj` confirmed:
 - Active Flame Chick staff assignments: exactly one, the user's restaurant-wide `admin`; no Owner/Manager/Cashier/Rider identities exist yet.
@@ -62,9 +62,10 @@ Added disposable CI fixture `supabase/tests/batch4_staff_admin_role_boundary.sql
 
 Added `.github/workflows/qa-staff-admin-role-boundary.yml` to replay the full migration history on a disposable local Supabase stack, run the existing Batch 4 ACL/RLS assertions, run the new runtime role fixture, and verify all synthetic data is gone.
 
-- CI run: [45027267180](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45027267180)
-- Initial workflow validation caught a too-specific grep for generated role-denial markers; workflow assertion was corrected in commit `c637e8c2683108e57ecb7bb09faa2dc4fc171451`. That first run failed only at preflight marker validation, before starting the local database.
-- Run `45027465430` exposed that the schema-only migration replay has no restaurant seed; the fixture now inserts deterministic QA restaurant and branch rows inside its rollback-only transaction, with post-rollback absence checks. Run `45028047643` exposed generated Auth column `confirmed_at`; the fixture was corrected to omit it. Run `45028238386` then exposed mismatched synthetic-user value counts; corrected to align every row with the generated-column-safe insert list. Run `45028449257` showed the authenticated fixture tried to read private restaurant rows directly (correctly denied by ACL); the fixture now passes tenant/branch IDs through transaction-local settings from the postgres setup block, so authenticated tests use only the real command API. Current run `45028629608` passed static validation and is starting disposable Supabase; runtime assertions remain pending.
+- Final passing CI run: [45028629608](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45028629608)
+- Iterative test-only corrections: fixed workflow marker validation; seeded a deterministic QA tenant/branch because migrations are schema-only; omitted generated Auth column `confirmed_at` and corrected row arity; changed authenticated test phase to use transaction-local tenant IDs instead of direct private-table reads (which must remain denied).
+- Final run `45028629608` completed successfully: full local migration replay, existing staff ACL/RLS baseline, Admin and Owner allow paths, Manager/Cashier/Rider deny paths including role-spoofing attempts, missing-JWT denial, direct table grant/RLS/Realtime structural checks, and post-rollback absence of synthetic Auth users, roles, audit rows, restaurant and branch all passed.
+- The fixture and CI use only a disposable local Supabase stack and rollback-only transaction. No intended-production Supabase migration, Auth setting, Edge Function, Vercel deployment, secret or live data was changed. No Owner account was created.
 
 No Production Supabase migration, Auth settings, Edge Function deployment, Vercel deployment, secret or live data was changed. No Owner account was created.
 
