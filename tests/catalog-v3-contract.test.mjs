@@ -145,6 +145,38 @@ test('rejects oversized snapshots before relationship processing', () => {
   assert.equal(result.code, 'SNAPSHOT_TOO_LARGE');
 });
 
+test('requires a BY_SIZE price rule for every assigned product variant', () => {
+  const snapshot = createSnapshot();
+  snapshot.modifierPriceRules = [];
+  assert.ok(contract.validateSnapshot(snapshot).errors.some(e => e.code === 'BY_SIZE_PRICE_RULE_MISSING'));
+});
+
+test('rejects deal variants whose allowed choices cannot meet required component units', () => {
+  const snapshot = createSnapshot();
+  snapshot.dealVariantComponentOptions = [];
+  assert.ok(contract.validateSnapshot(snapshot).errors.some(e => e.code === 'DEAL_REQUIRED_CHOICES_UNSATISFIABLE'));
+});
+
+test('allows standalone deal components only for standalone-sellable variants and base-plus pricing', () => {
+  const allowed = createSnapshot();
+  allowed.dealVariants[0].pricingMode = 'BASE_PLUS_SELECTED_ITEMS';
+  allowed.dealVariantComponentOptions[0].pricingTreatment = 'STANDALONE';
+  allowed.productVariants[0].standaloneSellable = true;
+  assert.equal(contract.validateSnapshot(allowed).ok, true);
+
+  const forbidden = createSnapshot();
+  forbidden.dealVariants[0].pricingMode = 'BASE_PLUS_SELECTED_ITEMS';
+  forbidden.dealVariantComponentOptions[0].pricingTreatment = 'STANDALONE';
+  forbidden.productVariants[0].standaloneSellable = false;
+  assert.ok(contract.validateSnapshot(forbidden).errors.some(e => e.code === 'STANDALONE_VARIANT_INVALID'));
+});
+
+test('rejects impossible calendar dates in publication timestamps', () => {
+  const snapshot = createSnapshot();
+  snapshot.publishedAt = '2026-02-31T10:00:00.000Z';
+  assert.equal(contract.validateSnapshot(snapshot).ok, false);
+});
+
 test('validates health response for unpublished and published catalogs', () => {
   const empty = contract.validateHealth({ ok: true, data: { schemaVersion: 3, published: false } });
   assert.equal(empty.ok, true);
