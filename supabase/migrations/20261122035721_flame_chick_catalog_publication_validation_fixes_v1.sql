@@ -266,12 +266,11 @@ BEGIN
         )
 
       UNION ALL
-      SELECT 'ACTIVE_DEAL_SCHEDULE_SET_INACTIVE',d.id::text,
-        pg_catalog.jsonb_build_object('code','ACTIVE_DEAL_SCHEDULE_SET_INACTIVE','message','An active deal collection references an inactive schedule set.','entity_type','deal','entity_id',d.id,'schedule_set_id',s.id)
-      FROM public.deals d
-      JOIN public.deal_collections dc ON dc.id=d.collection_id AND dc.restaurant_id=d.restaurant_id
+      SELECT 'ACTIVE_DEAL_SCHEDULE_SET_INACTIVE',dc.id::text,
+        pg_catalog.jsonb_build_object('code','ACTIVE_DEAL_SCHEDULE_SET_INACTIVE','message','An active deal collection fallback references an inactive schedule set.','entity_type','deal_collection','entity_id',dc.id,'schedule_set_id',s.id)
+      FROM public.deal_collections dc
       JOIN public.catalog_schedule_sets s ON s.id=dc.schedule_set_id AND s.restaurant_id=dc.restaurant_id
-      WHERE d.restaurant_id=p_restaurant_id AND d.is_active AND dc.is_active AND dc.schedule_set_id IS NOT NULL AND NOT s.is_active
+      WHERE dc.restaurant_id=p_restaurant_id AND dc.is_active AND dc.schedule_set_id IS NOT NULL AND NOT s.is_active
 
       UNION ALL
       SELECT 'ACTIVE_DEAL_ASSIGNMENT_SCHEDULE_INACTIVE',a.id::text,
