@@ -645,6 +645,54 @@
     };
   }
 
+  function findRow(rows, key, value) {
+    for (var i = 0; i < rows.length; i++) if (rows[i][key] === value) return rows[i];
+    return null;
+  }
+
+  function resolveProductAvailability(snapshot, branchId, productId) {
+    if (!isRecord(snapshot) || !Array.isArray(snapshot.products) || !Array.isArray(snapshot.branches) ||
+        !Array.isArray(snapshot.branchProductAvailability) || !findRow(snapshot.branches, 'branchId', branchId)) return false;
+    var product = findRow(snapshot.products, 'productId', productId);
+    if (!product || product.available !== true) return false;
+    var override = findRow(snapshot.branchProductAvailability, 'productId', productId);
+    if (override && override.branchId === branchId) return override.isAvailable === true;
+    return true;
+  }
+
+  function resolveVariantAvailability(snapshot, branchId, productId, variantId) {
+    if (!resolveProductAvailability(snapshot, branchId, productId) ||
+        !Array.isArray(snapshot.productVariants) || !Array.isArray(snapshot.branchVariantAvailability)) return false;
+    var variant = findRow(snapshot.productVariants, 'variantId', variantId);
+    if (!variant || variant.productId !== productId || variant.available !== true) return false;
+    for (var i = 0; i < snapshot.branchVariantAvailability.length; i++) {
+      var override = snapshot.branchVariantAvailability[i];
+      if (override.branchId === branchId && override.productVariantId === variantId) return override.isAvailable === true;
+    }
+    return true;
+  }
+
+  function resolveDealAvailability(snapshot, branchId, dealId) {
+    if (!isRecord(snapshot) || !Array.isArray(snapshot.deals) || !Array.isArray(snapshot.branches) ||
+        !Array.isArray(snapshot.branchDealAvailability) || !findRow(snapshot.branches, 'branchId', branchId)) return false;
+    var deal = findRow(snapshot.deals, 'dealId', dealId);
+    if (!deal || deal.available !== true) return false;
+    for (var i = 0; i < snapshot.branchDealAvailability.length; i++) {
+      var override = snapshot.branchDealAvailability[i];
+      if (override.branchId === branchId && override.dealId === dealId) return override.isAvailable === true;
+    }
+    return true;
+  }
+
+  function isBranchOrderingEnabled(snapshot, branchId, fulfilmentType) {
+    if (!isRecord(snapshot) || !Array.isArray(snapshot.branches)) return false;
+    var branch = findRow(snapshot.branches, 'branchId', branchId);
+    if (!branch || branch.websiteOrderingEnabled !== true) return false;
+    if (fulfilmentType === 'delivery') return branch.websiteDeliveryEnabled === true;
+    if (fulfilmentType === 'pickup') return branch.websitePickupEnabled === true;
+    return false;
+  }
+
   function validateHealth(payload) {
     if (!isRecord(payload) || payload.ok !== true || !isRecord(payload.data)) {
       return { ok: false, code: 'HEALTH_INVALID', message: 'Catalog health envelope is invalid.' };
@@ -675,7 +723,11 @@
     MAX_SNAPSHOT_BYTES: MAX_SNAPSHOT_BYTES,
     validateSnapshot: validateSnapshot,
     validateHealth: validateHealth,
-    minorUnits: minorUnits
+    minorUnits: minorUnits,
+    resolveProductAvailability: resolveProductAvailability,
+    resolveVariantAvailability: resolveVariantAvailability,
+    resolveDealAvailability: resolveDealAvailability,
+    isBranchOrderingEnabled: isBranchOrderingEnabled
   };
 
   if (typeof module === 'object' && module.exports) module.exports = api;
