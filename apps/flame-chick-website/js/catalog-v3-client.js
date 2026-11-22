@@ -136,7 +136,7 @@
 
     if (typeof snapshot.databaseNow !== 'string' ||
         !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(snapshot.databaseNow) ||
-        !Number.isFinite(Date.parse(snapshot.databaseNow))) {
+        typeof contract.isIsoUtcDateTime !== 'function' || !contract.isIsoUtcDateTime(snapshot.databaseNow)) {
       return fail('DATABASE_TIME_INVALID', 'Catalog response did not include a valid database timestamp.');
     }
 
