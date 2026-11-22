@@ -205,7 +205,6 @@
           priceMinor: priceMinor
         };
       }).filter(Boolean);
-      if (modifiers.length < group.minSelect) return null;
       return {
         id: group.modifierGroupId,
         name: group.nameEn,
@@ -213,6 +212,7 @@
         selectionMode: group.selectionMode,
         minSelect: group.minSelect,
         maxSelect: group.maxSelect,
+        branchSatisfiable: modifiers.length >= group.minSelect,
         modifiers: modifiers
       };
     }).filter(Boolean);
@@ -226,6 +226,9 @@
     var canonical = [];
     for (var groupIndex = 0; groupIndex < modifierGroups.length; groupIndex++) {
       var group = modifierGroups[groupIndex];
+      if (!group || group.branchSatisfiable === false) {
+        return fail('MODIFIER_GROUP_UNSATISFIABLE', 'A required modifier group cannot be satisfied for this product variant.');
+      }
       allowedGroupIds[group.id] = true;
       var selected = selections[group.id] || [];
       if (!Array.isArray(selected)) return fail('MODIFIER_SELECTION_GROUP_INVALID', 'Each modifier group selection must be an array.');
@@ -304,6 +307,8 @@
                   !contract.resolveVariantAvailability(snapshot, branchId, option.productId, option.productVariantId)) return null;
               var product = find(snapshot.products, 'productId', option.productId);
               var productVariant = find(snapshot.productVariants, 'variantId', option.productVariantId);
+              var productModifierGroups = buildProductModifierGroups(snapshot, option.productId, option.productVariantId, contract, { excludeStandaloneOnly: true });
+              if (productModifierGroups.some(function (modifierGroup) { return modifierGroup.branchSatisfiable === false; })) return null;
               return {
                 id: option.componentOptionId,
                 productId: option.productId,
@@ -315,7 +320,7 @@
                 surchargeMinor: contract.minorUnits(mapping.unitSurcharge),
                 standalonePriceMinor: mapping.pricingTreatment === 'STANDALONE'
                   ? contract.minorUnits(productVariant.price) : null,
-                modifierGroups: buildProductModifierGroups(snapshot, option.productId, option.productVariantId, contract, { excludeStandaloneOnly: true }),
+                modifierGroups: productModifierGroups,
                 maxQuantity: resolveOptionCap(group, mapping),
                 sortOrder: option.sortOrder
               };
