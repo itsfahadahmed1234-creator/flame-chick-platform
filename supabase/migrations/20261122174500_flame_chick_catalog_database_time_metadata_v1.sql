@@ -172,8 +172,8 @@ BEGIN
     RAISE EXCEPTION 'CATALOG_PUBLIC_READ_FUNCTION_SECURITY_INVALID';
   END IF;
 
-  IF pg_catalog.position('databaseNow' IN v_definition) = 0
-     OR pg_catalog.position('clock_timestamp' IN v_definition) = 0 THEN
+  IF pg_catalog.strpos(v_definition, 'databaseNow') = 0
+     OR pg_catalog.strpos(v_definition, 'clock_timestamp') = 0 THEN
     RAISE EXCEPTION 'CATALOG_DATABASE_TIME_METADATA_MISSING';
   END IF;
 
