@@ -57,3 +57,12 @@ test("CORS reflects only explicitly allowed origins without wildcard or credenti
   assert.equal(staffCorsHeaders("https://evil.example.test", allowed)["Access-Control-Allow-Origin"], undefined);
   assert.equal(staffCorsHeaders(null, allowed)["Access-Control-Allow-Origin"], undefined);
 });
+
+test("the production Edge Function imports and enforces the tested origin policy", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync("supabase/functions/flame-chick-staff-admin/index.ts", "utf8");
+  assert.match(source, /isAllowedRequestOrigin/);
+  assert.match(source, /isSafeInviteRedirect/);
+  assert.match(source, /parseAllowedOrigins/);
+  assert.match(source, /if\(!isAllowedRequestOrigin\(origin,ORIGINS\)\)/);
+});
