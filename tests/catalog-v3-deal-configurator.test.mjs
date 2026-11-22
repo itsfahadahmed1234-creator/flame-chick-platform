@@ -34,7 +34,7 @@ test('fails closed for missing deal, unavailable deal and incomplete catalog con
   const incomplete = createView();
   incomplete.versionId = null;
   assert.equal(create(incomplete).code, 'DEAL_CONTEXT_INVALID');
-  assert.equal(create(createView(), {}).code, 'MODIFIER_VALIDATOR_REQUIRED');
+  assert.equal(configurator.createDealConfigurator(createView(), IDS.deal, {}).code, 'MODIFIER_VALIDATOR_REQUIRED');
 });
 
 test('requires explicit deal variant and required component selection', () => {
@@ -151,7 +151,7 @@ test('clearing component quantity also clears customizations for removed instanc
 test('refuses to render without a DOM target and an explicit completion handler', () => {
   const ui = create();
   assert.equal(ui.render(null, { onComplete() {} }).code, 'DOM_TARGET_REQUIRED');
-  assert.equal(ui.render({ replaceChildren() {} }, {}).code, 'COMPLETION_HANDLER_REQUIRED');
+  assert.equal(ui.render({ replaceChildren() {} }, { document: {} }).code, 'COMPLETION_HANDLER_REQUIRED');
 });
 
 test('unavailable or unsatisfiable variants cannot be selected', () => {
