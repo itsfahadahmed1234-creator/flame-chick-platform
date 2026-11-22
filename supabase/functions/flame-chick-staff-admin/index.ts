@@ -1,5 +1,5 @@
 // Flame Chick Staff Admin API — Batch 4.
-import { isSafeInviteRedirect, parseAllowedOrigins, staffCorsHeaders } from "./origin-policy.mjs";
+import { isAllowedRequestOrigin, isSafeInviteRedirect, parseAllowedOrigins, staffCorsHeaders } from "./origin-policy.mjs";
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").replace(/\/+$/,"");
 function readKey(jsonName:string,fallback:string[]):string{
  try{const x=JSON.parse(Deno.env.get(jsonName)??"{}");const v=x?.default;if(typeof v==="string"&&v)return Deno.env.get(v)??v;}catch{}
@@ -93,7 +93,7 @@ async function post(req:Request,t:string):Promise<Obj>{
 }
 Deno.serve(async(req:Request)=>{
  const origin=req.headers.get("origin");
- if(origin&&!ORIGINS.has(origin))return response({ok:false,error:{code:"ORIGIN_NOT_ALLOWED",message:"This application origin is not allowed."}},403,null);
+ if(!isAllowedRequestOrigin(origin,ORIGINS))return response({ok:false,error:{code:"ORIGIN_NOT_ALLOWED",message:"This application origin is not allowed."}},403,null);
  if(req.method==="OPTIONS"){if(!origin||!ORIGINS.has(origin))return response({ok:false,error:{code:"ORIGIN_NOT_ALLOWED",message:"This origin is not allowed."}},403,null);return response({ok:true},200,origin);}
  try{
   if(!ORIGIN_CONFIG_VALID)throw new ApiError("STAFF_ADMIN_ORIGIN_NOT_CONFIGURED",503,"Staff Admin origin settings are not configured safely.");
