@@ -1,40 +1,34 @@
-# CURRENT IMPLEMENTATION STATUS — 2026-11-22 (catalog validator QA follow-up)
+# CURRENT IMPLEMENTATION STATUS — 2026-11-22 (catalog publication validation CI passed)
 
-## Candidate validator behavior — tested transactionally against Production schema
+This section supersedes the earlier catalog-validator QA status further below.
 
-The candidate migration `20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql` was installed only inside explicit rollback-only SQL transactions for behavior testing; it is NOT recorded in the Supabase migration ledger and no function change persisted.
+## Step 1 — disposable migration-chain QA: PASSED
 
-Verified:
-- Optional deal component group (`min_units=0`) with a valid eligible option but no deal-variant option mapping is accepted by the candidate validator.
-- Required group (`min_units=1`) with a valid eligible option but no deal-variant option mapping continues to produce `DEAL_VARIANT_REQUIRED_GROUP_NOT_CONFIGURED`.
-- Empty schedule referenced by an active deal collection continues to produce `ACTIVE_SCHEDULE_SET_INVALID`.
-- Unreferenced active empty schedule does not block validation and is omitted from compiled schedule sets.
-- Both candidate migration installation and fixtures were rolled back together. A subsequent Production query found zero QA schedule/category/product/deal rows, zero publications, and the single expected active Admin role.
-- A first fixture against the unmodified live validator reproduced the optional-group bug, confirming the test detects the intended regression.
+- GitHub Actions workflow: [QA Flame Chick catalog publication validation fixes V1](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45010662936).
+- Run ID: `45010662936`; result: **completed / success** on `work/production-source-audit`, commit `24964d22116f74b74a80ebd2fd31684db1ba9c9a`.
+- The workflow started a clean disposable local Supabase stack, installed the complete migration history present on the work branch (including candidate `20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql`), and verified the applied migration count matched the SQL migration-file count.
+- The rollback-only SQL fixture passed: optional groups without variant maps are accepted; required groups without maps are rejected; an active referenced empty schedule remains invalid; an unreferenced active empty schedule is accepted and excluded from the compiled snapshot.
+- The fixture transaction ended with `ROLLBACK`; the follow-up query confirmed the QA tenant did not remain. The disposable stack then stopped successfully and the overall workflow concluded green.
 
-## Disposable full migration-chain CI
+## CI-only and source-replay corrections
 
-- Added `supabase/tests/catalog_publication_validation_fixes_v1.sql`, a rollback-only fixture covering optional vs required groups and referenced vs unreferenced schedules.
-- Added `.github/workflows/qa-catalog-publication-validation-fixes-v1.yml`, which starts a clean local Supabase stack, runs the complete `supabase db reset --local` migration chain, executes the SQL fixture, verifies the fixture tenant rolled back, and stops the local stack.
-- Added `ops/triggers/qa-catalog-publication-validation-fixes-v1.txt` to trigger the workflow.
-- Commits: fixture `b2e218015b76138395e2af3cc11530ec95117b97`; workflow `e88cbf786d950df8f0b1749b8f1cb1e1c7fd8268`; trigger `868fa469ab59fd2666eed188990d78481241a51b`.
-- This environment has no Docker daemon, so local full-chain execution is not possible here. The workflow was committed to run the full test on GitHub-hosted Ubuntu, but its run status could not be retrieved through the connected GitHub actions tools during this session. Do not treat full migration-chain QA as passed until the Actions run is inspected and green.
-- Production migration ledger remains unchanged; candidate migration has not been applied.
+- The local runner lacks Supabase's hosted-managed `public.rls_auto_enable()` helper. The workflow now creates a no-op compatibility function only inside the disposable local database before replaying migrations. It creates no event trigger and changes no Production object.
+- The repository copy of `20261121053647_flame_chick_staff_admin_commands.sql` had three missing top-level semicolons after function definitions; these were added so PostgreSQL can replay the source file. This is a work-branch source correction only; no historical Production migration was edited or reapplied.
+- The workflow's push filter now runs the complete local replay when any `supabase/migrations/*.sql` file changes. A manual dispatch trigger is also available.
+- Earlier CI attempts failed first on the missing hosted-only local helper and then on the malformed SQL delimiter. Both harness/source-replay problems are corrected; the third run above passed end-to-end.
 
-## Production invariants rechecked
+## Production invariants — unchanged
 
-- Existing migration ledger still ends at `20261122031027_flame_chick_catalog_publish_rollback_v1`.
-- No Edge Functions are deployed.
-- No publications or real menu rows were seeded.
-- Customer Website and Vercel deployments remain untouched.
+- Production migration ledger remains at 23 migrations, latest version `20261122031027_flame_chick_catalog_publish_rollback_v1`.
+- The validator-fix candidate is **not applied to Production** and is not recorded in the Production migration ledger.
+- Read-only verification after CI reported zero QA fixture tenants and zero QA schedules in Production.
+- No menu data or publication was seeded; no Edge Function, Website, Admin app or Vercel deployment was changed.
 
-## Next step
+## Next controlled action
 
-Inspect the GitHub Actions run for `qa-catalog-publication-validation-fixes-v1.yml`. If green, review the candidate migration one final time and run its guarded migration workflow only after a separate explicit approval. If red, repair the local migration-chain issue and rerun CI. Do not enable Admin catalog modules or customer Website paths before the API and V3 client are complete.
+Step 1 is complete. The next task is a final review of the candidate validator migration and its production preflight/ACL preservation checks. Keep the candidate unapplied until the production change is separately approved. After that, proceed to the exact live-menu reconciliation and the missing settings/delivery-area/schedule dependencies. Do not connect the customer Website or publish a menu as part of this QA step.
 
----
 
-# CURRENT IMPLEMENTATION STATUS — 2026-11-22 (Admin bootstrap and catalog validator follow-up)
 
 ## Admin identity bootstrap — completed and verified
 
@@ -58,14 +52,13 @@ Inspect the GitHub Actions run for `qa-catalog-publication-validation-fixes-v1.y
 ## Catalog publication validation fixes — review branch only
 
 - Working branch: `work/production-source-audit`; no changes to `main`.
-- New additive migration candidate: `supabase/migrations/20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql`.
-- Commit: `36423a0e481095f306bdd02eaf5ee6d85f31b80c`.
-- Fix A: only active-referenced schedule sets (active deal collection fallback or active assignment to an active deal) are validated for timezone/windows and included in the public snapshot. Unreferenced active schedule drafts no longer block publication or leak into customer snapshots.
-- Fix B: missing per-variant option mappings are checked only for component groups where `min_units > 0`; optional groups can be left unmapped for a deal variant.
-- The migration includes strict PostgreSQL/session preflight checks, expected-baseline checks, and postflight checks that preserve function owner, ACL, SECURITY DEFINER flag and function configuration.
-- Rollback-only Production smoke test executed with a temporary unreferenced active schedule set; validation accepted it, snapshot omitted it, and transaction was rolled back. A follow-up query verified no temporary row remains.
-- This is partial QA, not full acceptance: optional-group behavior still needs a dedicated full fixture test; run the full migration chain on a disposable local Supabase stack and inspect function definitions/ACLs/advisors before requesting Production migration approval.
-- Migration has NOT been applied to the Production migration ledger. No production schema change resulted from this candidate.
+- Candidate migration: `supabase/migrations/20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql`.
+- Candidate commit: `36423a0e481095f306bdd02eaf5ee6d85f31b80c`.
+- Fix A: only active-referenced schedule sets (active deal collection fallback or active assignment to an active deal) are validated and included in the public snapshot. Unreferenced active schedule drafts no longer block publication or enter customer snapshots.
+- Fix B: per-deal-variant option-map completeness is enforced only for required component groups (`min_units > 0`). Optional groups do not require a map.
+- The migration includes strict preflight and postflight guards to preserve function owner, ACL, SECURITY DEFINER and function configuration.
+- Full disposable local QA is now green; see the CI run and fixture results in the current status section at the top of this file. The candidate was included in the local replay and its targeted fixture passed.
+- The candidate has NOT been applied to Production. Production migration ledger remains unchanged.
 
 ## Current Supabase advisor findings
 
@@ -81,8 +74,8 @@ Inspect the GitHub Actions run for `qa-catalog-publication-validation-fixes-v1.y
 
 ## Next execution order
 
-1. Complete isolated migration-chain and optional-deal-group QA; update the handoff with exact test outcomes.
-2. Configure Supabase Auth leaked-password protection and exact Site URL/redirect allowlist for the new Admin app domain.
+1. Review the candidate validator migration and its Production preflight, postflight, ownership and ACL assertions. Keep it unapplied until a separate explicit Production approval.
+2. Configure Supabase Auth leaked-password protection and the exact Site URL/redirect allowlist for the new Admin app domain.
 3. Deploy and test the Staff Admin Edge Function only after its exact origin and server-only secret settings are ready; verify Admin login, context, invitation, retry/finalize, role assignment, and denial for non-Admin actors.
 4. Deploy the Admin UI to a protected preview first, verify session handling and that all non-Staff modules stay disabled. Then separately review production access/protection.
 5. Build secure catalog, order, delivery and media APIs before enabling any corresponding Admin modules.
