@@ -477,22 +477,24 @@
     });
     s.dealVariants.forEach(function (dealVariant, variantIndex) {
       s.dealComponentGroups.forEach(function (group) {
-        if (group.dealId !== dealVariant.dealId || group.minUnits === 0) return;
+        if (group.dealId !== dealVariant.dealId) return;
         var capacity = 0;
+        var mappedOptionCount = 0;
         s.dealComponentOptions.forEach(function (option) {
           if (option.dealId !== group.dealId || option.componentGroupId !== group.componentGroupId) return;
           var mapping = s.dealVariantComponentOptions.find(function (item) {
             return item.dealVariantId === dealVariant.dealVariantId && item.componentOptionId === option.componentOptionId;
           });
           if (!mapping) return;
+          mappedOptionCount++;
           var optionCap = mapping.maxQuantityPerDeal !== null ? mapping.maxQuantityPerDeal :
             (group.maxUnitsPerOption !== null ? group.maxUnitsPerOption :
               (group.allowRepeatOption ? group.maxUnits : 1));
           capacity += Math.min(group.maxUnits, optionCap);
         });
-        if (capacity < group.minUnits) {
+        if (mappedOptionCount === 0 || capacity < group.minUnits) {
           addError(errors, 'dealVariants[' + variantIndex + ']', 'DEAL_REQUIRED_CHOICES_UNSATISFIABLE',
-            'Allowed options for this deal variant cannot satisfy component group ' + group.componentGroupId + '.');
+            'Each deal variant needs at least one allowed option per component group and enough capacity to satisfy its minimum.');
         }
       });
     });
