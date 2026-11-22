@@ -35,6 +35,11 @@ BEGIN
   INSERT INTO public.branches(id,restaurant_id,branch_code,name,is_active,timezone)
   VALUES(v_branch_id,v_restaurant_id,'qa-main','QA Main',true,'Asia/Karachi');
 
+  -- Pass fixture identifiers through transaction-local settings so the
+  -- authenticated test never queries private tenant tables directly.
+  PERFORM pg_catalog.set_config('test.staff_restaurant_id',v_restaurant_id::text,true);
+  PERFORM pg_catalog.set_config('test.staff_branch_id',v_branch_id::text,true);
+
   IF EXISTS(SELECT 1 FROM public.user_roles WHERE restaurant_id=v_restaurant_id) THEN
     RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_FIXTURE_EXPECTS_EMPTY_LOCAL_STAFF';
   END IF;
@@ -86,10 +91,8 @@ DECLARE
   v_restaurant_id uuid;
   v_result jsonb;
 BEGIN
-  SELECT id INTO v_restaurant_id FROM public.restaurants
-  WHERE slug='flame-chick' AND is_active LIMIT 1;
-  SELECT id INTO v_branch_id FROM public.branches
-  WHERE restaurant_id=v_restaurant_id AND is_active ORDER BY branch_code,id LIMIT 1;
+  v_restaurant_id:=pg_catalog.current_setting('test.staff_restaurant_id')::uuid;
+  v_branch_id:=pg_catalog.current_setting('test.staff_branch_id')::uuid;
 
   v_result:=public.flame_chick_staff_admin_command('assign_role',pg_catalog.jsonb_build_object(
     'target_user_id','a2222222-2222-4222-8222-222222222222',
