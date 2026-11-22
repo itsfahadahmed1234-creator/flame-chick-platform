@@ -1,3 +1,29 @@
+# CRITICAL IDENTITY AND SPELLING GUARDRAIL — READ BEFORE GITHUB / VERCEL ACTIONS
+
+This project has repeatedly been affected by assistant-side owner-name typos. Do not rely on memory, shortened names, or guessed account slugs. Copy these exact identifiers:
+
+- **GitHub owner (exact):** `itsfahadahmed1234-creator`
+- **GitHub repository (exact):** `flame-chick-platform`
+- **Full GitHub repository path (exact):** `itsfahadahmed1234-creator/flame-chick-platform`
+- **GitHub working branch (exact):** `work/production-source-audit`
+- **GitHub default branch:** `main` — leave it untouched unless the user explicitly directs otherwise.
+- **Vercel team name / slug:** `Fahad` / `fahad-7455`
+- **Vercel team ID (exact):** `team_Rpf9jeGg9r3cmMguFXHtziqz`
+
+### Mandatory safeguards
+
+1. Always use the full, exact GitHub repository path above in connector calls. Never abbreviate or reconstruct the owner name.
+2. The owner spelling contains **`ahmed`**: `itsfahad + ahmed + 1234-creator`. Do not drop letters or shorten it.
+3. Common incorrect variants include `itsfahadah1234-creator`, `itsfahad1234-creator`, and any other spelling that omits `ahmed`. These are not the repository owner.
+4. Before any GitHub read/write, verify the repository with GitHub `get_repo` or a successful fetch against the exact full path. Before any Vercel Git operation, verify the linked repository in Vercel Git deployment context.
+5. Before editing a handoff file, fetch the current file from the exact repository and branch, then pass the returned current blob SHA to the update call. If GitHub returns 404, stop and re-check the full owner/repository spelling; do not keep retrying guessed names.
+6. Do not assume GitHub owner, Vercel team, Supabase organization, or project identifiers are interchangeable. Keep each service's identifiers separate.
+7. Preserve the user's HFP resources and the legacy Flame Chick resources. Do not change them as a workaround for an account-name or connection error.
+
+This guardrail is intentionally prominent because these identifiers are operationally critical. Treat the exact values above as authoritative and verify them at the point of use.
+
+---
+
 ## Latest checkpoint — Vercel Git connections completed (2026-11-22)
 
 **Status: all four Flame Chick Vercel project shells are linked to the intended private GitHub repository; no deployment created.**
