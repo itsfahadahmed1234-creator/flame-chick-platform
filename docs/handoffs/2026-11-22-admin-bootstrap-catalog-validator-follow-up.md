@@ -78,7 +78,7 @@ Read-only verification after CI reported:
 
 ### Rollback readiness and review verdict
 
-Before commit, the migration transaction is atomic. After a successful commit, schema history remains append-only and rollback requires a new forward-only compensating migration restoring the original helper bodies and preserving the security metadata. That compensating migration has not yet been prepared or rehearsed. Prepare and test it on the disposable local stack before applying the candidate to Production if immediate post-commit rollback readiness is required.
+The forward-only compensation migration and recovery runbook are now prepared; see `docs/architecture/catalog-validator-recovery-v1.md`. The updated CI workflow rehearses candidate → behavior fixture → compensation → restored-state verification on the disposable local stack. Treat recovery as tested only after that new CI run is green. The compensation preserves append-only migration history and restores the original helper source hashes and security metadata.
 
 **Verdict:** the candidate has passed the live-baseline security review and full disposable QA. It is conditionally ready for a separately approved Production migration. It has not been applied and this review is not permission to apply it.
 
@@ -92,10 +92,33 @@ Before commit, the migration transaction is atomic. After a successful commit, s
 
 A legacy POS browser tab previously exposed a credential in its URL query string. Treat it as compromised, rotate it if valid, clear browser history/screenshots/logs where possible, and never place credentials in URLs. This was not established to be the new Admin password.
 
+## Recovery package prepared
+
+## Forward-only validator recovery — prepared; CI rehearsal running/pending
+
+The recovery package has now been added on `work/production-source-audit`:
+
+- Compensation migration: `supabase/migrations/20261122050000_flame_chick_catalog_publication_validation_restore_v1.sql`
+- Recovery verification fixture: `supabase/tests/catalog_publication_validation_recovery_v1.sql`
+- Operational runbook: `docs/architecture/catalog-validator-recovery-v1.md`
+- CI workflow updated to replay the full ordered migration history, then manually rehearse candidate → candidate regression fixture → compensation → restored-state fixture on the disposable local stack.
+
+The compensation is forward-only and transactional. It requires the exact candidate helper source hashes and the expected postgres owner, ACL, SECURITY DEFINER, empty search_path, and execution attributes. It restores the original function definitions copied from the already-applied `20261122031027` migration, then verifies the original SHA-256 hashes and restrictive metadata. It adds no persistent business schema/data and does not erase either migration-ledger entry.
+
+Exact helper fingerprints:
+
+| Helper | Candidate body | Restored body |
+| --- | --- | --- |
+| Validator | `f179cc3b15b1d6ad5b07b90587513001bed97b752b09b13ce2d9c946e88a7750` | `018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712` |
+| Snapshot compiler | `1cee9543d131260f71573afc2f0a5a204422a59fa7f46ef0b24f4c2e277e3808` | `b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2` |
+
+**Important:** this is prepared recovery code, not yet declared tested until the updated GitHub Actions run completes successfully. The intended production Supabase project remains untouched; neither the candidate nor compensation has been applied there. The recovery runbook requires a separate explicit approval for any future remote compensation and mandates a dry-run showing only the one intended migration.
+
+
 ## Next
 
-1. Prepare and rehearse the forward-only compensating migration/recovery runbook for the validator migration.
-2. Obtain separate explicit approval before applying the candidate to Production; it remains unapplied.
+1. Confirm the updated candidate → compensation CI rehearsal is green.
+2. Obtain separate explicit approval before applying the candidate to the intended production Supabase project; it remains unapplied.
 3. Enable Auth leaked-password protection and configure the exact Admin Site URL/redirect allowlist.
 4. Configure the Staff Admin Edge Function's exact origins and server-only secret, deploy with JWT verification enabled, and test role boundaries.
 5. Deploy Admin to a protected preview; test login and staff operations. Do not enable other modules.
