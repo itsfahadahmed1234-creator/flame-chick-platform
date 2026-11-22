@@ -32,3 +32,9 @@ jobs:
           node-version: "22"
       - name: Test catalog RPC route allowlist and request validation
         run: node --test tests/catalog-admin-api.test.mjs
+      - name: Install pinned Deno
+        run: |
+          npm install --global "deno@2.9.8"
+          deno --version
+      - name: Type-check Staff Admin Edge Function and imported action router
+        run: deno check supabase/functions/flame-chick-staff-admin/index.ts
