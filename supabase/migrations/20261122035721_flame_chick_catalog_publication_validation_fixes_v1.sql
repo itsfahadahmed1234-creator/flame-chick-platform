@@ -262,6 +262,10 @@ BEGIN
             WHERE a.restaurant_id=s.restaurant_id
               AND a.schedule_set_id=s.id
               AND a.is_active
+              AND (a.branch_id IS NULL OR EXISTS (
+                SELECT 1 FROM public.branches b
+                WHERE b.id=a.branch_id AND b.restaurant_id=a.restaurant_id AND b.is_active
+              ))
           )
         )
 
@@ -279,6 +283,14 @@ BEGIN
       JOIN public.deals d ON d.id=a.deal_id AND d.restaurant_id=a.restaurant_id AND d.is_active
       JOIN public.catalog_schedule_sets s ON s.id=a.schedule_set_id AND s.restaurant_id=a.restaurant_id
       WHERE a.restaurant_id=p_restaurant_id AND a.is_active AND NOT s.is_active
+
+      UNION ALL
+      SELECT 'ACTIVE_DEAL_ASSIGNMENT_BRANCH_INACTIVE',a.id::text,
+        pg_catalog.jsonb_build_object('code','ACTIVE_DEAL_ASSIGNMENT_BRANCH_INACTIVE','message','An active deal schedule assignment references an inactive branch.','entity_type','deal_schedule_assignment','entity_id',a.id,'deal_id',a.deal_id,'branch_id',b.id)
+      FROM public.deal_schedule_assignments a
+      JOIN public.deals d ON d.id=a.deal_id AND d.restaurant_id=a.restaurant_id AND d.is_active
+      JOIN public.branches b ON b.id=a.branch_id AND b.restaurant_id=a.restaurant_id
+      WHERE a.restaurant_id=p_restaurant_id AND a.is_active AND a.branch_id IS NOT NULL AND NOT b.is_active
 
       UNION ALL
       SELECT 'DEAL_ASSIGNMENT_TIMEZONE_MISMATCH',a.id::text,
@@ -545,6 +557,10 @@ BEGIN
       JOIN public.deals d ON d.id=a.deal_id AND d.restaurant_id=a.restaurant_id AND d.is_active
       JOIN public.catalog_schedule_sets s ON s.id=a.schedule_set_id AND s.restaurant_id=a.restaurant_id AND s.is_active
       WHERE a.restaurant_id=p_restaurant_id AND a.is_active
+        AND (a.branch_id IS NULL OR EXISTS (
+          SELECT 1 FROM public.branches b
+          WHERE b.id=a.branch_id AND b.restaurant_id=a.restaurant_id AND b.is_active
+        ))
     ),'[]'::jsonb),
     'branchProductAvailability',COALESCE((
       SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
