@@ -46,6 +46,7 @@ jobs:
           test -s supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "HAVING g.min_units > 0" "${migration}"
           grep -q "ACTIVE_SCHEDULE_SET_INVALID" "${migration}"
+          grep -q "ACTIVE_DEAL_SCHEDULE_SET_INACTIVE" "${migration}"
           grep -q "CATALOG_VALIDATION_FIX_VERIFICATION_FAILED" "${migration}"
           grep -q "CATALOG_PUBLICATION_HELPER_SECURITY_BASELINE_INVALID" "${migration}"
           grep -q "018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712" "${migration}"
@@ -54,6 +55,7 @@ jobs:
           grep -q "REQUIRED_GROUP_MISSING_VARIANT_MAP_WAS_NOT_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "UNREFERENCED_EMPTY_SCHEDULE_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "INACTIVE_DEAL_SCHEDULE_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
+          grep -q "INACTIVE_COLLECTION_FALLBACK_SCHEDULE_WAS_NOT_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "UNREFERENCED_OR_INACTIVE_DEAL_SCHEDULE_WAS_COMPILED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "INACTIVE_DEAL_TIMEZONE_MISMATCH_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "ACTIVE_DEAL_TIMEZONE_MISMATCH_WAS_NOT_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
