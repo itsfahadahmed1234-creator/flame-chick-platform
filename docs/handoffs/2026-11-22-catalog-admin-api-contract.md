@@ -42,7 +42,7 @@ Unsupported by design in this slice:
 ## Test coverage and CI
 
 - Added `tests/catalog-admin-api.test.mjs` for finite read/write mapping, required revision/request ID, input field rejection, UUID/cursor/limit checks, payload bounds, unsupported publish/rollback and user-JWT/no-service-secret routing.
-- Added `.github/workflows/qa-catalog-admin-api.yml`, which runs the contract tests under Node 22 without Supabase credentials or production secrets.
+- Added `.github/workflows/qa-catalog-admin-api.yml`, which runs the contract tests under Node 22 and type-checks the Staff Admin Edge Function with pinned Deno 2.9.8. It needs no Supabase credentials or production secrets.
 - Relevant source commits:
   - `74ed14b667f9977a303bee4f2b5d003ed6532c9b` — add finite RPC map
   - `17397780afc8c0e207734c6be64c82b6618faa61` — route API through authenticated caller context
