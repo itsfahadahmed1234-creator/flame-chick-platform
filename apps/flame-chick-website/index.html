@@ -368,9 +368,10 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
       <div class="wrap">
         <h2 class="menu-title">Menu</h2>
         <p class="gst">All prices are exclusive of applicable GST.</p>
+        <p class="gst" id="menuContractNotice" role="status" aria-live="polite">Checking the published menu. Items will appear only after the live catalog has been verified.</p>
       </div>
-      <div class="cats" id="cats"><div class="wrap cats-in" id="catsIn" aria-label="Menu categories"></div></div>
-      <div class="wrap" id="menuRoot"></div>
+      <div class="cats" id="cats" hidden><div class="wrap cats-in" id="catsIn" aria-label="Menu categories"></div></div>
+      <div class="wrap" id="menuRoot" hidden></div>
     </section>
 
     <div class="checker" aria-hidden="true"></div>
@@ -1033,12 +1034,27 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
   function fcNorm(value) {
     return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   }
+  function fcSetMenuCatalogState(ready, message) {
+    var cats = $('#cats');
+    var menuRoot = $('#menuRoot');
+    var notice = $('#menuContractNotice');
+    if (cats) cats.hidden = !ready;
+    if (menuRoot) menuRoot.hidden = !ready;
+    if (notice) {
+      notice.hidden = !!ready;
+      if (!ready) notice.textContent = message ||
+        'The published menu has not been verified. No menu items are being shown.';
+    }
+  }
   function fcLoadLiveCatalog() {
+    fcSetMenuCatalogState(false,
+      'Checking the published Flame Chick menu. Items will appear only after the live catalog has been verified.');
     el.send.disabled = true;
     el.note.textContent = 'Checking the live Flame Chick menu…';
 
     if (!window.FlameChickCatalog || !window.FLAME_CHICK_CONFIG) {
       catalogError = 'The Flame Chick catalogue connection is not available.';
+      fcSetMenuCatalogState(false, 'The live menu could not be verified. No menu items are being shown.');
       el.note.textContent = catalogError + ' Refresh the page and try again.';
       return;
     }
@@ -1114,6 +1130,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
       if (removedFromCart) store('fc.cart.v1', cart);
       catalogReady = true;
       catalogError = '';
+      fcSetMenuCatalogState(true);
       el.send.disabled = false;
       el.note.textContent = '';
       if (currentProductId) syncProductModal(currentProductId);
@@ -1122,6 +1139,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
     }).catch(function (error) {
       catalogReady = false;
       catalogError = String((error && error.message) || 'The live menu could not be checked.');
+      fcSetMenuCatalogState(false,
+        'The published menu is unavailable or uses an unsupported format. No menu items are being shown.');
       el.send.disabled = true;
       el.note.textContent = catalogError + ' No order was placed. Refresh the page and try again.';
     });
