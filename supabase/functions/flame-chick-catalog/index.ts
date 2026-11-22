@@ -163,7 +163,10 @@ Deno.serve(async (req: Request) => {
       return json({
         ok: true,
         data: {
-          schemaVersion: SCHEMA_VERSION,
+          // An unpublished restaurant has no live snapshot yet. Preserve the
+          // legacy schema marker only for that empty state; a published V3
+          // snapshot advertises its exact schema so older clients fail closed.
+          schemaVersion: publication.published ? publication.schemaVersion : SCHEMA_VERSION,
           published: publication.published,
           publicationId: publication.publicationId,
           publicationNumber: publication.publicationNumber,
