@@ -24,6 +24,44 @@ This guardrail is intentionally prominent because these identifiers are operatio
 
 ---
 
+## Latest checkpoint — Website database-driven catalog integration audit (2026-11-22)
+
+**Status: database-driven architecture confirmed; active V3 client integration is still pending. Do not deploy.**
+
+### Source-of-truth decision
+
+- Supabase's immutable published catalog is the only source of truth for Website categories, products, variants, sizes, prices, modifiers, deals, availability, schedules, branches and fulfilment eligibility.
+- Website HTML/JS may contain presentation templates, layout, static marketing copy and design assets, but must not contain operational menu/product/price/deal data.
+- Admin edits draft catalog data; publication creates an immutable version; Website reads only the current published snapshot. No draft-table fallback.
+- Customer-visible pricing is informational until the trusted checkout/order API independently validates the selected published IDs and recalculates all prices/totals.
+
+### Verified integration findings
+
+- Publication compiler in `20261122031027_flame_chick_catalog_publish_rollback_v1.sql` emits **schema V3** and publication metadata. SHA-256 is lowercase hex of UTF-8 bytes of PostgreSQL `jsonb::text`.
+- Public read RPC independently recomputes and verifies this hash before returning the immutable current publication.
+- Public Catalog Edge Function `supabase/functions/flame-chick-catalog/index.ts` returns the V3 snapshot plus publication identity metadata. It uses server-side database credentials only; browser receives only the public publishable key.
+- Found and fixed a health endpoint edge case: when there is no publication, it previously advertised schema 2 even though the contract is V3. Constant now reports schema 3 for the unpublished health response too.
+- V3 validator and tests were corrected to allow optional deal component groups with zero allowed mappings while still requiring satisfiable mappings for groups with `minUnits > 0`, matching the database publication validator.
+- Current edge function config keeps public catalog read with `verify_jwt=false`; the function still requires the public API key and uses server-side secret only for the internal RPC. Do not expose secret key to browser.
+
+### Verification
+
+- Website catalog V3 contract workflow passed previously: 26 tests, 0 failures (run 45045341326, commit `5540866736ba00c11a560a9147aa34bb436ab464`).
+- Edge Function Static Checks passed after unpublished-health schema correction (run [45045454847](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45045454847), commit `f68e2f11514a58760597d37576ff5facd809e9de`).
+- Current branch head at this checkpoint: `f68e2f11514a58760597d37576ff5facd809e9de`.
+- No Edge Function deployed, no catalog published, no database migration/write, no Website V3 client integration, no deployment, and no legacy site change.
+
+### Next safe implementation sequence
+
+1. Build a V3-only public client that calls health then catalog, verifies publication metadata matches exactly, validates the full V3 snapshot, rejects stale/tampered/mismatched responses, bounds response size/time/retries, and uses no persistent browser cache until integrity/caching design is explicitly tested.
+2. Test unpublished, network failure, timeout, HTTP errors, invalid JSON, schema mismatch, publication ID/version/hash mismatch, malformed snapshot, oversize response and server checksum failure.
+3. Integrate the V3 client behind the existing hidden menu gate; remove hardcoded operational menu data from the active Website path only after dynamic rendering and UI parity tests are complete.
+4. Render categories, products, variants, modifiers and deals by stable database IDs; never use display names as identifiers. Keep branch-specific availability and schedules fail-closed.
+5. Keep cart selection IDs and display quote separate from final price authority. Do not enable checkout until the order API supports V3 IDs and recalculates every amount server-side.
+6. Do not expose V3 menu, remove the old fallback guard, deploy or publish until all end-to-end tests pass.
+
+---
+
 ## Latest checkpoint — strict Website catalog V3 contract (2026-11-22)
 
 **Status: strict V3 snapshot/health contract implemented and automated checks pass. This is a validator milestone only; it is not yet wired into the storefront loader, pricing UI, or checkout. No deploy or live catalog publication.**
