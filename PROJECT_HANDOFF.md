@@ -1,3 +1,28 @@
+## Latest checkpoint — Vercel Git connections completed (2026-11-22)
+
+**Status: all four Flame Chick Vercel project shells are linked to the intended private GitHub repository; no deployment created.**
+
+- Correct GitHub owner/repository: `itsfahadahmed1234-creator/flame-chick-platform` (owner spelling includes `ahmed`; private repository).
+- Intended Vercel workspace: Fahad (`fahad-7455`, team ID `team_Rpf9jeGg9r3cmMguFXHtziqz`), Hobby plan. Hassan Food Point projects in this same workspace remain separate and untouched.
+- Vercel Git deployment context verified all four project links point to that exact repository:
+  - Website `flame-chick-website-production` — `prj_izBWyrFmPZIm63FHAT4jaLHUTLzu`
+  - Admin `flame-chick-admin-production` — `prj_kPEqsepRzivOJhNeA32Io3netjav`
+  - POS `flame-chick-pos-production` — `prj_gh1UnkZKnFnehWEs5eYhiXa40Xj5`
+  - Rider `flame-chick-rider-production` — `prj_U3djCTfZK0Ubl808umChQn7MPPNg`
+- Readback from all four projects: `latestDeployment=null`, `live=false`. No Vercel deployment has been created.
+- Project domains previously verified and assigned: `flamechic.vercel.app`, `flamechicadmin.vercel.app`, `flamechicpos.vercel.app`, and `flamechicrider.vercel.app`.
+- Git repository connection is confirmed. The Production Branch setting was not independently read back in this verification; intended branch remains `work/production-source-audit`, and `main` must remain untouched.
+- No HFP project, legacy Flame Chick project, legacy `flame-chick.vercel.app` domain, Supabase setting, secret, migration, menu data or application deployment was changed in this step.
+
+### Next safe gates
+
+1. Read back each Vercel project's Git branch and build/root-directory settings before any deployment.
+2. Verify CI on `work/production-source-audit`, especially the catalog Admin API workflow; do not treat the repository connection as a successful build.
+3. Review app-specific deployment configuration and security gates before creating any preview or production deployment.
+4. Keep all four apps undeployed until explicitly approved; no customer Website cutover or live order intake.
+
+---
+
 ## Latest implementation checkpoint — authenticated catalog Admin API contract (2026-11-22)
 
 **Status: source implementation committed; CI and runtime integration are not yet verified; not deployed.**
