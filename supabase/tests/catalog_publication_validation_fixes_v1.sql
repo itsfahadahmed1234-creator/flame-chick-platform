@@ -23,6 +23,12 @@ DECLARE
   v_referenced_schedule uuid := gen_random_uuid();
   v_unreferenced_schedule uuid := gen_random_uuid();
   v_schedule_collection uuid := gen_random_uuid();
+  v_schedule_deal uuid := gen_random_uuid();
+  v_schedule_deal_variant uuid := gen_random_uuid();
+  v_empty_collection uuid := gen_random_uuid();
+  v_inactive_collection uuid := gen_random_uuid();
+  v_inactive_deal uuid := gen_random_uuid();
+  v_inactive_deal_schedule uuid := gen_random_uuid();
   v_errors jsonb;
   v_snapshot jsonb;
 BEGIN
@@ -76,10 +82,26 @@ BEGIN
   VALUES(v_referenced_schedule,v_restaurant,'QA Referenced Empty Schedule',true,'Asia/Karachi');
   INSERT INTO public.deal_collections(id,restaurant_id,category_id,schedule_set_id,name_en,is_active)
   VALUES(v_schedule_collection,v_restaurant,v_deal_category,v_referenced_schedule,'QA Schedule Collection',true);
+  INSERT INTO public.deals(id,restaurant_id,collection_id,title,is_active,is_available)
+  VALUES(v_schedule_deal,v_restaurant,v_schedule_collection,'QA Scheduled Deal',true,true);
+  INSERT INTO public.deal_variants(id,restaurant_id,deal_id,variant_key,label_en,pricing_mode,base_price,is_active)
+  VALUES(v_schedule_deal_variant,v_restaurant,v_schedule_deal,'QA','QA','FIXED_BUNDLE',100,true);
 
-  -- Unreferenced active empty schedule is a harmless draft and must be ignored.
+  -- An active collection with no active deals is not a live schedule reference.
   INSERT INTO public.catalog_schedule_sets(id,restaurant_id,name,is_active,timezone)
-  VALUES(v_unreferenced_schedule,v_restaurant,'QA Unreferenced Empty Schedule',true,'Asia/Karachi');
+  VALUES(v_unreferenced_schedule,v_restaurant,'QA Collection Without Active Deals Schedule',true,'Asia/Karachi');
+  INSERT INTO public.deal_collections(id,restaurant_id,category_id,schedule_set_id,name_en,is_active)
+  VALUES(v_empty_collection,v_restaurant,v_deal_category,v_unreferenced_schedule,'QA Empty Collection',true);
+
+  -- An active assignment for an inactive deal must not block publication or enter the snapshot.
+  INSERT INTO public.catalog_schedule_sets(id,restaurant_id,name,is_active,timezone)
+  VALUES(v_inactive_deal_schedule,v_restaurant,'QA Inactive Deal Schedule',true,'UTC');
+  INSERT INTO public.deal_collections(id,restaurant_id,category_id,name_en,is_active)
+  VALUES(v_inactive_collection,v_restaurant,v_deal_category,'QA Inactive Deal Collection',true);
+  INSERT INTO public.deals(id,restaurant_id,collection_id,title,is_active,is_available)
+  VALUES(v_inactive_deal,v_restaurant,v_inactive_collection,'QA Inactive Deal',false,false);
+  INSERT INTO public.deal_schedule_assignments(id,restaurant_id,deal_id,branch_id,schedule_set_id,is_active)
+  VALUES(gen_random_uuid(),v_restaurant,v_inactive_deal,NULL,v_inactive_deal_schedule,true);
 
   v_errors := app_private.flame_chick_catalog_publication_validate(v_restaurant)->'errors';
 
@@ -105,14 +127,20 @@ BEGIN
     SELECT 1 FROM jsonb_array_elements(v_errors) e
     WHERE e->>'code'='ACTIVE_SCHEDULE_SET_INVALID'
       AND e->>'entity_id'=v_unreferenced_schedule::text
-  ) THEN RAISE EXCEPTION 'UNREFERENCED_EMPTY_SCHEDULE_WAS_REJECTED'; END IF;
+  ) THEN RAISE EXCEPTION 'COLLECTION_WITHOUT_ACTIVE_DEAL_SCHEDULE_WAS_REJECTED'; END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_errors) e
+    WHERE e->>'code' IN ('ACTIVE_SCHEDULE_SET_INVALID','DEAL_ASSIGNMENT_TIMEZONE_MISMATCH','ACTIVE_DEAL_ASSIGNMENT_SCHEDULE_INACTIVE')
+      AND e->>'entity_id'=v_inactive_deal_schedule::text
+  ) THEN RAISE EXCEPTION 'INACTIVE_DEAL_SCHEDULE_WAS_REJECTED'; END IF;
 
   v_snapshot := app_private.flame_chick_catalog_compile_snapshot(v_restaurant,now());
 
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_snapshot->'scheduleSets') s
-    WHERE s->>'scheduleSetId'=v_unreferenced_schedule::text
-  ) THEN RAISE EXCEPTION 'UNREFERENCED_SCHEDULE_WAS_COMPILED'; END IF;
+    WHERE s->>'scheduleSetId' IN (v_unreferenced_schedule::text,v_inactive_deal_schedule::text)
+  ) THEN RAISE EXCEPTION 'UNUSED_OR_INACTIVE_DEAL_SCHEDULE_WAS_COMPILED'; END IF;
 
   IF NOT EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_snapshot->'scheduleSets') s
