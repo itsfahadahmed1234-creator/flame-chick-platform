@@ -29,6 +29,7 @@ DECLARE
   v_inactive_collection uuid := gen_random_uuid();
   v_inactive_deal uuid := gen_random_uuid();
   v_inactive_deal_schedule uuid := gen_random_uuid();
+  v_active_mismatch_schedule uuid := gen_random_uuid();
   v_errors jsonb;
   v_snapshot jsonb;
 BEGIN
@@ -103,6 +104,12 @@ BEGIN
   INSERT INTO public.deal_schedule_assignments(id,restaurant_id,deal_id,branch_id,schedule_set_id,is_active)
   VALUES(gen_random_uuid(),v_restaurant,v_inactive_deal,NULL,v_inactive_deal_schedule,true);
 
+  -- Conversely, an active deal's timezone-mismatched assignment must still be rejected.
+  INSERT INTO public.catalog_schedule_sets(id,restaurant_id,name,is_active,timezone)
+  VALUES(v_active_mismatch_schedule,v_restaurant,'QA Active Deal Mismatched Schedule',true,'UTC');
+  INSERT INTO public.deal_schedule_assignments(id,restaurant_id,deal_id,branch_id,schedule_set_id,is_active)
+  VALUES(gen_random_uuid(),v_restaurant,v_schedule_deal,NULL,v_active_mismatch_schedule,true);
+
   v_errors := app_private.flame_chick_catalog_publication_validate(v_restaurant)->'errors';
 
   IF EXISTS (
@@ -140,6 +147,12 @@ BEGIN
     WHERE e->>'code'='DEAL_ASSIGNMENT_TIMEZONE_MISMATCH'
       AND e->>'deal_id'=v_inactive_deal::text
   ) THEN RAISE EXCEPTION 'INACTIVE_DEAL_TIMEZONE_MISMATCH_WAS_REJECTED'; END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_errors) e
+    WHERE e->>'code'='DEAL_ASSIGNMENT_TIMEZONE_MISMATCH'
+      AND e->>'deal_id'=v_schedule_deal::text
+  ) THEN RAISE EXCEPTION 'ACTIVE_DEAL_TIMEZONE_MISMATCH_WAS_NOT_REJECTED'; END IF;
 
   v_snapshot := app_private.flame_chick_catalog_compile_snapshot(v_restaurant,now());
 
