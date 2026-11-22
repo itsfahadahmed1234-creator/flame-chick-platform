@@ -34,7 +34,7 @@
 
   function parseTimeSeconds(value) {
     if (typeof value !== 'string') return null;
-    var match = /^(\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d{1,6}))?$/.exec(value);
+    var match = /^(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?$/.exec(value);
     if (!match) return null;
     var fraction = match[4] ? Number('0.' + match[4]) : 0;
     return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) + fraction;
