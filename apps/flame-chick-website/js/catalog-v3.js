@@ -26,7 +26,7 @@
     'scheduleSets', 'dealScheduleAssignments', 'branchProductAvailability',
     'branchVariantAvailability', 'branchDealAvailability', 'deliveryAreas',
     'promotions', 'versionId', 'publicationId', 'publicationNumber',
-    'draftRevision', 'pricingEngineVersion', 'snapshotSha256'
+    'draftRevision', 'pricingEngineVersion', 'snapshotSha256', 'databaseNow'
   ];
 
   function isRecord(value) {
@@ -608,6 +608,9 @@
     validateScalar(snapshot.draftRevision, 'integer', '$.draftRevision', errors);
     validateScalar(snapshot.pricingEngineVersion, 'string', '$.pricingEngineVersion', errors);
     validateScalar(snapshot.snapshotSha256, 'string', '$.snapshotSha256', errors);
+    if (typeof snapshot.databaseNow !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$/.test(snapshot.databaseNow) || !Number.isFinite(Date.parse(snapshot.databaseNow))) {
+      addError(errors, '$.databaseNow', 'DATABASE_TIME_INVALID', 'Database timestamp must be a valid UTC timestamp.');
+    }
     if (typeof snapshot.snapshotSha256 !== 'string' || !SHA256_RE.test(snapshot.snapshotSha256)) {
       addError(errors, '$.snapshotSha256', 'CHECKSUM_INVALID', 'Snapshot SHA-256 must be 64 lowercase hexadecimal characters.');
     }
