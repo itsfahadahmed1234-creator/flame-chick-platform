@@ -44,7 +44,7 @@ jobs:
           migration="${migrations[0]}"
           test -s "${migration}"
           test -s supabase/tests/catalog_publication_validation_fixes_v1.sql
-          test -s supabase/migrations/20261122050000_flame_chick_catalog_publication_validation_restore_v1.sql
+          test -s ops/recovery-migrations/catalog-publication-validation-restore-v1.sql
           test -s supabase/tests/catalog_publication_validation_recovery_v1.sql
           grep -q "HAVING g.min_units > 0" "${migration}"
           grep -q "ACTIVE_SCHEDULE_SET_INVALID" "${migration}"
@@ -55,8 +55,8 @@ jobs:
           grep -q "CATALOG_PUBLICATION_HELPER_SECURITY_BASELINE_INVALID" "${migration}"
           grep -q "018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712" "${migration}"
           grep -q "b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2" "${migration}"
-          grep -q "CATALOG_VALIDATION_RESTORE_CANDIDATE_SOURCE_MISMATCH" supabase/migrations/20261122050000_flame_chick_catalog_publication_validation_restore_v1.sql
-          grep -q "CATALOG_VALIDATION_RESTORE_SOURCE_VERIFICATION_FAILED" supabase/migrations/20261122050000_flame_chick_catalog_publication_validation_restore_v1.sql
+          grep -q "CATALOG_VALIDATION_RESTORE_CANDIDATE_SOURCE_MISMATCH" ops/recovery-migrations/catalog-publication-validation-restore-v1.sql
+          grep -q "CATALOG_VALIDATION_RESTORE_SOURCE_VERIFICATION_FAILED" ops/recovery-migrations/catalog-publication-validation-restore-v1.sql
           grep -q "018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712" supabase/tests/catalog_publication_validation_recovery_v1.sql
           grep -q "b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2" supabase/tests/catalog_publication_validation_recovery_v1.sql
           grep -q "OPTIONAL_GROUP_WITHOUT_VARIANT_MAP_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
@@ -127,21 +127,20 @@ jobs:
       # baseline. Re-run candidate -> candidate fixture -> compensation manually
       # in this disposable DB to exercise the actual forward recovery sequence.
       # Manual psql application does not add/delete migration-ledger rows.
-      - name: Rehearse candidate migration and regression fixture
+      - name: Run candidate regression fixture against the fully replayed candidate schema
         shell: bash
         run: |
           set -euo pipefail
           db="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-          psql "${db}" --set ON_ERROR_STOP=1 --file supabase/migrations/20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql
           psql "${db}" --set ON_ERROR_STOP=1 --file supabase/tests/catalog_publication_validation_fixes_v1.sql
       - name: Rehearse forward compensation and verify restored baseline
         shell: bash
         run: |
           set -euo pipefail
           db="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-          psql "${db}" --set ON_ERROR_STOP=1 --file supabase/migrations/20261122050000_flame_chick_catalog_publication_validation_restore_v1.sql
+          psql "${db}" --set ON_ERROR_STOP=1 --file ops/recovery-migrations/catalog-publication-validation-restore-v1.sql
           psql "${db}" --set ON_ERROR_STOP=1 --file supabase/tests/catalog_publication_validation_recovery_v1.sql
-      - name: Verify both fixtures left no test tenant and migration chain remains recorded
+      - name: Verify candidate fixture left no test tenant and migration chain remains recorded
         shell: bash
         run: |
           set -euo pipefail

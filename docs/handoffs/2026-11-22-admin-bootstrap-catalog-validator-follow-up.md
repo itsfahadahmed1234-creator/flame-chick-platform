@@ -98,10 +98,10 @@ A legacy POS browser tab previously exposed a credential in its URL query string
 
 The recovery package has now been added on `work/production-source-audit`:
 
-- Compensation migration: `supabase/migrations/20261122050000_flame_chick_catalog_publication_validation_restore_v1.sql`
+- Compensation template: `ops/recovery-migrations/catalog-publication-validation-restore-v1.sql` (deliberately outside the auto-applied migrations directory)
 - Recovery verification fixture: `supabase/tests/catalog_publication_validation_recovery_v1.sql`
 - Operational runbook: `docs/architecture/catalog-validator-recovery-v1.md`
-- CI workflow updated to replay the full ordered migration history, then manually rehearse candidate → candidate regression fixture → compensation → restored-state fixture on the disposable local stack.
+- CI workflow updated to replay the full ordered migration history ending at the candidate, run the candidate regression fixture, then manually rehearse compensation → restored-state fixture on the disposable local stack.
 
 The compensation is forward-only and transactional. It requires the exact candidate helper source hashes and the expected postgres owner, ACL, SECURITY DEFINER, empty search_path, and execution attributes. It restores the original function definitions copied from the already-applied `20261122031027` migration, then verifies the original SHA-256 hashes and restrictive metadata. It adds no persistent business schema/data and does not erase either migration-ledger entry.
 
@@ -112,7 +112,7 @@ Exact helper fingerprints:
 | Validator | `f179cc3b15b1d6ad5b07b90587513001bed97b752b09b13ce2d9c946e88a7750` | `018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712` |
 | Snapshot compiler | `1cee9543d131260f71573afc2f0a5a204422a59fa7f46ef0b24f4c2e277e3808` | `b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2` |
 
-**Important:** this is prepared recovery code, not yet declared tested until the updated GitHub Actions run completes successfully. The intended production Supabase project remains untouched; neither the candidate nor compensation has been applied there. The recovery runbook requires a separate explicit approval for any future remote compensation and mandates a dry-run showing only the one intended migration.
+The compensation template is intentionally outside `supabase/migrations`: a routine migration push must not queue the forward fix and its reversal together. During an approved recovery, copy the template into a newly timestamped migration newer than the current remote ledger. An initial rehearsal passed before this folder-safety correction; the revised workflow is pending and must pass before this recovery layout is called verified. The intended production Supabase project remains untouched; neither the candidate nor compensation has been applied there. The recovery runbook requires a separate explicit approval for any future remote compensation and mandates a dry-run showing only the one intended migration.
 
 
 ## Next

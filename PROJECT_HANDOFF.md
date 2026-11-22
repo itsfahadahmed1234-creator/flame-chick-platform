@@ -4,12 +4,12 @@
 
 The recovery package has now been added on `work/production-source-audit`:
 
-- Compensation migration: `supabase/migrations/20261122050000_flame_chick_catalog_publication_validation_restore_v1.sql`
+- Compensation template: `ops/recovery-migrations/catalog-publication-validation-restore-v1.sql` (kept outside the auto-applied migration folder)
 - Recovery verification fixture: `supabase/tests/catalog_publication_validation_recovery_v1.sql`
 - Operational runbook: `docs/architecture/catalog-validator-recovery-v1.md`
 - CI workflow updated to replay the full ordered migration history, then manually rehearse candidate → candidate regression fixture → compensation → restored-state fixture on the disposable local stack.
 
-The compensation is forward-only and transactional. It requires the exact candidate helper source hashes and the expected postgres owner, ACL, SECURITY DEFINER, empty search_path, and execution attributes. It restores the original function definitions copied from the already-applied `20261122031027` migration, then verifies the original SHA-256 hashes and restrictive metadata. It adds no persistent business schema/data and does not erase either migration-ledger entry.
+The compensation template is intentionally stored outside `supabase/migrations` because Supabase migration pushes apply all pending files in that folder; this prevents a routine forward push from applying the reversal too. It must be copied into a fresh timestamped migration only during an approved recovery. The compensation is forward-only and transactional. It requires the exact candidate helper source hashes and the expected postgres owner, ACL, SECURITY DEFINER, empty search_path, and execution attributes. It restores the original function definitions copied from the already-applied `20261122031027` migration, then verifies the original SHA-256 hashes and restrictive metadata. It adds no persistent business schema/data and does not erase either migration-ledger entry.
 
 Exact helper fingerprints:
 
@@ -18,7 +18,7 @@ Exact helper fingerprints:
 | Validator | `f179cc3b15b1d6ad5b07b90587513001bed97b752b09b13ce2d9c946e88a7750` | `018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712` |
 | Snapshot compiler | `1cee9543d131260f71573afc2f0a5a204422a59fa7f46ef0b24f4c2e277e3808` | `b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2` |
 
-**Important:** this is prepared recovery code, not yet declared tested until the updated GitHub Actions run completes successfully. The intended production Supabase project remains untouched; neither the candidate nor compensation has been applied there. The recovery runbook requires a separate explicit approval for any future remote compensation and mandates a dry-run showing only the one intended migration.
+**Important:** an earlier GitHub Actions rehearsal passed with the compensation still inside the migration history; this was then corrected because it would have queued the reversal in an ordinary migration push. The revised workflow is being rerun with the recovery template outside the migration folder. Do not treat the revised layout as verified until that run is green. The intended production Supabase project remains untouched; neither the candidate nor compensation has been applied there. The recovery runbook requires a separate explicit approval for any future remote compensation and mandates a dry-run showing only the one intended migration.
 
 This section supersedes the earlier catalog-validator QA status further below.
 

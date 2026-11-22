@@ -19,7 +19,7 @@ The intended production Supabase project is a build environment; the customer-fa
 ## Files
 
 - Candidate forward migration: `supabase/migrations/20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql`
-- Compensation: `supabase/migrations/20261122050000_flame_chick_catalog_publication_validation_restore_v1.sql`
+- Compensation template: `ops/recovery-migrations/catalog-publication-validation-restore-v1.sql` (intentionally outside `supabase/migrations`)
 - Candidate regression fixture: `supabase/tests/catalog_publication_validation_fixes_v1.sql`
 - Recovery verification fixture: `supabase/tests/catalog_publication_validation_recovery_v1.sql`
 
