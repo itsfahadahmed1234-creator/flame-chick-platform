@@ -1,3 +1,29 @@
+## Latest checkpoint — trusted database time and branch/fulfilment selector (2026-11-22)
+
+**Status: isolated V3 branch/fulfilment selector and database-time transport contract implemented; Website Static Checks passed. Candidate SQL migration is committed but NOT applied. No storefront integration or deployment.**
+
+- Added `apps/flame-chick-website/js/branch-fulfilment-v3.js`.
+  - If the published catalog has exactly one branch, it selects that branch automatically.
+  - If more than one branch exists, the customer must explicitly select one.
+  - Delivery/pickup is always an explicit choice, including the one-branch case.
+  - Each method is enabled only when both `websiteOrderingEnabled` and its corresponding branch flag are true.
+  - Changing branch clears the previous fulfilment selection. Unknown branch IDs, duplicate branch IDs, empty branch catalogs, missing contract/time and unsupported fulfilment methods fail closed.
+  - Accessible fieldsets, legends, labelled radio controls and live status text are used; catalog names are inserted as text, not HTML.
+  - The module does not use the customer's device clock.
+- The previous public catalog RPC did not return trusted server time. Added candidate migration `supabase/migrations/20261122174500_flame_chick_catalog_database_time_metadata_v1.sql` to return PostgreSQL `clock_timestamp()` as UTC `databaseNow` metadata. It leaves the immutable snapshot and its SHA-256 input unchanged, preserves SECURITY DEFINER + empty search_path, and keeps the RPC executable only by `service_role`. The migration verifies the checksum and closed table grants.
+- Updated `supabase/functions/flame-chick-catalog/index.ts` to pass the RPC timestamp through health/catalog metadata, validating its UTC shape. Updated V3 catalog client and contract so the catalog response must carry a valid database timestamp before it can be used; isolated publication-snapshot validation continues to accept the stored snapshot without transport-only time metadata.
+- Added strict UTC timestamp validation in `catalog-v3.js`; invalid calendar dates such as 30 February are rejected. The branch flow receives database time explicitly and does not calculate current time itself.
+- Added `tests/branch-fulfilment-v3.test.mjs` covering one/multiple branches, explicit fulfilment, branch switching, unsupported ordering, unknown/duplicate branch IDs, invalid/missing trusted time and absence of browser clock dependencies.
+- Added `tests/catalog-database-time-migration.test.mjs` to statically verify the candidate migration's checksum, metadata, SECURITY DEFINER, search_path and grants contract. These are source-level checks, not a live PostgreSQL migration rehearsal.
+- Added all new files/tests and migration path to Website Static Checks. A sequence of CI failures caught a misplaced metadata requirement, a validator splice/syntax issue and two test-order expectations; those were corrected before the final green run. Do not treat the earlier failed runs as successes.
+- Latest Website Static Checks [45049977005](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45049977005) passed on commit `a7ff7e98a6044b49a82b27349171fe3b9a052e9e`: **77 tests passed, 0 failed**, JavaScript syntax checks and inline Website script parsing passed.
+- Latest Edge Function Static Checks [45049441105](https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/45049441105) passed on commit `f0c0d381c2a7813b3a71900729a102ca55a7696b`; Deno type checks include the updated catalog function.
+- Website preview deployment workflow was skipped. No migration was applied; no Edge Function was deployed; no catalog was published/seeded; no Vercel deployment, domain change, menu enablement or checkout activation occurred. Existing Website HTML remains unchanged and the hidden-menu safety gate remains in force.
+
+**Next:** build an isolated orchestration/preview adapter that loads and verifies the V3 catalog, obtains the trusted database timestamp, requires branch/fulfilment selection, and then constructs product and deal view-models for that exact context. It must remain non-ordering and not activate the old hardcoded menu. Add tests for branch changes invalidating product/deal view models and ensure the quote/order server remains the only pricing authority. Only after that preview adapter passes should we consider integrating it into the Website behind a disabled-by-default feature gate.
+
+---
+
 ## Latest checkpoint — V3 deal configurator adapter (2026-11-22)
 
 **Status: isolated accessible deal configurator and ID-only selection payload implemented; latest full Website Static Checks passed. Not wired into storefront. No deployment or publication.**
