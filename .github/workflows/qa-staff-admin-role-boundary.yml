@@ -1,0 +1,96 @@
+name: Flame Chick Staff Admin Role Boundary QA
+
+on:
+  push:
+    branches:
+      - work/production-source-audit
+    paths:
+      - "supabase/migrations/*.sql"
+      - "supabase/tests/batch4_staff_admin_role_boundary.sql"
+      - "supabase/tests/batch4_staff_admin_security.sql"
+      - ".github/workflows/qa-staff-admin-role-boundary.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flame-chick-staff-admin-role-boundary-local-qa
+  cancel-in-progress: false
+
+jobs:
+  isolated-role-boundary:
+    if: github.ref == 'refs/heads/work/production-source-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: Install pinned Supabase CLI
+        run: |
+          set -euo pipefail
+          npm install --global "supabase@3.2.0"
+          supabase --version
+      - name: Validate fixture safeguards
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s supabase/tests/batch4_staff_admin_security.sql
+          test -s supabase/tests/batch4_staff_admin_role_boundary.sql
+          for marker in STAFF_ROLE_BOUNDARY_ADMIN_ACCESS_FAILED STAFF_ROLE_BOUNDARY_OWNER_ACCESS_FAILED STAFF_ROLE_BOUNDARY_MANAGER_WAS_GRANTED_ADMIN_ACCESS STAFF_ROLE_BOUNDARY_CASHIER_WAS_GRANTED_ADMIN_ACCESS STAFF_ROLE_BOUNDARY_RIDER_WAS_GRANTED_ADMIN_ACCESS STAFF_ROLE_BOUNDARY_MISSING_JWT_WAS_ACCEPTED STAFF_ROLE_BOUNDARY_DIRECT_TABLE_PRIVILEGE; do
+            grep -q "$marker" supabase/tests/batch4_staff_admin_role_boundary.sql
+          done
+          grep -q "ROLLBACK;" supabase/tests/batch4_staff_admin_role_boundary.sql
+      - name: Start disposable Supabase with hosted-only helper compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          parked="${RUNNER_TEMP}/flame-chick-migrations"
+          mv supabase/migrations "$parked"
+          mkdir -p supabase/migrations
+          restore_migrations() { rm -rf supabase/migrations; mv "$parked" supabase/migrations; }
+          trap restore_migrations EXIT
+          supabase start -x studio,imgproxy,edge-runtime,logflare,vector
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 <<'SQL'
+          DO $bootstrap$
+          BEGIN
+            IF to_regprocedure('public.rls_auto_enable()') IS NULL THEN
+              EXECUTE $ddl$
+                CREATE FUNCTION public.rls_auto_enable()
+                RETURNS event_trigger LANGUAGE plpgsql AS $function$
+                BEGIN RETURN; END;
+                $function$
+              $ddl$;
+            END IF;
+          END
+          $bootstrap$;
+          SQL
+          restore_migrations
+          trap - EXIT
+      - name: Replay complete migration history
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase migration up --local
+          expected="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')"
+          applied="$(psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -Atqc "select count(*) from supabase_migrations.schema_migrations")"
+          test "$applied" = "$expected"
+      - name: Verify staff ACL and RLS baseline
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/batch4_staff_admin_security.sql
+      - name: Exercise Admin, Owner and operational-role authorization
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/batch4_staff_admin_role_boundary.sql
+      - name: Verify all synthetic identities and role rows rolled back
+        shell: bash
+        run: |
+          set -euo pipefail
+          db="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          test "$(psql "$db" -Atqc "select count(*) from auth.users where email like 'qa-staff-admin-%@example.invalid'")" = "0"
+          test "$(psql "$db" -Atqc "select count(*) from public.user_roles ur join public.restaurants r on r.id=ur.restaurant_id where r.slug='flame-chick'")" = "0"
+          test "$(psql "$db" -Atqc "select count(*) from public.staff_role_audit a join public.restaurants r on r.id=a.restaurant_id where r.slug='flame-chick'")" = "0"
+      - name: Stop disposable Supabase stack
+        if: always()
+        run: supabase stop --no-backup
