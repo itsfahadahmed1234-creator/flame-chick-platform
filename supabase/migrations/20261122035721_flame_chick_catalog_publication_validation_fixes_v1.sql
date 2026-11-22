@@ -44,10 +44,10 @@ BEGIN
   IF position('count(m.id)=0 OR' IN v_validate_def)=0
      OR position('ACTIVE_SCHEDULE_SET_INVALID' IN v_validate_def)=0
      OR position('catalog_schedule_sets' IN v_compile_def)=0
-     OR (SELECT pg_catalog.md5(p.prosrc) FROM pg_catalog.pg_proc p WHERE p.oid=v_validate)
-          IS DISTINCT FROM '6f3ba61ae717bd7e9863b537e2e8b8de'
-     OR (SELECT pg_catalog.md5(p.prosrc) FROM pg_catalog.pg_proc p WHERE p.oid=v_compile)
-          IS DISTINCT FROM 'cd683ec5284e5c64d1af6ff526af4b43' THEN
+     OR (SELECT pg_catalog.encode(extensions.digest(pg_catalog.convert_to(p.prosrc,'UTF8'),'sha256'),'hex') FROM pg_catalog.pg_proc p WHERE p.oid=v_validate)
+          IS DISTINCT FROM '018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712'
+     OR (SELECT pg_catalog.encode(extensions.digest(pg_catalog.convert_to(p.prosrc,'UTF8'),'sha256'),'hex') FROM pg_catalog.pg_proc p WHERE p.oid=v_compile)
+          IS DISTINCT FROM 'b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2' THEN
     RAISE EXCEPTION 'CATALOG_VALIDATION_FUNCTIONS_NOT_AT_EXPECTED_BASELINE';
   END IF;
 
