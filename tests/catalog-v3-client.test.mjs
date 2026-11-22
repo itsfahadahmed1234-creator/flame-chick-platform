@@ -48,7 +48,7 @@ function makeFetch(snapshot, options = {}) {
     }
     if (url.endsWith('?action=catalog')) {
       if (options.catalogError) throw options.catalogError;
-      const data = options.catalogData || snapshot;
+      const data = { ...(options.catalogData || snapshot), databaseNow: (options.catalogData || snapshot).databaseNow || '2026-11-23T12:00:00.123456Z' };
       return jsonResponse(options.catalogPayload || { ok: true, data }, options.catalogStatus || 200);
     }
     throw new Error('Unexpected URL: ' + url);
@@ -63,6 +63,7 @@ test('loads a valid current V3 publication after health verification', async () 
   assert.equal(result.state, 'ready');
   assert.equal(result.snapshot.publicationId, snapshot.publicationId);
   assert.equal(result.versionId, snapshot.versionId);
+  assert.equal(result.databaseNow, '2026-11-23T12:00:00.123456Z');
   assert.equal(mock.calls.length, 2);
   for (const call of mock.calls) {
     assert.equal(call.init.method, 'GET');
@@ -161,4 +162,12 @@ test('rejects non-HTTPS configuration and missing V3 validator', async () => {
   const missingContract = await client.load({ config, contract: {}, fetchImpl: async () => {} });
   assert.equal(missingContract.state, 'error');
   assert.equal(missingContract.error.code, 'CONTRACT_UNAVAILABLE');
+});
+
+test('rejects a catalog response without trusted database time', async () => {
+  const snapshot = createSnapshot();
+  const mock = makeFetch(snapshot, { catalogData: { ...snapshot, databaseNow: 'not-a-time' } });
+  const result = await client.load({ config, contract, fetchImpl: mock.fetchImpl });
+  assert.equal(result.state, 'error');
+  assert.equal(result.error.code, 'DATABASE_TIME_INVALID');
 });
