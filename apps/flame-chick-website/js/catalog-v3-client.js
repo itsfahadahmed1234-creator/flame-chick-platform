@@ -134,11 +134,17 @@
       snapshot.publishedAt === health.publishedAt &&
       snapshot.versionId === health.versionId;
 
+    if (typeof snapshot.databaseNow !== 'string' ||
+        !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$/.test(snapshot.databaseNow) ||
+        !Number.isFinite(Date.parse(snapshot.databaseNow))) {
+      return fail('DATABASE_TIME_INVALID', 'Catalog response did not include a valid database timestamp.');
+    }
+
     if (!same) {
       return fail('PUBLICATION_MISMATCH', 'Health and catalog responses refer to different publication versions.');
     }
 
-    return { ok: true, snapshot: snapshot };
+    return { ok: true, snapshot: snapshot, databaseNow: snapshot.databaseNow };
   }
 
   function load(deps) {
@@ -186,7 +192,7 @@
       return get('catalog').then(function (catalogPayload) {
         var result = validateCatalogEnvelope(catalogPayload, health, contract);
         if (!result.ok) return { state: 'error', error: result };
-        return { state: 'ready', snapshot: result.snapshot, versionId: health.versionId };
+        return { state: 'ready', snapshot: result.snapshot, versionId: health.versionId, databaseNow: result.databaseNow };
       });
     }).catch(function (error) {
       return {
