@@ -10,7 +10,15 @@ CREATE TEMP TABLE flame_chick_catalog_function_guard (
   function_owner oid NOT NULL,
   function_acl aclitem[],
   function_security_definer boolean NOT NULL,
-  function_config text[]
+  function_config text[],
+  function_volatility "char" NOT NULL,
+  function_is_strict boolean NOT NULL,
+  function_parallel "char" NOT NULL,
+  function_is_leakproof boolean NOT NULL,
+  function_cost real NOT NULL,
+  function_rows real NOT NULL,
+  function_returns_set boolean NOT NULL,
+  function_kind "char" NOT NULL
 ) ON COMMIT DROP;
 
 DO $preflight$
@@ -35,12 +43,43 @@ BEGIN
 
   IF position('count(m.id)=0 OR' IN v_validate_def)=0
      OR position('ACTIVE_SCHEDULE_SET_INVALID' IN v_validate_def)=0
-     OR position('catalog_schedule_sets' IN v_compile_def)=0 THEN
+     OR position('catalog_schedule_sets' IN v_compile_def)=0
+     OR (SELECT pg_catalog.md5(p.prosrc) FROM pg_catalog.pg_proc p WHERE p.oid=v_validate)
+          IS DISTINCT FROM '6f3ba61ae717bd7e9863b537e2e8b8de'
+     OR (SELECT pg_catalog.md5(p.prosrc) FROM pg_catalog.pg_proc p WHERE p.oid=v_compile)
+          IS DISTINCT FROM 'cd683ec5284e5c64d1af6ff526af4b43' THEN
     RAISE EXCEPTION 'CATALOG_VALIDATION_FUNCTIONS_NOT_AT_EXPECTED_BASELINE';
   END IF;
 
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_proc p
+    WHERE p.oid IN (v_validate,v_compile)
+      AND (
+        p.proowner IS DISTINCT FROM (SELECT oid FROM pg_catalog.pg_roles WHERE rolname='postgres')
+        OR p.prosecdef IS DISTINCT FROM true
+        OR p.proconfig IS DISTINCT FROM ARRAY['search_path=""']::text[]
+        OR p.proacl::text IS DISTINCT FROM '{postgres=X/postgres}'
+        OR p.provolatile IS DISTINCT FROM 'v'
+        OR p.proisstrict IS DISTINCT FROM false
+        OR p.proparallel IS DISTINCT FROM 'u'
+        OR p.proleakproof IS DISTINCT FROM false
+        OR p.procost IS DISTINCT FROM 100
+        OR p.prorows IS DISTINCT FROM 0
+        OR p.proretset IS DISTINCT FROM false
+        OR p.prokind IS DISTINCT FROM 'f'
+        OR pg_catalog.has_function_privilege('anon',p.oid,'EXECUTE')
+        OR pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE')
+        OR pg_catalog.has_function_privilege('service_role',p.oid,'EXECUTE')
+      )
+  ) THEN
+    RAISE EXCEPTION 'CATALOG_PUBLICATION_HELPER_SECURITY_BASELINE_INVALID';
+  END IF;
+
   INSERT INTO pg_temp.flame_chick_catalog_function_guard
-  SELECT p.oid,p.proowner,p.proacl,p.prosecdef,p.proconfig
+  SELECT p.oid,p.proowner,p.proacl,p.prosecdef,p.proconfig,
+         p.provolatile,p.proisstrict,p.proparallel,p.proleakproof,
+         p.procost,p.prorows,p.proretset,p.prokind
   FROM pg_catalog.pg_proc p
   WHERE p.oid IN (v_validate,v_compile)
     AND p.proowner=(SELECT oid FROM pg_catalog.pg_roles WHERE rolname='postgres')
@@ -557,6 +596,14 @@ BEGIN
        OR p.proacl IS DISTINCT FROM g.function_acl
        OR p.prosecdef IS DISTINCT FROM g.function_security_definer
        OR p.proconfig IS DISTINCT FROM g.function_config
+       OR p.provolatile IS DISTINCT FROM g.function_volatility
+       OR p.proisstrict IS DISTINCT FROM g.function_is_strict
+       OR p.proparallel IS DISTINCT FROM g.function_parallel
+       OR p.proleakproof IS DISTINCT FROM g.function_is_leakproof
+       OR p.procost IS DISTINCT FROM g.function_cost
+       OR p.prorows IS DISTINCT FROM g.function_rows
+       OR p.proretset IS DISTINCT FROM g.function_returns_set
+       OR p.prokind IS DISTINCT FROM g.function_kind
   ) THEN
     RAISE EXCEPTION 'CATALOG_PUBLICATION_HELPER_SECURITY_METADATA_CHANGED';
   END IF;
