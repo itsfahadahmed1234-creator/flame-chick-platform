@@ -45,10 +45,47 @@ Both helpers remain postgres-owned, ACL `{postgres=X/postgres}`, SECURITY DEFINE
 - No menu data/publication, customer orders, Edge Functions, app deployments, Website cutover, Vercel aliases or DNS changes.
 - Flame Chick is still in the production-build phase; the customer-facing system is not live.
 
+## Latest stage — Admin security readiness and Staff Admin origin hardening
+
+**Code and CI: implemented; deployment configuration intentionally pending.**
+
+- Supabase organization `Flamechic` is still Free; project `adkrxfnawdiljhjaavnj` remains `ACTIVE_HEALTHY`.
+- Supabase confirms leaked-password screening via HaveIBeenPwned is available on Pro and above. No upgrade was made. The Admin invitation UI still requires at least 12 characters; use unique password-manager passwords. MFA remains a recommended next security control for Admin/Owner.
+- New Vercel project `flame-chick-admin-production` has a verified default domain `flame-chick-admin-production.vercel.app`, but SSO protection applies to all except custom domains and no deployment exists. It is not a suitable public staff invitation destination.
+- Legacy `flame-chick-admin.vercel.app` is a separate old project and is not used as the new Admin callback.
+- Staff Admin Edge Function remains undeployed; no Auth URL settings, environment secrets, Vercel deployment, DNS, or aliases were changed.
+
+### Staff Admin function changes
+
+- Added `origin-policy.mjs` with strict exact-origin parsing. Rejects wildcard hosts, non-HTTPS production origins, paths, queries, fragments, embedded credentials and malformed values. HTTP is allowed only for explicitly listed loopback development origins.
+- CORS reflects only an exact allowlisted browser origin; no wildcard or credentials header.
+- Invitation redirect is accepted only when it is HTTPS, on an allowlisted origin, and exactly `/accept-invitation.html` with no query or fragment.
+- Missing or malformed origin configuration fails closed with 503. Unlisted browser origins receive 403 without an allow-origin header.
+- JWT gateway verification remains `verify_jwt=true`; database commands still use the caller's JWT and derive actor identity from `auth.uid()`. Service secret is still only used in the server-side `apikey` header for the service-only invitation finalizer.
+- SQL role review confirmed the database trigger protects the last active Owner with `LAST_ACTIVE_OWNER_PROTECTED`. Admin and Owner remain distinct restaurant-wide roles; Manager, Cashier and Rider remain branch-scoped.
+
+### Automated tests
+
+- Added `tests/staff-admin-origin-policy.test.mjs` for exact origins, wildcard/path/query/fragment/credential rejection, safe invite callback, and CORS behavior.
+- Added `tests/staff-admin-role-boundary.test.mjs` for JWT verification, `auth.uid()` actor derivation, Admin/Owner versus operational role scope, private command isolation and service-secret header handling.
+- Expanded Edge Function hygiene checks and the Admin CI workflow to run these tests.
+- Latest static CI: [run 45020193034 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45020193034).
+- Edge Function Deno type check: [run 45020189510 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45020189510).
+
+### Exact configuration after custom domain selection
+
+Only after the chosen public custom Admin domain is attached and verified:
+- Supabase Auth Site URL: `https://<custom-admin-domain>/`
+- Auth redirect allowlist: exact `https://<custom-admin-domain>/accept-invitation.html` plus only separately approved local loopback URLs
+- `FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS=https://<custom-admin-domain>`
+- `FLAME_CHICK_STAFF_INVITE_REDIRECT_URL=https://<custom-admin-domain>/accept-invitation.html`
+
+Do not deploy Staff Admin or invite staff until the public callback is ready, exact origins and redirects are configured, and the server-only secret is stored securely.
+
 ## Remaining controlled work
 
-1. Enable Supabase Auth leaked-password protection before broad staff onboarding.
-2. Configure exact Admin Site URL/redirect allowlist, Staff Admin function origins and server-only secret.
+1. Choose and attach the public custom Admin domain; then configure exact Auth Site URL/redirect allowlist and matching Staff Admin origins.
+2. Decide whether to move to Supabase Pro if built-in leaked-password screening is required; do not upgrade without explicit approval.
 3. Deploy and test Staff Admin Edge Function and protected Admin preview; keep non-Staff modules disabled until secure command APIs replace legacy direct REST operations.
 4. Continue catalog/order/delivery command API and pricing/quote engine work. The public snapshot still has empty deliveryAreas/promotions stubs; do not cut over the Website until required DTO parts are implemented and version compatibility is resolved.
 5. Keep real-menu seeding/publication, customer Website cutover, POS/Rider deployments and Vercel changes separately reviewed and approved.
