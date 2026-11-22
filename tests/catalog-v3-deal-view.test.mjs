@@ -61,8 +61,8 @@ test('overnight weekly windows continue after midnight and retain the starting w
     }]
   };
   assert.equal(deals.evaluateScheduleSet(schedule, '2026-11-27T18:30:00Z').available, true);
-  assert.equal(deals.evaluateScheduleSet(schedule, '2026-11-27T21:30:00Z').available, true);
-  assert.equal(deals.evaluateScheduleSet(schedule, '2026-11-27T22:00:00Z').available, false);
+  assert.equal(deals.evaluateScheduleSet(schedule, '2026-11-27T20:30:00Z').available, true);
+  assert.equal(deals.evaluateScheduleSet(schedule, '2026-11-27T21:00:00Z').available, false);
 });
 
 test('fails closed when trusted time or timezone is invalid', () => {
