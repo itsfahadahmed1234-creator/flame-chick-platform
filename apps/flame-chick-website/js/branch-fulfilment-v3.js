@@ -21,11 +21,11 @@
         !Array.isArray(snapshot.branches) || snapshot.branches.length === 0) {
       return fail('BRANCH_CATALOG_INVALID', 'The published catalog does not contain valid branch information.');
     }
-    if (typeof contract.isIsoUtcDateTime !== 'function' || !contract.isIsoUtcDateTime(databaseNow)) {
-      return fail('DATABASE_TIME_REQUIRED', 'Trusted database time is missing or invalid. Please reload the menu.');
-    }
-    if (!contract || typeof contract.isBranchOrderingEnabled !== 'function') {
+    if (!contract || typeof contract.isIsoUtcDateTime !== 'function' || typeof contract.isBranchOrderingEnabled !== 'function') {
       return fail('CATALOG_CONTRACT_REQUIRED', 'The V3 branch availability validator is unavailable.');
+    }
+    if (!contract.isIsoUtcDateTime(databaseNow)) {
+      return fail('DATABASE_TIME_REQUIRED', 'Trusted database time is missing or invalid. Please reload the menu.');
     }
 
     var branches = snapshot.branches.slice();
