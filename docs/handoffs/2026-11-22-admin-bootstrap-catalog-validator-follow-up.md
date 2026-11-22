@@ -23,7 +23,7 @@ The Staff Admin Edge Function source now imports a strict origin policy:
 
 JWT verification remains enabled. User commands continue with the caller JWT and database-derived `auth.uid()`; service-only invite finalization uses the secret only in the `apikey` header. The database trigger was reviewed and protects the last active Owner (`LAST_ACTIVE_OWNER_PROTECTED`).
 
-CI tests were added for origin parsing/CORS/redirect safety and the role/security contract. Latest Admin static CI: [45020193034 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45020193034). Deno type check: [45020189510 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45020189510).
+CI tests were added for origin parsing/CORS/redirect safety and the role/security contract. Latest Admin static CI: [45020282242 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45020282242). Deno type check: [45020278858 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45020278858).
 
 No Auth settings, secrets, deployments, domains, DNS, or aliases have been changed. After the public custom Admin domain is selected and verified, set the Site URL to its root, allow only the exact `/accept-invitation.html` redirect, and configure `FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS` and `FLAME_CHICK_STAFF_INVITE_REDIRECT_URL` to match. Do not deploy or invite staff before this gate is complete.
 
