@@ -64,7 +64,7 @@ Added `.github/workflows/qa-staff-admin-role-boundary.yml` to replay the full mi
 
 - CI run: [45027267180](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45027267180)
 - Initial workflow validation caught a too-specific grep for generated role-denial markers; workflow assertion was corrected in commit `c637e8c2683108e57ecb7bb09faa2dc4fc171451`. That first run failed only at preflight marker validation, before starting the local database.
-- The corrected run passed fixture static validation and is currently at disposable Supabase startup. Runtime assertions remain pending.
+- Run `45027465430` exposed that the schema-only migration replay has no restaurant seed; the fixture was corrected to insert deterministic QA restaurant and branch rows inside its rollback-only transaction, with post-rollback absence checks. Current run `45028047643` passed static validation and remains at disposable Supabase startup; runtime assertions remain pending.
 
 No Production Supabase migration, Auth settings, Edge Function deployment, Vercel deployment, secret or live data was changed. No Owner account was created.
 
