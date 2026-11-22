@@ -208,7 +208,7 @@
           if (count > option.maxQuantity) {
             return fail('COMPONENT_QUANTITY_INVALID', 'A component exceeds its allowed quantity.');
           }
-          for (var unit = 0; unit < count; unit++) {
+          for (let unit = 0; unit < count; unit++) {
             var modifierSelections = Object.create(null);
             option.modifierGroups.forEach(function (modifierGroup) {
               modifierSelections[modifierGroup.id] =
