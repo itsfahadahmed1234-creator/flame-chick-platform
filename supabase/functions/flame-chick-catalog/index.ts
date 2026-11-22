@@ -45,6 +45,7 @@ type PublicationRead = {
   pricingEngineVersion: string | null;
   snapshotSha256: string | null;
   publishedAt: string | null;
+  databaseNow: string;
   snapshot: Record<string, unknown> | null;
 };
 
@@ -102,6 +103,7 @@ async function readCurrentPublication(): Promise<PublicationRead> {
       pricingEngineVersion: null,
       snapshotSha256: null,
       publishedAt: null,
+      databaseNow: typeof result.databaseNow === 'string' ? result.databaseNow : '',
       snapshot: null,
     };
   }
@@ -115,6 +117,9 @@ async function readCurrentPublication(): Promise<PublicationRead> {
     typeof result.snapshotSha256 !== "string" ||
     !/^[0-9a-f]{64}$/.test(result.snapshotSha256) ||
     typeof result.publishedAt !== "string" ||
+    typeof result.databaseNow !== "string" ||
+    !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$/.test(result.databaseNow) ||
+    !Number.isFinite(Date.parse(result.databaseNow)) ||
     !result.snapshot ||
     typeof result.snapshot !== "object" ||
     Array.isArray(result.snapshot)
@@ -173,6 +178,7 @@ Deno.serve(async (req: Request) => {
           draftRevision: publication.draftRevision,
           snapshotSha256: publication.snapshotSha256,
           publishedAt: publication.publishedAt,
+          databaseNow: publication.databaseNow,
         },
       });
     }
@@ -201,6 +207,7 @@ Deno.serve(async (req: Request) => {
         pricingEngineVersion: publication.pricingEngineVersion,
         snapshotSha256: publication.snapshotSha256,
         publishedAt: publication.publishedAt,
+        databaseNow: publication.databaseNow,
       },
     });
   } catch (error) {
