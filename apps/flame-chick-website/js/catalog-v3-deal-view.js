@@ -219,9 +219,11 @@
             var optionsForGroup = snapshot.dealComponentOptions.filter(function (option) {
               return option.dealId === deal.dealId && option.componentGroupId === group.componentGroupId;
             }).map(function (option) {
-              var mapping = find(snapshot.dealVariantComponentOptions, 'componentOptionId', option.componentOptionId);
-              if (!mapping || mapping.dealVariantId !== variant.dealVariantId ||
-                  mapping.dealId !== deal.dealId) return null;
+              var mapping = snapshot.dealVariantComponentOptions.find(function (item) {
+                return item.dealVariantId === variant.dealVariantId &&
+                  item.componentOptionId === option.componentOptionId && item.dealId === deal.dealId;
+              });
+              if (!mapping) return null;
               if (!contract.resolveProductAvailability(snapshot, branchId, option.productId) ||
                   !contract.resolveVariantAvailability(snapshot, branchId, option.productId, option.productVariantId)) return null;
               var product = find(snapshot.products, 'productId', option.productId);
