@@ -44,7 +44,6 @@ test('rejects invalid fulfilment and marks disabled fulfilment as not orderable'
 test('omits unavailable products and variants using branch overlays', () => {
   const snapshot = createSnapshot();
   snapshot.branchProductAvailability.push({
-    branchProductAvailabilityId: '17000000-0000-4000-8000-000000000001',
     branchId: IDS.branch,
     productId: IDS.product,
     isAvailable: false
@@ -55,8 +54,8 @@ test('omits unavailable products and variants using branch overlays', () => {
 
   const variantSnapshot = createSnapshot();
   variantSnapshot.branchVariantAvailability.push({
-    branchVariantAvailabilityId: '18000000-0000-4000-8000-000000000001',
     branchId: IDS.branch,
+    productId: IDS.product,
     productVariantId: IDS.variant,
     isAvailable: false
   });
@@ -67,13 +66,20 @@ test('omits unavailable products and variants using branch overlays', () => {
 
 test('retains multiple variants without silently selecting one', () => {
   const snapshot = createSnapshot();
+  const secondVariantId = '19000000-0000-4000-8000-000000000001';
   snapshot.productVariants.push({
     ...snapshot.productVariants[0],
-    variantId: '19000000-0000-4000-8000-000000000001',
+    variantId: secondVariantId,
     sizeKey: 'LARGE',
     sizeLabel: 'Large',
     price: 750,
     sortOrder: 2
+  });
+  snapshot.modifierPriceRules.push({
+    ...snapshot.modifierPriceRules[0],
+    modifierPriceRuleId: '1a000000-0000-4000-8000-000000000001',
+    productVariantId: secondVariantId,
+    price: 100
   });
   const result = view.buildMenuViewModel(snapshot, {}, contract);
   assert.equal(result.ok, true);
