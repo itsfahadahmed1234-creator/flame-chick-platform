@@ -177,6 +177,45 @@ test('rejects impossible calendar dates in publication timestamps', () => {
   assert.equal(contract.validateSnapshot(snapshot).ok, false);
 });
 
+test('every deal variant must map at least one option for each component group', () => {
+  const snapshot = createSnapshot();
+  snapshot.dealComponentGroups[0].minUnits = 0;
+  snapshot.dealVariantComponentOptions = [];
+  assert.ok(contract.validateSnapshot(snapshot).errors.some(e => e.code === 'DEAL_REQUIRED_CHOICES_UNSATISFIABLE'));
+});
+
+test('branch availability overrides never reactivate globally unavailable products or variants', () => {
+  const snapshot = createSnapshot();
+  snapshot.branchProductAvailability.push({
+    branchId: IDS.branch, productId: IDS.product, isAvailable: true
+  });
+  snapshot.products[0].available = false;
+  assert.equal(contract.resolveProductAvailability(snapshot, IDS.branch, IDS.product), false);
+
+  snapshot.products[0].available = true;
+  snapshot.branchProductAvailability[0].isAvailable = false;
+  assert.equal(contract.resolveProductAvailability(snapshot, IDS.branch, IDS.product), false);
+
+  snapshot.branchProductAvailability[0].isAvailable = true;
+  snapshot.branchVariantAvailability.push({
+    branchId: IDS.branch, productId: IDS.product,
+    productVariantId: IDS.variant, isAvailable: true
+  });
+  snapshot.productVariants[0].available = false;
+  assert.equal(contract.resolveVariantAvailability(snapshot, IDS.branch, IDS.product, IDS.variant), false);
+});
+
+test('branch ordering flags are enforced independently for delivery and pickup', () => {
+  const snapshot = createSnapshot();
+  assert.equal(contract.isBranchOrderingEnabled(snapshot, IDS.branch, 'delivery'), true);
+  assert.equal(contract.isBranchOrderingEnabled(snapshot, IDS.branch, 'pickup'), true);
+  snapshot.branches[0].websiteDeliveryEnabled = false;
+  assert.equal(contract.isBranchOrderingEnabled(snapshot, IDS.branch, 'delivery'), false);
+  assert.equal(contract.isBranchOrderingEnabled(snapshot, IDS.branch, 'pickup'), true);
+  snapshot.branches[0].websiteOrderingEnabled = false;
+  assert.equal(contract.isBranchOrderingEnabled(snapshot, IDS.branch, 'pickup'), false);
+});
+
 test('validates health response for unpublished and published catalogs', () => {
   const empty = contract.validateHealth({ ok: true, data: { schemaVersion: 3, published: false } });
   assert.equal(empty.ok, true);
