@@ -120,6 +120,13 @@
     }
 
     var snapshot = payload.data;
+    if (typeof snapshot.databaseNow !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(snapshot.databaseNow) ||
+        typeof contract.isIsoUtcDateTime !== 'function' || !contract.isIsoUtcDateTime(snapshot.databaseNow)) {
+      return fail('DATABASE_TIME_INVALID', 'Catalog response did not include a valid database timestamp.');
+    }
+
+
     var validation = contract.validateSnapshot(snapshot);
     if (!validation || validation.ok !== true) {
       return fail((validation && validation.code) || 'SNAPSHOT_INVALID', 'Published catalog did not pass V3 validation.');
@@ -133,12 +140,6 @@
       snapshot.snapshotSha256 === health.snapshotSha256 &&
       snapshot.publishedAt === health.publishedAt &&
       snapshot.versionId === health.versionId;
-
-    if (typeof snapshot.databaseNow !== 'string' ||
-        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(snapshot.databaseNow) ||
-        typeof contract.isIsoUtcDateTime !== 'function' || !contract.isIsoUtcDateTime(snapshot.databaseNow)) {
-      return fail('DATABASE_TIME_INVALID', 'Catalog response did not include a valid database timestamp.');
-    }
 
     if (!same) {
       return fail('PUBLICATION_MISMATCH', 'Health and catalog responses refer to different publication versions.');
