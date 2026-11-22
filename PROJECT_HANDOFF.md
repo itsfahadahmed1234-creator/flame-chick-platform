@@ -24,6 +24,71 @@ This guardrail is intentionally prominent because these identifiers are operatio
 
 ---
 
+## Latest checkpoint — runtime security and integration audit (2026-11-22)
+
+**Status: read-only audit completed. Security boundaries show expected deny-by-default behavior. No deployment or production-data mutation performed. Multiple launch-blocking integration gaps remain.**
+
+### Supabase project and deployed function state
+
+- Project `adkrxfnawdiljhjaavnj` is `ACTIVE_HEALTHY`, Postgres 17.12, Mumbai `ap-south-1`; Free plan retained.
+- Migration ledger contains 24 migrations through `20261122105821_flame_chick_catalog_publication_validation_fixes_v1`.
+- No Supabase database branches exist.
+- Only deployed Edge Function is `flame-chick-staff-admin`, ACTIVE version 1, deployment ID `ea8d70fb-5f7b-4198-9442-dedd82fdf79a`, `verify_jwt=true`, deployed SHA-256 `1c541dca27382731b10ccad6219aa94eaadf8c0412242e3da59471df78947327`.
+- The deployed Staff Admin version predates the Catalog route additions currently on the working GitHub branch. The branch code (including `catalog-actions.mjs`) passed CI but is **not deployed**. Do not assume the live function has Catalog Admin API routes.
+- No Staff Admin function log entries were found in the 24-hour audit window queried (2026-11-21 16:00 UTC to 2026-11-22 16:00 UTC). This confirms no invocation evidence in that window; it does not by itself prove a runtime failure.
+- The new Vercel Admin project has no deployment, so there is no new-domain authenticated browser session to use for an end-to-end test. The open browser tab `flame-chick-admin.vercel.app` belongs to a legacy app and must not be used for new-project tests.
+
+### Database access and role-isolation checks
+
+- Read-only ACL audit found 33 application tables across `public` and `app_private`; all 33 have RLS enabled and no direct SELECT/INSERT/UPDATE/DELETE grants for `anon` or `authenticated`.
+- `public.flame_chick_staff_admin_command` is a postgres-owned SECURITY INVOKER wrapper executable by authenticated only; its private implementation derives the actor from `auth.uid()` and checks the active restaurant-wide Admin/Owner role.
+- `public.flame_chick_staff_admin_system_command` is postgres-owned SECURITY DEFINER with empty search_path and executable only by service_role.
+- The catalog public wrappers are authenticated-only; private authoring helpers check the active restaurant-wide Admin/Owner. The public catalog read helper is service_role-only.
+- Safe negative runtime calls without an authenticated actor returned:
+  - Staff Admin `list` -> `STAFF_AUTH_REQUIRED`
+  - Catalog draft read -> `CATALOG_ADMIN_FORBIDDEN`
+  Both aborted before any write.
+- Live tenant counts: one restaurant, one branch, one active Admin role; no Owner, Manager, Cashier or Rider assignments. Zero menu categories/products/deals, zero catalog publications and zero current-publication pointers.
+- Security Advisor: 33 INFO `rls_enabled_no_policy` notices are the intentional deny-by-default table posture; one WARN `auth_leaked_password_protection` is unavailable on the Free plan. No paid upgrade is authorized.
+- Performance Advisor: 30 INFO unused indexes on this empty/pre-launch workload; retain until real workload evidence justifies a change. Health Advisor: no findings.
+
+### Storage and Admin UI
+
+- The `flame-chick-media` Storage bucket does not exist yet.
+- `storage.objects` and `storage.buckets` have RLS enabled and zero policies. Table-level privileges exist for the API roles, but without policies the legacy browser upload/delete paths remain denied. Do not add broad policies to make them work.
+- The Admin app's active bootstrap permits only the Staff & Riders page. Dashboard, Orders, Menu, Categories, Deals, Delivery, Website Images and Website Settings are disabled both in the HTML and again in the JavaScript bootstrap.
+- The Admin source still contains older direct PostgREST CRUD and Storage helper code for those disabled modules. Database RLS/no direct table grants and the no-policy Storage posture deny those operations. This is defense in depth, not a reason to re-enable the old UI. Before enabling any such module, remove/replace its direct browser CRUD path with its reviewed authenticated API and add tests proving the old paths are unreachable.
+
+### Critical Website / catalog compatibility blocker
+
+- Production database publication compiler creates **schemaVersion 3** snapshots with the normalized new catalog/deal model (typed product variants; exact product-variant modifier price rules; deal collections, deal variants, component groups/options, schedules and branch availability).
+- Current Website loader `apps/flame-chick-website/js/catalog.js` is still hard-coded to **schemaVersion 2** and requires the old PascalCase DTO arrays/fields (including legacy `dealComponents`, `SizeKey` modifier price rules and `deliveryAreas`).
+- Current public Catalog Edge Function source returns the stored V3 snapshot unchanged; it does not contain a V3-to-V2 adapter. It also advertises schema version 2 only for the unpublished health response.
+- Therefore, once a V3 publication exists, the current Website loader will reject the health/schema response before loading the menu. Merely changing the schema-version constant is not sufficient because the payload field names and deal/pricing model differ.
+- No publication exists and the Catalog function is not deployed, so this is a source-contract/launch blocker, not a current customer-facing incident.
+- Do not seed/publish or cut over the Website until the DTO strategy is explicit, the Website/catalog/pricing/deal code is updated together, and golden tests cover ordinary variants, exact modifier pricing, deal required/optional choices, included/surcharge/standalone components, schedules, branch availability, NULL vs zero prices and rollback.
+
+### Order and delivery readiness
+
+- Current Production database has no order, order-item, delivery-task, offer, assignment, rider, or website-rate-limit tables/functions.
+- Supabase has no deployed `flame-chick-order-api`, `flame-chick-delivery-api`, or `flame-chick-catalog`; source files alone are not deployed capability.
+- Do not deploy the Order or Delivery functions until their full schema/RPCs, role/branch/rider ownership checks, atomic status transitions, idempotency, website-only rate limiting, private Realtime authorization/outbox, expiry/return flows and E2E tests exist and pass.
+- The existing source code's TypeScript pass does not override these missing runtime dependencies.
+
+### Next gates — required order
+
+1. Resolve and document the V3 Website DTO contract. Then implement the Website catalog, pricing and deal adapter/client changes with deterministic fixtures and regression tests. Keep the legacy live website untouched.
+2. Complete a source-level security review and request-level tests for the new Catalog Admin route implementation. Only then consider updating the deployed Staff Admin function, with a separately reviewed deployment and readback.
+3. Replace the disabled Admin modules' direct REST/Storage code with secure domain APIs before enabling their navigation. Create Storage bucket and narrowly-scoped policies only when the media API/ownership model is ready.
+4. Implement Order and Delivery schema/RPCs and their Edge Functions, followed by role/rider/branch isolation, duplicate/retry/race/expiry/return/concurrency tests and private Realtime authorization.
+5. After the relevant source/schema gates pass, request approval for a controlled preview on the new Vercel projects. Use the **new** `flamechicadmin.vercel.app` origin, not any legacy project/session. Test the existing Admin identity read-only first; do not create staff identities or send invites for smoke tests.
+6. Keep all four Vercel projects without deployments, no menu seed/publication, no customer order intake and no legacy Website cutover until separate explicit approval.
+
+No Supabase migration, table data, Auth setting, function deployment, secret, Storage policy/bucket, Vercel setting, deployment or legacy live resource was changed during this audit.
+
+---
+
+
 ## Latest checkpoint — CI failure repairs and verification (2026-11-22)
 
 **Status: targeted CI failures repaired; all current relevant automated checks pass. This is not a production-readiness certification.**
