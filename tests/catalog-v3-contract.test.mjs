@@ -216,6 +216,18 @@ test('branch ordering flags are enforced independently for delivery and pickup',
   assert.equal(contract.isBranchOrderingEnabled(snapshot, IDS.branch, 'pickup'), false);
 });
 
+test('enforces branch code format from the database contract', () => {
+  const snapshot = createSnapshot();
+  snapshot.branches[0].branchCode = 'MAIN BRANCH';
+  assert.equal(contract.validateSnapshot(snapshot).ok, false);
+});
+
+test('requires every published product to have a purchasable variant', () => {
+  const snapshot = createSnapshot();
+  snapshot.productVariants = [];
+  assert.ok(contract.validateSnapshot(snapshot).errors.some(e => e.code === 'PRODUCT_VARIANT_REQUIRED'));
+});
+
 test('validates health response for unpublished and published catalogs', () => {
   const empty = contract.validateHealth({ ok: true, data: { schemaVersion: 3, published: false } });
   assert.equal(empty.ok, true);
