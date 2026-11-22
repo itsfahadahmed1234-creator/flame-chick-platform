@@ -1,3 +1,38 @@
+## Latest checkpoint — Vercel workspace isolation and Supabase verification (2026-11-22)
+
+**Status: workspace separation confirmed; no Vercel resources changed.**
+
+### Vercel workspace boundary
+
+- The newly connected Vercel workspace is team **Fahad** (`fahad-7455`, team ID `team_Rpf9jeGg9r3cmMguFXHtziqz`), Hobby plan.
+- Its verified projects are `hfp-admin-staging`, `hfp-website-staging`, and `hassan-food-point`. The project list returned 80 deployment records across those projects at the time of inspection.
+- A Flame Chick project search in this workspace returned no matches.
+- Treat this workspace as Hassan Food Point only. Do not deploy Flame Chick into it, transfer HFP resources, or modify/delete its projects, deployments, aliases, domains, environment variables, or settings.
+- The previously used Vercel workspace `befahad1234-7050` is not visible through the currently authorized Vercel connection. Existing Flame Chick project shells/deployments were previously identified in that workspace; this connection change does not imply they were transferred or deleted.
+- Before any Flame Chick Vercel operation, reconnect/authorize the original Flame Chick-owning Vercel workspace and verify its team ID and projects. Do not create replacement Flame Chick projects in the HFP workspace as a workaround.
+
+### Intended production-build Supabase verification
+
+- Project `adkrxfnawdiljhjaavnj` remains `ACTIVE_HEALTHY`, Mumbai `ap-south-1`, Free.
+- Migration ledger currently contains 24 entries; latest is `20261122105821_flame_chick_catalog_publication_validation_fixes_v1`.
+- `flame-chick-staff-admin` remains ACTIVE, version 1, with `verify_jwt=true`; deployed function SHA-256 `1c541dca27382731b10ccad6219aa94eaadf8c0412242e3da59471df78947327`.
+- A read-only function-log query for 2026-11-22 14:00–15:15 UTC returned no function-source log entries. This does not prove the function is broken; it means no end-to-end runtime request was observed in that window. Authenticated Admin browser integration remains unverified.
+- Security advisor: 33 INFO `rls_enabled_no_policy` notices are expected for deny-by-default tables; one WARN `auth_leaked_password_protection` remains because the built-in feature requires a paid Supabase plan. No plan upgrade is authorized.
+- Performance advisor: 30 INFO unused-index notices on the pre-launch, effectively zero-traffic database; retain indexes until real workload measurements justify any change.
+- Health advisor returned no findings.
+
+### Next safe gates
+
+1. Keep Flame Chick and Hassan Food Point Vercel workspaces separate.
+2. When returning to Vercel work, reauthorize the original Flame Chick workspace and verify project ownership before any change.
+3. Test Staff Admin from an authenticated Admin session on the intended Admin origin. Do not create synthetic persistent staff identities or send an invitation as a smoke test.
+4. Continue secure catalog/order/delivery implementation only on `work/production-source-audit`; keep `main` unchanged.
+5. No customer Website cutover, Admin/POS/Rider deployment, menu seed/publication, or live order intake is authorized by this checkpoint. Flame Chick remains in production-build phase, not live.
+
+No Supabase migration, Edge Function deployment/configuration, Auth setting, secret, Vercel deployment, Vercel transfer, project deletion, domain/alias change, or production menu/order data was changed during this checkpoint.
+
+---
+
 
 
 ## Latest stage — Staff Admin Edge Function deployed (2026-11-22)
