@@ -24,6 +24,63 @@ This guardrail is intentionally prominent because these identifiers are operatio
 
 ---
 
+## Latest checkpoint — strict Website catalog V3 contract (2026-11-22)
+
+**Status: strict V3 snapshot/health contract implemented and automated checks pass. This is a validator milestone only; it is not yet wired into the storefront loader, pricing UI, or checkout. No deploy or live catalog publication.**
+
+### Source and identity guardrails
+
+- Exact repository: `itsfahadahmed1234-creator/flame-chick-platform`.
+- Active work branch: `work/production-source-audit`. Keep `main` untouched.
+- Supabase project remains `adkrxfnawdiljhjaavnj` in Mumbai on Free plan.
+- Old deployed Website `flame-chick.vercel.app` and all legacy workspaces remain untouched.
+
+### Implemented
+
+- Added `apps/flame-chick-website/js/catalog-v3.js`, a standalone browser/CommonJS-compatible V3 contract module. It is intentionally not yet imported by the active storefront; the old V2 loader remains unchanged and rejects V3. The previously added hidden-by-default menu guard therefore remains in effect.
+- Exact V3 top-level allowlist matches the public Catalog Edge Function envelope's `data` object: publication compiler fields plus `versionId`, `publicationId`, `publicationNumber`, `draftRevision`, `pricingEngineVersion`, `snapshotSha256`, and `publishedAt`.
+- Rejects unsupported versions, missing/unknown fields, invalid metadata, oversized payloads (>4 MiB plus bounded envelope overhead), malformed arrays/rows, invalid UUID/date/time/timezone/currency/branch-code/key values, duplicate IDs/relationships, and dangling/cross-entity references.
+- Money is validated as finite non-negative numeric values with at most two decimal places and converted to integer minor units; null and zero remain distinct.
+- Enforces product variant existence, pack metadata shape, modifier selection bounds, exact BY_SIZE price-rule coverage for every assigned product variant, and adequate active modifier options.
+- Enforces deal/variant/group/option relationship integrity, per-variant allowed option mapping, group selection capacity, pricing treatment rules, and STANDALONE restrictions (BASE_PLUS_SELECTED_ITEMS + standalone-sellable priced variant).
+- Validates weekly/one-off schedule shapes, calendar dates, IANA timezones, restaurant/branch schedule timezone scope, and unique branch/global deal schedule assignments.
+- Exposes fail-closed branch ordering and product/variant/deal availability resolvers. A branch override cannot reactivate a globally unavailable product or variant.
+- Explicitly rejects nonempty `deliveryAreas` or `promotions` because publication schema V3 currently emits them as empty arrays and their full implementation is not yet available.
+- Added deterministic V3 fixture `tests/fixtures/catalog-v3-fixture.cjs` and 21 contract tests in `tests/catalog-v3-contract.test.mjs` (plus the existing 5 Website source-hygiene checks).
+- Updated `.github/workflows/ci-website-static.yml` to syntax-check the V3 module and execute both test files.
+
+### Verification
+
+- Latest Website Static Checks workflow for branch HEAD `d808bc5150eca1ba24af54f2ddd5555fe26636bf`: SUCCESS.
+- Run: [45044376718](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45044376718).
+- Test result: 26 passed, 0 failed; Website inline scripts parse successfully.
+- Preview workflow for the same change was skipped; no Vercel deployment was created.
+- Earlier exploratory test runs exposed fixture/test defects and were fixed before the successful run. Do not treat those failed runs as current failures; the latest branch-head run is the authoritative result.
+
+### Important limitations — still NOT production-ready
+
+1. V3 validator is not yet connected to `catalog.js` or the page's active loader.
+2. Website remains statically authored and name-matched; dynamic category/product/variant rendering is not implemented.
+3. The current `pricing.js` still implements the legacy V2 deal model; exact V3 modifier/deal pricing and customer choice UI are not implemented.
+4. Schedule evaluation, branch selection, branch-specific product/variant/deal visibility and fulfilment eligibility have only contract-level helpers/tests, not full customer UI integration.
+5. The public Catalog Edge Function is not deployed in this project; no published snapshot exists to perform a live read test.
+6. Client-side integer minor-unit conversion is a display/UX safety mechanism only. Checkout must independently recompute all prices, modifiers, deal selections, delivery fees and totals on the trusted server.
+
+### Next work — required sequence
+
+1. Add a version-pinned public catalog client for `health` and `catalog` actions: validate response envelope, health metadata, V3 schema, publication identity and cache/version behavior. Keep network errors, unpublished catalogs, unsupported versions and hash/metadata mismatch fail-closed.
+2. Reconcile the snapshot hash semantics exactly with the server's `snapshot_sha256` calculation before attempting browser-side hash verification. Do not assume whether the hash covers the raw snapshot or metadata-wrapped DTO; document and test the exact byte/canonicalization contract first.
+3. Build dynamic menu/category/product/variant rendering from stable IDs; sanitize all untrusted text and constrain media paths to a controlled same-origin allowlist. Do not use legacy name matching.
+4. Implement a V3 quote/pricing engine in integer minor units for product variants, FREE/FIXED/BY_SIZE modifiers, modifier selection bounds, deal variants, required/optional groups, repeat and quantity limits, INCLUDED/SURCHARGE/STANDALONE treatment, and schedules/branch availability.
+5. Add exhaustive golden and property tests, including DST/overnight schedule boundaries, cache invalidation, stale versions, tampering, XSS payloads, large payloads, duplicate cart selections, max quantities, null/zero prices and every deal pricing combination.
+6. Align checkout payload with stable V3 IDs and server-side order quote/recalculation, idempotency and website-only rate limiting before enabling order submission.
+7. Only after source, test and server dependencies are complete request a controlled preview; no deployment is currently authorized.
+
+No Supabase migration, database write, catalog publication, Edge Function deployment, secret change, Vercel setting, Vercel deployment or legacy live-site change was made during this milestone.
+
+---
+
+
 ## Latest checkpoint — Website V3 compatibility safety gate (2026-11-22)
 
 **Status: first fail-closed storefront guard implemented and its CI passed. V3 integration itself is NOT implemented; no menu is published and no deployment was created.**
