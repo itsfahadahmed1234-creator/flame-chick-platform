@@ -250,7 +250,12 @@ BEGIN
         )
         AND (
           EXISTS (
-            SELECT 1 FROM public.deal_collections dc
+            SELECT 1
+            FROM public.deal_collections dc
+            JOIN public.deals d
+              ON d.collection_id=dc.id
+             AND d.restaurant_id=dc.restaurant_id
+             AND d.is_active
             WHERE dc.restaurant_id=s.restaurant_id
               AND dc.schedule_set_id=s.id
               AND dc.is_active
@@ -285,6 +290,7 @@ BEGIN
       SELECT 'DEAL_ASSIGNMENT_TIMEZONE_MISMATCH',a.id::text,
         pg_catalog.jsonb_build_object('code','DEAL_ASSIGNMENT_TIMEZONE_MISMATCH','message','A deal schedule timezone no longer matches its branch or restaurant timezone.','entity_type','deal_schedule_assignment','entity_id',a.id,'deal_id',a.deal_id)
       FROM public.deal_schedule_assignments a
+      JOIN public.deals d ON d.id=a.deal_id AND d.restaurant_id=a.restaurant_id AND d.is_active
       JOIN public.catalog_schedule_sets s ON s.id=a.schedule_set_id AND s.restaurant_id=a.restaurant_id
       JOIN public.restaurants r ON r.id=a.restaurant_id
       LEFT JOIN public.branches b ON b.id=a.branch_id AND b.restaurant_id=a.restaurant_id
@@ -522,7 +528,12 @@ BEGIN
       WHERE s.restaurant_id=p_restaurant_id AND s.is_active
         AND (
           EXISTS (
-            SELECT 1 FROM public.deal_collections dc
+            SELECT 1
+            FROM public.deal_collections dc
+            JOIN public.deals d
+              ON d.collection_id=dc.id
+             AND d.restaurant_id=dc.restaurant_id
+             AND d.is_active
             WHERE dc.restaurant_id=s.restaurant_id
               AND dc.schedule_set_id=s.id
               AND dc.is_active
