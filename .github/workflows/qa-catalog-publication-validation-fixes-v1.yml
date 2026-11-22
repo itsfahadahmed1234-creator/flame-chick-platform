@@ -8,6 +8,8 @@ on:
       - "supabase/migrations/*_flame_chick_catalog_publication_validation_fixes_v1.sql"
       - "supabase/tests/catalog_publication_validation_fixes_v1.sql"
       - ".github/workflows/qa-catalog-publication-validation-fixes-v1.yml"
+      - "ops/triggers/qa-catalog-publication-validation-fixes-v1.txt"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -48,10 +50,60 @@ jobs:
           grep -q "OPTIONAL_GROUP_WITHOUT_VARIANT_MAP_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "REQUIRED_GROUP_MISSING_VARIANT_MAP_WAS_NOT_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "UNREFERENCED_EMPTY_SCHEDULE_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
-      - name: Start clean disposable Supabase stack
-        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector
+      - name: Start local Supabase with hosted-only helper compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          parked="${RUNNER_TEMP}/flame-chick-migrations"
+          test -d supabase/migrations
+          test ! -e "${parked}"
+          mv supabase/migrations "${parked}"
+          mkdir -p supabase/migrations
+
+          restore_migrations() {
+            rm -rf supabase/migrations
+            mv "${parked}" supabase/migrations
+          }
+          trap restore_migrations EXIT
+
+          # Start the disposable stack without app migrations so the local-only
+          # compatibility symbol can be installed before the historical first migration.
+          supabase start -x studio,imgproxy,edge-runtime,logflare,vector
+
+          # Hosted Supabase provides public.rls_auto_enable() as a managed helper.
+          # The local stack does not. This no-op event-trigger function exists only
+          # in this disposable CI database so the immutable hardening migration can
+          # revoke client EXECUTE exactly as it does on the hosted project.
+          # We deliberately do not create an event trigger or change any repository SQL.
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            --set ON_ERROR_STOP=1 <<'SQL'
+          DO $bootstrap$
+          BEGIN
+            IF to_regprocedure('public.rls_auto_enable()') IS NULL THEN
+              EXECUTE $ddl$
+                CREATE FUNCTION public.rls_auto_enable()
+                RETURNS event_trigger
+                LANGUAGE plpgsql
+                AS $function$
+                BEGIN
+                  RETURN;
+                END;
+                $function$
+              $ddl$;
+            END IF;
+          END
+          $bootstrap$;
+          SQL
+
+          restore_migrations
+          trap - EXIT
       - name: Apply complete migration history locally
-        run: supabase db reset --local
+        run: |
+          set -euo pipefail
+          supabase migration up --local
+          expected="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')"
+          applied="$(psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -Atqc "select count(*) from supabase_migrations.schema_migrations")"
+          test "${applied}" = "${expected}"
       - name: Run rollback-only catalog validation fixtures
         shell: bash
         run: |
