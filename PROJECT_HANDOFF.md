@@ -69,8 +69,8 @@ Both helpers remain postgres-owned, ACL `{postgres=X/postgres}`, SECURITY DEFINE
 - Added `tests/staff-admin-origin-policy.test.mjs` for exact origins, wildcard/path/query/fragment/credential rejection, safe invite callback, and CORS behavior.
 - Added `tests/staff-admin-role-boundary.test.mjs` for JWT verification, `auth.uid()` actor derivation, Admin/Owner versus operational role scope, private command isolation and service-secret header handling.
 - Expanded Edge Function hygiene checks and the Admin CI workflow to run these tests.
-- Latest static CI: [run 45020193034 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45020193034).
-- Edge Function Deno type check: [run 45020189510 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45020189510).
+- Latest static CI: [run 45020282242 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45020282242).
+- Edge Function Deno type check: [run 45020278858 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45020278858).
 
 ### Exact configuration after custom domain selection
 
