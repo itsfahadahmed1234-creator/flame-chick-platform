@@ -126,7 +126,8 @@ test('validates sparse branch availability references and duplicate overrides', 
   assert.equal(contract.validateSnapshot(badBranch).ok, false);
 
   const duplicate = createSnapshot();
-  duplicate.branchProductAvailability.push({ ...duplicate.branchProductAvailability[0] });
+  const override = { branchId: IDS.branch, productId: IDS.product, isAvailable: true };
+  duplicate.branchProductAvailability.push({ ...override }, { ...override });
   assert.ok(contract.validateSnapshot(duplicate).errors.some(e => e.code === 'DUPLICATE_RELATION'));
 });
 
