@@ -17,7 +17,7 @@ The Admin web app is not yet operational. Its bootstrap requires the `flame-chic
 - Applied ledger version: `20261122105821`.
 - Ledger name: `flame_chick_catalog_publication_validation_fixes_v1`.
 - Repository file: `supabase/migrations/20261122105821_flame_chick_catalog_publication_validation_fixes_v1.sql`.
-- GitHub Actions: [run 45014790768 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45014790768).
+- GitHub Actions: [run 45015289131 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45015289131).
 
 The migration changed only the bodies of:
 - `app_private.flame_chick_catalog_publication_validate(uuid)`
@@ -52,7 +52,7 @@ Post-apply metadata was independently read back:
 
 The final workflow run replays the complete migration history through the candidate, runs the candidate rollback-only fixture, manually executes the recovery template outside the migrations directory, and verifies the original helper hashes/security metadata are restored. The fixture tenant count is zero and the disposable Supabase stack stopped successfully.
 
-[GitHub Actions run 45014790768](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45014790768)
+[GitHub Actions run 45015289131](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45015289131)
 
 ### Intended production-build project state after apply
 

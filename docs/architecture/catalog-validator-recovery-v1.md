@@ -42,7 +42,7 @@ The compensation is forward-only and transactional. It refuses to run unless bot
 ## CI verification
 
 Latest revised workflow:
-[Run 45014790768 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45014790768)
+[Run 45015289131 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45015289131)
 
 It:
 1. Replayed the full ordered migration history through the candidate on a disposable local Supabase stack.

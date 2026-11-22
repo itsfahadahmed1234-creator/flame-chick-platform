@@ -8,7 +8,7 @@
 - Applied migration version: `20261122105821`, name `flame_chick_catalog_publication_validation_fixes_v1`.
 - Repository file: `supabase/migrations/20261122105821_flame_chick_catalog_publication_validation_fixes_v1.sql`.
 - Working branch: `work/production-source-audit`; `main` unchanged.
-- Revised local migration-chain and recovery rehearsal: [GitHub Actions run 45014790768 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45014790768).
+- Revised local migration-chain and recovery rehearsal: [GitHub Actions run 45015289131 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45015289131).
 
 ### Applied function fingerprints and security
 
@@ -79,7 +79,7 @@ The validator/compiler fix was reviewed against the exact pre-apply function sou
 - Applied ledger version: `20261122105821`.
 - Repository migration: `supabase/migrations/20261122105821_flame_chick_catalog_publication_validation_fixes_v1.sql`.
 - Working branch: `work/production-source-audit`; no changes to `main`.
-- CI run: [45014790768 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45014790768).
+- CI run: [45015289131 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45015289131).
 - Post-apply read-only verification confirmed both expected function source hashes, postgres ownership, exact postgres-only ACL, SECURITY DEFINER, empty search_path, and no EXECUTE for anon/authenticated/service_role.
 - Post-apply counts: one restaurant, one branch; zero categories, products, deals, schedule sets, publications and QA tenants.
 - No menu data, publication, Edge Function, app deployment, Website cutover or Vercel configuration changed.
