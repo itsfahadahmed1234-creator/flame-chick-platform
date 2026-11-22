@@ -1,4 +1,24 @@
-# CURRENT IMPLEMENTATION STATUS — 2026-11-22 (catalog validator final review passed; Production apply pending)
+# CURRENT IMPLEMENTATION STATUS — 2026-11-22 (catalog validator final review passed; recovery package prepared)
+
+## Forward-only validator recovery — prepared; CI rehearsal running/pending
+
+The recovery package has now been added on `work/production-source-audit`:
+
+- Compensation migration: `supabase/migrations/20261122050000_flame_chick_catalog_publication_validation_restore_v1.sql`
+- Recovery verification fixture: `supabase/tests/catalog_publication_validation_recovery_v1.sql`
+- Operational runbook: `docs/architecture/catalog-validator-recovery-v1.md`
+- CI workflow updated to replay the full ordered migration history, then manually rehearse candidate → candidate regression fixture → compensation → restored-state fixture on the disposable local stack.
+
+The compensation is forward-only and transactional. It requires the exact candidate helper source hashes and the expected postgres owner, ACL, SECURITY DEFINER, empty search_path, and execution attributes. It restores the original function definitions copied from the already-applied `20261122031027` migration, then verifies the original SHA-256 hashes and restrictive metadata. It adds no persistent business schema/data and does not erase either migration-ledger entry.
+
+Exact helper fingerprints:
+
+| Helper | Candidate body | Restored body |
+| --- | --- | --- |
+| Validator | `f179cc3b15b1d6ad5b07b90587513001bed97b752b09b13ce2d9c946e88a7750` | `018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712` |
+| Snapshot compiler | `1cee9543d131260f71573afc2f0a5a204422a59fa7f46ef0b24f4c2e277e3808` | `b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2` |
+
+**Important:** this is prepared recovery code, not yet declared tested until the updated GitHub Actions run completes successfully. The intended production Supabase project remains untouched; neither the candidate nor compensation has been applied there. The recovery runbook requires a separate explicit approval for any future remote compensation and mandates a dry-run showing only the one intended migration.
 
 This section supersedes the earlier catalog-validator QA status further below.
 
@@ -57,14 +77,14 @@ The candidate checks these fingerprints and the security metadata before changin
 
 ## Rollback and remaining release gates
 
-The transaction makes the migration all-or-nothing before commit. After a committed schema migration, the repository's append-only migration history must be reversed with a **new forward-only compensating migration**; it must not be removed or rewritten in the migration ledger. A compensating migration restoring the original helper bodies has **not** yet been prepared or rehearsed. Prepare and test that forward-only recovery path on the disposable local stack before the Production apply if immediate post-commit rollback readiness is required.
+The transaction makes the migration all-or-nothing before commit. After a committed schema migration, the repository's append-only migration history must be reversed with a **new forward-only compensating migration**; it must not be removed or rewritten in the migration ledger. The forward-only compensating migration and runbook are now prepared. The updated disposable CI rehearsal must pass before the candidate is considered release-ready; see the recovery section at the top of this handoff.
 
 Production security advisor still reports expected `rls_enabled_no_policy` INFO notices under the deny-by-default model and a separate WARN that Auth leaked-password protection is disabled. Enable leaked-password protection before broad staff onboarding. The performance advisor's unused-index INFO notices are expected while the business catalog is empty; do not remove those indexes from zero-traffic statistics. Health advisor returned no findings.
 
 ## Next controlled action
 
-1. Prepare and test the forward-only compensating migration/recovery runbook.
-2. Obtain separate explicit approval before applying the candidate to Production.
+1. Confirm the updated candidate → compensation CI rehearsal is green.
+2. Only then seek separate explicit approval before applying the candidate to the intended production Supabase project.
 3. After any approved apply, recheck migration ledger, function source fingerprints/metadata, permissions, security/performance/health advisors, and confirm the customer menu/publication state remains unchanged.
 4. Keep real-menu seeding, Admin/Edge Function deployment, Website cutover, and Vercel changes separately gated.
 
