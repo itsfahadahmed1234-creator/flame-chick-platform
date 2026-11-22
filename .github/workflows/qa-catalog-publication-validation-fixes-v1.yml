@@ -44,6 +44,8 @@ jobs:
           migration="${migrations[0]}"
           test -s "${migration}"
           test -s supabase/tests/catalog_publication_validation_fixes_v1.sql
+          test -s supabase/migrations/20261122050000_flame_chick_catalog_publication_validation_restore_v1.sql
+          test -s supabase/tests/catalog_publication_validation_recovery_v1.sql
           grep -q "HAVING g.min_units > 0" "${migration}"
           grep -q "ACTIVE_SCHEDULE_SET_INVALID" "${migration}"
           grep -q "ACTIVE_DEAL_ASSIGNMENT_BRANCH_INACTIVE" "${migration}"
@@ -53,6 +55,10 @@ jobs:
           grep -q "CATALOG_PUBLICATION_HELPER_SECURITY_BASELINE_INVALID" "${migration}"
           grep -q "018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712" "${migration}"
           grep -q "b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2" "${migration}"
+          grep -q "CATALOG_VALIDATION_RESTORE_CANDIDATE_SOURCE_MISMATCH" supabase/migrations/20261122050000_flame_chick_catalog_publication_validation_restore_v1.sql
+          grep -q "CATALOG_VALIDATION_RESTORE_SOURCE_VERIFICATION_FAILED" supabase/migrations/20261122050000_flame_chick_catalog_publication_validation_restore_v1.sql
+          grep -q "018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712" supabase/tests/catalog_publication_validation_recovery_v1.sql
+          grep -q "b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2" supabase/tests/catalog_publication_validation_recovery_v1.sql
           grep -q "OPTIONAL_GROUP_WITHOUT_VARIANT_MAP_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "REQUIRED_GROUP_MISSING_VARIANT_MAP_WAS_NOT_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "UNREFERENCED_EMPTY_SCHEDULE_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
@@ -117,18 +123,36 @@ jobs:
           expected="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')"
           applied="$(psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -Atqc "select count(*) from supabase_migrations.schema_migrations")"
           test "${applied}" = "${expected}"
-      - name: Run rollback-only catalog validation fixtures
+      # The full replay above proves the append-only history ends in the restored
+      # baseline. Re-run candidate -> candidate fixture -> compensation manually
+      # in this disposable DB to exercise the actual forward recovery sequence.
+      # Manual psql application does not add/delete migration-ledger rows.
+      - name: Rehearse candidate migration and regression fixture
         shell: bash
         run: |
           set -euo pipefail
-          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
-            --set ON_ERROR_STOP=1 \
-            --file supabase/tests/catalog_publication_validation_fixes_v1.sql
-      - name: Verify fixture rollback left no test tenant
+          db="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          psql "${db}" --set ON_ERROR_STOP=1 --file supabase/migrations/20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql
+          psql "${db}" --set ON_ERROR_STOP=1 --file supabase/tests/catalog_publication_validation_fixes_v1.sql
+      - name: Rehearse forward compensation and verify restored baseline
+        shell: bash
         run: |
           set -euo pipefail
-          result="$(psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -Atqc "select count(*) from public.restaurants where slug='qa-catalog-validator-v1'")"
+          db="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          psql "${db}" --set ON_ERROR_STOP=1 --file supabase/migrations/20261122050000_flame_chick_catalog_publication_validation_restore_v1.sql
+          psql "${db}" --set ON_ERROR_STOP=1 --file supabase/tests/catalog_publication_validation_recovery_v1.sql
+      - name: Verify both fixtures left no test tenant and migration chain remains recorded
+        shell: bash
+        run: |
+          set -euo pipefail
+          db="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          result="$(psql "${db}" -Atqc "select count(*) from public.restaurants where slug='qa-catalog-validator-v1'")"
           test "${result}" = "0"
+          recovery_fixture="$(psql "${db}" -Atqc "select count(*) from public.restaurants where slug='qa-catalog-validator-v1'")"
+          test "${recovery_fixture}" = "0"
+          expected="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')"
+          applied="$(psql "${db}" -Atqc "select count(*) from supabase_migrations.schema_migrations")"
+          test "${applied}" = "${expected}"
       - name: Stop disposable Supabase stack
         if: always()
         run: supabase stop --no-backup
