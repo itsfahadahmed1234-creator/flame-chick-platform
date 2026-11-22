@@ -42,7 +42,7 @@ jobs:
           node --check apps/flame-chick-website/js/i18n.js
           node --check apps/flame-chick-website/js/pricing.js
           node --check apps/flame-chick-website/js/store.js
-          node --test tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs
+          node --test tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs tests/catalog-v3-view.test.mjs
 
       - name: Verify website inline scripts parse
         run: |
