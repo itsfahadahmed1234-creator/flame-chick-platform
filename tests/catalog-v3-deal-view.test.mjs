@@ -186,6 +186,40 @@ test('validates required, optional, max quantity and allow-listed component sele
   }).code, 'SELECTION_GROUP_UNKNOWN');
 });
 
+test('maps exact product modifiers for a deal component and enforces selection bounds', () => {
+  const snapshot = createSnapshot();
+  const result = build(snapshot);
+  const option = result.collections[0].deals[0].variants[0].groups[0].options[0];
+  assert.equal(option.modifierGroups.length, 1);
+  const group = option.modifierGroups[0];
+  assert.equal(group.id, IDS.modifierGroup);
+  assert.equal(group.modifiers[0].id, IDS.modifier);
+  assert.equal(group.modifiers[0].priceMinor, 8000);
+
+  assert.equal(deals.validateModifierSelections([{
+    ...group, minSelect: 1, maxSelect: 1
+  }], {}).code, 'MODIFIER_SELECTION_BOUNDS');
+  const accepted = deals.validateModifierSelections([group], {
+    [IDS.modifierGroup]: [IDS.modifier]
+  });
+  assert.equal(accepted.ok, true);
+  assert.deepEqual(accepted.selections, [{
+    modifierGroupId: IDS.modifierGroup, modifierIds: [IDS.modifier]
+  }]);
+  assert.equal(deals.validateModifierSelections([group], {
+    [IDS.modifierGroup]: [IDS.modifier, IDS.modifier]
+  }).code, 'MODIFIER_SELECTION_OPTION_INVALID');
+});
+
+test('standalone-only product modifiers are not offered inside deals', () => {
+  const snapshot = createSnapshot();
+  snapshot.modifierGroups[0].standaloneOnly = true;
+  const groups = deals.buildProductModifierGroups(snapshot, IDS.product, IDS.variant, contract, {
+    excludeStandaloneOnly: true
+  });
+  assert.deepEqual(groups, []);
+});
+
 test('does not calculate or expose a browser-side deal total', () => {
   const result = build();
   const deal = result.collections[0].deals[0];
