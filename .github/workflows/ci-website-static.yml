@@ -12,6 +12,7 @@ on:
       - "tests/catalog-v3-view.test.mjs"
       - "tests/catalog-v3-deal-view.test.mjs"
       - "tests/catalog-v3-deal-configurator.test.mjs"
+      - "tests/branch-fulfilment-v3.test.mjs"
       - "tests/fixtures/catalog-v3-fixture.cjs"
       - ".github/workflows/ci-website-static.yml"
 
@@ -41,12 +42,13 @@ jobs:
           node --check apps/flame-chick-website/js/catalog-v3-view.js
           node --check apps/flame-chick-website/js/catalog-v3-deal-view.js
           node --check apps/flame-chick-website/js/catalog-v3-deal-configurator.js
+          node --check apps/flame-chick-website/js/branch-fulfilment-v3.js
           node --check apps/flame-chick-website/js/config.js
           node --check apps/flame-chick-website/js/hero-slider.js
           node --check apps/flame-chick-website/js/i18n.js
           node --check apps/flame-chick-website/js/pricing.js
           node --check apps/flame-chick-website/js/store.js
-          node --test tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs tests/catalog-v3-view.test.mjs tests/catalog-v3-deal-view.test.mjs tests/catalog-v3-deal-configurator.test.mjs
+          node --test tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs tests/catalog-v3-view.test.mjs tests/catalog-v3-deal-view.test.mjs tests/catalog-v3-deal-configurator.test.mjs tests/branch-fulfilment-v3.test.mjs
 
       - name: Verify website inline scripts parse
         run: |
