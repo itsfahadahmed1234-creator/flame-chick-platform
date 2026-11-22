@@ -6,6 +6,7 @@ DO $test$
 DECLARE
   v_restaurant uuid := gen_random_uuid();
   v_branch uuid := gen_random_uuid();
+  v_inactive_branch uuid := gen_random_uuid();
   v_menu_category uuid := gen_random_uuid();
   v_deal_category uuid := gen_random_uuid();
   v_product uuid := gen_random_uuid();
@@ -31,6 +32,8 @@ DECLARE
   v_inactive_fallback_collection uuid := gen_random_uuid();
   v_inactive_fallback_schedule uuid := gen_random_uuid();
   v_active_mismatch_schedule uuid := gen_random_uuid();
+  v_inactive_branch_schedule uuid := gen_random_uuid();
+  v_inactive_branch_assignment uuid := gen_random_uuid();
   v_errors jsonb;
   v_snapshot jsonb;
 BEGIN
@@ -41,7 +44,9 @@ BEGIN
   INSERT INTO public.restaurants(id,name,slug,currency_code,timezone,is_active)
   VALUES(v_restaurant,'QA Restaurant','qa-catalog-validator-v1','PKR','Asia/Karachi',true);
   INSERT INTO public.branches(id,restaurant_id,branch_code,name,is_active)
-  VALUES(v_branch,v_restaurant,'qa','QA Branch',true);
+  VALUES
+    (v_branch,v_restaurant,'qa','QA Branch',true),
+    (v_inactive_branch,v_restaurant,'qa-off','QA Inactive Branch',false);
 
   INSERT INTO public.categories(id,restaurant_id,category_kind,name_en,is_active)
   VALUES
@@ -115,6 +120,15 @@ BEGIN
   INSERT INTO public.deal_schedule_assignments(id,restaurant_id,deal_id,branch_id,schedule_set_id,is_active)
   VALUES(gen_random_uuid(),v_restaurant,v_schedule_deal,NULL,v_active_mismatch_schedule,true);
 
+  -- Active schedule assignments to deactivated branches must not leak into the snapshot.
+  INSERT INTO public.catalog_schedule_sets(id,restaurant_id,name,is_active,timezone)
+  VALUES(v_inactive_branch_schedule,v_restaurant,'QA Inactive Branch Schedule',true,'Asia/Karachi');
+  INSERT INTO public.catalog_schedule_windows(
+    id,restaurant_id,schedule_set_id,window_kind,weekday_iso,local_start,local_end,is_all_day
+  ) VALUES(gen_random_uuid(),v_restaurant,v_inactive_branch_schedule,'WEEKLY',1,'09:00','17:00',false);
+  INSERT INTO public.deal_schedule_assignments(id,restaurant_id,deal_id,branch_id,schedule_set_id,is_active)
+  VALUES(v_inactive_branch_assignment,v_restaurant,v_schedule_deal,v_inactive_branch,v_inactive_branch_schedule,true);
+
   v_errors := app_private.flame_chick_catalog_publication_validate(v_restaurant)->'errors';
 
   IF EXISTS (
@@ -166,12 +180,25 @@ BEGIN
       AND e->>'deal_id'=v_schedule_deal::text
   ) THEN RAISE EXCEPTION 'ACTIVE_DEAL_TIMEZONE_MISMATCH_WAS_NOT_REJECTED'; END IF;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_errors) e
+    WHERE e->>'code'='ACTIVE_DEAL_ASSIGNMENT_BRANCH_INACTIVE'
+      AND e->>'entity_id'=v_inactive_branch_assignment::text
+      AND e->>'deal_id'=v_schedule_deal::text
+      AND e->>'branch_id'=v_inactive_branch::text
+  ) THEN RAISE EXCEPTION 'INACTIVE_BRANCH_DEAL_ASSIGNMENT_WAS_NOT_REJECTED'; END IF;
+
   v_snapshot := app_private.flame_chick_catalog_compile_snapshot(v_restaurant,now());
 
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_snapshot->'scheduleSets') s
-    WHERE s->>'scheduleSetId' IN (v_unreferenced_schedule::text,v_inactive_deal_schedule::text,v_inactive_fallback_schedule::text)
+    WHERE s->>'scheduleSetId' IN (v_unreferenced_schedule::text,v_inactive_deal_schedule::text,v_inactive_fallback_schedule::text,v_inactive_branch_schedule::text)
   ) THEN RAISE EXCEPTION 'UNREFERENCED_OR_INACTIVE_DEAL_SCHEDULE_WAS_COMPILED'; END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_snapshot->'dealScheduleAssignments') a
+    WHERE a->>'assignmentId'=v_inactive_branch_assignment::text
+  ) THEN RAISE EXCEPTION 'INACTIVE_BRANCH_DEAL_ASSIGNMENT_WAS_COMPILED'; END IF;
 
   IF NOT EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_snapshot->'scheduleSets') s
