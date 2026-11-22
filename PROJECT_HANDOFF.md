@@ -1,3 +1,30 @@
+## Latest implementation checkpoint — authenticated catalog Admin API contract (2026-11-22)
+
+**Status: source implementation committed; CI and runtime integration are not yet verified; not deployed.**
+
+- Continued on `work/production-source-audit`; `main` remains untouched.
+- Extended the existing `flame-chick-staff-admin` Edge Function source with a finite, authenticated catalog RPC route map instead of adding another Edge Function.
+- Supported draft reads: categories, subcategories, products, modifier groups/assignments, deal collections/deals/details, schedule sets/details and publication history.
+- Supported draft writes: category/subcategory/product, modifier group/assignment, deal collection/deal/components/variant options, deal schedule assignment/branch availability and schedule set.
+- Every write requires a UUID `request_id` and expected draft revision. Read IDs/cursors/limits are validated; payload size is bounded to 65,536 UTF-8 bytes per mutation.
+- Catalog RPC requests use only the publishable key plus the caller's Bearer JWT. The existing DB functions derive `auth.uid()`, resolve the active restaurant-wide Admin/Owner identity and remain the authority for permissions, tenant checks, input validation, idempotency and transaction safety. No client table grants or permissive RLS policies were added.
+- `catalog_publish` and `catalog_rollback` are intentionally not routed yet. Do not expose them until the public Website schema-v3 DTO compatibility and launch gate are reviewed.
+- Added `tests/catalog-admin-api.test.mjs` and `.github/workflows/qa-catalog-admin-api.yml`. The combined GitHub commit-status lookup returned an empty status list; **the test workflow is not yet verified as passing**.
+- Detailed contract and action list: `docs/handoffs/2026-11-22-catalog-admin-api-contract.md`.
+- Source commits: `74ed14b667f9977a303bee4f2b5d003ed6532c9b`, `17397780afc8c0e207734c6be64c82b6618faa61`, `8781bbacc98ddc62844ff661d30c0aac145eb5a1`, `f62446a0aa8373d23bf93aca9e1edc63ccc471b2`, `13e3f19a12969824689b7f324036353a58894688`, docs `692936936371eee73b227599abf89aa77c136609`.
+- Deployed Supabase Staff Admin remains old version 1 until QA and source review pass. No function deployment, runtime request, catalog UI integration, DB migration, menu write/publication, or Vercel change occurred.
+
+### Next gates
+
+1. Verify the new GitHub Actions workflow succeeds.
+2. Run a full Deno/Edge Function type check and request-level mock tests.
+3. Review and deploy the expanded Staff Admin function only after QA succeeds.
+4. Test read-only draft reads with the existing Admin session; verify denied roles and wrong origins without writing rows.
+5. Integrate the disabled Admin UI and keep publication disabled until Website DTO compatibility is resolved.
+6. Keep HFP Vercel workspace isolated; reauthorize the original Flame Chick Vercel workspace before any Flame Chick deployment.
+
+---
+
 ## Latest checkpoint — Vercel workspace isolation and Supabase verification (2026-11-22)
 
 **Status: workspace separation confirmed; no Vercel resources changed.**
