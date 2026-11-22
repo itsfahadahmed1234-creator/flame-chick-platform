@@ -1,5 +1,6 @@
 // Flame Chick Staff Admin API — Batch 4.
 import { isAllowedRequestOrigin, isSafeInviteRedirect, parseAllowedOrigins, staffCorsHeaders } from "./origin-policy.mjs";
+import { buildCatalogRpcCall, isCatalogAction } from "./catalog-actions.mjs";
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").replace(/\/+$/,"");
 function readKey(jsonName:string,fallback:string[]):string{
  try{const x=JSON.parse(Deno.env.get(jsonName)??"{}");const v=x?.default;if(typeof v==="string"&&v)return Deno.env.get(v)??v;}catch{}
@@ -44,6 +45,18 @@ async function userRpc(t:string,action:string,payload:Obj={}):Promise<unknown>{
  const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/flame_chick_staff_admin_command",{method:"POST",headers:{apikey:PUBLIC_KEY,Authorization:"Bearer "+t,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({p_action:action,p_payload:payload}),cache:"no-store"});
  const x=await body(r);if(!r.ok)throw rpcErr(x);return x;
 }
+async function catalogRpc(t:string,call:{rpc:string;args:Obj}):Promise<unknown>{
+ const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/"+call.rpc,{method:"POST",headers:{apikey:PUBLIC_KEY,Authorization:"Bearer "+t,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify(call.args),cache:"no-store"});
+ const x=await body(r);if(!r.ok)throw rpcErr(x);return x;
+}
+async function catalogAction(t:string,b:Obj):Promise<Obj>{
+ let call:{rpc:string;args:Obj;kind:string};
+ try{call=buildCatalogRpcCall(b);}catch(e){
+  if(e instanceof Error&&e.name==="CatalogRequestError")throw new ApiError("CATALOG_REQUEST_INVALID",400,"The catalog request is invalid.");
+  throw e;
+ }
+ return{ok:true,result:await catalogRpc(t,call)};
+}
 async function systemRpc(action:string,payload:Obj):Promise<unknown>{
  if(!SECRET_KEY)throw new ApiError("STAFF_ADMIN_NOT_CONFIGURED",503,"Staff invitations are not configured.");
  const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/flame_chick_staff_admin_system_command",{method:"POST",headers:{apikey:SECRET_KEY,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({p_action:action,p_payload:payload}),cache:"no-store"});
@@ -78,9 +91,12 @@ async function invite(t:string,b:Obj):Promise<Obj>{
  catch{try{await systemRpc("fail_invitation",{invitation_id:id,auth_user_id:sent.id,failure_code:"AUTH_FINALIZATION_FAILED"});}catch{}throw new ApiError("STAFF_INVITATION_FINALIZATION_PENDING",503,"The Auth invitation exists but needs database recovery. Use Retry Finalize before sending again.");}
 }
 async function post(req:Request,t:string):Promise<Obj>{
- const raw=await req.text();if(raw.length>16000)throw new ApiError("REQUEST_TOO_LARGE",413,"The request is too large.");
+ const raw=await req.text();const rawBytes=new TextEncoder().encode(raw).byteLength;
+ if(rawBytes>262144)throw new ApiError("REQUEST_TOO_LARGE",413,"The request is too large.");
  const b=parse(raw);if(!obj(b))throw new ApiError("INVALID_JSON",400,"A valid JSON object is required.");
  const a=String(b.action??"").trim().toLowerCase();
+ if(a.startsWith("catalog_"))return await catalogAction(t,b);
+ if(rawBytes>16000)throw new ApiError("REQUEST_TOO_LARGE",413,"The staff request is too large.");
  if(a==="invite")return await invite(t,b);
  if(a==="accept_invitation")return{ok:true,result:await userRpc(t,a,{})};
  if(a==="retry_finalize"){
