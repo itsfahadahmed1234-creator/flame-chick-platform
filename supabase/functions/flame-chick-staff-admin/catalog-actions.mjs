@@ -42,7 +42,7 @@ function pageArgs(input, maxLimit = 50, defaultLimit = 25) {
 function mutationArgs(input) {
   if (!isObject(input.payload)) invalid();
   const payloadBytes = new TextEncoder().encode(JSON.stringify(input.payload)).byteLength;
-  if (payloadBytes === 0 || payloadBytes > 196608) invalid();
+  if (payloadBytes === 0 || payloadBytes > 65536) invalid();
   return {
     p_payload: input.payload,
     p_expected_revision: integer(input.expected_revision, 0, Number.MAX_SAFE_INTEGER),
