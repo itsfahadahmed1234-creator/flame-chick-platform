@@ -1,0 +1,1 @@
+Create the timestamped catalog publication validation fixes migration scaffold on work/production-source-audit. Do not apply it to Production until reviewed and QA passes.
