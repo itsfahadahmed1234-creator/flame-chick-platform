@@ -315,6 +315,7 @@
                 surchargeMinor: contract.minorUnits(mapping.unitSurcharge),
                 standalonePriceMinor: mapping.pricingTreatment === 'STANDALONE'
                   ? contract.minorUnits(productVariant.price) : null,
+                modifierGroups: buildProductModifierGroups(snapshot, option.productId, option.productVariantId, contract, { excludeStandaloneOnly: true }),
                 maxQuantity: resolveOptionCap(group, mapping),
                 sortOrder: option.sortOrder
               };
@@ -440,6 +441,8 @@
     resolveDealSchedule: resolveDealSchedule,
     buildDealViewModel: buildDealViewModel,
     validateDealSelections: validateDealSelections,
+    validateModifierSelections: validateModifierSelections,
+    buildProductModifierGroups: buildProductModifierGroups,
     resolveOptionCap: resolveOptionCap
   };
   if (typeof module === 'object' && module.exports) module.exports = api;
