@@ -8,6 +8,7 @@ on:
       - "apps/flame-chick-website/**"
       - "tests/website-source-hygiene.test.mjs"
       - "tests/catalog-v3-contract.test.mjs"
+      - "tests/catalog-v3-client.test.mjs"
       - "tests/fixtures/catalog-v3-fixture.cjs"
       - ".github/workflows/ci-website-static.yml"
 
@@ -33,12 +34,13 @@ jobs:
         run: |
           node --check apps/flame-chick-website/js/catalog.js
           node --check apps/flame-chick-website/js/catalog-v3.js
+          node --check apps/flame-chick-website/js/catalog-v3-client.js
           node --check apps/flame-chick-website/js/config.js
           node --check apps/flame-chick-website/js/hero-slider.js
           node --check apps/flame-chick-website/js/i18n.js
           node --check apps/flame-chick-website/js/pricing.js
           node --check apps/flame-chick-website/js/store.js
-          node --test tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs
+          node --test tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs
 
       - name: Verify website inline scripts parse
         run: |
