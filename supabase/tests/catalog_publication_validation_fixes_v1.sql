@@ -131,9 +131,15 @@ BEGIN
 
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_errors) e
-    WHERE e->>'code' IN ('ACTIVE_SCHEDULE_SET_INVALID','DEAL_ASSIGNMENT_TIMEZONE_MISMATCH','ACTIVE_DEAL_ASSIGNMENT_SCHEDULE_INACTIVE')
+    WHERE e->>'code'='ACTIVE_SCHEDULE_SET_INVALID'
       AND e->>'entity_id'=v_inactive_deal_schedule::text
   ) THEN RAISE EXCEPTION 'INACTIVE_DEAL_SCHEDULE_WAS_REJECTED'; END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_errors) e
+    WHERE e->>'code'='DEAL_ASSIGNMENT_TIMEZONE_MISMATCH'
+      AND e->>'deal_id'=v_inactive_deal::text
+  ) THEN RAISE EXCEPTION 'INACTIVE_DEAL_TIMEZONE_MISMATCH_WAS_REJECTED'; END IF;
 
   v_snapshot := app_private.flame_chick_catalog_compile_snapshot(v_restaurant,now());
 
