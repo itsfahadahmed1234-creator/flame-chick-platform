@@ -1,6 +1,6 @@
 # Flame Chick — Draft vs Live Published Catalog Separation
 
-Date: 2026-11-21
+Date: 2026-11-22
 Branch: `work/production-source-audit`
 Production project: `adkrxfnawdiljhjaavnj` (Mumbai, Free)
 
@@ -17,7 +17,9 @@ Never union, overlay, merge or fall back from the live snapshot to mutable draft
 
 ## Production implementation already applied
 
-Migration: `20261121155900_flame_chick_catalog_public_snapshot_read_v1`
+Migrations:
+- `20261121155900_flame_chick_catalog_public_snapshot_read_v1`
+- `20261122031027_flame_chick_catalog_publish_rollback_v1`
 
 It creates `public.flame_chick_catalog_public_read(text)`:
 - postgres-owned `SECURITY DEFINER`, `SET search_path = ''`.
@@ -51,41 +53,58 @@ The immutable publication-history table already rejects UPDATE, DELETE and TRUNC
 The source passed the Edge Function static-check workflow:
 https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44922820111
 
-The function has **not** been deployed. Supabase reports zero deployed Edge Functions. Do not deploy it until the publish compiler/commands and snapshot DTO are complete and tested.
+The function has **not** been deployed. Supabase reports zero deployed Edge Functions. Static checks pass, but do not deploy it to a customer-facing project until the V3 client adapter and quote/order path are complete and tested.
 
-## Publish transaction — required design
+## Publish transaction — implemented
 
-The publish command is Admin/Owner-only and must execute entirely in one database transaction:
+Public command: `public.flame_chick_catalog_publish(p_expected_revision bigint,p_request_id uuid)`.
 
-1. Acquire the restaurant's draft-state row lock and capture the exact current draft revision.
-2. Validate the entire graph: restaurant/categories/products/variants, NULL-vs-zero price semantics, modifiers and exact variant pricing, deals/deal variants/component groups/options/variant maps, all required/min/max quantities, branch availability, schedule/timezone correctness and any DTO requirements.
-3. Reject missing prices, unavailable or archived referenced products/variants, invalid option maps, incompatible deal pricing treatments, invalid schedule windows and incomplete required choice groups. Return actionable errors; do not auto-fix or silently default to free.
-4. Compile a deterministic, self-contained snapshot with stable sort orders, explicit DTO schema version and pricing-engine version.
-5. Compute the checksum using the exact SHA-256 contract above.
-6. Confirm the draft revision is still the revision validated. If not, abort with a revision conflict.
-7. Insert a new `catalog_publications` row with a monotonically increasing restaurant-scoped publication number, captured draft revision, schema version, pricing engine version, snapshot, checksum and actor.
-8. Atomically upsert `catalog_current_publication` to point to the new publication in the same transaction.
-9. Append publish audit and idempotency response in that transaction. If any statement fails, the transaction rolls back and the old live pointer remains in place.
+1. Resolve active Admin/Owner actor and restaurant.
+2. Lock the restaurant's `catalog_draft_state` row and compare the supplied expected revision.
+3. Validate the complete active menu/deal graph, pricing, exact modifier variant rules, component selection capacity, schedules, timezones and branch overlays. Validation errors are structured and capped at 100.
+4. Compile a deterministic schema-V3 snapshot with stable sort ordering and a fixed pricing-engine version.
+5. Compute SHA-256 of PostgreSQL `snapshot::text` as UTF-8 bytes, lower-case hex.
+6. Insert a new immutable `catalog_publications` history row with monotonic restaurant-scoped publication number, draft revision, schema version, engine version, snapshot, checksum and actor.
+7. Atomically switch `catalog_current_publication` in the same transaction.
+8. Append actor audit and idempotency response in the same transaction.
 
-No snapshot is visible until the transaction commits. Never write to the existing publication row.
+The draft revision and draft rows are not changed by publish. Any validation or transaction failure aborts all statements and leaves the previous pointer untouched.
 
-## Rollback contract
+## Rollback contract — implemented
 
-Rollback is a separate Admin/Owner command. It must verify the target publication belongs to the same restaurant and its immutable checksum is valid, then atomically move only the current pointer back to that prior publication. It must not change snapshot history, draft data or order snapshots. The actor, reason, previous pointer and new pointer must be audited.
+Public command: `public.flame_chick_catalog_rollback(target_publication_id, expected_draft_revision, request_id, reason)`.
 
-## Required automated release tests
+- Admin/Owner only; a reason of 10–500 characters is required.
+- Target must exist in the same restaurant, not already be current, and have valid schema metadata/checksum.
+- Rollback updates only `catalog_current_publication`, never snapshot history or draft content.
+- Actor, reason, previous and restored publication are audited; repeated same request replays idempotently.
+- A rollback to a prior database publication is available once at least two publications exist. Before the first database publication, the legacy Website deployment remains the emergency fallback.
 
-- Active restaurant with no pointer: public response is unpublished and contains no draft rows.
-- Draft changes before first publish: still no public menu.
-- Publish valid snapshot: public response exactly matches stored publication.
-- Edit draft after publish: public response, publication ID and checksum remain byte-for-byte stable.
-- Invalid draft / failed compiler / failed insert / stale revision: old pointer and old public snapshot remain unchanged.
-- Successful second publish: old publication remains immutable; only pointer switches to the new row.
-- Rollback: pointer moves to the previous immutable publication; its snapshot is returned exactly.
-- Corrupt snapshot/hash or orphaned pointer: return an error/fail closed; never fall back to draft.
-- Public caller cannot invoke Admin commands, read draft RPCs or select publication tables.
-- Website response retains existing schema-v2 DTO and uses publication ID/hash in cache identity.
-- Branch-specific availability is a separately versioned overlay. It may filter the live base snapshot but must not change base menu prices or use unpublished draft values.
+Publication history is exposed to Admin/Owner through `public.flame_chick_catalog_publication_history`, a bounded metadata-only read. It does not return stored snapshot JSON to the Admin browser.
+
+## QA performed — rollback-only and passed
+
+- Active restaurant with no publication pointer returns unpublished and NULL snapshot.
+- Authenticated Admin created a temporary category, product and priced variant through the existing command RPCs.
+- Published publication 1; same request replay did not create a duplicate.
+- Edited draft and successfully published publication 2.
+- Deactivated the category while a product remained active; publish was rejected with `ACTIVE_PRODUCT_CATEGORY_INACTIVE`.
+- Confirmed failed publish left publication 2 current and history remained exactly two immutable rows.
+- Rolled back to publication 1; same rollback request replayed idempotently.
+- Confirmed publication 1 current, publication 2 immutable/non-current, and the newer invalid draft remained unchanged.
+- Published-only read RPC returned the exact publication-1 snapshot and checksum.
+- Direct application-role SELECT on publication tables remained denied.
+- All temporary users, restaurant, menu data, publications, pointers, audit rows and idempotency rows were rolled back.
+
+## Remaining validation before live Website cutover
+
+- Publish/rollback concurrency test with simultaneous Admin requests and stale draft revisions.
+- V3 Website adapter and complete menu rendering tests.
+- Server-side quote/checkout pricing integration and historical order snapshot tests.
+- Runtime schedule evaluator tests (weekly, overnight, one-off, IANA timezone, DST behavior).
+- Delivery areas/settings and promotions domains.
+- End-to-end website checkout to POS tests and branch-specific availability.
+- Deployment-preview verification and explicit owner approval for custom domain cutover.
 
 ## Website cutover rule
 
@@ -98,18 +117,18 @@ The existing running Website must remain on its current data source until:
 
 Creating or editing drafts must never trigger this cutover. A preview URL or public query parameter that serves arbitrary draft revisions is prohibited. Any future Admin preview must be authenticated and separate from the customer catalog read endpoint.
 
-## Current state (verified 2026-11-21)
+## Current state (verified 2026-11-22)
 
-- Migration `20261121155900` is applied and recorded.
+- Migrations `20261121155900` and `20261122031027` are applied and recorded.
 - `flame_chick_catalog_public_read(text)` is postgres-owned SECURITY DEFINER with empty search_path.
 - Only `service_role` can execute it; `anon` and `authenticated` cannot.
 - Service role has no direct SELECT on publication or pointer tables.
 - Rollback-only tests confirmed no-pointer fail-closed, exact stored-snapshot response, no effect from later draft revision changes, and publication-history immutability.
 - All test fixtures rolled back.
 - Production currently has zero publication rows, zero live pointers and zero draft-state rows.
-- `flame-chick-catalog` Edge Function source now uses only the published-read RPC, passed static checks and is not deployed.
-- No Vercel or live Website cutover was performed.
+- `flame-chick-catalog` Edge Function source now uses only the published-read RPC, passed static checks, advertises the active publication schema version and is not deployed.
+- No Vercel or live Website cutover was performed. The legacy `flame-chick.vercel.app` alias remains assigned to verified production deployment `dpl_4MepX2o8ysrqsnHp7H6H7mVqznGP`; rollback runbook is `docs/architecture/website-release-cutover-rollback-v1.md`.
 
 ## Next stage
 
-Implement the snapshot compiler, full graph validation, publish command, rollback command and golden test suite. Only then deploy the Edge Function and perform a separately verified Website cutover.
+Implement the V3 Website adapter, delivery/checkout configuration, runtime schedule evaluation and order/quote integration. Then deploy the Edge Function and Website to preview, test end to end, and only with explicit approval cut over. The verified legacy Vercel deployment remains the emergency Website rollback target.
