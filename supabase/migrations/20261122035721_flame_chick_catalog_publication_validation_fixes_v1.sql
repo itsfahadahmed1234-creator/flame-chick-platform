@@ -546,6 +546,10 @@ BEGIN
             WHERE a.restaurant_id=s.restaurant_id
               AND a.schedule_set_id=s.id
               AND a.is_active
+              AND (a.branch_id IS NULL OR EXISTS (
+                SELECT 1 FROM public.branches b
+                WHERE b.id=a.branch_id AND b.restaurant_id=a.restaurant_id AND b.is_active
+              ))
           )
         )
     ),'[]'::jsonb),
