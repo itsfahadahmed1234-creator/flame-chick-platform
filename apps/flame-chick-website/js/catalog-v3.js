@@ -121,6 +121,7 @@
     else if (type.indexOf('enum:') === 0) ok = type.slice(5).split('|').indexOf(value) >= 0;
     else if (type === 'timezone') ok = isTimezone(value);
     else if (type === 'key') ok = typeof value === 'string' && KEY_RE.test(value);
+    else if (type === 'branchCode') ok = typeof value === 'string' && value.length >= 1 && value.length <= 32 && /^[a-z0-9]+([_-][a-z0-9]+)*$/.test(value);
     else if (type === 'time') ok = isTime(value);
     else if (type === 'nullableTime') ok = value === null || isTime(value);
     else if (type === 'array') ok = Array.isArray(value);
@@ -137,7 +138,7 @@
 
   var ROW_SPECS = {
     branches: {
-      branchId: 'uuid', branchCode: 'string', name: 'string', address: 'nullableString',
+      branchId: 'uuid', branchCode: 'branchCode', name: 'string', address: 'nullableString',
       phone: 'nullableString', timezone: 'timezone', websiteOrderingEnabled: 'boolean',
       websiteDeliveryEnabled: 'boolean', websitePickupEnabled: 'boolean'
     },
