@@ -8,6 +8,26 @@ The intended Auth user `itsfahadahmed1234@gmail.com` was created and email-confi
 
 The Admin web app is not yet operational. Its bootstrap requires the `flame-chick-staff-admin` Edge Function, which is not deployed. Exact allowed origins, invitation redirect URL and server-only secret configuration remain outstanding. The new Vercel Admin production project has not been deployed. Keep all non-Staff modules disabled: source still contains legacy direct REST CRUD/storage operations that must be replaced by secure command APIs before those modules can be enabled.
 
+## Admin security readiness — origin policy and plan limits
+
+The Flamechic Supabase organization remains on the Free plan. Current Supabase documentation states that leaked-password protection (HaveIBeenPwned screening) is available on Pro and above. No upgrade was made and no external password-checking substitute was added. The invitation page retains its 12-character minimum; Admin/Owner should use unique password-manager-generated passwords and enable MFA when the auth flow is ready.
+
+The new Vercel Admin project `flame-chick-admin-production` has the verified default domain `flame-chick-admin-production.vercel.app`, but SSO protection applies to all except custom domains. There is no deployment yet. The old `flame-chick-admin.vercel.app` domain belongs to a legacy project and is not the new callback.
+
+The Staff Admin Edge Function source now imports a strict origin policy:
+- exact HTTPS origins only in production; explicitly listed loopback HTTP only for local development;
+- wildcard hostnames, paths, query strings, fragments and credentials rejected;
+- CORS headers returned only for exact allowlisted origins, without wildcard or credentials;
+- invite redirects limited to the exact `/accept-invitation.html` page on an allowed HTTPS origin;
+- malformed/missing origin configuration fails closed, and disallowed browser origins receive 403.
+
+JWT verification remains enabled. User commands continue with the caller JWT and database-derived `auth.uid()`; service-only invite finalization uses the secret only in the `apikey` header. The database trigger was reviewed and protects the last active Owner (`LAST_ACTIVE_OWNER_PROTECTED`).
+
+CI tests were added for origin parsing/CORS/redirect safety and the role/security contract. Latest Admin static CI: [45020193034 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45020193034). Deno type check: [45020189510 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45020189510).
+
+No Auth settings, secrets, deployments, domains, DNS, or aliases have been changed. After the public custom Admin domain is selected and verified, set the Site URL to its root, allow only the exact `/accept-invitation.html` redirect, and configure `FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS` and `FLAME_CHICK_STAFF_INVITE_REDIRECT_URL` to match. Do not deploy or invite staff before this gate is complete.
+
+
 ## Catalog publication validator fix — applied and verified
 
 ### Migration
