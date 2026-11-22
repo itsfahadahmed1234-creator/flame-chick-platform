@@ -84,7 +84,7 @@ test('unpublished health returns closed state without requesting catalog', async
 test('health transport failure never falls back to cached or unverified data', async () => {
   const snapshot = createSnapshot();
   const mock = makeFetch(snapshot, { healthError: new Error('offline') });
-  const result = await client.load({ config, contract, fetchImpl: mock.fetchImpl });
+  const result = await client.load({ config, contract, fetchImpl: mock.fetchImpl, retries: 0 });
   assert.equal(result.state, 'error');
   assert.equal(result.error.code, 'NETWORK');
   assert.equal(mock.calls.length, 1);
@@ -158,7 +158,7 @@ test('rejects non-HTTPS configuration and missing V3 validator', async () => {
   assert.equal(insecure.state, 'error');
   assert.equal(insecure.error.code, 'CONFIG_INVALID');
 
-  const missingContract = await client.load({ config, contract: null, fetchImpl: async () => {} });
+  const missingContract = await client.load({ config, contract: {}, fetchImpl: async () => {} });
   assert.equal(missingContract.state, 'error');
   assert.equal(missingContract.error.code, 'CONTRACT_UNAVAILABLE');
 });
