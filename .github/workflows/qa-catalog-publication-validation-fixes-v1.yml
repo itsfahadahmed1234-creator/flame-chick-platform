@@ -47,6 +47,7 @@ jobs:
           grep -q "HAVING g.min_units > 0" "${migration}"
           grep -q "ACTIVE_SCHEDULE_SET_INVALID" "${migration}"
           grep -q "ACTIVE_DEAL_ASSIGNMENT_BRANCH_INACTIVE" "${migration}"
+          grep -q "a.branch_id IS NULL OR EXISTS" "${migration}"
           grep -q "ACTIVE_DEAL_SCHEDULE_SET_INACTIVE" "${migration}"
           grep -q "CATALOG_VALIDATION_FIX_VERIFICATION_FAILED" "${migration}"
           grep -q "CATALOG_PUBLICATION_HELPER_SECURITY_BASELINE_INVALID" "${migration}"
