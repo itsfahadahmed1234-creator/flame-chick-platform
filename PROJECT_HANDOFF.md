@@ -1,3 +1,65 @@
+# CURRENT IMPLEMENTATION STATUS — 2026-11-22 (publication, rollback and legacy Website fallback)
+
+## Hard release and rollback rule
+
+Draft menu changes never update the customer menu. The new Website reads only the immutable publication selected by `catalog_current_publication`; no pointer means no customer menu. Admin preview is separate and must never be a public draft URL.
+
+### Database migrations now applied
+- `20261121155900_flame_chick_catalog_public_snapshot_read_v1`
+- `20261122031027_flame_chick_catalog_publish_rollback_v1`
+
+### Implemented publish/rollback database commands
+- `public.flame_chick_catalog_publish(expected_revision, request_id)`: locks expected draft revision, validates full menu/deal graph, compiles deterministic schema V3, stores SHA-256 immutable publication and atomically changes current pointer.
+- `public.flame_chick_catalog_rollback(target_publication_id, expected_revision, request_id, reason)`: Admin/Owner only; requires a 10–500 character reason; validates same-restaurant immutable target + SHA-256 and changes only current pointer. Draft content remains untouched.
+- `public.flame_chick_catalog_publication_history(after_number, limit)`: bounded Admin/Owner metadata history, no snapshot body in Admin response.
+- Publish/rollback include actor audit and idempotency records in the same transaction. Failed validation/transaction leaves old pointer unchanged.
+- Private compile/validate helpers are postgres-owned SECURITY DEFINER with empty search_path; public wrappers are SECURITY INVOKER, authenticated-only, and actor authorization is active Admin/Owner. No direct table grants were added.
+- Publication snapshots use schema V3 and fixed pricing engine identifier `flame-chick-pricing-v1`. Snapshot hash is lower-case SHA-256 of PostgreSQL canonical `jsonb::text` converted to UTF-8.
+- Rollback-only full QA passed: publish v1, replay, edit/publish v2, invalid draft rejected with v2 still current, rollback v1, replay, verify v1 exact published snapshot and v2 immutable; invalid/newer draft remains unchanged. All fixtures were rolled back.
+
+### Production is still empty — no real menu seeded
+Verified counts after tests: zero restaurants, categories, products, deals, draft states, publications, current pointers, catalog audit rows and idempotency rows. Published-read returns `published=false` and NULL snapshot. No new live menu has been published.
+
+### Published-only read and Edge Function
+- `public.flame_chick_catalog_public_read(text)` is postgres-owned SECURITY DEFINER with empty search_path, executable only by `service_role`. Anon/authenticated cannot execute it; service_role has no direct SELECT on publication tables.
+- `supabase/functions/flame-chick-catalog/index.ts` now calls only this RPC, passes through the immutable snapshot and advertises the active snapshot schema version. Static checks passed.
+- Supabase currently lists zero deployed Edge Functions. Do not deploy this source to a customer-facing project until V3 Website client and quote/checkout integration are ready.
+
+### Important V3 and checkout blockers
+- Current Website catalog consumer validates schema V2; publication compiler emits V3. Do not point the V2 client to a V3 response or weaken the version check.
+- Existing schema does not yet include `restaurant_settings`, `delivery_areas` or promotions; current V3 snapshot explicitly uses empty deliveryAreas/promotions arrays and only the restaurant-name/currency/timezone settings. Implement those domains and checkout configuration before switching the customer website.
+- Runtime schedule evaluation, V3 Website menu renderer, deal quote calculation in order flow, branch-specific runtime effective availability, and complete end-to-end checkout-to-POS tests remain pending.
+- Existing Admin catalog modules stay disabled and direct browser REST writes remain prohibited.
+
+## Verified legacy Website emergency rollback target
+
+The existing public Website remains untouched and live:
+- Domain: `https://flame-chick.vercel.app`
+- Legacy Vercel project: `flamechicks` (`prj_ldHcRFVX0kadzR8jxVJz7pO1vPz5`)
+- Known-good production deployment: `dpl_4MepX2o8ysrqsnHp7H6H7mVqznGP`
+- Commit: `6ac16abf9195926a5cc7ac153fbd94d0b29c22a2`
+- Source: legacy repo `befahad1234-cmyk/-hfp-supabase-PROJECT_HANDOFFS`, ref `feature/flame-chick-wa-storefront`
+- Vercel confirms `flame-chick.vercel.app` is assigned to this READY production deployment; live fetch returned HTTP 200 on 2026-11-22.
+- New project `flame-chick-website-production` (`prj_jwin4eFY0BXIgZUgcZGAuntybqkI`) has no deployments or custom domain.
+
+Emergency rollback after a future Website cutover: use Vercel `assign_alias` with the old deployment ID above and alias `flame-chick.vercel.app`, team `team_lrFy9ILYEz9umsBy98GCyQjI`. Then verify the alias map and live HTTP 200. This action has not been performed. Database rollback to a previous catalog publication is separate; until at least two DB publications exist, the verified legacy Vercel deployment is the first-release fallback.
+
+Detailed runbook: `docs/architecture/website-release-cutover-rollback-v1.md`.
+Detailed implementation/QA: `docs/handoffs/2026-11-22-catalog-publish-rollback-implementation.md`.
+Draft/live invariants: `docs/architecture/draft-vs-published-catalog-separation.md`.
+
+## Release sequence still required
+1. Implement a V3 Website consumer and deal-variant rendering; V2 consumer remains unchanged until adapter passes.
+2. Implement delivery areas/settings, server-side schedule evaluation, and order/quote pricing over the same published snapshot.
+3. Complete golden/concurrency/idempotency/stale-revision tests and end-to-end customer checkout → POS tests.
+4. Deploy Edge Function + Website only to preview first. Keep `flame-chick.vercel.app` on the old deployment during testing.
+5. Record the new deployment ID; only with explicit owner approval assign the customer alias to it.
+6. If critical checks fail, assign the alias back to the verified old deployment above; database pointer rollback remains separately available.
+
+No Website alias move, Edge Function deployment, Vercel production deployment or real-menu seed was performed by this stage.
+
+---
+
 # CURRENT IMPLEMENTATION STATUS — 2026-11-21 (latest; draft/live menu isolation enforced)
 
 ## Hard rule: draft catalog can never become the live website menu by accident
