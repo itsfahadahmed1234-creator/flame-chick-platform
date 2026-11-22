@@ -64,9 +64,14 @@
   }
 
   function isIsoDateTime(value) {
-    return typeof value === 'string' && value.length >= 20 &&
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
-      Number.isFinite(Date.parse(value));
+    if (typeof value !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(value) ||
+        !isIsoDate(value.slice(0, 10))) return false;
+    var time = value.slice(11, 19);
+    if (!isTime(time)) return false;
+    var offset = value.slice(-6);
+    if (offset !== 'Z' && !/^([+-])(0\d|1[0-4]):([0-5]\d)$/.test(offset)) return false;
+    return Number.isFinite(Date.parse(value));
   }
 
   function isIsoDate(value) {
@@ -349,8 +354,10 @@
         if (!sub || sub.categoryId !== row.categoryId) addError(errors, 'products[' + i + '].subcategoryId', 'SUBCATEGORY_SCOPE_INVALID', 'Subcategory must belong to the product category.');
       }
     });
+    var productVariantKeys = Object.create(null);
     s.productVariants.forEach(function (row, i) {
       checkReference(maps.products, row.productId, 'productVariants[' + i + '].productId', errors);
+      checkComposite(productVariantKeys, row.productId + ':' + row.sizeKey, 'productVariants[' + i + ']', errors);
       if (row.variantKind === 'pack') {
         if (row.packQuantity === null || row.packUnit === null || !row.packUnit.length) addError(errors, 'productVariants[' + i + ']', 'PACK_METADATA_INVALID', 'Pack variants require a positive count and unit.');
       } else if (row.packQuantity !== null || row.packUnit !== null) {
@@ -393,6 +400,20 @@
       if (modifier && modifier.priceMode !== 'BY_SIZE') addError(errors, 'modifierPriceRules[' + i + '].modifierId', 'MODIFIER_PRICE_MODE_INVALID', 'Price rules are allowed only for BY_SIZE modifiers.');
       checkComposite(rulePairs, row.modifierId + ':' + row.productVariantId, 'modifierPriceRules[' + i + ']', errors);
     });
+    s.modifiers.forEach(function (modifier, modifierIndex) {
+      if (modifier.priceMode !== 'BY_SIZE') return;
+      s.modifierGroupAssignments.forEach(function (assignment) {
+        if (assignment.modifierGroupId !== modifier.modifierGroupId) return;
+        s.productVariants.forEach(function (variant) {
+          if (variant.productId !== assignment.productId) return;
+          var hasRule = s.modifierPriceRules.some(function (rule) {
+            return rule.modifierId === modifier.modifierId && rule.productVariantId === variant.variantId;
+          });
+          if (!hasRule) addError(errors, 'modifiers[' + modifierIndex + ']', 'BY_SIZE_PRICE_RULE_MISSING',
+            'Every assigned active product variant requires an exact BY_SIZE modifier price rule.');
+        });
+      });
+    });
     s.drinkOptions.forEach(function (row, i) {
       checkReference(maps.variants, row.productVariantId, 'drinkOptions[' + i + '].productVariantId', errors, true);
     });
@@ -400,12 +421,19 @@
       var cat = maps.categories[row.categoryId];
       if (!cat || cat.categoryKind !== 'deal') addError(errors, 'dealCollections[' + i + '].categoryId', 'CATEGORY_KIND_INVALID', 'Deal collections must reference a deal category.');
       checkReference(maps.schedules, row.scheduleSetId, 'dealCollections[' + i + '].scheduleSetId', errors, true);
+      var collectionSchedule = maps.schedules[row.scheduleSetId];
+      if (collectionSchedule && collectionSchedule.timezone !== s.settings.timezone) {
+        addError(errors, 'dealCollections[' + i + '].scheduleSetId', 'SCHEDULE_TIMEZONE_SCOPE_INVALID',
+          'Collection fallback schedule timezone must match the restaurant timezone.');
+      }
     });
     s.deals.forEach(function (row, i) {
       checkReference(maps.dealCollections, row.dealCollectionId, 'deals[' + i + '].dealCollectionId', errors);
     });
+    var dealVariantKeys = Object.create(null);
     s.dealVariants.forEach(function (row, i) {
       checkReference(maps.deals, row.dealId, 'dealVariants[' + i + '].dealId', errors);
+      checkComposite(dealVariantKeys, row.dealId + ':' + row.variantKey, 'dealVariants[' + i + ']', errors);
     });
     s.dealComponentGroups.forEach(function (row, i) {
       checkReference(maps.deals, row.dealId, 'dealComponentGroups[' + i + '].dealId', errors);
@@ -433,22 +461,54 @@
       var deal = maps.deals[row.dealId];
       if (!dealVariant || dealVariant.dealId !== row.dealId) addError(errors, 'dealVariantComponentOptions[' + i + '].dealVariantId', 'DEAL_VARIANT_SCOPE_INVALID', 'Deal variant must belong to the same deal.');
       if (!option || option.dealId !== row.dealId) addError(errors, 'dealVariantComponentOptions[' + i + '].componentOptionId', 'COMPONENT_OPTION_SCOPE_INVALID', 'Component option must belong to the same deal.');
-      if (row.pricingTreatment === 'STANDALONE' && dealVariant && dealVariant.pricingMode === 'FIXED_BUNDLE') {
-        addError(errors, 'dealVariantComponentOptions[' + i + '].pricingTreatment', 'PRICING_TREATMENT_INVALID', 'FIXED_BUNDLE deal variants cannot add STANDALONE component prices.');
+      if (row.pricingTreatment === 'STANDALONE') {
+        var standaloneVariant = option ? maps.variants[option.productVariantId] : null;
+        if (dealVariant && dealVariant.pricingMode !== 'BASE_PLUS_SELECTED_ITEMS') {
+          addError(errors, 'dealVariantComponentOptions[' + i + '].pricingTreatment', 'PRICING_TREATMENT_INVALID', 'STANDALONE components require BASE_PLUS_SELECTED_ITEMS pricing.');
+        }
+        if (!standaloneVariant || !standaloneVariant.standaloneSellable || minorUnits(standaloneVariant.price) === null) {
+          addError(errors, 'dealVariantComponentOptions[' + i + '].componentOptionId', 'STANDALONE_VARIANT_INVALID', 'STANDALONE components require a priced, standalone-sellable product variant.');
+        }
       }
       if (row.pricingTreatment !== 'SURCHARGE' && minorUnits(row.unitSurcharge) !== 0) {
         addError(errors, 'dealVariantComponentOptions[' + i + '].unitSurcharge', 'SURCHARGE_INVALID', 'Only SURCHARGE treatment may carry a non-zero unit surcharge.');
       }
       checkComposite(dealVariantOptionPairs, row.dealVariantId + ':' + row.componentOptionId, 'dealVariantComponentOptions[' + i + ']', errors);
     });
+    s.dealVariants.forEach(function (dealVariant, variantIndex) {
+      s.dealComponentGroups.forEach(function (group) {
+        if (group.dealId !== dealVariant.dealId || group.minUnits === 0) return;
+        var capacity = 0;
+        s.dealComponentOptions.forEach(function (option) {
+          if (option.dealId !== group.dealId || option.componentGroupId !== group.componentGroupId) return;
+          var mapping = s.dealVariantComponentOptions.find(function (item) {
+            return item.dealVariantId === dealVariant.dealVariantId && item.componentOptionId === option.componentOptionId;
+          });
+          if (!mapping) return;
+          var optionCap = mapping.maxQuantityPerDeal !== null ? mapping.maxQuantityPerDeal :
+            (group.maxUnitsPerOption !== null ? group.maxUnitsPerOption :
+              (group.allowRepeatOption ? group.maxUnits : 1));
+          capacity += Math.min(group.maxUnits, optionCap);
+        });
+        if (capacity < group.minUnits) {
+          addError(errors, 'dealVariants[' + variantIndex + ']', 'DEAL_REQUIRED_CHOICES_UNSATISFIABLE',
+            'Allowed options for this deal variant cannot satisfy component group ' + group.componentGroupId + '.');
+        }
+      });
+    });
     var windowSets = Object.create(null);
     s.scheduleSets.forEach(function (row, i) {
       if (!isTimezone(row.timezone)) addError(errors, 'scheduleSets[' + i + '].timezone', 'TIMEZONE_INVALID', 'Schedule timezone must be a valid IANA timezone.');
-      if (!Array.isArray(row.windows)) addError(errors, 'scheduleSets[' + i + '].windows', 'ARRAY_REQUIRED', 'Schedule windows must be an array.');
+      if (!Array.isArray(row.windows) || row.windows.length === 0) {
+        addError(errors, 'scheduleSets[' + i + '].windows', 'SCHEDULE_WINDOWS_REQUIRED', 'Published schedule sets must contain at least one valid window.');
+      }
       windowSets[row.scheduleSetId] = true;
     });
     validateScheduleWindows(s.scheduleSets, errors);
+    var dealScheduleKeys = Object.create(null);
     s.dealScheduleAssignments.forEach(function (row, i) {
+      checkComposite(dealScheduleKeys, row.dealId + ':' + (row.branchId || 'GLOBAL'),
+        'dealScheduleAssignments[' + i + ']', errors);
       var deal = maps.deals[row.dealId];
       var schedule = maps.schedules[row.scheduleSetId];
       checkReference(maps.branches, row.branchId, 'dealScheduleAssignments[' + i + '].branchId', errors, true);
