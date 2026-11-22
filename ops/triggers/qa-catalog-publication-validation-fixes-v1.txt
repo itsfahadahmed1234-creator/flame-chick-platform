@@ -1,0 +1,1 @@
+Run disposable local Supabase migration-chain QA and rollback-only catalog validator fixture tests. Never target Production.
