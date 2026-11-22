@@ -177,11 +177,15 @@ test('rejects impossible calendar dates in publication timestamps', () => {
   assert.equal(contract.validateSnapshot(snapshot).ok, false);
 });
 
-test('every deal variant must map at least one option for each component group', () => {
-  const snapshot = createSnapshot();
-  snapshot.dealComponentGroups[0].minUnits = 0;
-  snapshot.dealVariantComponentOptions = [];
-  assert.ok(contract.validateSnapshot(snapshot).errors.some(e => e.code === 'DEAL_REQUIRED_CHOICES_UNSATISFIABLE'));
+test('optional deal component groups may have no options; required groups must be satisfiable', () => {
+  const optional = createSnapshot();
+  optional.dealComponentGroups[0].minUnits = 0;
+  optional.dealVariantComponentOptions = [];
+  assert.equal(contract.validateSnapshot(optional).ok, true);
+
+  const required = createSnapshot();
+  required.dealVariantComponentOptions = [];
+  assert.ok(contract.validateSnapshot(required).errors.some(e => e.code === 'DEAL_REQUIRED_CHOICES_UNSATISFIABLE'));
 });
 
 test('branch availability overrides never reactivate globally unavailable products or variants', () => {
