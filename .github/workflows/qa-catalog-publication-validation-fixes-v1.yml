@@ -52,11 +52,11 @@ jobs:
           grep -q "b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2" "${migration}"
           grep -q "OPTIONAL_GROUP_WITHOUT_VARIANT_MAP_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "REQUIRED_GROUP_MISSING_VARIANT_MAP_WAS_NOT_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
-          grep -q "COLLECTION_WITHOUT_ACTIVE_DEAL_SCHEDULE_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
+          grep -q "UNREFERENCED_EMPTY_SCHEDULE_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "INACTIVE_DEAL_SCHEDULE_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
+          grep -q "UNREFERENCED_OR_INACTIVE_DEAL_SCHEDULE_WAS_COMPILED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "INACTIVE_DEAL_TIMEZONE_MISMATCH_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "ACTIVE_DEAL_TIMEZONE_MISMATCH_WAS_NOT_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
-          grep -q "UNUSED_OR_INACTIVE_DEAL_SCHEDULE_WAS_COMPILED" supabase/tests/catalog_publication_validation_fixes_v1.sql
       - name: Start local Supabase with hosted-only helper compatibility
         shell: bash
         run: |
