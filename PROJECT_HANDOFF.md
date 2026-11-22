@@ -1,32 +1,72 @@
-# CURRENT IMPLEMENTATION STATUS — 2026-11-22 (catalog publication validation CI passed)
+# CURRENT IMPLEMENTATION STATUS — 2026-11-22 (catalog validator final review passed; Production apply pending)
 
 This section supersedes the earlier catalog-validator QA status further below.
 
-## Step 1 — disposable migration-chain QA: PASSED
+## Step 2 — final Production review: PASSED
 
-- GitHub Actions workflow: [QA Flame Chick catalog publication validation fixes V1](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45010662936).
-- Run ID: `45010662936`; result: **completed / success** on `work/production-source-audit`, commit `24964d22116f74b74a80ebd2fd31684db1ba9c9a`.
-- The workflow started a clean disposable local Supabase stack, installed the complete migration history present on the work branch (including candidate `20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql`), and verified the applied migration count matched the SQL migration-file count.
-- The rollback-only SQL fixture passed: optional groups without variant maps are accepted; required groups without maps are rejected; an active referenced empty schedule remains invalid; an unreferenced active empty schedule is accepted and excluded from the compiled snapshot.
-- The fixture transaction ended with `ROLLBACK`; the follow-up query confirmed the QA tenant did not remain. The disposable stack then stopped successfully and the overall workflow concluded green.
+**Candidate remains unapplied.** The validator fix has been reviewed against the live Production helper definitions, and the complete local migration-chain/regression suite is green. This is technical readiness for a separately approved migration, not authorization to apply it.
 
-## CI-only and source-replay corrections
+- Candidate: `supabase/migrations/20261122035721_flame_chick_catalog_publication_validation_fixes_v1.sql`
+- Working branch: `work/production-source-audit`
+- Final reviewed branch commit: `88c92ffed25e550d7a09cd38013a7d0db9d5cc8d`
+- GitHub Actions: [QA Flame Chick catalog publication validation fixes V1 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45012702344)
+- The successful job replayed the complete migration chain on a disposable local Supabase stack, ran the rollback-only fixture, verified the fixture tenant was absent afterward, stopped the local stack, and completed cleanup. No Production credentials or database were used by this workflow.
 
-- The local runner lacks Supabase's hosted-managed `public.rls_auto_enable()` helper. The workflow now creates a no-op compatibility function only inside the disposable local database before replaying migrations. It creates no event trigger and changes no Production object.
-- The repository copy of `20261121053647_flame_chick_staff_admin_commands.sql` had three missing top-level semicolons after function definitions; these were added so PostgreSQL can replay the source file. This is a work-branch source correction only; no historical Production migration was edited or reapplied.
-- The workflow's push filter now runs the complete local replay when any `supabase/migrations/*.sql` file changes. A manual dispatch trigger is also available.
-- Earlier CI attempts failed first on the missing hosted-only local helper and then on the malformed SQL delimiter. Both harness/source-replay problems are corrected; the third run above passed end-to-end.
+## Reviewed behavior and regression cases
 
-## Production invariants — unchanged
+1. **Deal component groups:** only required groups (`min_units > 0`) must have a per-deal-variant option map. Optional groups can be unmapped. Required groups remain strictly validated.
+2. **Collection fallback schedules:** an active collection's `schedule_set_id` remains a real snapshot reference even when the collection has no active deals. If that referenced schedule is inactive or invalid, publication is rejected; the compiler must not leave a dangling fallback ID.
+3. **Unused schedules:** unreferenced active schedule drafts do not block publication and are omitted from the public snapshot.
+4. **Deal assignments:** schedules for active deals are validated and compiled. Assignments belonging to inactive deals are ignored and omitted. Active-deal timezone mismatches remain publication errors.
+5. **Branch-scoped assignments:** an active deal assignment targeting an inactive branch is rejected. Its assignment and otherwise-unreferenced schedule set are excluded from the compiled snapshot.
+6. The existing rule rejecting active component groups with no options remains unchanged.
 
-- Production migration ledger remains at 23 migrations, latest version `20261122031027_flame_chick_catalog_publish_rollback_v1`.
-- The validator-fix candidate is **not applied to Production** and is not recorded in the Production migration ledger.
-- Read-only verification after CI reported zero QA fixture tenants and zero QA schedules in Production.
-- No menu data or publication was seeded; no Edge Function, Website, Admin app or Vercel deployment was changed.
+The regression fixture explicitly exercises optional vs required groups, active collection fallback validity, inactive fallback rejection, unreferenced schedule omission, inactive-deal assignment exclusion, active-deal timezone mismatch rejection, and inactive-branch assignment rejection/omission. The SQL fixture runs inside `BEGIN` and ends with `ROLLBACK`; the workflow separately checks that its QA tenant count is zero.
+
+## Production function security baseline verified
+
+The migration replaces only these same-signature private helper functions:
+
+- `app_private.flame_chick_catalog_publication_validate(uuid)`
+- `app_private.flame_chick_catalog_compile_snapshot(uuid,timestamptz)`
+
+Read-only Production inspection verified both current function definitions and metadata:
+
+- PostgreSQL owner: `postgres`
+- ACL: `{postgres=X/postgres}`
+- `SECURITY DEFINER = true`
+- `search_path = ""`
+- `anon`, `authenticated` and `service_role` do not have EXECUTE
+- Volatility, strictness, parallel-safety, leakproof, cost and row-estimate attributes match the guarded baseline.
+
+Exact live-source SHA-256 fingerprints, which the candidate checks before replacement:
+
+- Validator: `018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712`
+- Snapshot compiler: `b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2`
+
+The candidate checks these fingerprints and the security metadata before changing either function, captures the execution metadata, and checks it again afterward. It uses an explicit transaction, so a failed preflight or postflight aborts the entire change. No persistent table, column, index, grant, business-data row or publication is created/modified by this candidate; the temporary guard table is transaction-local.
+
+## Production invariants — rechecked after CI
+
+- Applied migration count: **23**; latest: `20261122031027_flame_chick_catalog_publish_rollback_v1`.
+- Restaurants: 1; branches: 1.
+- Categories, products, product variants, deals, schedule sets, publications and current-publication pointers: **0**.
+- QA fixture tenants: **0**.
+- Candidate validator migration is **not** in the Production migration ledger.
+- No Edge Function, Admin deployment, customer Website, Vercel alias, live menu or publication was changed.
+
+## Rollback and remaining release gates
+
+The transaction makes the migration all-or-nothing before commit. After a committed schema migration, the repository's append-only migration history must be reversed with a **new forward-only compensating migration**; it must not be removed or rewritten in the migration ledger. A compensating migration restoring the original helper bodies has **not** yet been prepared or rehearsed. Prepare and test that forward-only recovery path on the disposable local stack before the Production apply if immediate post-commit rollback readiness is required.
+
+Production security advisor still reports expected `rls_enabled_no_policy` INFO notices under the deny-by-default model and a separate WARN that Auth leaked-password protection is disabled. Enable leaked-password protection before broad staff onboarding. The performance advisor's unused-index INFO notices are expected while the business catalog is empty; do not remove those indexes from zero-traffic statistics. Health advisor returned no findings.
 
 ## Next controlled action
 
-Step 1 is complete. The next task is a final review of the candidate validator migration and its production preflight/ACL preservation checks. Keep the candidate unapplied until the production change is separately approved. After that, proceed to the exact live-menu reconciliation and the missing settings/delivery-area/schedule dependencies. Do not connect the customer Website or publish a menu as part of this QA step.
+1. Prepare and test the forward-only compensating migration/recovery runbook.
+2. Obtain separate explicit approval before applying the candidate to Production.
+3. After any approved apply, recheck migration ledger, function source fingerprints/metadata, permissions, security/performance/health advisors, and confirm the customer menu/publication state remains unchanged.
+4. Keep real-menu seeding, Admin/Edge Function deployment, Website cutover, and Vercel changes separately gated.
 
 
 
