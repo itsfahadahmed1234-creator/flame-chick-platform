@@ -118,7 +118,7 @@ async function readCurrentPublication(): Promise<PublicationRead> {
     !/^[0-9a-f]{64}$/.test(result.snapshotSha256) ||
     typeof result.publishedAt !== "string" ||
     typeof result.databaseNow !== "string" ||
-    !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$/.test(result.databaseNow) ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(result.databaseNow) ||
     !Number.isFinite(Date.parse(result.databaseNow)) ||
     !result.snapshot ||
     typeof result.snapshot !== "object" ||
