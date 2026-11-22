@@ -11,7 +11,7 @@ BEGIN
   END IF;
   IF pg_catalog.to_regclass('public.catalog_draft_state') IS NULL
      OR pg_catalog.to_regclass('public.catalog_audit_log') IS NULL
-     OR pg_catalog.to_regclass('public.catalog_command_idempotency') IS NULL
+     OR pg_catalog.to_regclass('app_private.catalog_command_idempotency') IS NULL
      OR pg_catalog.to_regclass('public.catalog_publications') IS NULL
      OR pg_catalog.to_regclass('public.catalog_current_publication') IS NULL THEN
     RAISE EXCEPTION 'CATALOG_PUBLICATION_FOUNDATION_MISSING';
