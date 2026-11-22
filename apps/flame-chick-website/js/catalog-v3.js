@@ -69,7 +69,7 @@
         !isIsoDate(value.slice(0, 10))) return false;
     var time = value.slice(11, 19);
     if (!isTime(time)) return false;
-    var offset = value.slice(-6);
+    var offset = value.endsWith('Z') ? 'Z' : value.slice(-6);
     if (offset !== 'Z' && !/^([+-])(0\d|1[0-4]):([0-5]\d)$/.test(offset)) return false;
     return Number.isFinite(Date.parse(value));
   }
