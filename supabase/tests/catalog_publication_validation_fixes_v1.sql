@@ -25,7 +25,6 @@ DECLARE
   v_schedule_collection uuid := gen_random_uuid();
   v_schedule_deal uuid := gen_random_uuid();
   v_schedule_deal_variant uuid := gen_random_uuid();
-  v_empty_collection uuid := gen_random_uuid();
   v_inactive_collection uuid := gen_random_uuid();
   v_inactive_deal uuid := gen_random_uuid();
   v_inactive_deal_schedule uuid := gen_random_uuid();
@@ -88,11 +87,9 @@ BEGIN
   INSERT INTO public.deal_variants(id,restaurant_id,deal_id,variant_key,label_en,pricing_mode,base_price,is_active)
   VALUES(v_schedule_deal_variant,v_restaurant,v_schedule_deal,'QA','QA','FIXED_BUNDLE',100,true);
 
-  -- An active collection with no active deals is not a live schedule reference.
+  -- An unreferenced active empty schedule is a harmless draft and must be ignored.
   INSERT INTO public.catalog_schedule_sets(id,restaurant_id,name,is_active,timezone)
-  VALUES(v_unreferenced_schedule,v_restaurant,'QA Collection Without Active Deals Schedule',true,'Asia/Karachi');
-  INSERT INTO public.deal_collections(id,restaurant_id,category_id,schedule_set_id,name_en,is_active)
-  VALUES(v_empty_collection,v_restaurant,v_deal_category,v_unreferenced_schedule,'QA Empty Collection',true);
+  VALUES(v_unreferenced_schedule,v_restaurant,'QA Unreferenced Empty Schedule',true,'Asia/Karachi');
 
   -- An active assignment for an inactive deal must not block publication or enter the snapshot.
   INSERT INTO public.catalog_schedule_sets(id,restaurant_id,name,is_active,timezone)
@@ -134,7 +131,7 @@ BEGIN
     SELECT 1 FROM jsonb_array_elements(v_errors) e
     WHERE e->>'code'='ACTIVE_SCHEDULE_SET_INVALID'
       AND e->>'entity_id'=v_unreferenced_schedule::text
-  ) THEN RAISE EXCEPTION 'COLLECTION_WITHOUT_ACTIVE_DEAL_SCHEDULE_WAS_REJECTED'; END IF;
+  ) THEN RAISE EXCEPTION 'UNREFERENCED_EMPTY_SCHEDULE_WAS_REJECTED'; END IF;
 
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_errors) e
@@ -159,7 +156,7 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_snapshot->'scheduleSets') s
     WHERE s->>'scheduleSetId' IN (v_unreferenced_schedule::text,v_inactive_deal_schedule::text)
-  ) THEN RAISE EXCEPTION 'UNUSED_OR_INACTIVE_DEAL_SCHEDULE_WAS_COMPILED'; END IF;
+  ) THEN RAISE EXCEPTION 'UNREFERENCED_OR_INACTIVE_DEAL_SCHEDULE_WAS_COMPILED'; END IF;
 
   IF NOT EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_snapshot->'scheduleSets') s
