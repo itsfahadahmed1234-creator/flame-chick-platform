@@ -9,9 +9,9 @@
 - Every write requires a UUID `request_id` and expected draft revision. Read IDs/cursors/limits are validated; payload size is bounded to 65,536 UTF-8 bytes per mutation.
 - Catalog RPC requests use only the publishable key plus the caller's Bearer JWT. The existing DB functions derive `auth.uid()`, resolve the active restaurant-wide Admin/Owner identity and remain the authority for permissions, tenant checks, input validation, idempotency and transaction safety. No client table grants or permissive RLS policies were added.
 - `catalog_publish` and `catalog_rollback` are intentionally not routed yet. Do not expose them until the public Website schema-v3 DTO compatibility and launch gate are reviewed.
-- Added `tests/catalog-admin-api.test.mjs` and `.github/workflows/qa-catalog-admin-api.yml`. The combined GitHub commit-status lookup returned an empty status list; **the test workflow is not yet verified as passing**.
+- Added `tests/catalog-admin-api.test.mjs` and `.github/workflows/qa-catalog-admin-api.yml`. The workflow runs Node 22 contract tests and a pinned Deno 2.9.8 type-check of the Staff Admin Edge Function. Workflow update commit: `f22a1dbabebea2af44d769f5fb2c8103856194d3`. The combined GitHub commit-status lookup returned an empty status list; **the workflow is not yet verified as passing**.
 - Detailed contract and action list: `docs/handoffs/2026-11-22-catalog-admin-api-contract.md`.
-- Source commits: `74ed14b667f9977a303bee4f2b5d003ed6532c9b`, `17397780afc8c0e207734c6be64c82b6618faa61`, `8781bbacc98ddc62844ff661d30c0aac145eb5a1`, `f62446a0aa8373d23bf93aca9e1edc63ccc471b2`, `13e3f19a12969824689b7f324036353a58894688`, docs `692936936371eee73b227599abf89aa77c136609`.
+- Source commits: `74ed14b667f9977a303bee4f2b5d003ed6532c9b`, `17397780afc8c0e207734c6be64c82b6618faa61`, `8781bbacc98ddc62844ff661d30c0aac145eb5a1`, `f62446a0aa8373d23bf93aca9e1edc63ccc471b2`, `13e3f19a12969824689b7f324036353a58894688`, workflow `f22a1dbabebea2af44d769f5fb2c8103856194d3`, docs `692936936371eee73b227599abf89aa77c136609`, Deno-gate documentation `c4a9c2bb9cb93a61907d5b9bd6a1032706e7049c`.
 - Deployed Supabase Staff Admin remains old version 1 until QA and source review pass. No function deployment, runtime request, catalog UI integration, DB migration, menu write/publication, or Vercel change occurred.
 
 ### Next gates
