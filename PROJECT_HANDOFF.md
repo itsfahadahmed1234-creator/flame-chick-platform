@@ -1,3 +1,20 @@
+## Latest checkpoint — isolated V3 Website menu renderer foundation (2026-11-22)
+
+**Status: renderer/view-model and focused tests added; awaiting final CI verification. It is intentionally not connected to the storefront. No deployment or catalog publication.**
+
+- Added `apps/flame-chick-website/js/catalog-v3-view.js` as a separate module. It accepts only snapshots that pass the strict V3 validator and uses stable UUIDs, never legacy product names or hardcoded menu data.
+- Builds menu categories/products/variants from the immutable publication, maps modifier groups and exact variant-specific price rules, filters global and branch product/variant availability, and requires explicit branch selection when more than one branch exists.
+- Branch fulfilment flags are checked independently for delivery and pickup. It does not calculate cart totals or claim checkout price authority.
+- DOM renderer uses `createElement` and `textContent` for database-controlled text; no HTML-string injection. Multiple variants are not silently selected. Modifier UI is explicitly marked pending; products with modifiers are not addable through this initial renderer. Deals, schedules, media delivery and full customization UI are not yet rendered.
+- Added `tests/catalog-v3-view.test.mjs` for V3 validation gate, branch selection, fulfilment flags, branch overlays, multi-variant handling, modifier price mapping and integer-money formatting.
+- CI workflow now syntax-checks the new view module and includes the focused test file. First run exposed a test-isolation issue (global validator fallback); test was corrected to pass an explicitly empty validator dependency. Verify the latest run before proceeding.
+- The V3 renderer is not referenced by `index.html`; old V2/hardcoded path remains behind the hidden-menu safety gate. No live customer menu can be exposed by this work.
+- Preview workflow was skipped; no Vercel deployment. No Supabase/database write, Edge Function deployment, catalog publication, menu seed or secret change.
+
+**Next:** confirm the latest full CI run; then implement and test schedule evaluation, deal view-model/UI, modifier selection/pricing UX, controlled media handling, and a deliberate branch/fulfilment selection flow. Only after all V3 capabilities and end-to-end checks are complete should the storefront be integrated. Keep checkout disabled until server-side Order API pricing/idempotency/rate limits exist.
+ 
+---
+
 # CRITICAL IDENTITY AND SPELLING GUARDRAIL — READ BEFORE GITHUB / VERCEL ACTIONS
 
 This project has repeatedly been affected by assistant-side owner-name typos. Do not rely on memory, shortened names, or guessed account slugs. Copy these exact identifiers:
