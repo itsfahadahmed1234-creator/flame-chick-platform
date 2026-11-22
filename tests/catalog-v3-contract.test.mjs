@@ -254,3 +254,22 @@ test('validates health response for unpublished and published catalogs', () => {
 
   assert.equal(contract.validateHealth({ ok: true, data: { schemaVersion: 2, published: false } }).ok, false);
 });
+
+test('validates database time only when transport metadata is present', () => {
+  const publicationSnapshot = createSnapshot();
+  assert.equal(contract.validateSnapshot(publicationSnapshot).ok, true);
+
+  const withDatabaseTime = {
+    ...publicationSnapshot,
+    databaseNow: '2026-11-23T12:00:00.123456Z'
+  };
+  assert.equal(contract.validateSnapshot(withDatabaseTime).ok, true);
+
+  assert.equal(contract.validateSnapshot({
+    ...publicationSnapshot,
+    databaseNow: '2026-02-30T12:00:00Z'
+  }).ok, false);
+  assert.equal(contract.isIsoUtcDateTime('2026-11-23T12:00:00.123456Z'), true);
+  assert.equal(contract.isIsoUtcDateTime('2026-11-23T12:00:00+05:00'), false);
+  assert.equal(contract.isIsoUtcDateTime('2026-02-30T12:00:00Z'), false);
+});
