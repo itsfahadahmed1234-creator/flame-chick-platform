@@ -316,9 +316,18 @@
     currentPreviewId = preview.previewId;
     catalogSection.hidden = false;
     dealsSection.hidden = false;
+    var fulfilmentLabel = preview.fulfilmentType === 'delivery' ? 'Delivery' :
+      (preview.fulfilmentType === 'pickup' ? 'Pickup' : 'Menu browsing only');
+    var orderingLabel = preview.orderingEnabled
+      ? 'Online ordering available'
+      : (preview.fulfilmentType
+        ? 'Online ordering unavailable for this fulfilment method'
+        : (preview.availableFulfilmentTypes.length
+          ? 'Read-only until a fulfilment method is selected'
+          : 'Read-only; website ordering is disabled for this branch'));
     byId('catalog-context-label').textContent =
       (preview.branchId ? 'Branch selected' : 'Branch not selected') + ' · ' +
-      (preview.fulfilmentType === 'delivery' ? 'Delivery' : 'Pickup') + ' · ' +
+      fulfilmentLabel + ' · ' + orderingLabel + ' · ' +
       'Times evaluated in ' + preview.timezone;
 
     renderProducts(preview.products);
@@ -356,7 +365,7 @@
       return;
     }
     if (state.loadState === 'ready') {
-      setConnection('ready', 'The published catalog passed V3 validation. Select a branch and fulfilment method to preview availability.');
+      setConnection('ready', 'The published catalog passed V3 validation. Select a branch to browse the menu; choose an available fulfilment method to check online ordering.');
       contextSection.hidden = false;
     }
   }
@@ -369,9 +378,12 @@
         if (selectionState && selectionState.ready) {
           connectionMessage.textContent = 'Published catalog verified for the selected branch and fulfilment method.';
         } else if (selectionState && selectionState.branchRequired) {
-          connectionMessage.textContent = 'Choose a branch to continue. Delivery and pickup will be shown according to its published settings.';
+          connectionMessage.textContent = 'Choose a branch to browse its published menu and see its ordering options.';
+        } else if (selectionState && selectionState.selectedBranchId &&
+                   selectionState.availableFulfilmentTypes.length === 0) {
+          connectionMessage.textContent = 'The published menu is available for browsing, but website ordering is disabled for this branch.';
         } else {
-          connectionMessage.textContent = 'Choose delivery or pickup to build a branch-specific preview.';
+          connectionMessage.textContent = 'The menu is displayed read-only until you choose an available fulfilment method.';
         }
       }
     });
