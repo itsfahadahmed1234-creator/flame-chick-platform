@@ -1,3 +1,29 @@
+# CURRENT CHECKPOINT — 2026-11-23 — four-case concurrent delivery QA in progress
+
+**Active branch:** `work/production-source-audit`  
+**Concurrency test sources:** `supabase/tests/flame_chick_delivery_concurrency_setup.sql` and `supabase/tests/flame_chick_delivery_concurrency.sh`  
+**Latest concurrency run:** [45187227803](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45187227803) — in progress at checkpoint time.  
+**Supabase Production is a partly provisioned pre-launch target environment; no live restaurant operations system is running. This test run uses disposable local Supabase.**
+
+## Delivery concurrency work
+
+- The race harness uses separate `psql` connections identified through `PGAPPNAME` and verifies that one session reaches `PgSleep` while it holds the task lock and the competing session is waiting on a PostgreSQL lock (or, for the expiry sweeper, completes through `SKIP LOCKED`).
+- Four deterministic races are configured:
+  1. accept wins against concurrent decline;
+  2. decline wins against concurrent accept;
+  3. accept is within deadline and holds the task lock while the expiry sweeper reaches the deadline and must skip the locked task;
+  4. expiry sweep reaches the deadline first while Rider acceptance waits for the same task lock.
+- Each checks offer/task/order status, current assignment count, Rider availability, and the mutually exclusive `offer_accepted`, `offer_declined`, `offer_expired` event counts.
+- First CI attempt [45186758614](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45186758614) passed migration replay, staff authorization, operational schema and the existing delivery lifecycle fixture, but the new concurrency fixture failed because Staff Admin resolves its restaurant using canonical slug `flame-chick`. This was a fixture setup error; no delivery command or security protection was weakened.
+- Corrected the local disposable fixture to use canonical `flame-chick` tenant slug. Retry [45187227803](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45187227803) is running. **Do not claim concurrency tests passed until its final race-test step and workflow finish successfully.**
+
+## Authoritative delivery/payment rule
+
+Rider Delivered is delivery confirmation only. POS keeps the order in the active Delivered / awaiting-payment queue. Payment remains outstanding until Cashier actually receives and records it as Collected, with amount/method/actor/time audit. Only then may POS set the order to Completed and move it into history. The current candidate delivery command incorrectly sets `completed_at` at Rider delivery; fix that before integration and add payment-collection command/tests. This requirement is also in the focused delivery handoff below.
+
+The exact 60-second expiry boundary and previous delivery lifecycle tests already passed on [45182331625](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45182331625). GST remains deferred. No target Supabase writes or app deployments occurred in these concurrency test stages.
+---
+
 # AUTHORITATIVE ORDER DELIVERY VS PAYMENT COLLECTION RULE — 2026-11-23
 
 **Rider marking an order Delivered does NOT mean payment was collected and does NOT complete the order.**
