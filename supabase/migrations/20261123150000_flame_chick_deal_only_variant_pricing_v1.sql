@@ -33,14 +33,14 @@ BEGIN
     INTO v_compile_hash
   FROM pg_catalog.pg_proc p WHERE p.oid=v_compile;
 
-  IF v_validate_hash IS DISTINCT FROM '018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712'
-     OR v_compile_hash IS DISTINCT FROM 'b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2' THEN
+  IF v_validate_hash IS DISTINCT FROM 'f179cc3b15b1d6ad5b07b90587513001bed97b752b09b13ce2d9c946e88a7750'
+     OR v_compile_hash IS DISTINCT FROM '1cee9543d131260f71573afc2f0a5a204422a59fa7f46ef0b24f4c2e277e3808' THEN
     RAISE EXCEPTION 'DEAL_ONLY_VARIANT_PRICING_SOURCE_BASELINE_MISMATCH';
   END IF;
 
   IF EXISTS (
     SELECT 1 FROM pg_catalog.pg_proc p
-    WHERE p.oid=v_validate
+    WHERE p.oid IN (v_validate,v_compile)
       AND (
         p.proowner IS DISTINCT FROM (SELECT oid FROM pg_catalog.pg_roles WHERE rolname='postgres')
         OR p.prosecdef IS DISTINCT FROM true
