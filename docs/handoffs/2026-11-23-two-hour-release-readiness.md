@@ -25,6 +25,7 @@ The POS and Rider apps are existing, substantial apps. They are not being rebuil
 - Delivery profile, role and presence checks use `role_key` and server-side profile reads.
 - POS rider reassignment now uses the delivery API's `assign` action rather than an old direct legacy RPC.
 - Order API board reads use service-side reads after verifying the signed-in staff role and deriving the branch. They accept bounded optional order ID/source filters for history/status readback.
+- POS and Website delivery order payloads now send explicit `selection_type: listed_area | not_listed`, and send no client-authoritative delivery fee or display area name. The branch-owned fee remains server/database-resolved under the approved delivery-pricing contract.
 
 These changes preserve the intended deny-by-default RLS design. They do not add browser table policies or expose a service key.
 
@@ -47,9 +48,10 @@ Preview workflows remain fail-closed. They require the `flame-chick-preview` Git
 
 Latest successful checks on this working branch:
 
-- POS and Rider Static Checks #11: passed — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45146645763)
-- Admin Static Checks #75: passed — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45146951151)
-- Edge Function Static Checks #35: passed — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45146951185)
+- POS and Rider Static Checks #14: passed, including API-only reads and explicit delivery-selection payload assertions — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45148072360)
+- Website Static Checks #142: passed, including explicit delivery-selection/fee-trust assertions and inline-script parsing — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45148044799)
+- Admin Static Checks #81: passed — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45147902896)
+- Edge Function Static Checks #39: passed — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45147768536)
 
 The POS/Rider static suite checks source hygiene and inline JavaScript syntax. Admin static checks also parse POS/Rider inline scripts. Edge checks parse the Edge Function TypeScript and assert the staff/Rider/dispatch API contracts. These are static/source checks, not live endpoint or browser sign-in tests.
 
@@ -63,6 +65,7 @@ The POS/Rider static suite checks source hygiene and inline JavaScript syntax. A
 - The following required operational tables are **absent**: `orders`, `order_items`, `order_status_history`, `payments`, `delivery_tasks`, `delivery_task_offers`, `delivery_assignments`, `delivery_task_events`, `rider_profiles`, `rider_push_subscriptions`, `delivery_areas`.
 - No tables are in `supabase_realtime`; no Storage buckets exist.
 - Only `flame-chick-staff-admin` is deployed, and it is version 1. Its deployed source predates the current Catalog V3 command implementation.
+- The current database function inventory contains catalog/staff functions, but no `flame_chick_create_order`, `flame_chick_update_order_status`, `flame_chick_check_website_order_rate_limit`, `flame_chick_manage_delivery`, `flame_chick_accept_delivery_offer` or `flame_chick_decline_delivery_offer` operational RPCs.
 - Security Advisor has 33 intentional RLS-enabled/no-policy informational notices and a warning for disabled leaked-password protection. Do not resolve the informational notices by adding broad table policies.
 
 ## Hard blockers to a working release
