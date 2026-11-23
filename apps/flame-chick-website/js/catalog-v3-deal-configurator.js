@@ -57,7 +57,7 @@
     helpers = helpers || {};
     var deal = findDeal(viewModel, dealId);
     if (!deal) return fail('DEAL_NOT_FOUND', 'This deal is not in the current published catalog.');
-    if (deal.available !== true) return fail('DEAL_UNAVAILABLE', 'This deal is not currently available at the selected branch.');
+    if (deal.branchAvailable !== true) return fail('DEAL_UNAVAILABLE', 'This deal is not available at the selected branch.');
     if (!Array.isArray(deal.variants) || deal.variants.length === 0) {
       return fail('DEAL_VARIANTS_MISSING', 'This deal has no purchasable options.');
     }
@@ -71,6 +71,10 @@
     }
 
     var variants = deal.variants;
+    // A deal can be opened for read-only details when its schedule is closed
+    // or the selected fulfilment context is not order-enabled. It must never
+    // emit a selection payload in that state.
+    var readOnly = deal.available !== true;
     var selectedVariantId = null;
     var quantities = Object.create(null);
     var customizations = Object.create(null);
@@ -82,6 +86,12 @@
 
     function unitKey(groupId, optionId, unitIndex, modifierGroupId) {
       return key(groupId, optionId) + ':' + unitIndex + ':' + modifierGroupId;
+    }
+
+    function isFixedGroup(group) {
+      return group && group.options.length === 1 &&
+        group.minUnits > 0 && group.minUnits === group.maxUnits &&
+        group.options[0].maxQuantity >= group.minUnits;
     }
 
     function selectedVariant() {
@@ -130,11 +140,17 @@
       selectedVariantId = variantId;
       quantities = Object.create(null);
       customizations = Object.create(null);
+      // Fixed one-option groups are canonicalized immediately. The UI locks
+      // them; the server still validates every emitted product/variant ID.
+      variant.groups.forEach(function (group) {
+        if (isFixedGroup(group)) quantities[key(group.id, group.options[0].id)] = group.minUnits;
+      });
       lastError = null;
       return { ok: true };
     }
 
     function setOptionQuantity(groupId, optionId, quantity) {
+      if (readOnly) return fail('DEAL_READ_ONLY', 'This deal is visible for information only and cannot be ordered now.');
       var variant = selectedVariant();
       var group = findGroup(variant, groupId);
       var option = findOption(group, optionId);
@@ -226,6 +242,7 @@
     }
 
     function toPayload() {
+      if (readOnly) return fail('DEAL_READ_ONLY', 'This deal is visible for information only and cannot be ordered now.');
       var result = validate();
       if (!result.ok) return result;
       var variant = selectedVariant();
@@ -298,6 +315,7 @@
 
       fragment.appendChild(makeElement(doc, 'h3', 'fc-deal-config-title', deal.title));
       if (deal.description) fragment.appendChild(makeElement(doc, 'p', 'fc-deal-config-description', deal.description));
+      if (readOnly) fragment.appendChild(makeElement(doc, 'p', 'fc-deal-config-status', 'This deal is currently outside its orderable context. Details are shown for information only.'));
 
       var variantSet = makeElement(doc, 'fieldset', 'fc-deal-variants');
       variantSet.appendChild(makeElement(doc, 'legend', '', 'Choose a deal option'));
@@ -342,7 +360,10 @@
             group.minUnits + ' to ' + group.maxUnits));
           group.options.forEach(function (option) {
             var optionRow = makeElement(doc, 'div', 'fc-deal-component-option');
-            var optionLabel = option.productName + ' — ' + option.variantLabel;
+            var optionLabel = group.options.length === 1
+              ? group.name
+              : option.productName + ' — ' + option.variantLabel;
+            var fixedGroup = isFixedGroup(group);
             var priceLabel = option.pricingTreatment === 'INCLUDED'
               ? 'Included'
               : (option.pricingTreatment === 'SURCHARGE'
@@ -365,6 +386,7 @@
               quantity.inputMode = 'numeric';
             }
             quantity.setAttribute('aria-label', 'Quantity of ' + optionLabel);
+            quantity.disabled = readOnly || fixedGroup;
             quantity.addEventListener('change', function () {
               var next = quantity.type === 'checkbox' ? (quantity.checked ? 1 : 0) : Number(quantity.value);
               var changed = setOptionQuantity(group.id, option.id, next);
@@ -432,7 +454,7 @@
 
       var continueButton = makeElement(doc, 'button', 'fc-deal-config-continue', options.completeButtonLabel || 'Continue');
       continueButton.type = 'button';
-      continueButton.disabled = !validation.ok;
+      continueButton.disabled = readOnly || !validation.ok;
       continueButton.addEventListener('click', function () {
         var payload = toPayload();
         // Successful payloads are identifier-only objects and intentionally do
