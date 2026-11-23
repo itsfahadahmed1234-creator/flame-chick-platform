@@ -195,7 +195,7 @@ function getClientIp(req: Request): string {
   return candidate.length <= 45 && /^[0-9a-fA-F:.]+$/.test(candidate) ? candidate : "";
 }
 
-async function callRpc(name: "flame_chick_create_order" | "flame_chick_update_order_status" | "flame_chick_check_website_order_rate_limit", payload: Record<string, unknown>) {
+async function callRpc(name: "flame_chick_create_order" | "flame_chick_update_order_status" | "flame_chick_check_website_order_rate_limit" | "flame_chick_collect_order_payment", payload: Record<string, unknown>) {
   const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + name, {
     method: "POST",
     headers: {
