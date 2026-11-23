@@ -1312,7 +1312,7 @@ const recoveryAttemptedOrders=new Set();
 const FLAME_CHICK_AUTH_URL='https://adkrxfnawdiljhjaavnj.supabase.co/auth/v1';
 const FLAME_CHICK_REST_URL='https://adkrxfnawdiljhjaavnj.supabase.co/rest/v1';
 const FLAME_CHICK_SESSION_KEY='flame_chick_pos_staff_session_v1';
-const FLAME_CHICK_ALLOWED_POS_ROLES=new Set(['owner','admin','manager','cashier','kitchen']);
+const FLAME_CHICK_ALLOWED_POS_ROLES=new Set(['owner','admin','manager','cashier']);
 let flameChickStaffSession=null;
 let flameChickStaffProfile=null;
 function loadFlameChickStaffSession(){try{const raw=sessionStorage.getItem(FLAME_CHICK_SESSION_KEY);flameChickStaffSession=raw?JSON.parse(raw):null;}catch(e){flameChickStaffSession=null;}}
@@ -1327,15 +1327,18 @@ async function flameChickAuthFetchUser(accessToken){
   return data;
 }
 async function flameChickFetchStaffRole(userId,accessToken){
-  const url=FLAME_CHICK_REST_URL+'/user_roles?select=role,branch_id,is_active&user_id=eq.'+encodeURIComponent(userId)+'&is_active=eq.true';
-  const r=await fetch(url,{method:'GET',headers:{'apikey':FLAME_CHICK_PUBLISHABLE_KEY,'Authorization':'Bearer '+accessToken,'Accept':'application/json'},cache:'no-store'});
-  const rows=await r.json().catch(()=>[]);
-  if(!r.ok)throw new Error('Could not verify Flame Chick staff permissions. Please contact the administrator.');
-  const allowed=Array.isArray(rows)?rows.filter(x=>x.is_active===true&&FLAME_CHICK_ALLOWED_POS_ROLES.has(String(x.role||'').toLowerCase())):[];
-  if(!allowed.length)throw new Error('Your email is signed in, but it has no active Flame Chick staff role. Ask the administrator to assign the cashier role in Flame Chick User Roles.');
-  const priority={owner:1,admin:2,manager:3,cashier:4,kitchen:5};
-  allowed.sort((a,b)=>(priority[a.role]||99)-(priority[b.role]||99));
-  return {role:String(allowed[0].role).toLowerCase(),branch_id:allowed[0].branch_id||null,roles:allowed};
+  const r=await fetch(API_URL+'?view=staff_context',{
+    method:'GET',
+    headers:{'apikey':FLAME_CHICK_PUBLISHABLE_KEY,'Authorization':'Bearer '+accessToken,'Accept':'application/json'},
+    cache:'no-store'
+  });
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok||data.ok!==true||!data.staff||data.staff.user_id!==userId)
+    throw new Error(data.error?.message||'Could not verify Flame Chick staff permissions. Please contact the administrator.');
+  const role=String(data.staff.role||'').toLowerCase();
+  if(!FLAME_CHICK_ALLOWED_POS_ROLES.has(role)||typeof data.staff.branch_id!=='string')
+    throw new Error('Your account needs an active Flame Chick Admin, Owner, Manager or Cashier role assigned to a branch.');
+  return {role,branch_id:data.staff.branch_id,roles:Array.isArray(data.staff.roles)?data.staff.roles:[]};
 }
 async function flameChickRefreshSessionIfNeeded(session){
   if(!session?.access_token)return null;
