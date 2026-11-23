@@ -1,3 +1,21 @@
+# CURRENT OVERRIDE — 2026-11-23: newly published menu is the authoritative target
+
+The user confirms that the restaurant has now published the menu that was previously described as the upcoming menu. That newly published menu is now the current/authoritative Flame Chick menu to implement. The formerly running menu is superseded for operational catalog purposes: do not import it, merge it into the new catalog, use it as a fallback, or assume old-only products remain in the target menu.
+
+The 2026-11-21 current-vs-upcoming comparison and related menu reconciliation are historical records of the earlier plan. Their previous designation of the old running menu as the compatibility baseline and the upcoming menu as a future target is superseded. They must not be used as the final source of restaurant menu data.
+
+The user will provide the actual newly published menu/catalog material when catalog entry becomes necessary. Do not request it prematurely; do not reconstruct it from the old menu, historical comparison, synthetic fixtures or legacy hardcoded website. Until that material is provided and reconciled, keep the production catalog empty. Do not seed guessed records, publish a catalog or enable ordering. At the menu-entry phase, reconcile the supplied new menu's exact products, categories, variants, prices, modifiers, deal choices and schedules; identify unresolved facts rather than assuming.
+
+This update changes which menu is authoritative; it does not authorize production writes, deployment, publication or checkout enablement.
+
+## Latest CI verification — 2026-11-23
+
+GitHub Actions **Flame Chick Website Static Checks**, run [45116517717](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45116517717), completed successfully on `work/production-source-audit`, commit `96c44121eececa3d7947a406ad5d21a35f6bbe41`. The static-checks job passed the JavaScript syntax checks, core catalog regression tests, V3 preview regression tests and website inline-script parsing. This is source CI only; it does not demonstrate live Supabase catalog integration and does not authorize deployment.
+
+No production catalog data was inserted and no production write or deployment occurred for this verification.
+
+---
+
 ## Latest checkpoint — standalone V3 non-ordering menu preview page (2026-11-23)
 
 **Status: separate catalog preview entry, product/deal rendering and local selection validation implemented. Static CI passed. Preview deployment skipped; existing storefront is untouched.**
