@@ -1,7 +1,7 @@
 (() => {
 "use strict";
 const C=window.FLAME_CHICK_CONFIG, $=id=>document.getElementById(id);
-const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],range:"7",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
+const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],catalogV3Revision:0,catalogV3Workspace:null,catalogV3Mounted:false,range:"7",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
 const roles=["owner","admin"], labels={new:"New",accepted:"Accepted",preparing:"Preparing",ready:"Ready",out_for_delivery:"On delivery",delivered:"Delivered",collected:"Collected",served:"Served",completed:"Completed",rejected:"Rejected",cancelled:"Cancelled"};
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const cash=n=>new Intl.NumberFormat("en-PK",{style:"currency",currency:"PKR",maximumFractionDigits:0}).format(Number(n)||0);
@@ -103,7 +103,7 @@ async function bootstrap(){
  $("profileBadge").textContent=(u.email||"FC").slice(0,2).toUpperCase();
  showAuth(false);
  document.querySelectorAll(".nav-item[data-page]").forEach(button=>{
-  const allowed=button.dataset.page==="staff";
+  const allowed=["staff","catalog-v3"].includes(button.dataset.page);
   button.disabled=!allowed;
   if(!allowed){button.title="This module will be enabled after its secure production API is completed.";button.setAttribute("aria-disabled","true");}
  });
@@ -137,6 +137,28 @@ async function staffApi(method,query,body){
  if(response.status===401){clearSession();showAuth(true);throw Error("Your session expired. Sign in again.");}
  if(!response.ok||data.ok===false)throw Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");
  return data;
+}
+async function catalogV3Request(action,payload,isMutation){
+ const body=isMutation
+  ?{action,payload,expected_revision:S.catalogV3Revision,request_id:staffRequestId()}
+  :Object.assign({action},payload||{});
+ const response=await staffApi("POST",null,body);
+ const result=response&&response.result;
+ if(!result||result.ok===false)throw Error(result&&result.error&&result.error.message||"Catalog V3 request failed.");
+ if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=result.draft_revision;
+ return result;
+}
+async function openCatalogV3(){
+ const root=$("catalogV3Root");
+ if(!root)throw Error("Catalog V3 page root is missing.");
+ if(!window.FlameChickAdminCatalogV3||typeof window.FlameChickAdminCatalogV3.createWorkspace!=="function")throw Error("Catalog V3 authoring module is unavailable.");
+ if(!S.catalogV3Workspace)S.catalogV3Workspace=window.FlameChickAdminCatalogV3.createWorkspace();
+ if(!S.catalogV3Mounted){
+  await S.catalogV3Workspace.mount(root,catalogV3Request);
+  S.catalogV3Mounted=true;
+ }else{
+  await S.catalogV3Workspace.refresh();
+ }
 }
 function staffRoleLabel(role){return ({owner:"Owner",admin:"Admin",manager:"Manager",cashier:"Cashier",rider:"Rider"})[role]||role;}
 function staffRequestId(){return crypto.randomUUID?crypto.randomUUID():"b4-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2);}
@@ -222,7 +244,7 @@ async function saveStaffForm(e){
  finally{btn.disabled=false;btn.textContent=$("staffDialog").dataset.mode==="scope"?"Add access":"Send invitation";}
 }
 
-function nav(p){document.querySelectorAll(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===p));document.querySelectorAll(".page").forEach(x=>x.hidden=x.id!=="page-"+p);$("pageTitle").textContent=({dashboard:"Dashboard",orders:"Orders",menu:"Menu & products",categories:"Categories",deals:"Deals & offers",delivery:"Delivery areas",staff:"Staff & riders",media:"Website images",settings:"Website settings"})[p]||"Dashboard";$("crumb").textContent=p.toUpperCase();if(p==="staff")loadStaff().catch(e=>toast(e.message,true));if(p==="media")renderSiteMedia();if(p==="dashboard")loadDashboard().catch(()=>{});}
+function nav(p){document.querySelectorAll(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===p));document.querySelectorAll(".page").forEach(x=>x.hidden=x.id!=="page-"+p);$("pageTitle").textContent=({dashboard:"Dashboard",orders:"Orders",menu:"Menu & products",categories:"Categories",deals:"Deals & offers",delivery:"Delivery areas",staff:"Staff & riders",catalog-v3:"Catalog V3 draft",media:"Website images",settings:"Website settings"})[p]||"Dashboard";$("crumb").textContent=p.toUpperCase();if(p==="staff")loadStaff().catch(e=>toast(e.message,true));if(p==="catalog-v3")openCatalogV3().catch(e=>toast(e.message,true));if(p==="media")renderSiteMedia();if(p==="dashboard")loadDashboard().catch(()=>{});}
 function renderDashboard(){
  let today=parts(new Date()),n=S.range==="today"?1:Number(S.range),start=parts(new Date(Date.now()-(n-1)*86400000));
  let os=S.orders.filter(o=>parts(new Date(o.created_at||o.placed_at))>=start),valid=os.filter(o=>!["cancelled","rejected"].includes(o.status));
