@@ -221,7 +221,7 @@ async function callRpc(name: "flame_chick_create_order" | "flame_chick_update_or
   return { ok: true as const, data };
 }
 
-async function readOrderBoard(token: string, apiKey: string, board: string, limit: number, branchId: string) {
+async function readOrderBoard(board: string, limit: number, branchId: string, filters: { orderId?: string; source?: string } = {}) {
   const allowedBoards: Record<string, string[]> = {
     orders: ["new", "accepted"],
     preparing: ["preparing", "ready"],
@@ -241,26 +241,24 @@ async function readOrderBoard(token: string, apiKey: string, board: string, limi
   );
   query.set("branch_id", "eq." + branchId);
   query.set("status", "in.(" + statuses.join(",") + ")");
+  if (filters.orderId) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(filters.orderId)) {
+      return { ok:false as const, status:400, body:{ok:false,error:{code:"ORDER_ID_INVALID",message:"A valid order id is required."}} };
+    }
+    query.set("id", "eq." + filters.orderId);
+  }
+  if (filters.source && ["website","pos","whatsapp","phone","third_party","manual","other"].includes(filters.source)) {
+    query.set("source", "eq." + filters.source);
+  }
   query.set("order", "created_at.desc");
   query.set("limit", String(Math.max(1, Math.min(limit, 100))));
-  const res = await fetch(SUPABASE_URL + "/rest/v1/orders?" + query.toString(), {
-    method: "GET",
-    headers: {
-      apikey: apiKey,
-      Authorization: "Bearer " + token,
-      Accept: "application/json",
-    },
-    cache: "no-store",
-  });
-  const raw = await res.text();
-  let data: unknown;
-  try { data = raw ? JSON.parse(raw) : []; } catch { data = []; }
-  if (!res.ok) {
-    const err = isObject(data) ? data : {};
-    const msg = String(err.message ?? ("Unable to load Flame Chick orders (" + res.status + ")."));
-    return { ok: false as const, status: res.status === 401 ? 401 : res.status === 403 ? 403 : 500, body: { ok: false, error: { code: res.status === 401 ? "SESSION_EXPIRED" : res.status === 403 ? "ORDER_ACCESS_DENIED" : "ORDER_READ_FAILED", message: msg } } };
+  const result = await readAsService("orders?" + query.toString());
+  if (!result.ok) {
+    const err = isObject(result.data) ? result.data : {};
+    const msg = String(err.message ?? ("Unable to load Flame Chick orders (" + result.status + ")."));
+    return { ok:false as const, status:500, body:{ok:false,error:{code:"ORDER_READ_FAILED",message:msg}} };
   }
-  return { ok: true as const, data };
+  return { ok:true as const, data:result.data };
 }
 
 Deno.serve(async (req: Request) => {
@@ -294,7 +292,12 @@ Deno.serve(async (req: Request) => {
     const board = (url.searchParams.get("board") ?? "active").toLowerCase();
     const requestedLimit = Number(url.searchParams.get("limit") ?? 50);
     const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(Math.trunc(requestedLimit), 100)) : 50;
-    const result = await readOrderBoard(token, apiKey, board, limit, context.branch_id);
+    const orderId = (url.searchParams.get("order_id") ?? "").trim();
+    const source = (url.searchParams.get("source") ?? "").trim().toLowerCase();
+    const result = await readOrderBoard(board, limit, context.branch_id, {
+      ...(orderId ? {orderId} : {}),
+      ...(source ? {source} : {})
+    });
     if (!result.ok) return response(result.body, result.status);
     return response({ ok: true, data: result.data });
   }
