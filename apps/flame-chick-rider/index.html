@@ -443,7 +443,7 @@ function normalizeTask(task){
   const items=Array.isArray(order.order_items)?order.order_items:[];
   return {task,order,assignment,items};
 }
-function statusLabel(value){return ({assigned:'Assigned to you',accepted:'Accepted',arrived_at_restaurant:'At restaurant',picked_up:'Picked up',out_for_delivery:'On the way',delivered:'Delivered',failed:'Delivery issue — return pending'})[value]||value||'Assigned'}
+function statusLabel(value){return ({assigned:'Offer accepted',accepted:'Accepted',picked_up:'Picked up',out_for_delivery:'On the way',delivered:'Delivered',failed:'Delivery issue — return pending'})[value]||value||'Assigned'}
 function renderItem(it){
   const name=it.product_name_snapshot||it.deal_title_snapshot||'Order item';
   const variant=it.variant_label_snapshot?' · '+it.variant_label_snapshot:'';
@@ -494,7 +494,7 @@ function renderJob(row){
 function renderJobs(){
   const rows=jobs.map(normalizeTask);
   $('activeCount').textContent=String(rows.length);
-  $('pickupCount').textContent=String(rows.filter(x=>['assigned','accepted','arrived_at_restaurant'].includes(x.task.status)).length);
+  $('pickupCount').textContent=String(rows.filter(x=>['assigned','accepted'].includes(x.task.status)).length);
   $('onWayCount').textContent=String(rows.filter(x=>['out_for_delivery','picked_up'].includes(x.task.status)).length);
   $('jobList').innerHTML=rows.length?rows.map(renderJob).join(''):'<div class="empty"><strong>No active delivery</strong>You are all caught up.</div>';
 }
