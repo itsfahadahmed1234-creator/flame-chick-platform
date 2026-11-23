@@ -125,6 +125,33 @@ test('builds deals only from exact mapped option IDs and respects branch/time av
   assert.equal(variant.groups[1].options[0].productVariantId, IDS.drinkVariant);
 });
 
+test('fixed deal price never inherits a component standalone price for INCLUDED items', () => {
+  const snapshot = createSnapshot();
+  snapshot.productVariants.find(variant => variant.variantId === IDS.variant).price = 9999;
+  const result = build(snapshot);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const dealVariant = result.collections[0].deals[0].variants[0];
+  const includedOption = dealVariant.groups[0].options[0];
+  assert.equal(dealVariant.basePriceMinor, 75000);
+  assert.equal(includedOption.pricingTreatment, 'INCLUDED');
+  assert.equal(includedOption.surchargeMinor, 0);
+  assert.equal(includedOption.standalonePriceMinor, null);
+});
+
+test('deal popup can resolve a null-priced non-standalone component while keeping its fixed deal price', () => {
+  const snapshot = createSnapshot();
+  const component = snapshot.productVariants.find(variant => variant.variantId === IDS.variant);
+  component.price = null;
+  component.standaloneSellable = false;
+  const result = build(snapshot);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const dealVariant = result.collections[0].deals[0].variants[0];
+  const includedOption = dealVariant.groups[0].options[0];
+  assert.equal(dealVariant.basePriceMinor, 75000);
+  assert.equal(includedOption.pricingTreatment, 'INCLUDED');
+  assert.equal(includedOption.standalonePriceMinor, null);
+});
+
 test('a missing variant-option mapping is never treated as included or free', () => {
   const snapshot = createSnapshot();
   snapshot.dealVariantComponentOptions = [];
