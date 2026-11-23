@@ -537,6 +537,21 @@ html,body{background:var(--bg);overflow:hidden}
 .table-tile.disabled{opacity:.55;cursor:not-allowed}
 .table-tile.disabled:hover{transform:none;box-shadow:none}
 
+/* Flame Chick delivery payment collection */
+.payment-collection-actions{display:flex;align-items:center;justify-content:space-between;gap:7px;flex-wrap:wrap}
+.payment-collection-actions .payment-collection-balance{font-size:10px;font-weight:800;color:#586474}
+.payment-collection-actions .btn{font-size:11px;padding:7px 10px}
+.payment-collection-modal{width:min(460px,calc(100vw - 24px))}
+.payment-collection-modal .tables-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.payment-collection-modal .tables-head h3{margin:0 0 4px}
+.payment-collection-modal .tables-head p{margin:0;color:var(--muted);font-size:12px}
+.payment-collection-summary{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:11px;background:#f8fafc;font-size:12px;font-weight:800;line-height:1.6}
+.payment-collection-modal .field{margin-top:12px}
+.payment-collection-modal input,.payment-collection-modal select{width:100%;min-height:42px;border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff}
+.payment-collection-note{font-size:11px;color:var(--muted);line-height:1.45}
+.payment-collection-modal .modal-actions{justify-content:flex-end;gap:8px;margin-top:14px}
+.payment-collection-modal .btn:disabled{opacity:.55;cursor:wait}
+
 /* Flame Chick delivery exception / return handoff */
 .delivery-issue-alert{display:grid;gap:6px;width:100%;padding:10px 12px;border:1px solid #efb5ae;border-radius:12px;background:#fff1ef;color:#842821;font-size:12px;line-height:1.4}
 .delivery-issue-alert strong{font-size:13px;color:#842821}
@@ -1230,6 +1245,14 @@ html,body{background:var(--bg);overflow:hidden}
   <div id="assignRiderBody" class="dispatch-rider-list"></div>
   <div class="modal-actions"><button class="btn" type="button" onclick="closeModal('assignRiderModal')">Cancel</button></div>
 </div></div>
+<div id="paymentCollectionModal" class="modal-wrap"><div class="modal payment-collection-modal">
+  <div class="tables-head"><div><h3 id="paymentCollectionTitle">Collect Order Payment</h3><p id="paymentCollectionSubtitle">Record the amount physically received by staff.</p></div><button class="close-btn" type="button" onclick="closeModal('paymentCollectionModal')" aria-label="Close payment collection">×</button></div>
+  <div id="paymentCollectionBalance" class="payment-collection-summary"></div>
+  <div class="field"><label for="paymentCollectionAmount">Amount received (Rs.)</label><input id="paymentCollectionAmount" type="number" inputmode="decimal" min="0.01" step="0.01" required></div>
+  <div class="field"><label for="paymentCollectionMethod">Payment method</label><select id="paymentCollectionMethod"><option value="cash">Cash</option><option value="card">Card</option><option value="bank">Bank transfer</option><option value="wallet">Wallet</option><option value="other">Other</option></select></div>
+  <p class="payment-collection-note">A partial collection keeps the order Delivered with a remaining balance. The order moves to Completed only when the full balance is recorded.</p>
+  <div class="modal-actions"><button class="btn" type="button" onclick="closeModal('paymentCollectionModal')">Cancel</button><button id="submitPaymentCollectionBtn" class="btn primary" type="button" onclick="submitOrderPaymentCollection()">Record payment</button></div>
+</div></div>
 <div id="tablesModal" class="modal-wrap"><div class="modal tables-modal">
   <div class="tables-head"><div><h3 id="tablesModalTitle">Open Tables</h3><p id="tablesModalHint">Open checks stay active until payment is completed.</p></div><button class="close-btn" type="button" onclick="closeModal('tablesModal')">×</button></div>
   <div class="tables-tools"><button class="btn" id="manageTablesBtn" type="button">Manage Tables</button><span id="tablesMeta"></span></div>
@@ -1431,7 +1454,15 @@ function dispatchStatusLabel(status){
 }
 function renderDeliveryDispatchAction(order){
   const task=deliveryTasksByOrder.get(String(order.OrderID));
-  if(String(order.Status||'')==='Delivered')return '<span class="dispatch-rider-pill">Delivered · awaiting cashier payment collection</span>';
+  if(String(order.Status||'')==='Delivered'){
+    const role=String(flameChickStaffProfile?.role||'').toLowerCase();
+    const balance=Number(order.BalanceDue);
+    const canCollect=['owner','admin','manager','cashier'].includes(role);
+    const collection=canCollect&&Number.isFinite(balance)&&balance>0
+      ? `<div class="payment-collection-actions"><span class="payment-collection-balance">Paid Rs. ${money(order.PaidAmount)} · Due Rs. ${money(balance)}</span><button class="btn primary" type="button" data-collect-payment="${esc(order.OrderID)}">Collect Payment</button></div>`
+      : '<span class="dispatch-rider-pill">Delivered · awaiting cashier payment collection</span>';
+    return collection;
+  }
   if(!task)return '<span class="pill pending">Checking dispatch…</span>';
   const assignments=Array.isArray(task.delivery_assignments)?task.delivery_assignments:[];
   const latest=[...assignments].sort((a,b)=>new Date(b.assigned_at||b.created_at||0)-new Date(a.assigned_at||a.created_at||0))[0]||null;
@@ -1464,6 +1495,64 @@ function renderDeliveryDispatchAction(order){
   }
   return `<span class="pill pending">${esc(dispatchStatusLabel(task.status))}</span>`;
 }
+let paymentCollectionState=null;
+function openPaymentCollection(orderId){
+  const role=String(flameChickStaffProfile?.role||'').toLowerCase();
+  if(!['owner','admin','manager','cashier'].includes(role)){showToast('An authorized Cashier, Manager, Admin or Owner role is required to collect payment.');return;}
+  const key=String(orderId||'');
+  const order=inboxOrders.get(key);
+  if(!order||order.Status!=='Delivered'){showToast('Only a delivered order can be settled from this screen.');return;}
+  const balance=Number(order.BalanceDue);
+  if(!Number.isFinite(balance)||balance<=0){showToast('This order has no outstanding balance. Refresh the order board.');return;}
+  paymentCollectionState={orderId:key,requestId:crypto.randomUUID(),amount:null,method:'cash'};
+  $('paymentCollectionTitle').textContent='Collect Payment · '+(order.OrderNumber||'Flame Chick order');
+  $('paymentCollectionSubtitle').textContent=(order.CustomerName||'Customer')+' · '+(order.Phone||'');
+  $('paymentCollectionBalance').textContent='Order total Rs. '+money(order.Total)+' · Already paid Rs. '+money(order.PaidAmount)+' · Outstanding Rs. '+money(balance);
+  $('paymentCollectionAmount').value=balance.toFixed(2).replace(/\\.00$/,'');
+  $('paymentCollectionAmount').max=balance.toFixed(2);
+  $('paymentCollectionMethod').value='cash';
+  $('submitPaymentCollectionBtn').disabled=false;
+  $('submitPaymentCollectionBtn').textContent='Record payment';
+  openModal('paymentCollectionModal');
+  $('paymentCollectionAmount').focus();
+}
+async function submitOrderPaymentCollection(){
+  const state=paymentCollectionState;
+  if(!state)return;
+  const order=inboxOrders.get(state.orderId);
+  if(!order||order.Status!=='Delivered'){showToast('The order is no longer awaiting payment. Refresh and try again.');return;}
+  const amount=Number($('paymentCollectionAmount').value);
+  const method=String($('paymentCollectionMethod').value||'').toLowerCase();
+  if(!Number.isFinite(amount)||amount<=0||Math.round(amount*100)!==amount*100){showToast('Enter an amount greater than zero with no more than two decimal places.');return;}
+  if(amount>Number(order.BalanceDue)){showToast('The collected amount cannot exceed the outstanding balance.');return;}
+  if(!['cash','card','bank','wallet','other'].includes(method)){showToast('Choose a valid payment method.');return;}
+  // Preserve the request ID after a network failure so retrying the same
+  // amount/method is safe. A changed payload receives a new idempotency key.
+  if(state.amount!==amount||state.method!==method){
+    state.requestId=crypto.randomUUID();
+    state.amount=amount;
+    state.method=method;
+  }
+  const button=$('submitPaymentCollectionBtn');
+  button.disabled=true;button.textContent='Recording…';
+  try{
+    const result=await flameChickOrderRequest('POST',null,{
+      action:'collect_payment',order_id:state.orderId,amount,
+      payment_method:method,request_id:state.requestId
+    });
+    if(result?.ok!==true||!result?.payment_id)throw new Error('The database did not confirm the payment collection.');
+    closeModal('paymentCollectionModal');
+    paymentCollectionState=null;
+    await loadInitialOnlineInbox();
+    showToast(result.completed
+      ? 'Payment fully collected. Order completed and moved to Order History.'
+      : 'Partial payment recorded. Rs. '+money(result.balance_due)+' remains outstanding.');
+  }catch(error){
+    showToast(error?.message||'Payment collection failed. Retry the same amount and method safely.');
+    button.disabled=false;button.textContent='Retry payment';
+  }
+}
+
 async function confirmDeliveryReturn(taskId,button){
   const role=String(flameChickStaffProfile?.role||'').toLowerCase();
   if(!['owner','admin','manager','cashier'].includes(role)){showToast('Only an authorized cashier, manager, admin or owner can confirm a returned delivery.');return;}
@@ -1533,7 +1622,7 @@ function flameChickNormalizeOrder(row){
     return {itemName:name+variant+(mods.length?' — '+mods.join(', '):''),quantity:Number(it.quantity)||1,price:Number(it.unit_price_snapshot)||0,lineTotal:Number(it.line_total)||0,description:[...mods,...comps].join(', '),contents:[...mods,...comps]};
   });
   const statusMap={new:'Pending',accepted:'Accepted',preparing:'Preparing',ready:'Ready','out_for_delivery':'Out for Delivery',delivered:'Delivered',collected:'Collected',served:'Served',completed:'Completed',rejected:'Rejected',cancelled:'Cancelled'};
-  return {OrderID:row.id,OrderNumber:row.order_number,DateTime:row.created_at||row.placed_at,UpdatedAt:row.updated_at,OrderSource:row.source,LocalOrderID:row.local_order_id||'',Status:statusMap[row.status]||row.status,CustomerName:row.customer_name,Phone:row.customer_phone,Address:row.delivery_address||'',Area:row.delivery_area_name_snapshot||'',FulfillmentType:row.fulfillment_type==='delivery'?'Delivery':row.fulfillment_type==='dine_in'?'Dine-in':'Takeaway',PaymentMethod:row.payment_method_summary,PaymentStatus:row.payment_status,Notes:row.notes,Subtotal:Number(row.subtotal)||0,DeliveryFee:Number(row.delivery_fee)||0,Total:Number(row.total)||0,items,itemsReady:true,raw:row};
+  return {OrderID:row.id,OrderNumber:row.order_number,DateTime:row.created_at||row.placed_at,UpdatedAt:row.updated_at,OrderSource:row.source,LocalOrderID:row.local_order_id||'',Status:statusMap[row.status]||row.status,CustomerName:row.customer_name,Phone:row.customer_phone,Address:row.delivery_address||'',Area:row.delivery_area_name_snapshot||'',FulfillmentType:row.fulfillment_type==='delivery'?'Delivery':row.fulfillment_type==='dine_in'?'Dine-in':'Takeaway',PaymentMethod:row.payment_method_summary,PaymentStatus:row.payment_status||'unpaid',PaidAmount:Number(row.paid_amount)||0,BalanceDue:row.balance_due===null||row.balance_due===undefined?Math.max(0,(Number(row.total)||0)-(Number(row.paid_amount)||0)):Number(row.balance_due),Notes:row.notes,Subtotal:Number(row.subtotal)||0,DeliveryFee:Number(row.delivery_fee)||0,Total:Number(row.total)||0,items,itemsReady:true,raw:row};
 }
 
 let recoveryInFlight=new Set();
@@ -2093,6 +2182,8 @@ function renderKanban(){
   $('onlineNavBadge').textContent=orders.filter(o=>['Pending','Accepted'].includes(String(o.Status||'Pending'))).length;
 
   $('kanban').onclick=(e)=>{
+    const collectBtn=e.target.closest('[data-collect-payment]');
+    if(collectBtn){e.preventDefault();e.stopPropagation();openPaymentCollection(collectBtn.dataset.collectPayment);return;}
     const returnBtn=e.target.closest('[data-confirm-return]');
     if(returnBtn){e.preventDefault();e.stopPropagation();confirmDeliveryReturn(returnBtn.dataset.confirmReturn,returnBtn);return;}
     const assignBtn=e.target.closest('[data-assign-rider]');
