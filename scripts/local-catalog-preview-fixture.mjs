@@ -89,6 +89,8 @@ async function buildLocalPreviewHtml() {
   );
   html = html.replace('<a class="brand" href="index.html"', '<a class="brand" href="#page-title"');
   html = html.replace('<title>Flame Chick — Catalog Preview</title>', '<title>Flame Chick — Local Synthetic Fixture</title>');
+  html = html.replace('Live catalog connection', 'Synthetic local test fixture');
+  html = html.replace('Published menu data', 'Synthetic menu data');
   html = html.replace('<span class="preview-label">Private catalog preview</span>', '<span class="preview-label">LOCAL SYNTHETIC FIXTURE</span>');
   html = html.replace(
     'This page reads the currently published catalog. It is separate from the customer storefront and cannot accept or submit orders.',
@@ -106,11 +108,11 @@ async function buildLocalPreviewHtml() {
   return html;
 }
 
-function localConfigScript(port) {
+function localConfigScript() {
   return [
     "'use strict';",
     'window.FLAME_CHICK_CONFIG = Object.freeze({',
-    "  apiBase: 'http://127.0.0.1:" + port + "/__blocked',",
+    "  apiBase: 'LOCAL_FIXTURE_ONLY_DISABLED',",
     "  publishableKey: 'LOCAL_FIXTURE_ONLY',",
     '  requestTimeoutMs: 1000,',
     '  retries: 0',
@@ -236,7 +238,7 @@ export function createLocalCatalogPreviewServer() {
       }
 
       if (url.pathname === '/__local-preview-config.js') {
-        send(response, 200, 'text/javascript; charset=utf-8', localConfigScript(port), request.method);
+        send(response, 200, 'text/javascript; charset=utf-8', localConfigScript(), request.method);
         return;
       }
 
