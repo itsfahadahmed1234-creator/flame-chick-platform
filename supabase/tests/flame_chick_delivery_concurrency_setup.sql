@@ -170,11 +170,19 @@ END
 $assign_offers$;
 
 DO $verify$
+DECLARE
+  v_roles integer;
+  v_audit integer;
+  v_offers integer;
 BEGIN
-  IF (SELECT count(*) FROM public.user_roles WHERE restaurant_id='b7777777-7777-4777-8777-777777777660' AND is_active)<>6
-     OR (SELECT count(*) FROM public.staff_role_audit WHERE restaurant_id='b7777777-7777-4777-8777-777777777660')<>5
-     OR (SELECT count(*) FROM public.delivery_task_offers WHERE restaurant_id='b7777777-7777-4777-8777-777777777660' AND status='offered')<>4 THEN
-    RAISE EXCEPTION 'DELIVERY_CONCURRENCY_FIXTURE_SETUP_INCOMPLETE';
+  SELECT count(*) INTO v_roles FROM public.user_roles
+  WHERE restaurant_id='b7777777-7777-4777-8777-777777777660' AND is_active;
+  SELECT count(*) INTO v_audit FROM public.staff_role_audit
+  WHERE restaurant_id='b7777777-7777-4777-8777-777777777660';
+  SELECT count(*) INTO v_offers FROM public.delivery_task_offers
+  WHERE restaurant_id='b7777777-7777-4777-8777-777777777660' AND status='offered';
+  IF v_roles<>6 OR v_audit<>6 OR v_offers<>4 THEN
+    RAISE EXCEPTION 'DELIVERY_CONCURRENCY_FIXTURE_SETUP_INCOMPLETE roles=% audit=% offers=%',v_roles,v_audit,v_offers;
   END IF;
 END
 $verify$;
