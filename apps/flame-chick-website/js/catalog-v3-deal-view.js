@@ -290,9 +290,7 @@
         var scheduleResult = schedule.ok && schedule.scheduleSet
           ? evaluateScheduleSet(schedule.scheduleSet, instant)
           : { ok: true, available: true };
-        var isAvailable = orderingEnabled &&
-          contract.resolveDealAvailability(snapshot, branchId, deal.dealId) &&
-          schedule.ok && scheduleResult.ok && scheduleResult.available;
+        var branchAvailable = contract.resolveDealAvailability(snapshot, branchId, deal.dealId);
         var variants = sortByOrder(snapshot.dealVariants.filter(function (variant) {
           return variant.dealId === deal.dealId;
         }), 'dealVariantId').map(function (variant) {
@@ -361,6 +359,9 @@
           };
         });
         var variantsSatisfiable = variants.some(function (variant) { return variant.branchSatisfiable; });
+        branchAvailable = branchAvailable && variantsSatisfiable;
+        var isAvailable = orderingEnabled && branchAvailable &&
+          schedule.ok && scheduleResult.ok && scheduleResult.available;
         return {
           id: deal.dealId,
           collectionId: collection.dealCollectionId,
@@ -373,7 +374,8 @@
           scheduleSource: schedule.ok ? schedule.source : 'invalid',
           scheduleSetId: schedule.ok ? schedule.scheduleSetId : null,
           scheduleAvailable: schedule.ok && scheduleResult.ok && scheduleResult.available,
-          available: isAvailable && variantsSatisfiable,
+          branchAvailable: branchAvailable,
+          available: isAvailable,
           variants: variants
         };
       });
