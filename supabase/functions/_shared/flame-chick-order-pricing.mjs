@@ -7,7 +7,7 @@ const MAX_ORDER_LINES = 100;
 const MAX_COMPONENTS_PER_DEAL = 200;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function fail(code, message) {
+function fail(code, message): { ok: false; error: { code: string; message: string } } {
   return { ok: false, error: { code, message } };
 }
 
@@ -85,7 +85,7 @@ function validateModifierInput(groups, input, dealView) {
       });
     }
   }
-  return { ok: true, entries, totalMinor, selections };
+  return { ok: true as const, entries, totalMinor, selections };
 }
 
 function buildModifierGroups(snapshot, productId, productVariantId, contract, dealView, excludeStandaloneOnly) {
@@ -122,7 +122,7 @@ function validateProductLine(snapshot, branchId, item, quantity, contract, dealV
     return fail("ORDER_TOTAL_INVALID", "The order total exceeds the supported amount.");
   }
   return {
-    ok: true,
+    ok: true as const,
     line: {
       line_kind: "product",
       product_id: product.productId,
@@ -299,7 +299,7 @@ function validateDealLine(snapshot, branchId, item, quantity, dealViewModel, con
   }
   const dealRow = find(snapshot.deals, "dealId", deal.id);
   return {
-    ok: true,
+    ok: true as const,
     lineMinor,
     line: {
       line_kind: "deal",
@@ -411,7 +411,7 @@ export function calculateWebsiteOrder(snapshot, request, dependencies = {}) {
   }
 
   return {
-    ok: true,
+    ok: true as const,
     data: {
       schema_version: 3,
       publication_id: snapshot.publicationId,
