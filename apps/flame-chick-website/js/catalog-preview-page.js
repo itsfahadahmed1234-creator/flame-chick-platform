@@ -449,6 +449,7 @@
     function begin() {
       currentPreviewId = null;
       closeDealConfigurator();
+      closeProductDetail();
       productCatalog.replaceChildren();
       productNav.replaceChildren();
       dealCatalog.replaceChildren();
