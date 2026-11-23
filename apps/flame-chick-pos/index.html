@@ -2549,17 +2549,22 @@ function adaptFlameChickCatalog(snapshot){
     });
   }
   rows.sort((a,b)=>a.SortOrder-b.SortOrder||a.Name.localeCompare(b.Name));
-  const areas=snapshot.deliveryAreas.filter(a=>a.Active===true).map(a=>({
-    ID:String(a.ID),AreaName:String(a.AreaName||''),AreaNameUr:String(a.AreaNameUr||''),
-    Name:String(a.AreaName||''),Fee:Number(a.Fee)||0,DeliveryFee:Number(a.Fee)||0,Active:true
-  }));
+  const areas=snapshot.deliveryAreas.filter(a=>a.Active===true).map(a=>{
+    const rawFee=a.Fee;
+    const n=rawFee===null||rawFee===undefined||rawFee===''?null:Number(rawFee);
+    const fee=Number.isFinite(n)&&n>=0?n:null;
+    return {
+      ID:String(a.ID),AreaName:String(a.AreaName||''),AreaNameUr:String(a.AreaNameUr||''),
+      Name:String(a.AreaName||''),Fee:fee,DeliveryFee:fee,Active:true
+    };
+  });
   const pizzaIds=new Set(activeCategories.filter(c=>/pizza/i.test(c.Name)).map(c=>c.ID));
   return {categories:activeCategories,menu:rows,deliveryAreas:areas,pizzaCategoryIds:pizzaIds};
 }
 function normalizeLookupText(value){return String(value??'').trim().toLowerCase().replace(/\s+/g,' ')}
 function firstField(row,names){for(const name of names){if(Object.prototype.hasOwnProperty.call(row,name)&&row[name]!==''&&row[name]!==null&&row[name]!==undefined)return row[name]}return ''}
 function deliveryAreaName(row){return String(firstField(row,['AreaName','Area','area','Name','name','DeliveryArea','deliveryArea','Mohalla','mohalla'])||'').trim()}
-function deliveryAreaFee(row){const raw=firstField(row,['DeliveryFee','Delivery Fee','deliveryFee','delivery fee','Fee','fee','Price','price','Amount','amount']);const n=Number(raw);return Number.isFinite(n)&&n>=0?n:0}
+function deliveryAreaFee(row){const raw=firstField(row,['DeliveryFee','Delivery Fee','deliveryFee','delivery fee','Fee','fee','Price','price','Amount','amount']);if(raw===''||raw===null||raw===undefined)return null;const n=Number(raw);return Number.isFinite(n)&&n>=0?n:null}
 function getDefaultDeliveryFee(){const raw=catalogSnapshot?.settings?.DefaultDeliveryFee;if(raw===null||raw===undefined||raw==='')return null;const n=Number(raw);return Number.isFinite(n)&&n>=0?n:null}
 function getDeliveryFeeForArea(area){const key=normalizeLookupText(area);if(key==='not listed')return getDefaultDeliveryFee();if(!key)return null;const row=deliveryAreas.find(x=>normalizeLookupText(deliveryAreaName(x))===key);return row?deliveryAreaFee(row):null}
 async function refreshDeliveryAreas(){if(!catalogSnapshot)return;const rows=catalogSnapshot.deliveryAreas||[];await clearStore(STORES.deliveryAreas);for(const row of rows)await put(STORES.deliveryAreas,row);deliveryAreas=await all(STORES.deliveryAreas)}
@@ -3976,11 +3981,15 @@ function flameChickBuildPosDeliveryOrderPayload(order){
   if(areaChoice==='not listed'){
     areaId='';
     areaName='Not Listed';
-    if(getDefaultDeliveryFee()===null)throw new Error('The Not Listed default delivery fee has not been configured in Admin.');
   }else if(selectedArea){
     areaName=deliveryAreaName(selectedArea);
   }else{
     throw new Error('Choose a listed delivery area or enter Not Listed.');
+  }
+  if(getDeliveryFeeForArea(order.area)===null){
+    throw new Error(areaChoice==='not listed'
+      ?'The Not Listed default delivery fee has not been configured in Admin.'
+      :'The delivery fee for this area has not been configured. Ask the manager to set it before taking the order.');
   }
 
   const localItems=Array.isArray(order.items)?order.items:[];
