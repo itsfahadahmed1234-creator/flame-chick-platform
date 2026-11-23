@@ -89,7 +89,7 @@ function validateModifierInput(groups, input, dealView) {
       });
     }
   }
-  return { ok: true as const, entries, totalMinor, selections };
+  return { ok: true, entries, totalMinor, selections };
 }
 
 function buildModifierGroups(snapshot, productId, productVariantId, contract, dealView, excludeStandaloneOnly) {
@@ -127,7 +127,7 @@ function validateProductLine(snapshot, branchId, item, quantity, contract, dealV
     return fail("ORDER_TOTAL_INVALID", "The order total exceeds the supported amount.");
   }
   return {
-    ok: true as const,
+    ok: true,
     line: {
       line_kind: "product",
       product_id: product.productId,
@@ -305,7 +305,7 @@ function validateDealLine(snapshot, branchId, item, quantity, dealViewModel, con
   }
   const dealRow = find(snapshot.deals, "dealId", deal.id);
   return {
-    ok: true as const,
+    ok: true,
     lineMinor,
     line: {
       line_kind: "deal",
@@ -418,7 +418,7 @@ export function calculateWebsiteOrder(snapshot, request, dependencies = {}) {
   }
 
   return {
-    ok: true as const,
+    ok: true,
     data: {
       schema_version: 3,
       publication_id: snapshot.publicationId,
