@@ -123,3 +123,16 @@ test("Rider API refuses accounts with ambiguous active branch assignments", () =
   assert.match(source, /riderBranches\.length !== 1/);
   assert.match(source, /RIDER_BRANCH_SELECTION_REQUIRED/);
 });
+
+
+test("delivery dispatch reads are service-side and branch context is derived from role_key", () => {
+  const source = sources["flame-chick-delivery-api"];
+  assert.match(source, /async function resolveDispatchContext\(userId: string\)/);
+  assert.match(source, /role_key,branch_id,is_active/);
+  assert.match(source, /readAsService\("user_roles\?/);
+  assert.match(source, /const staffContext = await resolveDispatchContext\(user\.id\)/);
+  assert.match(source, /requestedBranch !== staffContext\.branchId/);
+  assert.match(source, /readAsService\("delivery_tasks\?/);
+  assert.match(source, /readAsService\("rider_profiles\?/);
+  assert.doesNotMatch(source, /readAsUser\(/);
+});
