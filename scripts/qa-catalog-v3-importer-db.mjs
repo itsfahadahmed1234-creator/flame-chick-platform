@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import importer from '../apps/flame-chick-admin/catalog-v3-importer.js';
 import contract from '../apps/flame-chick-website/js/catalog-v3.js';
 import { buildCatalogRpcCall } from '../supabase/functions/flame-chick-staff-admin/catalog-actions.mjs';
+import admin from '../apps/flame-chick-admin/catalog-v3-admin.js';
 
 const DATABASE_URL = process.env.FLAME_CHICK_QA_DATABASE_URL ||
   'postgresql://postgres:postgres@127.0.0.1:54322/postgres';
@@ -234,12 +235,61 @@ const summary=importer.validatePublishedMenuDraft(draft);
 assert.equal(summary.products,25);
 assert.equal(summary.deals,6);
 
-const first=await importer.runPublishedMenuImport(draft,{
-  request,
-  onProgress:event=>console.log('[import]',event.phase,event.completed+'/'+event.total,event.message)
-});
-assert.equal(first.ok,true);
-assert.equal(first.publicationPerformed,false);
+// Exercise the actual Admin workspace import button and confirmation path
+// against disposable Supabase, not only the importer module in isolation.
+const previousWindow=globalThis.window;
+const previousFetch=globalThis.fetch;
+let approveImport=false;
+const confirmationMessages=[];
+let first;
+try {
+  globalThis.window={
+    FlameChickCatalogV3Importer:importer,
+    confirm(message){confirmationMessages.push(message);return approveImport;}
+  };
+  globalThis.fetch=async(resource,options={})=>{
+    assert.equal(resource,'./flame-chick-published-menu-2026-11-23.v3-draft.json');
+    assert.equal(options.cache,'no-store');
+    assert.equal(options.credentials,'same-origin');
+    return {ok:true,json:async()=>draft};
+  };
+
+  const root={innerHTML:'',onclick:null,onchange:null,onsubmit:null};
+  const workspace=admin.createWorkspace();
+  await workspace.mount(root,request);
+  assert.equal(typeof root.onclick,'function');
+  assert.match(root.innerHTML,/Import published menu draft/);
+
+  const importButton={dataset:{action:'import-menu'},disabled:false};
+  const clickImport=()=>root.onclick({
+    target:{closest(selector){assert.equal(selector,'[data-action]');return importButton;}}
+  });
+
+  // A dismissed confirmation must not send any mutation RPC.
+  await clickImport();
+  assert.equal(writeCount,0,'Cancelling the Admin confirmation must perform zero catalog writes.');
+  assert.match(workspace.getState().notice,/cancelled/i);
+
+  // Confirm the same Admin action and run the real importer through the
+  // authenticated catalog command request handler.
+  approveImport=true;
+  await clickImport();
+  const uiState=workspace.getState();
+  first=uiState.lastImportResult;
+  assert.equal(first&&first.ok,true,'The Admin workspace did not complete the catalog importer.');
+  assert.equal(first.publicationPerformed,false,'Admin importer must never publish the catalog.');
+  assert.equal(uiState.importProgress.phase,'complete');
+  assert.match(uiState.notice,/remains unpublished/i);
+  assert.equal(confirmationMessages.length,2);
+  assert.match(confirmationMessages[1],/UNPUBLISHED/);
+  assert.match(confirmationMessages[1],/will NOT publish the catalog/i);
+  assert.match(confirmationMessages[1],/selectable \+price upgrades/i);
+} finally {
+  if(previousWindow===undefined) delete globalThis.window;
+  else globalThis.window=previousWindow;
+  if(previousFetch===undefined) delete globalThis.fetch;
+  else globalThis.fetch=previousFetch;
+}
 verifyDatabaseCounts(countsFromDatabase());
 verifyMenuSpecificMappings();
 assert.ok(readCount>0);
