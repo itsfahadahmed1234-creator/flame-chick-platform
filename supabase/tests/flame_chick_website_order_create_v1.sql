@@ -338,6 +338,10 @@ BEGIN
     END IF;
   END LOOP;
 
+  -- Wait until the final cluster is outside ten minutes while all 15 success
+  -- events remain inside one hour. This isolates the hourly quota assertion.
+  PERFORM set_config('test.website.clock_now',(base_time+interval '55 minutes')::text,true);
+
   -- Fifteenth success committed: the sixteenth is rejected by the hourly cap.
   SELECT count(*) INTO events_count FROM app_private.website_order_success_events
   WHERE restaurant_id=r AND phone_digest=decode(digest,'hex')
