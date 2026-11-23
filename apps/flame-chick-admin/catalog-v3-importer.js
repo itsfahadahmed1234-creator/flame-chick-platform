@@ -313,6 +313,54 @@
       buildProductPayload(draft,{...product,_importSortOrder:draft.products.indexOf(product)+1},categoryId,existing);
     }
 
+    // Preflight the target Deals collection and every existing offer before
+    // creating categories/products. This avoids partial writes when the target
+    // collection contains unrelated or conflicting records.
+    const dealsCategoryIdPreflight=categoryIds.get(draft.dealCollection.categoryKey);
+    let preflightCollection=null;
+    let preflightDeals=[];
+    if(dealsCategoryIdPreflight){
+      const preflightCollections=await readCollections();
+      const matchingCollections=preflightCollections.filter(item=>
+        item.category_id===dealsCategoryIdPreflight&&item.name_en==='Deals'
+      );
+      if(matchingCollections.length>1)fail('More than one Deals collection exists for the target category. Stop before writing.');
+      if(matchingCollections.length===1){
+        preflightCollection=matchingCollections[0];
+        preflightDeals=await readDeals(preflightCollection.id);
+        ensureOnlyManagedDeals(preflightDeals);
+        for(const deal of draft.deals){
+          const stable=legacyId(draft,'deal',deal.key);
+          const found=uniqueBy(preflightDeals,'legacy_id',stable,'deal');
+          if(found&&(
+            found.title!==deal.title||
+            found.collection_id!==preflightCollection.id||
+            (found.description_en??null)!==(deal.descriptionEn??null)||
+            found.is_available!==true
+          ))fail('Existing deal '+deal.title+' differs from the approved draft. Stop before any catalog writes.');
+          if(!found&&preflightDeals.some(row=>row.title===deal.title)){
+            fail('A deal named '+deal.title+' exists without the expected stable import key. Stop before any catalog writes.');
+          }
+        }
+      }
+    }
+
+    const hasFlameHourPreflight=draft.deals.some(deal=>!!deal.schedule);
+    if(hasFlameHourPreflight){
+      const scheduleMatches=(await readSchedules()).filter(item=>item.name==='Flame Hour daily');
+      if(scheduleMatches.length>1)fail('Multiple Flame Hour daily schedules exist. Stop before any catalog writes.');
+      if(scheduleMatches.length===1){
+        const item=scheduleMatches[0];
+        const scheduleDetail=await readSchedule(item.id);
+        const windows=scheduleDetail.windows||[];
+        const valid=item.is_active===true&&item.timezone==='Asia/Karachi'&&windows.length===7&&windows.every((window,index)=>
+          window.window_kind==='WEEKLY'&&Number(window.weekday_iso)===index+1&&
+          window.local_start==='15:00:00'&&window.local_end==='17:00:00'&&!window.is_all_day
+        );
+        if(!valid)fail('An existing Flame Hour daily schedule has different settings. Stop before any catalog writes.');
+      }
+    }
+
     for(const [index,category] of draft.categories.entries()){
       const legacy=legacyId(draft,'category',category.key);
       let found=uniqueBy(categories,'legacy_id',legacy,'category');
