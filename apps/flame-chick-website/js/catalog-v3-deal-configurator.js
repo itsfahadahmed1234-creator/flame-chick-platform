@@ -317,7 +317,7 @@
             var changed = selectVariant(variant.id);
             if (!changed.ok) lastError = changed;
             render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: controlKey,
-              formatMoney: options.formatMoney });
+              formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel });
           }
         });
         label.appendChild(input);
@@ -402,7 +402,7 @@
                       if (!changed.ok) lastError = changed;
                     }
                     render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: modifierKey,
-                      formatMoney: options.formatMoney });
+                      formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel });
                   });
                   modifierLabel.appendChild(check);
                   modifierLabel.appendChild(makeElement(doc, 'span', '', modifier.name + ' — ' +
@@ -426,14 +426,15 @@
       status.setAttribute('aria-live', 'polite');
       fragment.appendChild(status);
 
-      var continueButton = makeElement(doc, 'button', 'fc-deal-config-continue', 'Continue');
+      var continueButton = makeElement(doc, 'button', 'fc-deal-config-continue', options.completeButtonLabel || 'Continue');
       continueButton.type = 'button';
       continueButton.disabled = !validation.ok;
       continueButton.addEventListener('click', function () {
         var payload = toPayload();
         if (!payload.ok) {
           lastError = payload;
-          render(container, { document: doc, onComplete: options.onComplete, formatMoney: options.formatMoney });
+          render(container, { document: doc, onComplete: options.onComplete, formatMoney: options.formatMoney,
+            completeButtonLabel: options.completeButtonLabel });
           return;
         }
         options.onComplete(payload);
