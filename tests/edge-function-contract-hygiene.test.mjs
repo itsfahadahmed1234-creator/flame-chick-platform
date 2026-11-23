@@ -115,3 +115,11 @@ test("delivery API checks role_key and reads private role/profile rows server-si
   assert.match(source, /readAsService\("rider_profiles\?/);
   assert.doesNotMatch(source, /readAsUser\("user_roles\?/);
 });
+
+
+test("Rider API refuses accounts with ambiguous active branch assignments", () => {
+  const source = sources["flame-chick-delivery-api"];
+  assert.match(source, /const riderBranches = \[\.\.\.new Set\(riderRoles\.map/);
+  assert.match(source, /riderBranches\.length !== 1/);
+  assert.match(source, /RIDER_BRANCH_SELECTION_REQUIRED/);
+});
