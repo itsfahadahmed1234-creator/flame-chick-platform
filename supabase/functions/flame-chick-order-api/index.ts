@@ -325,12 +325,18 @@ async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
     items:body.items
   };
   const priced = calculateWebsiteOrder(pricingSnapshot,pricingRequest,{contract,dealView,databaseNow:snapshot.databaseNow});
-  if (!isObject(priced) || priced.ok !== true || !isObject(priced.data)) {
-    const err = isObject(priced?.error) ? priced.error : {};
+  if (!isObject(priced)) {
+    return websiteError("ORDER_QUOTE_INVALID","The selected menu items could not be validated.",400);
+  }
+  if (priced.ok !== true) {
+    const err = isObject(priced.error) ? priced.error : {};
     const code = String(err.code ?? "ORDER_QUOTE_INVALID");
     const status = code === "CATALOG_PUBLICATION_CHANGED" ? 409 :
       ["BRANCH_FULFILMENT_UNAVAILABLE","PRODUCT_UNAVAILABLE","DEAL_UNAVAILABLE","DEAL_VARIANT_UNAVAILABLE"].includes(code) ? 409 : 400;
     return websiteError(code,String(err.message ?? "The selected menu items could not be validated."),status);
+  }
+  if (!isObject(priced.data)) {
+    return websiteError("ORDER_QUOTE_INVALID","The published menu could not be priced safely.",503);
   }
 
   const branch = {
@@ -340,7 +346,7 @@ async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
   };
   const restaurantId = restaurant.id;
 
-  const deliveryRaw = isRecord(body.delivery) ? body.delivery : null;
+  const deliveryRaw: Record<string,unknown>|null = isObject(body.delivery) ? body.delivery : null;
   let deliveryFee = 0;
   let delivery: Record<string,unknown>|null = null;
   let publicAreas: Array<Record<string,unknown>> = [];
