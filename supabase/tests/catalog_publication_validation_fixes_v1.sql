@@ -161,6 +161,18 @@ BEGIN
       AND e->>'entity_id'=v_deal_only_variant::text
   ) THEN RAISE EXCEPTION 'MAPPED_DEAL_ONLY_VARIANT_WAS_REJECTED'; END IF;
 
+  -- Standalone variants remain price-required even when the same product is
+  -- otherwise referenced by a deal; restore the fixture value immediately.
+  UPDATE public.product_variants SET price=NULL WHERE id=v_product_variant;
+  v_errors := app_private.flame_chick_catalog_publication_validate(v_restaurant)->'errors';
+  IF NOT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_errors) e
+    WHERE e->>'code'='ACTIVE_VARIANT_PRICE_MISSING'
+      AND e->>'entity_id'=v_product_variant::text
+  ) THEN RAISE EXCEPTION 'STANDALONE_NULL_PRICE_WAS_NOT_REJECTED'; END IF;
+  UPDATE public.product_variants SET price=100 WHERE id=v_product_variant;
+  v_errors := app_private.flame_chick_catalog_publication_validate(v_restaurant)->'errors';
+
   -- A future deal-specific surcharge is allowed without reading the component
   -- product's standalone price. This fixture does not enable a customer selector.
   UPDATE public.deal_variant_component_options
