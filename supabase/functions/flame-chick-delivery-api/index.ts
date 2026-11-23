@@ -216,7 +216,7 @@ async function resolveDispatchContext(userId: string): Promise<{
   rolesQuery.set("restaurant_id", "eq." + restaurantId);
   rolesQuery.set("is_active", "eq.true");
   rolesQuery.set("role_key", "in.(owner,admin,manager,cashier)");
-  rolesQuery.set("limit", "20");
+  rolesQuery.set("limit", "100");
   const roleResult = await readAsService("user_roles?" + rolesQuery.toString());
   if (!roleResult.ok || !Array.isArray(roleResult.data)) return { ok:false };
   const roleRows = roleResult.data.filter((row): row is Record<string, unknown> =>
