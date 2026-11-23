@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const migrationUrl = new URL('../supabase/migrations/20261122174500_flame_chick_catalog_database_time_metadata_v1.sql', import.meta.url);
+const migrationUrl = new URL('../supabase/migrations/20261123101105_flame_chick_catalog_database_time_metadata_v1.sql', import.meta.url);
 
 test('candidate migration adds database time outside the immutable publication snapshot', async () => {
   const sql = await readFile(migrationUrl, 'utf8');
