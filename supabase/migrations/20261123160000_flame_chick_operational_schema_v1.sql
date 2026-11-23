@@ -401,6 +401,8 @@ CREATE TABLE public.order_item_components (
   created_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
 
   CONSTRAINT order_item_components_pkey PRIMARY KEY(id),
+  CONSTRAINT order_item_components_id_order_branch_restaurant_key
+    UNIQUE(id,order_id,branch_id,restaurant_id),
   CONSTRAINT order_item_components_item_fkey
     FOREIGN KEY(order_item_id,order_id,branch_id,restaurant_id)
     REFERENCES public.order_items(id,order_id,branch_id,restaurant_id) ON DELETE RESTRICT,
