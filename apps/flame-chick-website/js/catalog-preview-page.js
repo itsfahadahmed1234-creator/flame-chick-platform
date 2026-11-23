@@ -361,6 +361,22 @@
     }
   }
 
+  function renderBranchSelector() {
+    return app.renderSelection(branchSelector, {
+      document: document,
+      onChange: function (selectionState) {
+        renderPreview(app.getPreview());
+        if (selectionState && selectionState.ready) {
+          connectionMessage.textContent = 'Published catalog verified for the selected branch and fulfilment method.';
+        } else if (selectionState && selectionState.branchRequired) {
+          connectionMessage.textContent = 'Choose a branch to continue. Delivery and pickup will be shown according to its published settings.';
+        } else {
+          connectionMessage.textContent = 'Choose delivery or pickup to build a branch-specific preview.';
+        }
+      }
+    });
+  }
+
   function initialise() {
     if (!window.FlameChickCatalogV3Preview) {
       setConnection('error', 'The preview modules are not available on this page.');
@@ -398,26 +414,12 @@
           return;
         }
         contextSection.hidden = false;
-        app.renderSelection(branchSelector, {
-          document: document,
-          onChange: function (selectionState) {
-            renderPreview(app.getPreview());
-            if (selectionState && selectionState.ready) {
-              // Apply visibility after rendering so the selected-context view is
-              // not left hidden by an earlier empty-preview state.
-              var currentPreview = app.getPreview();
-              if (currentPreview && currentPreview.ok === true) {
-                catalogSection.hidden = false;
-                dealsSection.hidden = false;
-              }
-              connectionMessage.textContent = 'Published catalog verified for the selected branch and fulfilment method.';
-            } else if (selectionState && selectionState.branchRequired) {
-              connectionMessage.textContent = 'Choose a branch to continue. Delivery and pickup will be shown according to its published settings.';
-            } else {
-              connectionMessage.textContent = 'Choose delivery or pickup to build a branch-specific preview.';
-            }
-          }
-        });
+        var selectionRender = renderBranchSelector();
+        if (!selectionRender || selectionRender.ok !== true) {
+          setConnection('error', selectionRender && selectionRender.message
+            ? selectionRender.message : 'Branch and fulfilment controls could not be rendered.');
+          return;
+        }
         renderPreview(app.getPreview());
       }).catch(function () {
         renderState(app.getState());
@@ -426,7 +428,28 @@
 
     reloadButton.addEventListener('click', function () {
       reloadButton.disabled = true;
-      app.reload().finally(function () { reloadButton.disabled = false; });
+      app.reload().then(function (result) {
+        if (!result || result.state === 'error' || result.state === 'unpublished') {
+          renderState(app.getState());
+          return;
+        }
+        // Reload creates a new selection controller. Re-render its controls so
+        // radio handlers do not retain the previous, invalidated controller.
+        contextSection.hidden = false;
+        var selectionRender = renderBranchSelector();
+        if (!selectionRender || selectionRender.ok !== true) {
+          catalogSection.hidden = true;
+          dealsSection.hidden = true;
+          setConnection('error', selectionRender && selectionRender.message
+            ? selectionRender.message : 'Branch and fulfilment controls could not be rendered after reload.');
+          return;
+        }
+        renderPreview(app.getPreview());
+      }).catch(function () {
+        renderState(app.getState());
+      }).finally(function () {
+        reloadButton.disabled = false;
+      });
     });
     closeConfigButton.addEventListener('click', closeDealConfigurator);
     begin();
