@@ -190,3 +190,16 @@ The first implementation gaps identified above have now been addressed on the wo
 **Latest CI:** [Flame Chick Website Static Checks run 45124549443](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45124549443), exact head `9b3698f0e03f00f5999bf1090d662c70db53b42b`, completed successfully. JavaScript syntax, core catalog regression tests, preview regression tests and inline script parsing passed.
 
 This is still preview/source behaviour only. The main customer storefront has not been switched to V3. No menu data has been seeded, no production migration applied, no catalog published, no Edge Function or Vercel deployment performed, and website ordering remains disabled. The next safe source step is review of product popup variants (especially required Smash Single/Double), then an isolated preview UI/manual smoke test before preparing a menu import plan.
+
+
+## Additional schema gate found during safe pre-entry review
+
+The live database allows `product_variants.price` to be NULL at the table-constraint level, but two higher-level publication contracts currently reject that:
+- V3 snapshot validator declares every product variant `price: money` (non-null).
+- Publication validation emits `ACTIVE_VARIANT_PRICE_MISSING` for every active variant with a NULL price, even if it is non-standalone and used only as an included deal component.
+
+This matters for the newly approved menu because Fries, Juice, the Flame Feast 1L restaurant-supplied drink, and the 6-piece Classic Nuggets deal portion have no standalone menu price and must be deal-only. Do **not** invent Rs. 0 or any other price just to pass validation.
+
+Before entering these components, design and test a narrow schema/contract update that permits a NULL price only for a non-standalone variant that is referenced exclusively by active deal component mappings with `pricingTreatment = INCLUDED`. Keep all standalone-sellable variants price-required; reject null-priced variants that are unreferenced, used in surcharge/standalone deal pricing, or otherwise violate the intended included-only scope. Update snapshot validation, publication validation and product preview mapping consistently. Test both accepted and rejected cases. This is a source/migration candidate only until separately approved for Production.
+
+Also, the current isolated V3 preview uses inline product-card selectors rather than a product detail popup. The required Smash Single/Double selection is not yet a popup implementation. Before customer storefront cutover, build/test an accessible product detail popup (or another explicitly approved popup-equivalent) with mandatory variant selection, then connect it only after the secure order API and main V3 storefront migration are complete.
