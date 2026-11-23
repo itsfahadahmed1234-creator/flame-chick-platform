@@ -185,7 +185,7 @@ Correctness must not depend on a paid scheduler, continuous worker, Realtime or 
 
 These are not settled by the lifecycle decision:
 - Whether Rider rejection/failure reason is mandatory and which reason codes apply.
-- Whether arrival-at-restaurant is a separate recorded state or pickup is the next explicit action.
+- **Resolved:** there is no arrival-at-restaurant state or button. Rider actions are Accept offer → Picked up → Delivered. After accepting, the next action is Picked up.
 - Whether Not Listed checkout collects a separate locality/mohalla label in addition to full address.
 - Canonical order status names and customer notification/payment/refund handling for returned orders. Preserve payment records; do not invent automatic refunds.
 - Optional scheduler configuration, only after Free-plan capability verification.
