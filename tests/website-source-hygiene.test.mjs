@@ -62,3 +62,13 @@ test("website delivery submission carries explicit area selection and no client-
   assert.doesNotMatch(html,/delivery:\s*customer\.mode === 'Takeaway'[\s\S]{0,250}area_name:/);
   assert.doesNotMatch(html,/delivery:\s*customer\.mode === 'Takeaway'[\s\S]{0,250}delivery_fee:/);
 });
+
+
+test("website keeps a missing listed-area fee separate from explicitly configured Rs. 0", () => {
+  const html=source["index.html"];
+  assert.match(html,/rawFee === null \|\| rawFee === undefined \|\| rawFee === '' \? null : Number\(rawFee\)/);
+  assert.match(html,/Number\.isFinite\(parsedFee\) && parsedFee >= 0 \? parsedFee : null/);
+  assert.match(html,/Fee not configured/);
+  assert.match(html,/selectedAreaForCheckout\.fee === null/);
+  assert.doesNotMatch(html,/Math\.max\(0, Number\(area\.Fee[\s\S]{0,60}\|\| 0\)/);
+});
