@@ -50,7 +50,7 @@ BEGIN
 
   -- Exact source hashes of the reviewed candidate migration. This prevents this
   -- compensation being used after an unrelated helper edit or a later revision.
-  IF v_validate_hash IS DISTINCT FROM 'f179cc3b15b1d6ad5b07b90587513001bed97b752b09b13ce2d9c946e88a7750'
+  IF v_validate_hash IS DISTINCT FROM '270133a76cb649e70190945028b87b916b9e946d63e2794550fef31ad3fec86d'
      OR v_compile_hash IS DISTINCT FROM '1cee9543d131260f71573afc2f0a5a204422a59fa7f46ef0b24f4c2e277e3808' THEN
     RAISE EXCEPTION 'CATALOG_VALIDATION_RESTORE_CANDIDATE_SOURCE_MISMATCH'
       USING DETAIL=pg_catalog.format('validator=%s compiler=%s',v_validate_hash,v_compile_hash);
