@@ -504,9 +504,18 @@ The review-only menu importer has now passed a real PostgreSQL integration run u
 - First-run catalog writes / reads: 61 / 95
 - Second-run mutation count: 0
 
-### Additional strict gate in progress at handoff update time
+### Final strict publication-validation gate — passed
 
-A follow-up run `45139264349` adds an assertion that the SQL publication validator must return `ok: true` with exactly zero errors, not just absence of the two deal-only pricing errors. An initial attempt `45139118409` stopped at Node syntax-check before starting Supabase due a formatting typo in the QA summary; that typo is fixed in the current source. At handoff update time, `45139264349` is still in local Supabase startup with no failure reported. Do not mark this stricter gate as passed until that run completes successfully.
+The follow-up [local Supabase QA run 45139264349](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45139264349), head `37bd8557be42a6c1e6bfd70896742a24c508d085`, completed successfully.
+- Full migration replay passed.
+- Real authenticated importer and deal read-back passed.
+- Compiled database snapshot passed the V3 snapshot contract.
+- SQL publication validator returned `ok: true` with **zero errors**.
+- Second full import made **zero mutations** and did not increment the draft revision.
+- No publication rows were created.
+- Disposable local Supabase stack stopped successfully.
+
+The earlier `45139118409` attempt failed only at the QA script syntax check due a literal escaped-newline formatting typo; the source was corrected before the successful run.
 
 ### Safe boundary remains unchanged
 
