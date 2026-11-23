@@ -133,7 +133,7 @@
     if (message) status(message);
   }
 
-  function canEdit() { return !state.busy && !state.checkoutUncertain && !$('order-success').hidden; }
+  function canEdit() { return !state.busy && !state.checkoutUncertain && $('order-success').hidden; }
   function invalidateQuote() {
     if (state.checkoutUncertain || state.busy) return;
     resetQuote('Your changes need a fresh server quote.');
@@ -407,7 +407,12 @@
     $('deal-configurator').replaceChildren();
     configurator.render($('deal-configurator'), {
       onComplete: function (payload) {
-        if (!payload || payload.ok !== true) return;
+        // The V3 configurator returns the selection object itself on success;
+        // only validation failures carry ok:false.
+        if (!payload || payload.ok === false) {
+          if(payload && payload.message) status(payload.message,'error');
+          return;
+        }
         var item = payload;
         item.kind = 'deal';
         item.quantity = 1;
