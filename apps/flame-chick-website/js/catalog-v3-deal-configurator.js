@@ -317,12 +317,15 @@
             var changed = selectVariant(variant.id);
             if (!changed.ok) lastError = changed;
             render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: controlKey,
-              formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel });
+              formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel, showVariantBasePrice: options.showVariantBasePrice });
           }
         });
         label.appendChild(input);
-        var price = formatAmount(variant.basePriceMinor, viewModel.currencyCode, options.formatMoney);
-        label.appendChild(makeElement(doc, 'span', '', variant.label + ' — ' + price));
+        var variantText = variant.label;
+        if (options.showVariantBasePrice !== false) {
+          variantText += ' — ' + formatAmount(variant.basePriceMinor, viewModel.currencyCode, options.formatMoney);
+        }
+        label.appendChild(makeElement(doc, 'span', '', variantText));
         if (variant.branchSatisfiable !== true) {
           label.appendChild(makeElement(doc, 'span', 'fc-deal-unavailable', 'Unavailable'));
         }
@@ -402,7 +405,7 @@
                       if (!changed.ok) lastError = changed;
                     }
                     render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: modifierKey,
-                      formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel });
+                      formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel, showVariantBasePrice: options.showVariantBasePrice });
                   });
                   modifierLabel.appendChild(check);
                   modifierLabel.appendChild(makeElement(doc, 'span', '', modifier.name + ' — ' +
