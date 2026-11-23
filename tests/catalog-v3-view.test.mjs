@@ -104,6 +104,14 @@ test('rejects invalid snapshots and missing validator instead of falling back to
   assert.equal(view.buildMenuViewModel(createSnapshot(), {}, {}).code, 'CONTRACT_UNAVAILABLE');
 });
 
+test('excludes variants that are not sellable as standalone menu items', () => {
+  const snapshot = createSnapshot();
+  snapshot.productVariants[0].standaloneSellable = false;
+  const result = view.buildMenuViewModel(snapshot, {}, contract);
+  assert.equal(result.ok, true);
+  assert.equal(result.categories.length, 0);
+});
+
 test('formats integer minor units with the publication currency', () => {
   const formatted = view.formatMoney(55000, 'PKR', 'en-PK');
   assert.match(formatted, /550/);
