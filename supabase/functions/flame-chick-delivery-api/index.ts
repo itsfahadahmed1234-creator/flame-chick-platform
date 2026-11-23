@@ -150,8 +150,9 @@ async function callDeliveryRpc(payload: Record<string, unknown>) {
   const raw = await res.text();
   let data: unknown = null;
   try { data = raw ? JSON.parse(raw) : null; } catch { data = { message: raw.slice(0, 500) }; }
-  if (!res.ok) {
-    const err = isObject(data) ? data : {};
+  if (!res.ok || (isObject(data) && data.ok === false)) {
+    const outer = isObject(data) && isObject(data.error) ? data.error : data;
+    const err = isObject(outer) ? outer : {};
     const message = String(err.message ?? err.details ?? ("Delivery action failed (" + res.status + ")."));
     const code = String(err.code ?? "");
     const status = code === "P0002" ? 404 :
@@ -184,8 +185,9 @@ async function callServiceRpc(name: string, args: Record<string, unknown> = {}) 
   const raw = await res.text();
   let data: unknown = null;
   try { data = raw ? JSON.parse(raw) : null; } catch { data = null; }
-  if (!res.ok) {
-    const err = isObject(data) ? data : {};
+  if (!res.ok || (isObject(data) && data.ok === false)) {
+    const outer = isObject(data) && isObject(data.error) ? data.error : data;
+    const err = isObject(outer) ? outer : {};
     const message = String(err.message ?? err.details ?? "A delivery operation failed.");
     const code = String(err.code ?? "");
     return { ok:false as const, status:code === "P0002" ? 404 : code === "23505" ? 409 : code === "42501" ? 403 : code === "22023" ? 409 : 500, message, data };
@@ -493,6 +495,8 @@ Deno.serve(async (req: Request) => {
       return response({ok:false,error:{code:"BRANCH_ACCESS_DENIED",message:"You cannot access dispatch data for another branch."}},403);
     }
     const branchId = staffContext.branchId;
+    const expiry = await callServiceRpc("flame_chick_expire_delivery_offers", { p_branch_id:branchId, p_batch_limit:100 });
+    if (!expiry.ok) return response({ok:false,error:{code:"DELIVERY_EXPIRY_SWEEP_FAILED",message:"Could not refresh expired rider offers. Please retry."}},503);
 
     const taskQuery = new URLSearchParams();
     taskQuery.set("select",
@@ -550,6 +554,9 @@ Deno.serve(async (req: Request) => {
     const rpcName = action === "accept_offer" ? "flame_chick_accept_delivery_offer" : "flame_chick_decline_delivery_offer";
     const args:Record<string,unknown> = { p_offer_id:offerId, p_rider_user_id:user.id };
     if(action === "decline_offer") args.p_reason = body.reason ?? null;
+    const requestId = typeof body.request_id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.request_id)
+      ? body.request_id : crypto.randomUUID();
+    args.p_request_id = requestId;
     const result = await callServiceRpc(rpcName,args);
     if(!result.ok) return response({ ok:false, error:{ code:"DELIVERY_OFFER_ACTION_FAILED", message:result.message.split(":").slice(1).join(":").trim() || "This delivery offer is no longer available." } },result.status);
     return response(result.data,200);
@@ -603,6 +610,8 @@ Deno.serve(async (req: Request) => {
   };
   if (action === "assign") payload.rider_user_id = body.rider_user_id;
   if (["reject", "failed"].includes(action)) payload.reason = body.reason ?? null;
+  payload.request_id = typeof body.request_id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.request_id)
+    ? body.request_id : crypto.randomUUID();
 
   const result = await callDeliveryRpc(payload);
   if (!result.ok) return response(result.body, result.status);
