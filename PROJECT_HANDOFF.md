@@ -3306,6 +3306,6 @@ Latest static verification:
 - POS/Rider Static Checks #16 passed, including API-only reads, explicit delivery-selection payloads, and missing-vs-zero area-fee handling.
 - Website Static Checks #144 passed, including the delivery selection and missing-vs-zero fee checks.
 - Admin Static Checks #82 passed.
-- Edge Function Static Checks #39 passed.
+- Edge Function Static Checks #40 passed.
 
 The detailed checkpoint and remaining release gates are in `docs/handoffs/2026-11-23-two-hour-release-readiness.md`. Full Production deployment remains NO-GO: the live Production DB has no order/delivery/payment/rider operational tables or RPCs; catalog counts and publications are zero; only Staff Admin Edge Function v1 is deployed; ordering flags are disabled; Storage and Realtime are empty; preview credentials/gates remain unconfigured. No Production writes or deployments were made.
