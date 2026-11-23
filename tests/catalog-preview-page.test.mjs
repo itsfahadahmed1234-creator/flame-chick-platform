@@ -60,6 +60,7 @@ test('preview renderer uses safe DOM text nodes and has no order or persistence 
   assert.match(source, /textContent/);
   assert.match(source, /createDealConfigurator/);
   assert.match(source, /Validate preview choices/);
+  assert.match(source, /deal.branchAvailable/);
   assert.match(source, /No quote was requested and no order was created/);
 });
 
