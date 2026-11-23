@@ -464,9 +464,9 @@
     });
     s.dealComponentGroups.forEach(function (row, i) {
       checkReference(maps.deals, row.dealId, 'dealComponentGroups[' + i + '].dealId', errors);
-      if (!s.dealComponentOptions.some(function (option) { return option.componentGroupId === row.componentGroupId; })) {
+      if (row.minUnits > 0 && !s.dealComponentOptions.some(function (option) { return option.componentGroupId === row.componentGroupId; })) {
         addError(errors, 'dealComponentGroups[' + i + ']', 'DEAL_COMPONENT_OPTIONS_REQUIRED',
-          'Every published active deal component group must contain at least one active option.');
+          'Every required deal component group must contain at least one active option.');
       }
       if (row.minUnits > row.maxUnits || row.maxUnits > 100 ||
           (row.maxUnitsPerOption !== null && (row.maxUnitsPerOption < 1 || row.maxUnitsPerOption > row.maxUnits))) {
