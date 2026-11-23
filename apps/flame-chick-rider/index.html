@@ -453,15 +453,11 @@ function renderItem(it){
 function actionButtons(row){
   const s=row.task.status;
   if(s==='assigned'){
-    const a=row.assignment||{};
-    const deadline=Date.parse(a.assigned_at||row.task.assigned_at||'')+60000;
-    if(a.status==='assigned'&&!a.accepted_at&&Number.isFinite(deadline)&&Date.now()>=deadline){
-      return '<span class="status">Time expired · finding next rider</span>';
-    }
-    return '<button class="btn primary" data-action="accept">Accept</button><button class="btn danger" data-action="reject">Decline</button>';
+    // Offer acceptance is handled once in the Offers panel. Never ask the
+    // Rider to accept the same delivery a second time from the active-jobs card.
+    return '<span class="status">Respond to the offer above</span>';
   }
-  if(s==='accepted')return '<button class="btn primary" data-action="arrive">At restaurant</button><button class="btn danger" data-action="reject">Cannot complete</button>';
-  if(s==='arrived_at_restaurant')return '<button class="btn primary" data-action="picked_up">Picked up</button><button class="btn danger" data-action="reject">Cannot complete</button>';
+  if(s==='accepted')return '<button class="btn primary" data-action="picked_up">Picked up</button><button class="btn danger" data-action="reject">Cannot complete</button>';
   if(s==='out_for_delivery'||s==='picked_up')return '<button class="btn primary" data-action="delivered">Delivered</button><button class="btn danger" data-action="failed">Report issue</button>';
   if(s==='failed'&&!row.task.return_reported_at)return '<button class="btn primary" data-action="return_reported">Returned to restaurant</button>';
   if(s==='failed'&&row.task.return_reported_at)return '<span class="status">Return reported · awaiting confirmation</span>';
