@@ -51,6 +51,30 @@ CREATE TRIGGER qa_delivery_offer_race_delay
 BEFORE UPDATE OF status ON public.delivery_task_offers
 FOR EACH ROW EXECUTE FUNCTION app_private.test_delivery_offer_race_delay();
 
+CREATE OR REPLACE FUNCTION app_private.test_payment_collection_race_delay()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path=''
+AS $function$
+BEGIN
+  IF NEW.restaurant_id='b7777777-7777-4777-8777-777777777660'::uuid
+     AND NEW.order_id IN (
+       'b7777777-7777-4777-8777-777777777684'::uuid,
+       'b7777777-7777-4777-8777-777777777685'::uuid
+     )
+     AND COALESCE(pg_catalog.current_setting('test.payment.race_delay',true),'')='on' THEN
+    -- The payment command has already acquired the order row lock before the
+    -- ledger INSERT fires this trigger, so a second session must wait on it.
+    PERFORM pg_catalog.pg_sleep(1.2);
+  END IF;
+  RETURN NEW;
+END
+$function$;
+
+CREATE TRIGGER qa_payment_collection_race_delay
+BEFORE INSERT ON public.payments
+FOR EACH ROW EXECUTE FUNCTION app_private.test_payment_collection_race_delay();
+
 INSERT INTO public.restaurants(id,name,slug,currency_code,timezone,is_active)
 VALUES('b7777777-7777-4777-8777-777777777660','QA Delivery Concurrency','flame-chick','PKR','Asia/Karachi',true);
 INSERT INTO public.branches(id,restaurant_id,branch_code,name,is_active)
@@ -180,6 +204,15 @@ BEGIN
   END LOOP;
 END
 $assign_offers$;
+
+INSERT INTO public.orders(
+  id,restaurant_id,branch_id,order_number,idempotency_key,request_hash,source,
+  fulfillment_type,status,customer_name,customer_phone,delivery_address,delivery_area_id,
+  delivery_area_name_snapshot,delivery_selection_type,delivery_area_fee_snapshot,
+  subtotal,discount_amount,delivery_fee,total,currency_code,payment_status,delivered_at
+) VALUES
+ ('b7777777-7777-4777-8777-777777777684','b7777777-7777-4777-8777-777777777660','b7777777-7777-4777-8777-777777777661','QA-RACE-PAY-0001','qa-race-payment-0001',repeat('b',64),'pos','delivery','delivered','QA Race Payment One','03000000005','205 QA Race Road, Karachi','b7777777-7777-4777-8777-777777777662','QA Race Area','listed_area',0,100,0,0,100,'PKR','unpaid',clock_timestamp()),
+ ('b7777777-7777-4777-8777-777777777685','b7777777-7777-4777-8777-777777777660','b7777777-7777-4777-8777-777777777661','QA-RACE-PAY-0002','qa-race-payment-0002',repeat('c',64),'pos','delivery','delivered','QA Race Payment Two','03000000006','206 QA Race Road, Karachi','b7777777-7777-4777-8777-777777777662','QA Race Area','listed_area',0,100,0,0,100,'PKR','unpaid',clock_timestamp());
 
 DO $verify$
 DECLARE
