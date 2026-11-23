@@ -537,7 +537,7 @@ This successful real-DB integration was local/disposable only. No Production mig
 
 - Run **45140258871** passed on script commit `2afcb6a3c03e9ccc25a5a2811b44ebce0d6aaaac`. Full migration replay, Admin workspace cancellation/confirmation path, actual authenticated importer, database snapshot validation, strict SQL publication validation, retry idempotency and local stack cleanup all passed.
 - The run again observed transient Docker image-registry `toomanyrequests` messages during startup; it recovered and the run passed. This is runner infrastructure rate limiting, not an application/database failure.
-- Latest workflow-only commit: `afc1540e9ad41738c9d837bc79a4ca4098831d28`. Run **45140263708** is the subsequent latest-head repeat; checkout, pinned CLI and syntax/source guard steps passed, while disposable Supabase startup remained in progress at the last inspection. Do not call this run failed or fully passed until its final conclusion is available.
+- Latest workflow-only commit `afc1540e9ad41738c9d837bc79a4ca4098831d28` passed in run **45140263708**. The complete migration replay, Admin workspace action integration, authenticated importer, snapshot contract, strict SQL publication validation (zero errors), idempotent retry and disposable-stack cleanup all passed. The only later commits are documentation updates.
 - This is a **module-level workspace interaction test with a mocked root element and same-origin draft fetch**, not a full Chromium/real-browser E2E test. Browser rendering/navigation and a real authenticated Admin session remain separate QA work.
 
 ### Current safe boundary
