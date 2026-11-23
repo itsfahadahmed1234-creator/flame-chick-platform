@@ -55,7 +55,7 @@ jobs:
           grep -q "buildCatalogRpcCall" scripts/qa-catalog-v3-importer-db.mjs
           grep -q "flame_chick_catalog_compile_snapshot" scripts/qa-catalog-v3-importer-db.mjs
           grep -q "catalog_publication_validate" scripts/qa-catalog-v3-importer-db.mjs
-          grep -q "second import" scripts/qa-catalog-v3-importer-db.mjs
+          grep -q "const second=await importer.runPublishedMenuImport" scripts/qa-catalog-v3-importer-db.mjs
 
       - name: Start disposable Supabase with hosted-only helper compatibility
         shell: bash
