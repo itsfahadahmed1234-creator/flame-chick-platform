@@ -1,49 +1,40 @@
-# CURRENT CHECKPOINT — 2026-11-23 16:58 PKT — operational schema security replay
+# CURRENT CHECKPOINT — 2026-11-23 17:12 PKT — staff role lookup hardening
 
-**Active source branch:** `work/production-source-audit`  
-**Latest correction commit:** `a30609aac5892d8e55277ad8a434d88633a864ce`  
-**Production:** untouched. **`main`: untouched.**
+**Active branch:** `work/production-source-audit`  
+**Implementation commit:** `dd993c74accf61dd5494882c4eb8d53b0f2718be`  
+**Production and `main`: untouched.**
 
-## Delivery lifecycle contract
+## Verified CI status from previous checkpoint
 
-Rider flow remains exactly **Accept offer → Picked up → Delivered**. No At restaurant/arrival stage and no second Accept action in the active-job card. Delivery failure/return is a separate exception: rider reports the return; authorized Cashier or Manager confirms physical receipt. Offer timeout is 60 seconds; rejection/expiry returns the task to POS for manual reassignment.
+- Full disposable migration/catalog importer chain on `a30609a`: passed.
+- Catalog publication validation fixture chain on `a30609a`: passed.
+- Staff Admin role-boundary workflow on `a30609a`: failed at `BATCH4_DIRECT_TABLE_PRIVILEGES_LEAK`. Its strict check correctly found service_role had direct SELECT on `public.user_profiles` and `public.user_roles`, contradicting the established Batch 4 security baseline. Do not waive this guard.
 
-## Fixes made after the previous checkpoint
+## Current source correction
 
-- Added required unique key `delivery_tasks(id,branch_id,restaurant_id)` to satisfy composite foreign keys from offers, assignments and events.
-- Set the assignment default to `accepted`, matching accepted-offer state and allowed status constraints.
-- Removed obsolete `arrived_at_restaurant` query filter and `arrived_at` assignment projections from the Delivery API.
-- Removed Rider's obsolete assigned/acceptance-countdown stage and POS's second acceptance countdown/reassignment state. POS now displays the targeted offer state.
-- Added Rider/POS/Edge API regression assertions. First CI caught an over-escaped regex in the test; corrected on `c07dd9772137de7c4ce4cdea8826267b5c7d8336`.
-- POS/Rider static checks passed on `5c9ae27...`; Admin and Edge Function static checks passed on `c07dd977...`.
-- Disposable full migration replay then caught a security preflight mismatch: the operational migration/QA incorrectly rejected authenticated USAGE on `app_private`, despite the existing Batch 4 Staff Admin SECURITY INVOKER wrapper explicitly requiring it. Corrected both operational migration and disposable QA to allow only that established authenticated schema USAGE while continuing to deny `anon` and `service_role`; added a fail-closed assertion that authenticated USAGE exists.
-- Latest source correction: `a30609aac5892d8e55277ad8a434d88633a864ce`.
+Commit `dd993c7...` adds `20261123170000_flame_chick_staff_role_projection_rpc_v1.sql`:
+- Revokes service_role direct SELECT on `user_profiles` and `user_roles`.
+- Adds a SECURITY DEFINER, empty-search-path, service_role-only RPC `flame_chick_get_staff_role_rows(p_user_id)` returning only active Flame Chick role rows for the supplied subject, with active profile/Auth/restaurant checks.
+- Leaves anon/authenticated/public without EXECUTE.
+- Updates Order and Delivery Edge Functions to resolve staff/rider roles via the narrow RPC, rather than direct `user_roles` REST queries.
+- Reuses the shared rider-role guard for presence instead of duplicating direct role lookup.
+- Adds regression checks to the Batch 4 and operational SQL tests and Edge Function contract test.
 
-## Current verification — pending
+**Important:** This commit has just been pushed. Its CI has not yet been inspected. Do not claim the new migration, role tests or TypeScript checks pass until Actions for `dd993c7...` complete.
 
-Three workflows were started on `a30609a...` and were still in progress at the time of this handoff update:
-- Catalog importer full local migration chain: run 45169678210
-- Staff Admin role-boundary isolated QA: run 45169678326
-- Catalog publication full local migration chain/fixture: run 45169678223
+## Delivery workflow still next
 
-Do not report these as passed until their conclusions and any failing logs are inspected. Preview deployment jobs remain skipped intentionally. No production migrations or deployments have been made.
+After role QA passes, add disposable operational fixtures and then implement transactional delivery commands:
+- POS targeted rider assignment, branch scoped and idempotent.
+- One 60-second offer, no broadcast or automatic reoffer.
+- Rider may accept/decline only their own offer; expiry/rejection returns task to POS for manual reassignment.
+- Rider transitions accepted → picked_up → delivered only.
+- Rider may report failure/return; Manager/Cashier confirms physical return and audit.
+- Protect concurrent acceptance and duplicate requests with row locks/idempotency.
+- No "At restaurant" stage or second Accept action.
+- No Realtime enablement, deployments, Production migration, checkout activation or menu publication.
 
-## Next implementation stage
-
-1. Confirm the three workflows above.
-2. If replay passes, extend the disposable operational fixture with a test Auth rider, rider profile, delivery order/task, 60-second offer and accepted assignment; assert one pending offer per task, offer uniqueness, tenant/branch FKs, no cross-rider access and rollback.
-3. Implement transactional delivery RPCs in a separate candidate migration:
-   - POS/Admin/Owner/Manager/Cashier targeted rider assignment, branch scoped and idempotent;
-   - atomically create one 60-second offer and move task to offering;
-   - rider-only accept/decline of own offer, with expiry and concurrent accept guarded by row locks;
-   - Picked up and Delivered transitions only for the currently assigned rider;
-   - failure/return report by rider, physical-return confirmation only by Manager/Cashier, with audit;
-   - reject/expiry returns task to POS manual reassignment; never automatically fan out offers.
-4. Match exact action/RPC payloads in `flame-chick-delivery-api`; add contract and disposable SQL concurrency/role tests.
-5. Keep source-only. Do not apply to Production, deploy Edge Functions, configure Realtime, publish Vercel or enable checkout without a separate review/approval.
-
-Do not add GST. Preserve catalog Publication #2 and Option 1 product/variant-linked deal model. New published menu details must come from the user's supplied menu when that stage is reached; do not reconstruct or seed guesses.
-
+Catalog Publication #2 and Option 1 linked product/variant deal model remain unchanged. GST remains deferred.
 ---
 
 **Detailed audit:** [docs/handoffs/2026-11-23-production-integration-audit.md](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/blob/work/production-source-audit/docs/handoffs/2026-11-23-production-integration-audit.md)  
