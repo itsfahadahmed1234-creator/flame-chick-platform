@@ -95,14 +95,14 @@ Timezone: Asia/Karachi. Start is inclusive; end is exclusive (15:00:00 <= local 
 1. **The Injector + Cold Drink** (the Rs. 120 Cold Drink) — Rs. 699.
 2. **Quarter Broast + Burger + Cold Drink** (the Rs. 120 Cold Drink) — Rs. 1,599.
 
-The second package's customer-facing component label and deal description must say **"Burger"**, not "OG Crunch". The fixed internal product reference remains OG Crunch as previously confirmed. No substitutions or selection UI.
+The second package's customer-facing component label and deal description must say **"Burger"**, not "OG Crunch". Its fixed internal component must link to the separate deal-only **Burger** product, not OG Crunch. No substitutions or selection UI.
 
 Outside 3–5 PM, both Flame Hour offers must remain visible and greyed out. Customers must still be able to open the deal detail popup and see the composition, but all ordering/continue/add actions must be unavailable. The trusted order API must independently reject attempts outside the schedule. Do not hide the deals or rely on the browser clock.
 
 ### Flame Duo — Rs. 2,099
 
 Fixed composition:
-- 2 x OG Crunch internally; customer-facing component label: **"Burger"** with quantity 2.
+- 2 x the deal-only **Burger** product; customer-facing component label: **"Burger"** with quantity 2.
 - 1 x Quarter Broast.
 - 2 x the Rs. 120 Cold Drink.
 
@@ -112,7 +112,7 @@ The deal description and popup must say **"2 Burgers"**, not "2 OG Crunch". No s
 
 Fixed composition:
 - 1 x Half Broast.
-- 3 x OG Crunch internally; customer-facing component label: **"Burger"** with quantity 3.
+- 3 x the deal-only **Burger** product; customer-facing component label: **"Burger"** with quantity 3.
 - 1 x restaurant-supplied 1L drink.
 
 The customer-facing description/popup must say **"3 Burgers"**, not "3 OG Crunch". The 1L drink is a deal-only included component. Do not add a standalone product, standalone price, selectable drink list, or charge for it separately. Restaurant decides what is supplied.
@@ -139,7 +139,7 @@ No selectable burger choices.
 ## Implementation requirements discovered from current V3 source
 
 1. The V3 deal data model already identifies each component by exact productId and productVariantId. Keep those authoritative IDs bound to the fixed products.
-2. The current published snapshot's dealComponentGroups.nameEn is a customer-facing label, while each component option links to an internal product. For the generic burger components, set the group label to **"Burger"** and keep the component option's product ID linked to OG Crunch. The website must render a fixed one-option group's group label instead of exposing the internal product name.
+2. The current published snapshot's dealComponentGroups.nameEn is a customer-facing label, while each component option links to an internal product. For the generic burger components, set the group label to **"Burger"** and link the component option to the separate deal-only **Burger** product and variant. Do not map generic Burger to OG Crunch. The website must render a fixed one-option group's group label instead of exposing the internal product name.
 3. All fixed deal groups should be preselected/locked by the UI using the single-option + exact required quantity model. The customer must not be asked to select a burger, drink, fries, or restaurant-supplied juice/1L drink. Keep ID/quantity validation and server-side reconstruction.
 4. Current V3 deal availability combines branch/fulfilment availability and schedule availability, and the configurator refuses every unavailable deal. Separate "can open details" from "can order": a schedule-closed Flame Hour offer can open in read-only detail mode while remaining unorderable. Keep the current available/orderable meaning fail-closed and never let a read-only popup yield an orderable quote.
 5. Flame Hour schedule evaluation must use trusted database time and restaurant timezone Asia/Karachi; do not use client time for order acceptance.
