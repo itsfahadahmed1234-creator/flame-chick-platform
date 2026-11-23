@@ -13,13 +13,14 @@ const databaseNow = '2026-11-23T12:00:00.123456Z';
 const secondBranchId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
 function createDependencies(snapshot = createSnapshot(), overrides = {}) {
+  const catalogSnapshot = { ...snapshot, databaseNow };
   return {
     config: {},
     client: {
       load: async () => ({
         state: 'ready',
-        snapshot: snapshot,
-        versionId: snapshot.versionId,
+        snapshot: catalogSnapshot,
+        versionId: catalogSnapshot.versionId,
         databaseNow: databaseNow
       })
     },
