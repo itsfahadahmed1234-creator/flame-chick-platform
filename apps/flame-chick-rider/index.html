@@ -205,7 +205,6 @@ const PUBLISHABLE_KEY='sb_publishable_89MQIj_drF15IrF05ZLt0w_txUjPMxy';
 const DELIVERY_API=SUPABASE_URL+'/functions/v1/flame-chick-delivery-api';
 const ORDER_API=SUPABASE_URL+'/functions/v1/flame-chick-order-api';
 const AUTH_URL=SUPABASE_URL+'/auth/v1';
-const REST_URL=SUPABASE_URL+'/rest/v1';
 const SESSION_KEY='flame_chick_rider_session_v1';
 let session=null,user=null,rider=null,jobs=[],offers=[],busy=false,pendingAuthSession=null,pendingAuthType='invite',riderPresenceTimer=null,riderPresenceSending=false,riderWantsOnline=true,offerExpiryTimer=null;
 const expiredAcceptanceRefreshes=new Set();
@@ -337,18 +336,6 @@ function markRiderOfflineBestEffort(){
     keepalive:true
   }).catch(()=>{});
 }
-async function riderDirectRead(resource,query){
-  if(!session?.access_token)throw new Error('Please sign in again.');
-  const url=REST_URL+'/'+resource+'?'+new URLSearchParams(query||{}).toString();
-  const response=await fetch(url,{method:'GET',headers:{...authHeaders(),'Accept':'application/json'},cache:'no-store'});
-  const data=await response.json().catch(()=>[]);
-  if(response.status===401){signOut('Your session expired. Please sign in again.');throw new Error('Your session expired. Please sign in again.');}
-  if(response.status===403)throw new Error('Your rider account is not allowed to read this delivery.');
-  if(!response.ok)throw new Error(data.message||'Could not refresh your delivery ('+response.status+').');
-  return data;
-}
-
-
 function stopRiderRealtime(){
   clearTimeout(riderRealtimeRefreshTimer);
   clearTimeout(riderRealtimeRefreshDebounce);
