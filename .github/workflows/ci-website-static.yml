@@ -15,6 +15,7 @@ on:
       - "tests/branch-fulfilment-v3.test.mjs"
       - "tests/catalog-database-time-migration.test.mjs"
       - "tests/catalog-v3-preview.test.mjs"
+      - "tests/catalog-preview-page.test.mjs"
       - "supabase/migrations/20261122174500_flame_chick_catalog_database_time_metadata_v1.sql"
       - "tests/fixtures/catalog-v3-fixture.cjs"
       - ".github/workflows/ci-website-static.yml"
@@ -47,12 +48,13 @@ jobs:
           node --check apps/flame-chick-website/js/catalog-v3-deal-configurator.js
           node --check apps/flame-chick-website/js/branch-fulfilment-v3.js
           node --check apps/flame-chick-website/js/catalog-v3-preview.js
+          node --check apps/flame-chick-website/js/catalog-preview-page.js
           node --check apps/flame-chick-website/js/config.js
           node --check apps/flame-chick-website/js/hero-slider.js
           node --check apps/flame-chick-website/js/i18n.js
           node --check apps/flame-chick-website/js/pricing.js
           node --check apps/flame-chick-website/js/store.js
-          node --test tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs tests/catalog-v3-view.test.mjs tests/catalog-v3-deal-view.test.mjs tests/catalog-v3-deal-configurator.test.mjs tests/branch-fulfilment-v3.test.mjs tests/catalog-database-time-migration.test.mjs tests/catalog-v3-preview.test.mjs
+          node --test tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs tests/catalog-v3-view.test.mjs tests/catalog-v3-deal-view.test.mjs tests/catalog-v3-deal-configurator.test.mjs tests/branch-fulfilment-v3.test.mjs tests/catalog-database-time-migration.test.mjs tests/catalog-v3-preview.test.mjs tests/catalog-preview-page.test.mjs
 
       - name: Verify website inline scripts parse
         run: |
@@ -72,5 +74,17 @@ jobs:
             const code = chunk.slice(tagEnd + 1, close).trim();
             if (code) new vm.Script(code, { filename: "website-inline-" + inlineIndex++ + ".js" });
           }
-          console.log("Website inline scripts parse successfully.");
+          const previewHtml = readFileSync("apps/flame-chick-website/catalog-preview.html", "utf8");
+          const previewChunks = previewHtml.split("<script").slice(1);
+          for (const chunk of previewChunks) {
+            const tagEnd = chunk.indexOf(">");
+            if (tagEnd < 0) continue;
+            const attributes = chunk.slice(0, tagEnd).toLowerCase();
+            if (attributes.includes("src=")) continue;
+            const close = chunk.indexOf("</script>", tagEnd + 1);
+            if (close < 0) continue;
+            const code = chunk.slice(tagEnd + 1, close).trim();
+            if (code) new vm.Script(code, { filename: "catalog-preview-inline.js" });
+          }
+          console.log("Website and preview inline scripts parse successfully.");
           NODE
