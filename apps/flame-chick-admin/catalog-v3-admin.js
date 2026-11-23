@@ -64,7 +64,7 @@
   }
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const cash=v=>v==null?'No standalone price':'Rs. '+Number(v).toLocaleString('en-PK',{maximumFractionDigits:2});
-  function checkbox(name,label,checked){return '<label class="fcv3-check"><input type="checkbox" data-field="'+name+'"'+(checked?' checked':'')+'> '+label+'</label>';}
+  function checkbox(name,label,checked){return '<label class="fcv3-check"><input type="checkbox" name="'+name+'" data-field="'+name+'"'+(checked?' checked':'')+'> '+label+'</label>';}
   function createWorkspace(){
     let el=null,request=null;
     const s={loading:false,saving:false,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,components:[],detail:null,partial:null};
@@ -242,7 +242,16 @@
         const payload=normalizeProductDraft({id:fd.get('id')||undefined,category_id:fd.get('category_id'),name_en:fd.get('name_en'),name_ur:fd.get('name_ur'),description_en:fd.get('description_en'),description_ur:fd.get('description_ur'),sort_order:Number(fd.get('sort_order')||0),featured:fd.has('featured'),is_active:fd.has('is_active'),is_available:fd.has('is_available'),variants:readVariantRows(form)});
         await write(WRITE.product,payload);s.editor=null;s.notice='Product and variants saved to catalog draft.';await refresh();return;
       }
-      if(type==='deal'){s.dealDraft={title:fd.get('title'),description_en:fd.get('description_en'),base_price:fd.get('base_price'),flame_hour:fd.has('flame_hour')};await createDeal(s.dealDraft);}
+      if(type==='deal'){
+        s.components=Array.from(form.querySelectorAll('[data-component-row]')).map(row=>({
+          display_name:row.querySelector('[data-field="display_name"]').value,
+          product_id:row.querySelector('[data-field="product_id"]').value,
+          product_variant_id:row.querySelector('[data-field="product_variant_id"]').value,
+          quantity:Number(row.querySelector('[data-field="quantity"]').value)
+        }));
+        s.dealDraft={title:fd.get('title'),description_en:fd.get('description_en'),base_price:fd.get('base_price'),flame_hour:fd.has('flame_hour')};
+        await createDeal(s.dealDraft);
+      }
     }
     function bind(){
       el.onclick=async event=>{
