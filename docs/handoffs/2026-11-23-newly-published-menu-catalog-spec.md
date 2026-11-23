@@ -203,3 +203,49 @@ This matters for the newly approved menu because Fries, Juice, the Flame Feast 1
 Before entering these components, design and test a narrow schema/contract update that permits a NULL price only for a non-standalone variant that is referenced exclusively by active deal component mappings with `pricingTreatment = INCLUDED`. Keep all standalone-sellable variants price-required; reject null-priced variants that are unreferenced, used in surcharge/standalone deal pricing, or otherwise violate the intended included-only scope. Update snapshot validation, publication validation and product preview mapping consistently. Test both accepted and rejected cases. This is a source/migration candidate only until separately approved for Production.
 
 Also, the current isolated V3 preview uses inline product-card selectors rather than a product detail popup. The required Smash Single/Double selection is not yet a popup implementation. Before customer storefront cutover, build/test an accessible product detail popup (or another explicitly approved popup-equivalent) with mandatory variant selection, then connect it only after the secure order API and main V3 storefront migration are complete.
+
+## Latest user decision — retain linked deal products (2026-11-23)
+
+**Decision:** Do not use the proposed text-only included-content model. Retain the existing V3 product/variant-linked deal architecture. Any item that appears in a deal but is not a standalone item on the newly published menu must be represented as a **deal-only product** and linked through the existing `deal_component_options` product/variant references.
+
+This is the user's chosen simpler operational model. It supersedes the earlier conversational proposal for a separate text-only included-content structure. Do not create a new text-only deal-content table for this menu.
+
+### Deal-only product rules
+
+- Deal-only items are real internal catalog product/variant records, but they are **not independently sellable** and must never appear as standalone menu cards, standalone search results or customer-selectable products.
+- Keep the existing fixed deal component mappings and `pricingTreatment = INCLUDED`. The deal's printed fixed price is the only amount charged. Component prices must not be added to the deal, exposed as individual charges, or used to calculate a second total.
+- Do not invent standalone prices or insert Rs. 0 merely to satisfy validation. A deal-only included variant may have a NULL price only after a narrowly scoped, tested source/migration change proves it is non-standalone and referenced exclusively by valid included deal mappings. Standalone variants remain price-required. Reject orphaned NULL-price variants and NULL-price variants used for standalone/surcharge treatment.
+- Fixed bundle contents remain preselected and locked. No substitutions or customer-facing component selectors are introduced.
+- Keep immutable order snapshots of the resolved component product/variant IDs, customer-facing names and quantities when the future order API is implemented. Do not rely on a live catalog join to reconstruct historical order contents.
+- Generic deal wording is not evidence of a specific standalone product. Do not map a generic Burger to OG Crunch just to satisfy the foreign key; create the deal-only Burger product below.
+- Deal-only products should be shared across deals only where the restaurant wording and operational identity are the same. Do not guess recipes, brands, flavours or further composition.
+
+### Required mapping for the published offers
+
+**Existing standalone products/variants reused as deal components:**
+- The Injector — Flame Hour first offer.
+- Cold Drink, the exact menu entry priced Rs. 120 — Flame Hour both offers, Flame Duo and Little Crunch.
+- Quarter Broast — Flame Hour second offer and Flame Duo.
+- Half Broast — Flame Feast.
+- OG Crunch — Little Crunch only, because that deal explicitly names OG Crunch.
+
+**Create deal-only product/variant records (non-standalone):**
+- **Burger** — generic burger component for Flame Hour's Quarter Broast + Burger offer, Flame Duo (quantity 2), and Flame Feast (quantity 3). Do not map this product to OG Crunch.
+- **Classic Nuggets (6 pcs)** — the six-piece included portion in Mini Flame and Little Crunch. Keep it separate from the standalone Classic Nuggets 12-piece pack; do not represent six pieces as six 12-piece packs.
+- **Fries** — included component in Mini Flame and Little Crunch. No size/portion selector.
+- **Juice** — included component in Mini Flame. Restaurant decides what is supplied; do not invent a brand/flavour.
+- **1L Drink** — included component in Flame Feast. Restaurant decides what is supplied; do not create a standalone drink entry or selectable choice.
+
+The deal quantities stay as printed: Flame Hour first offer (1 The Injector + 1 Rs.120 Cold Drink); Flame Hour second offer (1 Quarter Broast + 1 Burger + 1 Rs.120 Cold Drink); Flame Duo (2 Burgers + 1 Quarter Broast + 2 Rs.120 Cold Drinks); Flame Feast (1 Half Broast + 3 Burgers + 1 1L Drink); Mini Flame (6-piece Classic Nuggets portion + Fries + Juice); Little Crunch (6-piece Classic Nuggets portion + 1 OG Crunch + Fries + 1 Rs.120 Cold Drink).
+
+### Required source/schema work before catalog entry
+
+1. Inspect the actual current migrations, product/variant fields, deal component constraints, catalog write commands, publication validator, compiled snapshot, V3 snapshot validator, view models and preview renderer. Follow the existing architecture; do not invent a parallel model.
+2. Confirm the product/variant non-standalone field semantics and ensure deal-only records are excluded from all standalone product surfaces, while remaining resolvable through deal component mappings.
+3. Implement the narrow NULL-price rule for deal-only variants with INCLUDED treatment only, consistently in SQL publication validation and the TypeScript snapshot validator. Standalone, orphaned, and surcharge-priced NULL variants must fail closed. Preserve all existing RLS, grants and immutable snapshot guarantees.
+4. Keep deal component presentation fixed and customer-friendly. Generic Burger displays as Burger; the Little Crunch component displays as OG Crunch. Included deal components must not show separate component prices or a browser-calculated deal total.
+5. Add synthetic fixtures and regression tests for all six offers, checking product IDs, variant IDs, quantities, included treatment, standalone exclusion, NULL-price acceptance/rejection, generic Burger versus OG Crunch identity, and the exact fixed deal prices.
+6. No Production SQL, migration application, seed/import, catalog publication, Edge Function deployment, website deployment, or checkout activation is authorized by this decision. These remain separate explicit approval gates. GST remains deferred.
+
+**Current safe boundary:** documentation decision only. The live Production catalog remains empty and unpublished. No database, deployment, or checkout changes were made for this decision.
+
