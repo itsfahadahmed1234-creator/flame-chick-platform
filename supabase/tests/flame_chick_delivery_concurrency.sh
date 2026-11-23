@@ -23,10 +23,11 @@ offer_for() { scalar "SELECT id FROM public.delivery_task_offers WHERE delivery_
 expiry_for() { scalar "SELECT expires_at::text FROM public.delivery_task_offers WHERE id='$1'"; }
 before_expiry_for() { scalar "SELECT (expires_at-interval '1 microsecond')::text FROM public.delivery_task_offers WHERE id='$1'"; }
 
+LAST_PID=""
 start_session() {
   local app="$1" sql="$2" output="$3"
   PGAPPNAME="$app" "${PSQL[@]}" -c "$sql" >"$output" 2>&1 &
-  echo $!
+  LAST_PID=$!
 }
 
 wait_for_event() {
@@ -107,9 +108,11 @@ OFFER1="$(offer_for "$TASK1")"
 EXP1="$(before_expiry_for "$OFFER1")"
 SQL_A1="BEGIN; SELECT set_config('test.delivery.clock_now','$EXP1',true); SELECT set_config('test.delivery.clock_sleep_on_call','1',true); SELECT set_config('test.delivery.clock_sleep_seconds','1.2',true); SELECT public.flame_chick_accept_delivery_offer('$OFFER1','$RIDER1',gen_random_uuid()); COMMIT;"
 SQL_B1="BEGIN; SELECT public.flame_chick_decline_delivery_offer('$OFFER1','$RIDER1','Concurrent decline contender',gen_random_uuid()); COMMIT;"
-PID_A1="$(start_session race1_accept "$SQL_A1" "$TMP_DIR/race1_accept.log")"
+start_session race1_accept "$SQL_A1" "$TMP_DIR/race1_accept.log"
+PID_A1="$LAST_PID"
 wait_for_event race1_accept PgSleep "$PID_A1"
-PID_B1="$(start_session race1_decline "$SQL_B1" "$TMP_DIR/race1_decline.log")"
+start_session race1_decline "$SQL_B1" "$TMP_DIR/race1_decline.log"
+PID_B1="$LAST_PID"
 wait_for_event race1_decline Lock "$PID_B1"
 wait "$PID_B1"
 wait "$PID_A1"
@@ -121,9 +124,11 @@ echo "[race 2/4] Rider decline wins against concurrent accept"
 OFFER2="$(offer_for "$TASK2")"
 SQL_A2="BEGIN; SELECT set_config('test.delivery.clock_sleep_on_call','1',true); SELECT set_config('test.delivery.clock_sleep_seconds','1.2',true); SELECT public.flame_chick_decline_delivery_offer('$OFFER2','$RIDER2','Concurrent decline winner',gen_random_uuid()); COMMIT;"
 SQL_B2="BEGIN; SELECT public.flame_chick_accept_delivery_offer('$OFFER2','$RIDER2',gen_random_uuid()); COMMIT;"
-PID_A2="$(start_session race2_decline "$SQL_A2" "$TMP_DIR/race2_decline.log")"
+start_session race2_decline "$SQL_A2" "$TMP_DIR/race2_decline.log"
+PID_A2="$LAST_PID"
 wait_for_event race2_decline PgSleep "$PID_A2"
-PID_B2="$(start_session race2_accept "$SQL_B2" "$TMP_DIR/race2_accept.log")"
+start_session race2_accept "$SQL_B2" "$TMP_DIR/race2_accept.log"
+PID_B2="$LAST_PID"
 wait_for_event race2_accept Lock "$PID_B2"
 wait "$PID_B2"
 wait "$PID_A2"
@@ -137,9 +142,11 @@ EXP3_BEFORE="$(before_expiry_for "$OFFER3")"
 EXP3_AT="$(expiry_for "$OFFER3")"
 SQL_A3="BEGIN; SELECT set_config('test.delivery.clock_now','$EXP3_BEFORE',true); SELECT set_config('test.delivery.clock_sleep_on_call','1',true); SELECT set_config('test.delivery.clock_sleep_seconds','1.2',true); SELECT public.flame_chick_accept_delivery_offer('$OFFER3','$RIDER3',gen_random_uuid()); COMMIT;"
 SQL_B3="BEGIN; SELECT set_config('test.delivery.clock_now','$EXP3_AT',true); SELECT public.flame_chick_expire_delivery_offers('$BRANCH_ID',100); COMMIT;"
-PID_A3="$(start_session race3_accept "$SQL_A3" "$TMP_DIR/race3_accept.log")"
+start_session race3_accept "$SQL_A3" "$TMP_DIR/race3_accept.log"
+PID_A3="$LAST_PID"
 wait_for_event race3_accept PgSleep "$PID_A3"
-PID_B3="$(start_session race3_expiry "$SQL_B3" "$TMP_DIR/race3_expiry.log")"
+start_session race3_expiry "$SQL_B3" "$TMP_DIR/race3_expiry.log"
+PID_B3="$LAST_PID"
 wait "$PID_B3"
 if ! kill -0 "$PID_A3" 2>/dev/null; then
   echo "Expiry sweep did not complete while acceptance held its row lock" >&2
@@ -156,9 +163,11 @@ OFFER4="$(offer_for "$TASK4")"
 EXP4_AT="$(expiry_for "$OFFER4")"
 SQL_A4="BEGIN; SELECT set_config('test.delivery.clock_now','$EXP4_AT',true); SELECT set_config('test.delivery.clock_sleep_on_call','3',true); SELECT set_config('test.delivery.clock_sleep_seconds','1.2',true); SELECT public.flame_chick_expire_delivery_offers('$BRANCH_ID',100); COMMIT;"
 SQL_B4="BEGIN; SELECT set_config('test.delivery.clock_now','$EXP4_AT',true); SELECT public.flame_chick_accept_delivery_offer('$OFFER4','$RIDER4',gen_random_uuid()); COMMIT;"
-PID_A4="$(start_session race4_expiry "$SQL_A4" "$TMP_DIR/race4_expiry.log")"
+start_session race4_expiry "$SQL_A4" "$TMP_DIR/race4_expiry.log"
+PID_A4="$LAST_PID"
 wait_for_event race4_expiry PgSleep "$PID_A4"
-PID_B4="$(start_session race4_accept "$SQL_B4" "$TMP_DIR/race4_accept.log")"
+start_session race4_accept "$SQL_B4" "$TMP_DIR/race4_accept.log"
+PID_B4="$LAST_PID"
 wait_for_event race4_accept Lock "$PID_B4"
 wait "$PID_B4"
 wait "$PID_A4"
