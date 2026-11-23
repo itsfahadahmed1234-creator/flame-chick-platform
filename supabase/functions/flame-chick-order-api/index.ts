@@ -377,6 +377,49 @@ Deno.serve(async (req: Request) => {
     return response(result.data, 201);
   }
 
+  if (action === "collect_payment") {
+    const authorization = req.headers.get("authorization") ?? "";
+    const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+    const user = await verifyStaffUser(token, apiKey);
+    if (!user) {
+      return response({ ok:false, error:{ code:"STAFF_AUTH_REQUIRED", message:"Sign in with a Flame Chick staff account to collect payment." } },401);
+    }
+    const canCollect = await verifyStaffRole(user.id, token, apiKey, ["owner","admin","manager","cashier"]);
+    if (!canCollect) {
+      return response({ ok:false, error:{ code:"PAYMENT_STAFF_REQUIRED", message:"An active Cashier, Manager, Admin or Owner role is required to collect payment." } },403);
+    }
+    const requestId = typeof body.request_id === "string"
+      ? body.request_id.trim() : "";
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
+      return response({ ok:false, error:{ code:"PAYMENT_REQUEST_ID_REQUIRED", message:"A valid unique payment request ID is required for safe retries." } },400);
+    }
+    if (typeof body.amount !== "number" || !Number.isFinite(body.amount) || body.amount <= 0) {
+      return response({ ok:false, error:{ code:"PAYMENT_AMOUNT_INVALID", message:"Enter a valid payment amount greater than zero." } },400);
+    }
+    const paymentMethod = String(body.payment_method ?? "").trim().toLowerCase();
+    if (!["cash","card","bank","wallet","other"].includes(paymentMethod)) {
+      return response({ ok:false, error:{ code:"PAYMENT_METHOD_INVALID", message:"Choose cash, card, bank, wallet or other." } },400);
+    }
+    const result = await callRpc("flame_chick_collect_order_payment", {
+      order_id: body.order_id,
+      actor_user_id: user.id,
+      request_id: requestId,
+      amount: body.amount,
+      payment_method: paymentMethod,
+    });
+    if (!result.ok) return response(result.body, result.status);
+    if (isObject(result.data) && result.data.ok === false) {
+      const err = isObject(result.data.error) ? result.data.error : {};
+      const code = String(err.code ?? "PAYMENT_COLLECTION_FAILED");
+      const status = code === "PAYMENT_ORDER_NOT_FOUND" ? 404 :
+        ["PAYMENT_STAFF_REQUIRED"].includes(code) ? 403 :
+        ["PAYMENT_ALREADY_SETTLED","PAYMENT_AMOUNT_EXCEEDS_BALANCE","PAYMENT_IDEMPOTENCY_CONFLICT","PAYMENT_ORDER_STATE_INVALID"].includes(code) ? 409 :
+        ["PAYMENT_REQUEST_INVALID","PAYMENT_IDENTIFIERS_INVALID","PAYMENT_AMOUNT_INVALID","PAYMENT_METHOD_INVALID"].includes(code) ? 400 : 500;
+      return response({ ok:false, error:{ code, message:String(err.message ?? "Payment collection could not be completed.") } },status);
+    }
+    return response(result.data,200);
+  }
+
   if (action === "update_status" || action === "cancel" || action === "reject") {
     const authorization = req.headers.get("authorization") ?? "";
     const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
