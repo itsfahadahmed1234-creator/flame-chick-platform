@@ -1431,6 +1431,7 @@ function dispatchStatusLabel(status){
 }
 function renderDeliveryDispatchAction(order){
   const task=deliveryTasksByOrder.get(String(order.OrderID));
+  if(String(order.Status||'')==='Delivered')return '<span class="dispatch-rider-pill">Delivered · awaiting cashier payment collection</span>';
   if(!task)return '<span class="pill pending">Checking dispatch…</span>';
   const assignments=Array.isArray(task.delivery_assignments)?task.delivery_assignments:[];
   const latest=[...assignments].sort((a,b)=>new Date(b.assigned_at||b.created_at||0)-new Date(a.assigned_at||a.created_at||0))[0]||null;
@@ -1465,14 +1466,14 @@ function renderDeliveryDispatchAction(order){
 }
 async function confirmDeliveryReturn(taskId,button){
   const role=String(flameChickStaffProfile?.role||'').toLowerCase();
-  if(!['owner','admin','manager'].includes(role)){showToast('Only an Flame Chick manager, admin or owner can confirm a returned delivery.');return;}
+  if(!['owner','admin','manager','cashier'].includes(role)){showToast('Only an authorized cashier, manager, admin or owner can confirm a returned delivery.');return;}
   const task=[...deliveryTasksByOrder.values()].find(x=>String(x.id)===String(taskId));
   if(!task||task.status!=='failed'||!task.return_reported_at){showToast('The rider has not yet reported the return.');return;}
   if(button)button.disabled=true;
   try{
     await flameChickDeliveryRequest('POST',null,{action:'confirm_return',delivery_task_id:taskId});
     await loadInitialOnlineInbox();
-    showToast('Returned order cancelled. Rider is now available.');
+    showToast('Physical return confirmed. Order moved to Cancelled Orders; payment status was not changed.');
   }catch(e){showToast(e?.message||'Could not confirm the returned delivery.');if(button)button.disabled=false;}
 }
 async function openRiderAssignment(orderId){
@@ -1840,7 +1841,7 @@ function queueStatusWrite(orderId,status,previous,intentVersion){
 const ORDER_STATUS_LABEL_BY_DB={
   new:'Pending',accepted:'Accepted',preparing:'Preparing',ready:'Ready',
   out_for_delivery:'Out for Delivery',delivered:'Delivered',collected:'Collected',
-  served:'Served',completed:'Completed',rejected:'Rejected',cancelled:'Cancelled'
+  served:'Served',completed:'Completed',rejected:'Rejected',cancelled:'Cancelled',returned:'Returned',returned:'Returned'
 };
 function applyDatabaseOrderStatus(order,row){
   const dbStatus=String(row?.status||'').toLowerCase();
@@ -2061,7 +2062,7 @@ function renderKanban(){
   // The 3 shared operational order columns accept website and manual POS delivery orders.
   // Pending orders are temporarily kept in the Accepted column so the
   // cashier can accept them without creating a fourth visible column.
-  const cols=[['Orders','accepted'],['Preparing','preparing'],['Out for Delivery','out']];
+  const cols=[['Orders','accepted'],['Preparing','preparing'],['Delivery & Awaiting Payment','out']];
   pruneInboxOrders();
   const orders=[...inboxOrders.values()].filter(isRecentWebsiteOrder);
 
@@ -2070,7 +2071,7 @@ function renderKanban(){
       const st=String(o.Status||'Pending').trim();
       if(label==='Orders') return st==='Pending'||st==='Accepted';
       if(label==='Preparing') return st==='Preparing'||st==='Ready';
-      return st==='Out for Delivery';
+      return st==='Out for Delivery'||st==='Delivered';
     }).sort((a,b)=>orderChangeTime(b)-orderChangeTime(a));
 
     const pages=[];
@@ -2087,7 +2088,7 @@ function renderKanban(){
     </section>`;
   }).join('');
 
-  const active=orders.filter(o=>['Pending','Accepted','Preparing','Ready','Out for Delivery'].includes(String(o.Status||'Pending')));
+  const active=orders.filter(o=>['Pending','Accepted','Preparing','Ready','Out for Delivery','Delivered'].includes(String(o.Status||'Pending')));
   $('ordersMeta').textContent=`${active.length} active Flame Chick orders · live updates`;
   $('onlineNavBadge').textContent=orders.filter(o=>['Pending','Accepted'].includes(String(o.Status||'Pending'))).length;
 
@@ -2138,7 +2139,7 @@ function renderOrderCard(o){
   let action='';
   if(statusSaving){
     action=`<button class="btn primary status-saving-btn" type="button" disabled aria-busy="true"><span class="status-saving-spinner" aria-hidden="true"></span>Saving…</button>`;
-  }else if(status==='Pending'){action=`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Accepted">Accept Order</button><button class="btn reject" data-order-id="${esc(o.OrderID)}" data-order-status="Rejected">Reject Order</button>`;}else if(status==='Accepted'){action=`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Preparing">Start Preparing</button>`;}else if(status==='Preparing'){action=`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Ready">Mark Ready</button><button class="btn reject" data-order-id="${esc(o.OrderID)}" data-order-status="Cancelled">Cancel</button>`;}else if(status==='Ready'){action=o.FulfillmentType==='Delivery'?renderDeliveryDispatchAction(o):`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Collected">Collected</button>`;}else if(status==='Out for Delivery'){action=renderDeliveryDispatchAction(o);}
+  }else if(status==='Pending'){action=`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Accepted">Accept Order</button><button class="btn reject" data-order-id="${esc(o.OrderID)}" data-order-status="Rejected">Reject Order</button>`;}else if(status==='Accepted'){action=`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Preparing">Start Preparing</button>`;}else if(status==='Preparing'){action=`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Ready">Mark Ready</button><button class="btn reject" data-order-id="${esc(o.OrderID)}" data-order-status="Cancelled">Cancel</button>`;}else if(status==='Ready'){action=o.FulfillmentType==='Delivery'?renderDeliveryDispatchAction(o):`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Collected">Collected</button>`;}else if(status==='Out for Delivery'||status==='Delivered'){action=renderDeliveryDispatchAction(o);}
 
   const displayStatus=status==='Pending'?'New':status;
   const cls=inboxStatusClass(status)==='out'?'out':(inboxStatusClass(status)||'accepted');
@@ -4349,12 +4350,12 @@ async function refreshHistoryData(){
       historyServerRows.pos=merge(serverPos,localRows);
       historyServerRows.online=serverOnline;
       historyServerRows.all=merge([...serverPos,...serverOnline],localRows);
-      historyServerRows.cancelled=historyServerRows.all.filter(o=>String(o.status||'').trim().toLowerCase()==='cancelled');
+      historyServerRows.cancelled=historyServerRows.all.filter(o=>['cancelled','returned'].includes(String(o.status||'').trim().toLowerCase()));
     }else{
       historyServerRows.pos=localRows;
       historyServerRows.online=[];
       historyServerRows.all=localRows;
-      historyServerRows.cancelled=localRows.filter(o=>String(o.status||'').trim().toLowerCase()==='cancelled');
+      historyServerRows.cancelled=localRows.filter(o=>['cancelled','returned'].includes(String(o.status||'').trim().toLowerCase()));
     }
     const sorter=(a,b)=>{const am=Date.parse(String(a.createdAt||'')),bm=Date.parse(String(b.createdAt||''));return (Number.isFinite(bm)?bm:0)-(Number.isFinite(am)?am:0)};
     historyServerRows.pos.sort(sorter);historyServerRows.online.sort(sorter);historyServerRows.all.sort(sorter);
