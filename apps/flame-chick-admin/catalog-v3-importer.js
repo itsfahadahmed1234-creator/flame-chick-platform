@@ -168,7 +168,7 @@
       const doc=detail.component_groups[index]||null;
       const group=doc&&doc.group;
       const options=doc&&doc.options;
-      if(doc&&(!group||group.name_en!==component.displayName))fail('Existing deal component order/name differs from the approved draft. Stop for manual review.');
+      if(doc&&(!group||group.name_en!==component.display_name))fail('Existing deal component order/name differs from the approved draft. Stop for manual review.');
       if(doc&&(!Array.isArray(options)||options.length>1))fail('Existing deal component has multiple options. Stop for manual review.');
       const option=doc&&options[0]||null;
       const expectedVariantId=component.product_variant_id;
@@ -180,7 +180,7 @@
         group.is_active!==true||!option||option.is_active!==true)needsWrite=true;
       return {
         ...(group?{id:group.id}:{}),
-        name_en:component.displayName,name_ur:null,min_units:quantity,max_units:quantity,
+        name_en:component.display_name,name_ur:null,min_units:quantity,max_units:quantity,
         allow_repeat_option:quantity>1,max_units_per_option:quantity>1?quantity:null,
         sort_order:index+1,is_active:true,
         options:[{...(option?{id:option.id}:{}),product_variant_id:expectedVariantId,sort_order:1,is_active:true}]
