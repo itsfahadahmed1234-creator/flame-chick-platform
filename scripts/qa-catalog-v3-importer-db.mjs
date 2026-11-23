@@ -287,6 +287,8 @@ assert.equal(snapshot.productVariants.filter(row=>row.price===null&&!row.standal
 
 const validation=psqlJson(`SELECT app_private.flame_chick_catalog_publication_validate('${RESTAURANT_ID}'::uuid)::text;`);
 const errors=Array.isArray(validation.errors)?validation.errors:[];
+assert.equal(validation.ok,true,'The imported unpublished draft must pass publication validation: '+JSON.stringify(errors,null,2));
+assert.equal(errors.length,0,'The imported unpublished draft must have zero publication validation errors.');
 for(const forbiddenCode of ['ACTIVE_VARIANT_PRICE_MISSING','DEAL_ONLY_VARIANT_NOT_MAPPED']){
   assert.equal(errors.some(item=>item&&item.code===forbiddenCode),false,'Publication validation reported '+forbiddenCode);
 }
@@ -308,7 +310,7 @@ console.log(JSON.stringify({
   firstRunWrites:writesBeforeResume,
   reads:readCount,
   snapshotValid:snapshotResult.ok,
-  publicationPriceErrors:errors.filter(item=>item&&['ACTIVE_VARIANT_PRICE_MISSING','DEAL_ONLY_VARIANT_NOT_MAPPED'].includes(item.code)),
+  publicationValidationOk:validation.ok,\n  publicationValidationErrorCount:errors.length,\n  publicationPriceErrors:errors.filter(item=>item&&['ACTIVE_VARIANT_PRICE_MISSING','DEAL_ONLY_VARIANT_NOT_MAPPED'].includes(item.code)),
   secondRunMutationCount:0,
   databaseCounts:countsAfterResume
 },null,2));
