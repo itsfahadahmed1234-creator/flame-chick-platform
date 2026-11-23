@@ -6,6 +6,9 @@ import { isValidDatabaseNow } from "../supabase/functions/flame-chick-catalog/pu
 const root = "supabase/functions/";
 const names = ["flame-chick-catalog", "flame-chick-order-api", "flame-chick-delivery-api", "flame-chick-staff-admin"];
 const sources = Object.fromEntries(names.map((name) => [name, readFileSync(root + name + "/index.ts", "utf8")]));
+const paymentMigration=readFileSync("supabase/migrations/20261123173000_flame_chick_payment_collection_v1.sql","utf8");
+const deliveryFixture=readFileSync("supabase/tests/flame_chick_delivery_commands_v1.sql","utf8");
+
 
 test("Edge Function sources contain no retired HFP identifiers", () => {
   const all = Object.values(sources).join("\n");
@@ -173,4 +176,49 @@ test("Order API keeps delivered orders active until payment collection and expos
   const source=sources["flame-chick-order-api"];
   assert.match(source,/active: \["new", "accepted", "preparing", "ready", "out_for_delivery", "delivered"\]/);
   assert.match(source,/all: \[[^\]]*"returned"\]/);
+});
+
+
+test("Order API exposes payment collection only to authenticated POS staff and derives actor from Auth", () => {
+  const source=sources["flame-chick-order-api"];
+  const start=source.indexOf('if (action === "collect_payment")');
+  const end=source.indexOf('if (action === "update_status"',start);
+  const route=source.slice(start,end);
+  assert.ok(start>=0&&end>start);
+  assert.match(route,/verifyStaffUser\(token, apiKey\)/);
+  assert.match(route,/verifyStaffRole\(user\.id, token, apiKey, \["owner","admin","manager","cashier"\]\)/);
+  assert.match(route,/actor_user_id: user\.id/);
+  assert.match(route,/request_id: requestId/);
+  assert.match(route,/amount: body\.amount/);
+  assert.match(route,/flame_chick_collect_order_payment/);
+  assert.doesNotMatch(route,/actor_user_id: body\.|\["rider"\]/);
+});
+
+test("Payment collection database command is row-locked, idempotent, branch-authorized and service-role-only", () => {
+  assert.match(paymentMigration,/CREATE OR REPLACE FUNCTION public\.flame_chick_collect_order_payment\(p_payload jsonb\)/);
+  assert.match(paymentMigration,/SELECT o\.\* INTO v_order[\s\S]*?WHERE o\.id=v_order_id[\s\S]*?FOR UPDATE/);
+  assert.match(paymentMigration,/app_private\.flame_chick_delivery_staff_role\(/);
+  assert.match(paymentMigration,/idempotency_key=v_request_id::text/);
+  assert.match(paymentMigration,/PAYMENT_IDEMPOTENCY_CONFLICT/);
+  assert.match(paymentMigration,/PAYMENT_AMOUNT_EXCEEDS_BALANCE/);
+  assert.match(paymentMigration,/INSERT INTO public\.payments/);
+  assert.match(paymentMigration,/payment_status=CASE WHEN v_complete THEN 'paid' ELSE 'partially_paid' END/);
+  assert.match(paymentMigration,/completed_at=CASE WHEN v_complete THEN v_now ELSE NULL END/);
+  assert.match(paymentMigration,/GRANT EXECUTE ON FUNCTION public\.flame_chick_collect_order_payment\(jsonb\) TO service_role/);
+  assert.match(paymentMigration,/has_function_privilege\('anon',v_oid,'EXECUTE'\)/);
+  assert.doesNotMatch(paymentMigration,/GRANT .* ON TABLE public\.payments/);
+});
+
+test("Disposable delivery/payment behavior fixture covers partial/full collection and financial boundaries", () => {
+  for(const marker of [
+    "RIDER_PAYMENT_COLLECTION_NOT_DENIED",
+    "PARTIAL_PAYMENT_COLLECTION_FAILED",
+    "PAYMENT_AMOUNT_PRECISION_NOT_ENFORCED",
+    "PARTIAL_PAYMENT_RETRY_NOT_IDEMPOTENT",
+    "PAYMENT_IDEMPOTENCY_CONFLICT_NOT_ENFORCED",
+    "PAYMENT_OVER_COLLECTION_NOT_DENIED",
+    "FINAL_PAYMENT_COLLECTION_DID_NOT_COMPLETE_ORDER",
+    "FINAL_PAYMENT_RETRY_NOT_IDEMPOTENT",
+    "RETURNED_ORDER_PAYMENT_COLLECTION_NOT_DENIED"
+  ]) assert.ok(deliveryFixture.includes(marker),marker);
 });
