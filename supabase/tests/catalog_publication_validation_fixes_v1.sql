@@ -11,6 +11,9 @@ DECLARE
   v_deal_category uuid := gen_random_uuid();
   v_product uuid := gen_random_uuid();
   v_product_variant uuid := gen_random_uuid();
+  v_deal_only_variant uuid := gen_random_uuid();
+  v_deal_only_option uuid := gen_random_uuid();
+  v_deal_only_mapping uuid := gen_random_uuid();
   v_optional_collection uuid := gen_random_uuid();
   v_optional_deal uuid := gen_random_uuid();
   v_optional_variant uuid := gen_random_uuid();
@@ -70,6 +73,18 @@ BEGIN
   INSERT INTO public.deal_component_options(
     id,restaurant_id,deal_id,component_group_id,product_id,product_variant_id,pricing_treatment,is_active
   ) VALUES(v_optional_option,v_restaurant,v_optional_deal,v_optional_group,v_product,v_product_variant,'INCLUDED',true);
+
+  -- Deal-only variant: no standalone price, not independently sellable, and
+  -- explicitly included in an active fixed-price deal variant.
+  INSERT INTO public.product_variants(
+    id,restaurant_id,product_id,size_key,size_label,price,is_active,is_available,is_standalone_sellable
+  ) VALUES(v_deal_only_variant,v_restaurant,v_product,'DEAL_PORTION','Deal portion',NULL,true,true,false);
+  INSERT INTO public.deal_component_options(
+    id,restaurant_id,deal_id,component_group_id,product_id,product_variant_id,pricing_treatment,is_active
+  ) VALUES(v_deal_only_option,v_restaurant,v_optional_deal,v_optional_group,v_product,v_deal_only_variant,'INCLUDED',true);
+  INSERT INTO public.deal_variant_component_options(
+    id,restaurant_id,deal_id,deal_variant_id,component_option_id,pricing_treatment,unit_surcharge,is_active
+  ) VALUES(v_deal_only_mapping,v_restaurant,v_optional_deal,v_optional_variant,v_deal_only_option,'INCLUDED',0,true);
 
   -- Required group has an eligible option but intentionally no variant map.
   INSERT INTO public.deal_collections(id,restaurant_id,category_id,name_en,is_active)
@@ -133,6 +148,33 @@ BEGIN
 
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_errors) e
+    WHERE e->>'code'='ACTIVE_VARIANT_PRICE_MISSING'
+      AND e->>'entity_id'=v_deal_only_variant::text
+  ) THEN RAISE EXCEPTION 'MAPPED_DEAL_ONLY_NULL_PRICE_WAS_REJECTED'; END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_errors) e
+    WHERE e->>'code'='DEAL_ONLY_VARIANT_NOT_MAPPED'
+      AND e->>'entity_id'=v_deal_only_variant::text
+  ) THEN RAISE EXCEPTION 'MAPPED_DEAL_ONLY_VARIANT_WAS_REJECTED'; END IF;
+
+  -- A future deal-specific surcharge is allowed without reading the component
+  -- product's standalone price. This fixture does not enable a customer selector.
+  UPDATE public.deal_variant_component_options
+  SET pricing_treatment='SURCHARGE',unit_surcharge=50
+  WHERE id=v_deal_only_mapping;
+  v_errors := app_private.flame_chick_catalog_publication_validate(v_restaurant)->'errors';
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_errors) e
+    WHERE e->>'code' IN ('ACTIVE_VARIANT_PRICE_MISSING','DEAL_ONLY_VARIANT_NOT_MAPPED','DEAL_VARIANT_PRICING_TREATMENT_INVALID')
+      AND (e->>'entity_id'=v_deal_only_variant::text OR e->>'entity_id'=v_deal_only_mapping::text)
+  ) THEN RAISE EXCEPTION 'DEAL_ONLY_SURCHARGE_MAPPING_WAS_REJECTED'; END IF;
+  UPDATE public.deal_variant_component_options
+  SET pricing_treatment='INCLUDED',unit_surcharge=0
+  WHERE id=v_deal_only_mapping;
+
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_errors) e
     WHERE e->>'code'='DEAL_VARIANT_REQUIRED_GROUP_NOT_CONFIGURED'
       AND e->>'component_group_id'=v_optional_group::text
   ) THEN RAISE EXCEPTION 'OPTIONAL_GROUP_WITHOUT_VARIANT_MAP_WAS_REJECTED'; END IF;
@@ -189,6 +231,23 @@ BEGIN
   ) THEN RAISE EXCEPTION 'INACTIVE_BRANCH_DEAL_ASSIGNMENT_WAS_NOT_REJECTED'; END IF;
 
   v_snapshot := app_private.flame_chick_catalog_compile_snapshot(v_restaurant,now());
+
+  IF NOT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_snapshot->'productVariants') pv
+    WHERE pv->>'variantId'=v_deal_only_variant::text
+      AND pv->'price'='null'::jsonb
+      AND pv->'standaloneSellable'='false'::jsonb
+  ) THEN RAISE EXCEPTION 'DEAL_ONLY_NULL_PRICE_SNAPSHOT_INVALID'; END IF;
+
+  UPDATE public.deal_variant_component_options
+  SET is_active=false
+  WHERE id=v_deal_only_mapping;
+  v_errors := app_private.flame_chick_catalog_publication_validate(v_restaurant)->'errors';
+  IF NOT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_errors) e
+    WHERE e->>'code'='DEAL_ONLY_VARIANT_NOT_MAPPED'
+      AND e->>'entity_id'=v_deal_only_variant::text
+  ) THEN RAISE EXCEPTION 'UNMAPPED_DEAL_ONLY_VARIANT_WAS_NOT_REJECTED'; END IF;
 
   IF EXISTS (
     SELECT 1 FROM jsonb_array_elements(v_snapshot->'scheduleSets') s
