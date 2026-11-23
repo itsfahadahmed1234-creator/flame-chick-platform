@@ -28,7 +28,7 @@ test('fails closed for missing deal, unavailable deal and incomplete catalog con
   assert.equal(configurator.createDealConfigurator(view, 'missing', {
     validateModifierSelections: deals.validateModifierSelections
   }).code, 'DEAL_NOT_FOUND');
-  view.collections[0].deals[0].available = false;
+  view.collections[0].deals[0].branchAvailable = false;
   assert.equal(create(view).code, 'DEAL_UNAVAILABLE');
 
   const incomplete = createView();
@@ -44,12 +44,12 @@ test('requires explicit deal variant and required component selection', () => {
   assert.equal(ui.toPayload().code, 'DEAL_VARIANT_REQUIRED');
 
   assert.equal(ui.selectVariant(IDS.dealVariant).ok, true);
-  assert.equal(ui.validate().code, 'COMPONENT_GROUP_BOUNDS');
+  assert.equal(ui.getState().quantities[IDS.componentGroup][IDS.componentOption], 1);
+  assert.equal(ui.getState().quantities[IDS.drinkComponentGroup][IDS.drinkComponentOption], 1);
+  assert.equal(ui.validate().ok, true);
   assert.equal(ui.toPayload().code, 'COMPONENT_GROUP_BOUNDS');
 
-  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 1).ok, true);
-  assert.equal(ui.validate().code, 'COMPONENT_GROUP_BOUNDS');
-  assert.equal(ui.setOptionQuantity(IDS.drinkComponentGroup, IDS.drinkComponentOption, 1).ok, true);
+  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 0).code, 'COMPONENT_QUANTITY_INVALID');
   assert.equal(ui.validate().ok, true);
 });
 
@@ -166,6 +166,30 @@ test('refuses to render without a DOM target and an explicit completion handler'
   const ui = create();
   assert.equal(ui.render(null, { onComplete() {} }).code, 'DOM_TARGET_REQUIRED');
   assert.equal(ui.render({ replaceChildren() {} }, { document: {} }).code, 'COMPLETION_HANDLER_REQUIRED');
+});
+
+test('fixed single-option deal groups are preselected and locked', () => {
+  const ui = create();
+  ui.selectVariant(IDS.dealVariant);
+  const state = ui.getState();
+  assert.equal(state.quantities[IDS.componentGroup][IDS.componentOption], 1);
+  assert.equal(state.quantities[IDS.drinkComponentGroup][IDS.drinkComponentOption], 1);
+  assert.equal(ui.validate().ok, true);
+  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 0).code, 'COMPONENT_QUANTITY_INVALID');
+});
+
+test('schedule-closed deal can be opened read-only but cannot emit a payload', () => {
+  const view = createView();
+  const deal = view.collections[0].deals[0];
+  deal.available = false;
+  deal.scheduleAvailable = false;
+  deal.branchAvailable = true;
+  const ui = create(view);
+  assert.equal(ui.ok, true);
+  assert.equal(ui.selectVariant(IDS.dealVariant).ok, true);
+  assert.equal(ui.validate().ok, true);
+  assert.equal(ui.toPayload().code, 'DEAL_READ_ONLY');
+  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 0).code, 'DEAL_READ_ONLY');
 });
 
 test('unavailable or unsatisfiable variants cannot be selected', () => {
