@@ -618,3 +618,39 @@ All Admin action and database integration checks above target disposable local S
 - Production catalog remains empty and unpublished. No Production migration, catalog import, publication/current pointer change, Edge Function deployment, Vercel deployment/domain change or checkout activation was performed.
 - The only source/documentation writes were on `work/production-source-audit`; `main` was not modified.
 - Current deals remain fixed-price with INCLUDED/zero-surcharge components. Selectable deal products/flavours and +price upgrades remain future-only. GST remains deferred.
+
+
+## Latest continuation — API wiring and two-hour release readiness (2026-11-23)
+
+User clarified that Website, Admin, POS and Rider are already substantially built; do not rebuild them. Focus on existing API connections, authentication/branch context and small fixes.
+
+### Latest source integration on `work/production-source-audit`
+
+- Production `user_roles` uses `role_key`; Order/Delivery API reads have been corrected to that field.
+- POS gets its caller's role and branch from authenticated `flame-chick-order-api?view=staff_context`.
+- Rider gets its own active profile from authenticated `flame-chick-delivery-api?view=profile` and checks roles through the same staff context API.
+- POS browser no longer reads operational orders/delivery/rider tables directly; order board, history/status and dispatch use authenticated Edge API requests.
+- Delivery dispatch API derives caller branch from active `role_key` and rejects a mismatched caller-supplied branch.
+- Rider multi-branch ambiguity fails closed; no silent branch selection.
+- Removed obsolete browser-side direct PostgREST/RPC helper functions from POS and Rider.
+- Preview workflows use the verified Vercel project/team IDs, but preview gates remain disabled until GitHub Environment secret/vars are configured.
+
+### Latest CI evidence
+
+- POS/Rider Static Checks #11 passed.
+- Admin Static Checks #75 passed.
+- Edge Function Static Checks #35 passed.
+
+The current exact release report is `docs/handoffs/2026-11-23-two-hour-release-readiness.md`. The Vercel target document is `docs/deployment/vercel-github-actions.md`.
+
+### Production state rechecked (read-only)
+
+- 24 migrations through `20261122105821`.
+- Catalog tables exist but categories/products/variants/deals/publications/current publication all have zero rows.
+- Website ordering/delivery/pickup flags are false.
+- Only `flame-chick-staff-admin` Edge Function version 1 is deployed; Catalog/Order/Delivery APIs are not deployed.
+- Operational tables are absent: orders, order_items, order_status_history, payments, delivery_areas, delivery_tasks, delivery_task_offers, delivery_assignments, delivery_task_events, rider_profiles and rider_push_subscriptions.
+- Realtime has no published tables; Storage has no buckets.
+- Vercel has four correct project records and repository links, but no deployments or custom domains. SSO is enabled. Preview workflows skipped due missing GitHub deployment secret/enable variables.
+
+**Release assessment: NO-GO for full operational deployment until the additive operational schema/RPCs are implemented and tested, the current Edge Functions and Catalog V3 Staff Admin code are deployed with verified secrets/CORS, catalog is imported and published after review, and live browser E2E is passed.** No Production DB writes, migration, import/publication, Edge Function deployment, Vercel deployment, domain change, checkout activation or paid-plan upgrade occurred in this sprint. `main` remains untouched. GST remains deferred; future deal selectors/+price choices remain future-only.
