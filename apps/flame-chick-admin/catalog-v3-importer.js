@@ -435,7 +435,20 @@
         }
       }
       verifyDealState(detail,deal,componentRefs,scheduleId,false);
-      await write(WRITE.deal,{id:saved.id,is_active:true});
+      const variantToActivate=detail.variants[0].variant;
+      await write(WRITE.deal,{
+        id:saved.id,is_active:true,
+        variants:[{
+          id:variantToActivate.id,
+          variant_key:sourceVariant.variantKey,
+          label_en:sourceVariant.labelEn,
+          label_ur:null,
+          pricing_mode:'FIXED_BUNDLE',
+          base_price:sourceVariant.basePrice,
+          sort_order:1,
+          is_active:true
+        }]
+      });
       detail=await readDeal(saved.id);
       verifyDealState(detail,deal,componentRefs,scheduleId,true);
       completed++;
