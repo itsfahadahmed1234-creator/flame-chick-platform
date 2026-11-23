@@ -118,6 +118,10 @@ test('builds deals only from exact mapped option IDs and respects branch/time av
   assert.equal(variant.groups[1].name, 'Choose your drink');
   assert.equal(variant.groups[1].options[0].productName, 'Cola');
   assert.equal(variant.groups[1].options[0].productVariantId, IDS.drinkVariant);
+  assert.equal(variant.groups.length, 2);
+  assert.equal(variant.groups[1].name, 'Choose your drink');
+  assert.equal(variant.groups[1].options[0].productName, 'Cola');
+  assert.equal(variant.groups[1].options[0].productVariantId, IDS.drinkVariant);
 });
 
 test('a missing variant-option mapping is never treated as included or free', () => {
@@ -171,12 +175,16 @@ test('validates required, optional, max quantity and allow-listed component sele
   const variant = result.collections[0].deals[0].variants[0];
   assert.equal(deals.validateDealSelections(variant, {}).code, 'SELECTION_GROUP_BOUNDS');
   const accepted = deals.validateDealSelections(variant, {
-    [IDS.componentGroup]: [{ componentOptionId: IDS.componentOption, quantity: 1 }]
+    [IDS.componentGroup]: [{ componentOptionId: IDS.componentOption, quantity: 1 }],
+    [IDS.drinkComponentGroup]: [{ componentOptionId: IDS.drinkComponentOption, quantity: 1 }]
   });
   assert.equal(accepted.ok, true);
   assert.deepEqual(accepted.selections, [{
     componentGroupId: IDS.componentGroup,
     selections: [{ componentOptionId: IDS.componentOption, quantity: 1 }]
+  }, {
+    componentGroupId: IDS.drinkComponentGroup,
+    selections: [{ componentOptionId: IDS.drinkComponentOption, quantity: 1 }]
   }]);
   assert.equal(deals.validateDealSelections(variant, {
     [IDS.componentGroup]: [{ componentOptionId: IDS.componentOption, quantity: 2 }]
@@ -186,6 +194,7 @@ test('validates required, optional, max quantity and allow-listed component sele
   }).code, 'SELECTION_OPTION_INVALID');
   assert.equal(deals.validateDealSelections(variant, {
     [IDS.componentGroup]: [{ componentOptionId: IDS.componentOption, quantity: 1 }],
+    [IDS.drinkComponentGroup]: [{ componentOptionId: IDS.drinkComponentOption, quantity: 1 }],
     'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee': []
   }).code, 'SELECTION_GROUP_UNKNOWN');
 });
