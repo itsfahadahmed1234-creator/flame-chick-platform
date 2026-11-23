@@ -146,6 +146,9 @@ DECLARE
   result jsonb;
   assignment_id uuid;
   payment_count integer;
+  partial_request uuid:=gen_random_uuid();
+  full_request uuid:=gen_random_uuid();
+  partial_payment_id uuid;
 BEGIN
   IF (SELECT count(*) FROM public.user_roles WHERE restaurant_id=r AND is_active)<>5
      OR (SELECT count(*) FROM public.staff_role_audit WHERE restaurant_id=r)<>5 THEN
@@ -234,6 +237,96 @@ BEGIN
     RAISE EXCEPTION 'RIDER_DELIVERY_RETRY_FAILED: %',result;
   END IF;
 
+  -- Rider delivery is not authority to collect money.
+  result:=public.flame_chick_collect_order_payment(jsonb_build_object(
+    'order_id',o1,'actor_user_id',rider_one,'request_id',gen_random_uuid(),
+    'amount',20,'payment_method','cash'));
+  IF result->>'ok'<>'false' OR result#>>'{error,code}'<>'PAYMENT_STAFF_REQUIRED' THEN
+    RAISE EXCEPTION 'RIDER_PAYMENT_COLLECTION_NOT_DENIED: %',result;
+  END IF;
+
+  -- A ready (not yet delivered) order cannot be settled from this delivery flow.
+  result:=public.flame_chick_collect_order_payment(jsonb_build_object(
+    'order_id',o2,'actor_user_id',cashier,'request_id',gen_random_uuid(),
+    'amount',20,'payment_method','cash'));
+  IF result->>'ok'<>'false' OR result#>>'{error,code}'<>'PAYMENT_ORDER_STATE_INVALID' THEN
+    RAISE EXCEPTION 'UNDELIVERED_ORDER_PAYMENT_COLLECTION_NOT_DENIED: %',result;
+  END IF;
+
+  -- Record a partial collection. The order remains Delivered; no completion
+  -- timestamp is written and the generated balance remains due.
+  result:=public.flame_chick_collect_order_payment(jsonb_build_object(
+    'order_id',o1,'actor_user_id',cashier,'request_id',partial_request,
+    'amount',40,'payment_method','cash'));
+  IF result->>'ok'<>'true' OR result->>'completed'<>'false'
+     OR result->>'payment_status'<>'partially_paid'
+     OR (result->>'balance_due')::numeric<>60
+     OR (SELECT status FROM public.orders WHERE id=o1)<>'delivered'
+     OR (SELECT payment_status FROM public.orders WHERE id=o1)<>'partially_paid'
+     OR (SELECT paid_amount FROM public.orders WHERE id=o1)<>40
+     OR (SELECT balance_due FROM public.orders WHERE id=o1)<>60
+     OR (SELECT completed_at FROM public.orders WHERE id=o1) IS NOT NULL
+     OR (SELECT count(*) FROM public.payments WHERE order_id=o1 AND entry_type='collection')<>1 THEN
+    RAISE EXCEPTION 'PARTIAL_PAYMENT_COLLECTION_FAILED: %',result;
+  END IF;
+  partial_payment_id:=(result->>'payment_id')::uuid;
+
+  -- Same request ID and same payment facts return the original ledger row.
+  result:=public.flame_chick_collect_order_payment(jsonb_build_object(
+    'order_id',o1,'actor_user_id',cashier,'request_id',partial_request,
+    'amount',40,'payment_method','cash'));
+  IF result->>'ok'<>'true' OR result->>'already_processed'<>'true'
+     OR (result->>'payment_id')::uuid<>partial_payment_id
+     OR (SELECT count(*) FROM public.payments WHERE order_id=o1 AND entry_type='collection')<>1 THEN
+    RAISE EXCEPTION 'PARTIAL_PAYMENT_RETRY_NOT_IDEMPOTENT: %',result;
+  END IF;
+
+  -- Reusing the same ID with altered payment facts is a conflict, not a new
+  -- ledger movement or silently accepted retry.
+  result:=public.flame_chick_collect_order_payment(jsonb_build_object(
+    'order_id',o1,'actor_user_id',cashier,'request_id',partial_request,
+    'amount',50,'payment_method','cash'));
+  IF result->>'ok'<>'false' OR result#>>'{error,code}'<>'PAYMENT_IDEMPOTENCY_CONFLICT'
+     OR (SELECT count(*) FROM public.payments WHERE order_id=o1 AND entry_type='collection')<>1 THEN
+    RAISE EXCEPTION 'PAYMENT_IDEMPOTENCY_CONFLICT_NOT_ENFORCED: %',result;
+  END IF;
+
+  -- A stale POS amount cannot over-collect the remaining balance.
+  result:=public.flame_chick_collect_order_payment(jsonb_build_object(
+    'order_id',o1,'actor_user_id',cashier,'request_id',gen_random_uuid(),
+    'amount',60.01,'payment_method','cash'));
+  IF result->>'ok'<>'false' OR result#>>'{error,code}'<>'PAYMENT_AMOUNT_EXCEEDS_BALANCE'
+     OR (SELECT count(*) FROM public.payments WHERE order_id=o1 AND entry_type='collection')<>1 THEN
+    RAISE EXCEPTION 'PAYMENT_OVER_COLLECTION_NOT_DENIED: %',result;
+  END IF;
+
+  -- The final balance collection completes the order only after both payment
+  -- ledger entries have committed in this same transaction.
+  result:=public.flame_chick_collect_order_payment(jsonb_build_object(
+    'order_id',o1,'actor_user_id',cashier,'request_id',full_request,
+    'amount',60,'payment_method','cash'));
+  IF result->>'ok'<>'true' OR result->>'completed'<>'true'
+     OR result->>'order_status'<>'completed'
+     OR result->>'payment_status'<>'paid'
+     OR (SELECT status FROM public.orders WHERE id=o1)<>'completed'
+     OR (SELECT payment_status FROM public.orders WHERE id=o1)<>'paid'
+     OR (SELECT paid_amount FROM public.orders WHERE id=o1)<>100
+     OR (SELECT balance_due FROM public.orders WHERE id=o1)<>0
+     OR (SELECT completed_at FROM public.orders WHERE id=o1) IS NULL
+     OR (SELECT collected_at FROM public.orders WHERE id=o1) IS NULL
+     OR (SELECT count(*) FROM public.payments WHERE order_id=o1 AND entry_type='collection')<>2 THEN
+    RAISE EXCEPTION 'FINAL_PAYMENT_COLLECTION_DID_NOT_COMPLETE_ORDER: %',result;
+  END IF;
+
+  result:=public.flame_chick_collect_order_payment(jsonb_build_object(
+    'order_id',o1,'actor_user_id',cashier,'request_id',full_request,
+    'amount',60,'payment_method','cash'));
+  IF result->>'ok'<>'true' OR result->>'already_processed'<>'true'
+     OR result->>'order_status'<>'completed'
+     OR (SELECT count(*) FROM public.payments WHERE order_id=o1 AND entry_type='collection')<>2 THEN
+    RAISE EXCEPTION 'FINAL_PAYMENT_RETRY_NOT_IDEMPOTENT: %',result;
+  END IF;
+
   -- POS explicitly targets one Rider; no automatic rotation is created.
   result:=public.flame_chick_manage_delivery(jsonb_build_object(
     'action','assign','delivery_task_id',t2,'actor_user_id',manager,'rider_user_id',rider_two,'request_id',gen_random_uuid()));
@@ -305,12 +398,17 @@ BEGIN
   END IF;
 
   SELECT count(*) INTO payment_count FROM public.payments WHERE order_id IN(o1,o2);
-  IF payment_count<>0 OR EXISTS(SELECT 1 FROM public.orders WHERE id IN(o1,o2) AND payment_status<>'unpaid') THEN
-    RAISE EXCEPTION 'DELIVERY_COMMANDS_CHANGED_PAYMENT_LEDGER';
+  IF payment_count<>2
+     OR (SELECT count(*) FROM public.payments WHERE order_id=o1 AND entry_type='collection' AND status='succeeded')<>2
+     OR (SELECT COALESCE(sum(amount),0) FROM public.payments WHERE order_id=o1 AND entry_type='collection')<>100
+     OR EXISTS(SELECT 1 FROM public.payments WHERE order_id=o2)
+     OR (SELECT payment_status FROM public.orders WHERE id=o1)<>'paid'
+     OR (SELECT payment_status FROM public.orders WHERE id=o2)<>'unpaid' THEN
+    RAISE EXCEPTION 'PAYMENT_LEDGER_OR_RETURN_FINANCIAL_STATE_INVALID';
   END IF;
 
-  IF (SELECT count(*) FROM public.order_status_history WHERE order_id IN(o1,o2))<>4 THEN
-    RAISE EXCEPTION 'ORDER_STATUS_HISTORY_NOT_APPENDED_FOR_PICKUP_DELIVERY_RETURN';
+  IF (SELECT count(*) FROM public.order_status_history WHERE order_id IN(o1,o2))<>6 THEN
+    RAISE EXCEPTION 'ORDER_STATUS_HISTORY_NOT_APPENDED_FOR_DELIVERY_AND_PAYMENT_COLLECTION';
   END IF;
   IF (SELECT count(*) FROM public.delivery_task_events WHERE delivery_task_id IN(t1,t2))<8 THEN
     RAISE EXCEPTION 'DELIVERY_TASK_EVENT_AUDIT_INCOMPLETE';
