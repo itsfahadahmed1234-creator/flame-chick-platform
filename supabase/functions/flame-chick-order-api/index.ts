@@ -206,6 +206,33 @@ async function readPublishedV3Catalog(): Promise<
   return {ok:true,snapshot};
 }
 
+async function readFlameChickRestaurant(): Promise<{id:string;currencyCode:string;timezone:string}|null> {
+  const query = new URLSearchParams();
+  query.set("select","id,currency_code,timezone");
+  query.set("slug","eq.flame-chick");
+  query.set("is_active","eq.true");
+  query.set("limit","1");
+  const result = await readAsService("restaurants?"+query.toString());
+  if(!result.ok||!Array.isArray(result.data)||result.data.length!==1)return null;
+  const row = result.data[0];
+  if(!isObject(row)||typeof row.id!=="string"||typeof row.currency_code!=="string"||typeof row.timezone!=="string")return null;
+  return {id:row.id,currencyCode:row.currency_code,timezone:row.timezone};
+}
+
+async function readActiveWebsiteBranches(restaurantId:string, branchId?:string): Promise<{ok:true;branches:Array<Record<string,unknown>>}|{ok:false}> {
+  const query = new URLSearchParams();
+  query.set("select","id,branch_code,name,is_active,website_ordering_enabled,website_delivery_enabled,website_pickup_enabled");
+  query.set("restaurant_id","eq."+restaurantId);
+  query.set("is_active","eq.true");
+  query.set("website_ordering_enabled","eq.true");
+  if(branchId)query.set("id","eq."+branchId);
+  query.set("order","branch_code.asc");
+  query.set("limit","20");
+  const result = await readAsService("branches?"+query.toString());
+  if(!result.ok||!Array.isArray(result.data))return {ok:false};
+  return {ok:true,branches:result.data.filter(isObject)};
+}
+
 async function readBranchDeliveryConfiguration(
   restaurantId: string,
   branchId: string
@@ -248,6 +275,32 @@ async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
   const dealView = V3_RUNTIME.FlameChickCatalogV3DealView;
   if (!contract || !dealView) return websiteError("CATALOG_RUNTIME_UNAVAILABLE","The trusted menu validator is unavailable.",503);
 
+  const publicationId = typeof body.publication_id === "string" ? body.publication_id : body.publicationId;
+  const versionId = typeof body.version_id === "string" ? body.version_id : body.versionId;
+  const branchId = typeof body.branch_id === "string" ? body.branch_id : body.branchId;
+  const fulfillmentType = typeof body.fulfillment_type === "string" ? body.fulfillment_type : body.fulfilmentType;
+  if(typeof branchId!=="string"||!/^([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i.test(branchId)){
+    return websiteError("BRANCH_NOT_FOUND","Choose a valid Flame Chick branch.",400);
+  }
+  const restaurant = await readFlameChickRestaurant();
+  if(!restaurant)return websiteError("RESTAURANT_UNAVAILABLE","Flame Chick is not accepting online orders.",503);
+  const branchRead = await readActiveWebsiteBranches(restaurant.id,branchId);
+  if(!branchRead.ok)return websiteError("BRANCH_CONFIGURATION_UNAVAILABLE","Branch ordering configuration could not be verified.",503);
+  const branchConfiguration = branchRead.branches[0];
+  if(!branchConfiguration)return websiteError("BRANCH_FULFILMENT_UNAVAILABLE","The selected branch is not accepting website orders.",409);
+  const snapshotBranches = Array.isArray(snapshot.branches)?snapshot.branches:[];
+  const selectedSnapshotBranch = snapshotBranches.find((row:any)=>row&&row.branchId===branchId);
+  if(!selectedSnapshotBranch)return websiteError("BRANCH_NOT_FOUND","Choose a valid published Flame Chick branch.",400);
+  const pricingSnapshot = {
+    ...snapshot,
+    branches:snapshotBranches.map((row:any)=>row&&row.branchId===branchId?{
+      ...row,
+      websiteOrderingEnabled:branchConfiguration.website_ordering_enabled===true,
+      websiteDeliveryEnabled:branchConfiguration.website_delivery_enabled===true,
+      websitePickupEnabled:branchConfiguration.website_pickup_enabled===true
+    }:row)
+  };
+
   const sourceCustomer = isObject(body.customer) ? body.customer : {};
   const customerName = typeof sourceCustomer.name === "string" ? sourceCustomer.name.trim() : "";
   const customerPhone = normalizeCustomerPhone(sourceCustomer.phone);
@@ -257,10 +310,6 @@ async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
     return websiteError("CUSTOMER_DETAILS_INVALID","Enter a valid customer name and phone number.");
   }
 
-  const publicationId = typeof body.publication_id === "string" ? body.publication_id : body.publicationId;
-  const versionId = typeof body.version_id === "string" ? body.version_id : body.versionId;
-  const branchId = typeof body.branch_id === "string" ? body.branch_id : body.branchId;
-  const fulfillmentType = typeof body.fulfillment_type === "string" ? body.fulfillment_type : body.fulfilmentType;
   const pricingRequest = {
     schemaVersion:3,
     publicationId,
@@ -271,7 +320,7 @@ async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
     notes:typeof body.notes === "string" ? body.notes.trim() : null,
     items:body.items
   };
-  const priced = calculateWebsiteOrder(snapshot,pricingRequest,{contract,dealView,databaseNow:snapshot.databaseNow});
+  const priced = calculateWebsiteOrder(pricingSnapshot,pricingRequest,{contract,dealView,databaseNow:snapshot.databaseNow});
   if (!isObject(priced) || priced.ok !== true || !isObject(priced.data)) {
     const err = isObject(priced?.error) ? priced.error : {};
     const code = String(err.code ?? "ORDER_QUOTE_INVALID");
@@ -280,11 +329,12 @@ async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
     return websiteError(code,String(err.message ?? "The selected menu items could not be validated."),status);
   }
 
-  const branch = Array.isArray(snapshot.branches)
-    ? snapshot.branches.find((row: any) => row && row.branchId === branchId) as Record<string,unknown>|undefined
-    : undefined;
-  const restaurantId = typeof snapshot.restaurantId === "string" ? snapshot.restaurantId : "";
-  if (!branch || !restaurantId) return websiteError("BRANCH_NOT_FOUND","Choose a valid Flame Chick branch.",400);
+  const branch = {
+    branchId,
+    name:String(branchConfiguration.name??selectedSnapshotBranch.name??""),
+    branchCode:String(branchConfiguration.branch_code??selectedSnapshotBranch.branchCode??"")
+  };
+  const restaurantId = restaurant.id;
 
   const deliveryRaw = isRecord(body.delivery) ? body.delivery : null;
   let deliveryFee = 0;
@@ -355,7 +405,7 @@ async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
     version_id:snapshot.versionId,
     branch_id:branchId,
     fulfillment_type:fulfillmentType,
-    currency_code:snapshot.settings?.currency_code,
+    currency_code:restaurant.currencyCode,
     customer_name:customerName,
     customer_phone:customerPhone,
     customer_email:customerEmail,
@@ -373,7 +423,7 @@ async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
     versionId:snapshot.versionId,
     branch:{id:branchId,name:branch.name,branchCode:branch.branchCode},
     fulfillmentType,
-    currencyCode:snapshot.settings?.currency_code,
+    currencyCode:restaurant.currencyCode,
     items:priced.data.items,
     subtotal,
     deliveryFee,
@@ -438,22 +488,22 @@ async function buildWebsiteContext(): Promise<
   const catalog = await readPublishedV3Catalog();
   if(!catalog.ok)return catalog;
   const snapshot = catalog.snapshot;
-  const rawBranches = Array.isArray(snapshot.branches)?snapshot.branches:[];
-  const enabled = rawBranches.filter((row):row is Record<string,unknown> =>
-    isObject(row)&&row.websiteOrderingEnabled===true
-  );
+  const restaurant=await readFlameChickRestaurant();
+  if(!restaurant)return websiteError("RESTAURANT_UNAVAILABLE","Flame Chick is not accepting online orders.",503);
+  const branchRead=await readActiveWebsiteBranches(restaurant.id);
+  if(!branchRead.ok)return websiteError("BRANCH_CONFIGURATION_UNAVAILABLE","Branch ordering options could not be loaded.",503);
   const branches: Array<Record<string,unknown>> = [];
-  for(const branch of enabled.slice(0,20)){
-    const branchId = typeof branch.branchId==="string"?branch.branchId:"";
+  for(const branch of branchRead.branches){
+    const branchId = typeof branch.id==="string"?branch.id:"";
     if(!branchId)continue;
-    const config = await readBranchDeliveryConfiguration(String(snapshot.restaurantId??""),branchId);
+    const config = await readBranchDeliveryConfiguration(restaurant.id,branchId);
     if(!config.ok)return websiteError("DELIVERY_CONFIGURATION_UNAVAILABLE","Branch ordering options could not be loaded.",503);
     branches.push({
       id:branchId,
       name:typeof branch.name==="string"?branch.name:"",
-      branchCode:typeof branch.branchCode==="string"?branch.branchCode:"",
-      websiteDeliveryEnabled:branch.websiteDeliveryEnabled===true,
-      websitePickupEnabled:branch.websitePickupEnabled===true,
+      branchCode:typeof branch.branch_code==="string"?branch.branch_code:"",
+      websiteDeliveryEnabled:branch.website_delivery_enabled===true,
+      websitePickupEnabled:branch.website_pickup_enabled===true,
       deliveryAreas:config.areas.map(row=>({
         id:row.id,name:row.name,nameUr:row.name_ur??null,deliveryFee:Number(row.delivery_fee)
       })),
