@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import admin from '../apps/flame-chick-admin/catalog-v3-admin.js';
 
 test('deal-only product variant accepts a null standalone price and remains non-standalone', () => {
@@ -127,4 +128,24 @@ test('the Admin workspace exposes only finite catalog actions, with no publish o
   ]);
   assert.equal(Object.values(admin.WRITE).includes('catalog_publish'), false);
   assert.equal(Object.values(admin.WRITE).includes('catalog_rollback'), false);
+});
+
+
+test('Admin read/write actions match the finite authenticated Staff Admin routes', async () => {
+  const source = await readFile(new URL('../supabase/functions/flame-chick-staff-admin/catalog-actions.mjs', import.meta.url), 'utf8');
+  for (const action of Object.values(admin.READ)) {
+    assert.ok(source.includes(action + ':'), 'Unmapped read action: ' + action);
+  }
+  for (const action of Object.values(admin.WRITE)) {
+    assert.ok(source.includes(action + ':'), 'Unmapped write action: ' + action);
+  }
+  assert.doesNotMatch(source, /catalog_publish\s*:/);
+  assert.doesNotMatch(source, /catalog_rollback\s*:/);
+});
+
+test('deal inspection renders the exact product-name field returned by the database detail DTO', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-admin/catalog-v3-admin.js', import.meta.url), 'utf8');
+  assert.match(source, /product_name_en/);
+  assert.match(source, /variant_label/);
+  assert.doesNotMatch(source, /product_name\)/);
 });
