@@ -32,7 +32,11 @@ start_session() {
 wait_for_event() {
   local app="$1" event="$2" pid="$3" count
   for _ in $(seq 1 120); do
-    count="$(scalar "SELECT count(*) FROM pg_catalog.pg_stat_activity WHERE application_name='$app' AND wait_event='$event'")"
+    if [[ "$event" == "Lock" ]]; then
+      count="$(scalar "SELECT count(*) FROM pg_catalog.pg_stat_activity WHERE application_name='$app' AND wait_event_type='Lock'")"
+    else
+      count="$(scalar "SELECT count(*) FROM pg_catalog.pg_stat_activity WHERE application_name='$app' AND wait_event='$event'")"
+    fi
     if [[ "$count" -gt 0 ]]; then return 0; fi
     if ! kill -0 "$pid" 2>/dev/null; then
       echo "Session $app ended before reaching expected wait event $event" >&2
@@ -62,7 +66,8 @@ assert_json() {
 }
 assert_database_state() {
   local task="$1" rider="$2" expected_offer="$3" expected_task="$4"
-  local expected_current="$5" expected_rider="$6" expected_event="$7" expected_expire="$8" label="$9"
+  local expected_current="$5" expected_rider="$6" expected_accept="$7"
+  local expected_decline="$8" expected_expired="$9" label="${10}"
   local json
   json="$(query "
     SELECT pg_catalog.jsonb_build_object(
@@ -87,9 +92,9 @@ assert_database_state() {
     .order_status==\"ready\" and
     .current_assignments==$expected_current and
     .rider_status==\"$expected_rider\" and
-    .accepted_events==$expected_event and
-    .declined_events==$expected_expire and
-    .expired_events==$expected_rider
+    .accepted_events==$expected_accept and
+    .declined_events==$expected_decline and
+    .expired_events==$expected_expired
   " >/dev/null <<<"$json"; then
     echo "Final database state mismatch: $label" >&2
     echo "$json" | jq . >&2 || echo "$json" >&2
