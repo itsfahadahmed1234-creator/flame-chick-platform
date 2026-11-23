@@ -248,3 +248,157 @@ test('deal read-back verifier rejects altered prices, components, surcharge mapp
     }]
   }, expected), /component failed read-back/i);
 });
+
+
+test('fixed-deal edit builder preserves retained identities and disables removed groups without deleting them', () => {
+  const groupOne = {
+    group: { id: '61000000-0000-4000-8000-000000000001', name_en: 'Burger', name_ur: null,
+      min_units: 2, max_units: 2, allow_repeat_option: true, max_units_per_option: 2,
+      sort_order: 1, is_active: true },
+    options: [{ id: '62000000-0000-4000-8000-000000000001',
+      product_variant_id: '63000000-0000-4000-8000-000000000001', sort_order: 1, is_active: true }]
+  };
+  const removedGroup = {
+    group: { id: '61000000-0000-4000-8000-000000000002', name_en: 'Cold Drink', name_ur: null,
+      min_units: 1, max_units: 1, allow_repeat_option: false, max_units_per_option: null,
+      sort_order: 2, is_active: true },
+    options: [{ id: '62000000-0000-4000-8000-000000000002',
+      product_variant_id: '63000000-0000-4000-8000-000000000002', sort_order: 1, is_active: true }]
+  };
+  const result = admin.buildFixedComponentGroups([{
+    group_id: groupOne.group.id,
+    option_id: groupOne.options[0].id,
+    display_name: 'Burger',
+    product_variant_id: '63000000-0000-4000-8000-000000000003',
+    quantity: 3
+  }], [groupOne, removedGroup]);
+
+  assert.equal(result.groups.length, 2);
+  assert.equal(result.groups[0].id, groupOne.group.id);
+  assert.equal(result.groups[0].options[0].id, groupOne.options[0].id);
+  assert.equal(result.groups[0].options[0].product_variant_id, '63000000-0000-4000-8000-000000000003');
+  assert.equal(result.groups[0].min_units, 3);
+  assert.equal(result.groups[0].max_units, 3);
+  assert.equal(result.groups[0].is_active, true);
+  assert.equal(result.groups[1].id, removedGroup.group.id);
+  assert.equal(result.groups[1].is_active, false);
+  assert.equal(result.groups[1].options[0].id, removedGroup.options[0].id);
+  assert.equal(result.groups[1].options[0].is_active, false);
+});
+
+test('fixed-deal edit mapping builder keeps active INCLUDED maps and deactivates removed component maps', () => {
+  const optionOne = { id: '62000000-0000-4000-8000-000000000001',
+    product_variant_id: '63000000-0000-4000-8000-000000000003', is_active: true };
+  const optionTwo = { id: '62000000-0000-4000-8000-000000000002',
+    product_variant_id: '63000000-0000-4000-8000-000000000002', is_active: false };
+  const detail = {
+    component_groups: [
+      { group: { id: '61000000-0000-4000-8000-000000000001', is_active: true, min_units: 3, max_units: 3 },
+        options: [optionOne] },
+      { group: { id: '61000000-0000-4000-8000-000000000002', is_active: false, min_units: 1, max_units: 1 },
+        options: [optionTwo] }
+    ],
+    variants: [{
+      variant: { id: '64000000-0000-4000-8000-000000000001', pricing_mode: 'FIXED_BUNDLE' },
+      allowed_options: [
+        { id: '65000000-0000-4000-8000-000000000001', component_option_id: optionOne.id,
+          is_active: true, product_variant_id: optionOne.product_variant_id },
+        { id: '65000000-0000-4000-8000-000000000002', component_option_id: optionTwo.id,
+          is_active: true, product_variant_id: optionTwo.product_variant_id }
+      ]
+    }]
+  };
+  const result = admin.buildIncludedMappings(detail);
+  assert.equal(result.options.length, 2);
+  assert.equal(result.options[0].id, '65000000-0000-4000-8000-000000000001');
+  assert.equal(result.options[0].is_active, true);
+  assert.equal(result.options[0].pricing_treatment, 'INCLUDED');
+  assert.equal(result.options[0].unit_surcharge, 0);
+  assert.equal(result.options[1].id, '65000000-0000-4000-8000-000000000002');
+  assert.equal(result.options[1].is_active, false);
+  assert.equal(result.options[1].unit_surcharge, 0);
+});
+
+test('fixed-deal editor loads only single-option INCLUDED bundles and preserves supported Flame Hour schedule', () => {
+  const variantId = '64000000-0000-4000-8000-000000000001';
+  const dealId = '66000000-0000-4000-8000-000000000001';
+  const scheduleId = '67000000-0000-4000-8000-000000000001';
+  const optionId = '62000000-0000-4000-8000-000000000001';
+  const productVariantId = '63000000-0000-4000-8000-000000000001';
+  const detail = {
+    deal: { id: dealId, collection_id: '68000000-0000-4000-8000-000000000001',
+      title: 'Flame Hour', description_en: 'Offer', is_active: true, is_available: false },
+    component_groups: [{
+      group: { id: '61000000-0000-4000-8000-000000000001', name_en: 'Burger', min_units: 1,
+        max_units: 1, is_active: true },
+      options: [{ id: optionId, product_id: '69000000-0000-4000-8000-000000000001',
+        product_variant_id: productVariantId, is_active: true }]
+    }],
+    variants: [{
+      variant: { id: variantId, pricing_mode: 'FIXED_BUNDLE', base_price: 699, is_active: true },
+      allowed_options: [{ id: '65000000-0000-4000-8000-000000000001', component_option_id: optionId,
+        product_variant_id: productVariantId, pricing_treatment: 'INCLUDED', unit_surcharge: 0,
+        max_quantity_per_deal: 1, is_active: true }]
+    }],
+    schedule_assignments: [{ id: '71000000-0000-4000-8000-000000000001',
+      branch_id: null, schedule_set_id: scheduleId, is_active: true }]
+  };
+  const schedules = [{ id: scheduleId, name: 'Flame Hour daily', timezone: 'Asia/Karachi' }];
+  const windows = Array.from({length:7},(_,i)=>({window_kind:'WEEKLY',weekday_iso:i+1,
+    local_start:'15:00:00',local_end:'17:00:00',is_all_day:false}));
+  const result = admin.buildFixedDealEditDraft(detail,schedules,{
+    schedule_set:{id:scheduleId},windows
+  });
+  assert.equal(result.dealDraft.id,dealId);
+  assert.equal(result.dealDraft.base_price,'699');
+  assert.equal(result.dealDraft.is_active,true);
+  assert.equal(result.dealDraft.is_available,false);
+  assert.equal(result.dealDraft.flame_hour,true);
+  assert.equal(result.dealDraft.scheduleId,scheduleId);
+  assert.deepEqual(result.components,[{
+    group_id:'61000000-0000-4000-8000-000000000001',
+    option_id:optionId,display_name:'Burger',
+    product_id:'69000000-0000-4000-8000-000000000001',
+    product_variant_id:productVariantId,quantity:1
+  }]);
+});
+
+test('fixed-deal editor refuses variable, selectable, surcharge or branch-specific deal configurations', () => {
+  const optionId = '62000000-0000-4000-8000-000000000001';
+  const variantId = '64000000-0000-4000-8000-000000000001';
+  const deal = {
+    deal: { id:'66000000-0000-4000-8000-000000000001',collection_id:'68000000-0000-4000-8000-000000000001',
+      title:'Deal',is_active:true,is_available:true },
+    component_groups: [{ group:{id:'61000000-0000-4000-8000-000000000001',name_en:'Burger',
+      min_units:1,max_units:1,is_active:true},options:[{id:optionId,product_id:'69000000-0000-4000-8000-000000000001',
+      product_variant_id:'63000000-0000-4000-8000-000000000001',is_active:true}] }],
+    variants: [{variant:{id:variantId,pricing_mode:'FIXED_BUNDLE',base_price:500,is_active:true},
+      allowed_options:[{component_option_id:optionId,product_variant_id:'63000000-0000-4000-8000-000000000001',
+        pricing_treatment:'INCLUDED',unit_surcharge:0,max_quantity_per_deal:1,is_active:true}]}],
+    schedule_assignments:[]
+  };
+  assert.throws(()=>admin.buildFixedDealEditDraft({
+    ...deal,component_groups:[{...deal.component_groups[0],group:{...deal.component_groups[0].group,max_units:2}}]
+  }),/variable component structure/i);
+  assert.throws(()=>admin.buildFixedDealEditDraft({
+    ...deal,variants:[{...deal.variants[0],allowed_options:[{...deal.variants[0].allowed_options[0],
+      pricing_treatment:'SURCHARGE',unit_surcharge:50}]}]
+  }),/non-INCLUDED/i);
+  assert.throws(()=>admin.buildFixedDealEditDraft({
+    ...deal,schedule_assignments:[{branch_id:'72000000-0000-4000-8000-000000000001',schedule_set_id:'67000000-0000-4000-8000-000000000001',is_active:true}]
+  }),/branch-specific schedules/i);
+});
+
+test('Admin workspace wires category and fixed-deal edit actions through the secured command API', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-admin/catalog-v3-admin.js', import.meta.url), 'utf8');
+  assert.match(source,/data-action="category-edit"/);
+  assert.match(source,/data-action="deal-edit"/);
+  assert.match(source,/async function openDealEdit/);
+  assert.match(source,/async function editDeal/);
+  assert.match(source,/buildFixedComponentGroups\(s\.components,latest\.component_groups\)/);
+  assert.match(source,/is_active:false,is_available:isAvailable/);
+  assert.match(source,/stage='pre-activation verification'/);
+  assert.match(source,/Removed components are inactive/);
+  assert.match(source,/catalogV3Request|request\(action/);
+  assert.doesNotMatch(source,/fetch\([^)]*rest\/v1|service_role|serviceRoleKey/i);
+});
