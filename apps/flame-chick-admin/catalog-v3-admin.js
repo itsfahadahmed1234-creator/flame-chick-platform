@@ -62,6 +62,67 @@
     if(!options.length)throw Error('Deal has no components.');
     return {deal_variant_id:variant.id,options};
   }
+  function moneyMatches(actual, expected) {
+    const a = Number(actual), b = Number(expected);
+    return Number.isFinite(a) && Number.isFinite(b) && Math.round(a * 100) === Math.round(b * 100);
+  }
+  function verifyFixedDealDetail(detail, expected) {
+    if (!isObj(detail) || !isObj(detail.deal) ||
+        !Array.isArray(detail.component_groups) || !Array.isArray(detail.variants) ||
+        detail.variants.length !== 1) {
+      throw Error('The saved deal did not return a complete, single-variant detail record.');
+    }
+    const deal = detail.deal;
+    const variantDoc = detail.variants[0];
+    const variant = variantDoc && variantDoc.variant;
+    const expectedActive = expected && expected.active === true;
+    if (!variant || variant.pricing_mode !== 'FIXED_BUNDLE' ||
+        deal.is_active !== expectedActive || variant.is_active !== expectedActive ||
+        !moneyMatches(variant.base_price, expected.basePrice)) {
+      throw Error('The deal activation state or fixed base price did not match the saved draft.');
+    }
+    if (!Array.isArray(expected.components) ||
+        detail.component_groups.length !== expected.components.length) {
+      throw Error('The saved deal component count did not match the fixed deal draft.');
+    }
+    const optionById = new Map();
+    detail.component_groups.forEach((doc, index) => {
+      const group = doc && doc.group;
+      const rows = doc && doc.options;
+      const wanted = expected.components[index];
+      if (!group || !wanted || group.is_active !== true ||
+          group.name_en !== wanted.display_name ||
+          Number(group.min_units) !== Number(wanted.quantity) ||
+          Number(group.max_units) !== Number(wanted.quantity) ||
+          !Array.isArray(rows) || rows.length !== 1 ||
+          rows[0].is_active !== true ||
+          rows[0].product_variant_id !== wanted.product_variant_id) {
+        throw Error('A fixed deal component failed read-back verification: ' + (wanted && wanted.display_name || index + 1));
+      }
+      optionById.set(rows[0].id, { option: rows[0], quantity: Number(wanted.quantity) });
+    });
+    const mappings = variantDoc.allowed_options;
+    if (!Array.isArray(mappings) || mappings.length !== expected.components.length) {
+      throw Error('The saved deal did not return the complete INCLUDED component mapping set.');
+    }
+    for (const mapping of mappings) {
+      const linked = optionById.get(mapping.component_option_id);
+      if (!linked || mapping.is_active !== true ||
+          mapping.product_variant_id !== linked.option.product_variant_id ||
+          mapping.pricing_treatment !== 'INCLUDED' ||
+          Number(mapping.unit_surcharge) !== 0 ||
+          Number(mapping.max_quantity_per_deal) !== linked.quantity) {
+        throw Error('A saved deal component mapping is not active, fixed and INCLUDED.');
+      }
+    }
+    if (expected.flameHour === true) {
+      const assignment = (detail.schedule_assignments || []).find(item =>
+        item.branch_id === null && item.schedule_set_id === expected.scheduleId && item.is_active === true
+      );
+      if (!assignment) throw Error('The Flame Hour daily schedule assignment could not be verified.');
+    }
+    return true;
+  }
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const cash=v=>v==null?'No standalone price':'Rs. '+Number(v).toLocaleString('en-PK',{maximumFractionDigits:2});
   function checkbox(name,label,checked){return '<label class="fcv3-check"><input type="checkbox" name="'+name+'" data-field="'+name+'"'+(checked?' checked':'')+'> '+label+'</label>';}
@@ -215,10 +276,15 @@
         const mapped=buildIncludedMappings(detail);
         if(mapped.deal_variant_id!==dealVariantId)throw Error('Deal variant identity changed during component setup.');
         await write(WRITE.mappings,{deal_id:dealId,deal_variant_id:dealVariantId,options:mapped.options});
-        if(form.flame_hour){const scheduleId=await ensureFlameHourSchedule();await write(WRITE.assignment,{deal_id:dealId,branch_id:null,schedule_set_id:scheduleId,is_active:true});}
+        let scheduleId=null;
+        if(form.flame_hour){scheduleId=await ensureFlameHourSchedule();await write(WRITE.assignment,{deal_id:dealId,branch_id:null,schedule_set_id:scheduleId,is_active:true});}
+        const beforeActivation=await read(READ.dealDetail,{deal_id:dealId});
+        verifyFixedDealDetail(beforeActivation,{basePrice:base,components:s.components,flameHour:form.flame_hour===true,scheduleId,active:false});
         await write(WRITE.deal,{id:dealId,title,description_en:desc,is_active:true,is_available:true,
           variants:[{id:dealVariantId,variant_key:'BUNDLE',label_en:title,label_ur:null,pricing_mode:'FIXED_BUNDLE',base_price:base,sort_order:1,is_active:true}]});
-        s.partial=null;s.editor=null;s.notice='Fixed deal saved. Components are locked and use INCLUDED pricing.';await refresh();
+        const afterActivation=await read(READ.dealDetail,{deal_id:dealId});
+        verifyFixedDealDetail(afterActivation,{basePrice:base,components:s.components,flameHour:form.flame_hour===true,scheduleId,active:true});
+        s.partial=null;s.editor=null;s.notice='Fixed deal saved and read-back verified. Components are locked and use INCLUDED pricing.';await refresh();
       }catch(error){if(dealId)s.partial={id:dealId,variantId:dealVariantId};throw error;}
     }
     function readVariantRows(form){
@@ -288,5 +354,5 @@
     }
     return {mount:async(element,requestFn)=>{if(!element||typeof requestFn!=='function')throw Error('Catalog V3 workspace requires a root and authenticated request handler.');el=element;request=requestFn;bind();await refresh();},refresh,getState:()=>JSON.parse(JSON.stringify(s))};
   }
-  return {READ,WRITE,normalizeProductDraft,buildFixedComponentGroups,buildIncludedMappings,createWorkspace};
+  return {READ,WRITE,normalizeProductDraft,buildFixedComponentGroups,buildIncludedMappings,verifyFixedDealDetail,createWorkspace};
 });
