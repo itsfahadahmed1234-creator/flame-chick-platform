@@ -126,3 +126,24 @@ test("Rider delivered confirmation explicitly distinguishes delivery from cashie
   const html=source[1].html;
   assert.match(html,/Delivery marked delivered\. The order remains awaiting cashier payment collection\./);
 });
+
+
+test("POS exposes Cashier payment collection only for delivered orders and preserves safe retry identity", () => {
+  const html=source[0].html;
+  assert.match(html,/data-collect-payment=/);
+  assert.match(html,/function openPaymentCollection\(orderId\)/);
+  assert.match(html,/action:'collect_payment',order_id:state\.orderId,amount/);
+  assert.match(html,/payment_method:method,request_id:state\.requestId/);
+  assert.match(html,/state\.requestId=crypto\.randomUUID\(\)/);
+  assert.match(html,/A partial collection keeps the order Delivered/);
+  assert.match(html,/order\.Status!=='Delivered'/);
+  assert.doesNotMatch(html,/public\.payments\?select=|flame_chick_collect_order_payment|INSERT INTO public\.payments/);
+});
+
+test("POS displays the authoritative outstanding balance rather than treating delivery as collection", () => {
+  const html=source[0].html;
+  assert.match(html,/BalanceDue:row\.balance_due===null/);
+  assert.match(html,/PaidAmount:Number\(row\.paid_amount\)\|\|0/);
+  assert.match(html,/Due Rs\. \$\{money\(balance\)\}/);
+  assert.match(html,/Payment fully collected\. Order completed and moved to Order History\./);
+});
