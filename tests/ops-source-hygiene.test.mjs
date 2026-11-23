@@ -131,7 +131,9 @@ test("Rider delivered confirmation explicitly distinguishes delivery from cashie
 test("POS exposes Cashier payment collection only for delivered orders and preserves safe retry identity", () => {
   const html=source[0].html;
   assert.match(html,/data-collect-payment=/);
-  assert.match(html,/function openPaymentCollection\(orderId\)/);
+  assert.ok(html.includes("async function openPaymentCollection(orderId)"));
+  assert.ok(html.includes("await loadInitialOnlineInbox()"));
+  assert.ok(html.includes("state.sent&&(state.amount!==amount||state.method!==method)"));
   assert.match(html,/action:'collect_payment',order_id:state\.orderId,amount/);
   assert.match(html,/payment_method:method,request_id:state\.requestId/);
   assert.match(html,/state\.requestId=crypto\.randomUUID\(\)/);
