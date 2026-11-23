@@ -1,0 +1,115 @@
+name: QA Flame Chick Catalog V3 Menu Importer against local Supabase
+
+on:
+  push:
+    branches:
+      - work/production-source-audit
+    paths:
+      - "scripts/qa-catalog-v3-importer-db.mjs"
+      - "apps/flame-chick-admin/catalog-v3-importer.js"
+      - "apps/flame-chick-website/js/catalog-v3.js"
+      - "ops/catalog-drafts/flame-chick-published-menu-2026-11-23.v3-draft.json"
+      - "supabase/functions/flame-chick-staff-admin/catalog-actions.mjs"
+      - "supabase/migrations/*.sql"
+      - ".github/workflows/qa-catalog-v3-importer-db.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flame-chick-catalog-v3-importer-local-db-qa
+  cancel-in-progress: false
+
+jobs:
+  local-database-import-and-resume:
+    if: github.ref == 'refs/heads/work/production-source-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      FLAME_CHICK_QA_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    steps:
+      - name: Check out reviewed source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Install pinned Supabase CLI
+        run: |
+          set -euo pipefail
+          npm install --global "supabase@3.2.0"
+          supabase --version
+
+      - name: Check importer QA script syntax and required source
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/qa-catalog-v3-importer-db.mjs
+          test -s apps/flame-chick-admin/catalog-v3-importer.js
+          test -s ops/catalog-drafts/flame-chick-published-menu-2026-11-23.v3-draft.json
+          grep -q "buildCatalogRpcCall" scripts/qa-catalog-v3-importer-db.mjs
+          grep -q "flame_chick_catalog_compile_snapshot" scripts/qa-catalog-v3-importer-db.mjs
+          grep -q "catalog_publication_validate" scripts/qa-catalog-v3-importer-db.mjs
+          grep -q "second import" scripts/qa-catalog-v3-importer-db.mjs
+
+      - name: Start disposable Supabase with hosted-only helper compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          parked="${RUNNER_TEMP}/flame-chick-migrations"
+          test -d supabase/migrations
+          test ! -e "${parked}"
+          mv supabase/migrations "${parked}"
+          mkdir -p supabase/migrations
+
+          restore_migrations() {
+            rm -rf supabase/migrations
+            mv "${parked}" supabase/migrations
+          }
+          trap restore_migrations EXIT
+
+          # This isolated database has no hosted managed helpers. Install the
+          # same local-only no-op compatibility function used by catalog QA.
+          supabase start -x studio,imgproxy,edge-runtime,logflare,vector
+          psql "${FLAME_CHICK_QA_DATABASE_URL}" --set ON_ERROR_STOP=1 <<'SQL'
+          DO $bootstrap$
+          BEGIN
+            IF to_regprocedure('public.rls_auto_enable()') IS NULL THEN
+              EXECUTE $ddl$
+                CREATE FUNCTION public.rls_auto_enable()
+                RETURNS event_trigger
+                LANGUAGE plpgsql
+                AS $function$
+                BEGIN
+                  RETURN;
+                END;
+                $function$
+              $ddl$;
+            END IF;
+          END
+          $bootstrap$;
+          SQL
+
+          restore_migrations
+          trap - EXIT
+
+      - name: Apply the complete migration history to disposable local Supabase
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase migration up --local
+          expected="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')"
+          applied="$(psql "${FLAME_CHICK_QA_DATABASE_URL}" -Atqc "select count(*) from supabase_migrations.schema_migrations")"
+          test "${applied}" = "${expected}"
+
+      - name: Import published menu through real authenticated catalog RPCs, compile, validate and resume
+        run: node scripts/qa-catalog-v3-importer-db.mjs
+
+      - name: Stop disposable Supabase stack
+        if: always()
+        run: supabase stop --no-backup
