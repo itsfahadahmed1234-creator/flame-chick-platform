@@ -221,8 +221,12 @@ BEGIN
     'action','delivered','delivery_task_id',t1,'actor_user_id',rider_one,'request_id',gen_random_uuid()));
   IF result->>'ok'<>'true' OR result->>'task_status'<>'delivered'
      OR (SELECT status FROM public.orders WHERE id=o1)<>'delivered'
-     OR (SELECT is_current FROM public.delivery_assignments WHERE id=assignment_id) THEN
-    RAISE EXCEPTION 'RIDER_DELIVERY_FAILED: %',result;
+     OR (SELECT is_current FROM public.delivery_assignments WHERE id=assignment_id)
+     OR (SELECT completed_at FROM public.orders WHERE id=o1) IS NOT NULL
+     OR (SELECT payment_status FROM public.orders WHERE id=o1)<>'unpaid'
+     OR (SELECT paid_amount FROM public.orders WHERE id=o1)<>0
+     OR (SELECT balance_due FROM public.orders WHERE id=o1)<>(SELECT total FROM public.orders WHERE id=o1) THEN
+    RAISE EXCEPTION 'RIDER_DELIVERY_FAILED_OR_PREMATURE_ORDER_COMPLETION: %',result;
   END IF;
   result:=public.flame_chick_manage_delivery(jsonb_build_object(
     'action','delivered','delivery_task_id',t1,'actor_user_id',rider_one,'request_id',gen_random_uuid()));
