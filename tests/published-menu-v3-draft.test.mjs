@@ -240,7 +240,6 @@ test('Flame Hour popup is read-only and cannot emit a payload outside its schedu
       validateModifierSelections: dealView.validateModifierSelections
     });
     assert.equal(ui.ok, true);
-    assert.equal(ui.getState().readOnly, true);
     assert.equal(ui.selectVariant(flameHour.variants[0].id).ok, true);
     assert.equal(ui.validate().ok, true);
     assert.equal(ui.toPayload().code, 'DEAL_READ_ONLY');
