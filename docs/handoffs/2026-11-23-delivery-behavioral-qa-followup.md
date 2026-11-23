@@ -1,32 +1,28 @@
-# Authoritative order/payment workflow rule — 2026-11-23
+# Delivery concurrency QA — four real PostgreSQL-session races — 2026-11-23
 
-Rider marking **Delivered** is delivery confirmation only; it does not mean that money was received and does not complete the order. POS must show the order as **Delivered** while it remains active/awaiting cashier payment collection. Payment status remains outstanding until the Cashier actually receives/records the payment and explicitly marks it **Collected**, with collection amount/method and cashier/time audit. Only then does POS mark the order **Completed**, set `completed_at`, and move it to order history.
-
-**Known mismatch:** the current candidate `flame_chick_manage_delivery(action='delivered')` sets `orders.completed_at` during the Rider action. This must be corrected in the order/payment processing implementation before integrating this command into the apps. Rider delivery must not update payment status or close the order. Add tests proving only Cashier collection completes the order. GST remains deferred.
-
----
-
-# Delivery behavioral QA — expiry boundary passed; concurrency next — 2026-11-23
+**Authoritative delivery/payment workflow:** Rider marking **Delivered** confirms delivery only. POS keeps the order active in its Delivered / awaiting-payment queue; payment remains outstanding. Cashier must physically receive and mark payment **Collected**, recording amount, method, actor and time. Only then may POS set **Completed**, set `completed_at`, and move the order to history. Current candidate delivery SQL sets `completed_at` too early during Rider delivery; it must be corrected before app integration and tested in the order/payment stage. GST remains deferred.
 
 - Branch: `work/production-source-audit`
-- Verified expiry source commit: `355a7c38c2abb9232021ac1cfcf0c12796ba3df0`
-- Passing exact-boundary/lifecycle run: [45182331625](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45182331625)
-- Flame Chick is a pre-launch production build; no live restaurant operations system is running. The designated Supabase Production project is partly provisioned and is the target we're building toward. This disposable QA stage did not write to that target or change `main`.
+- Previous expiry-boundary / lifecycle pass: [45182331625](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45182331625)
+- First concurrency attempt: [45186758614](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45186758614) — existing tests passed, race-fixture setup failed because it used a non-canonical tenant slug. No production objects were changed.
+- Corrected retry: [45187227803](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45187227803) — in progress at checkpoint time.
+- Flame Chick is a pre-launch build. Supabase Production is the partly provisioned target environment; this workflow runs against disposable local Supabase.
 
-## Passed verification
+## What the new harness tests
 
-The disposable Supabase workflow passed complete migration replay, staff ACL/RLS and role boundary checks, synthetic fixture rollback, operational schema security/constraints, delivery lifecycle commands, exact 60-second expiry boundary tests, and disposable stack cleanup.
+It provisions synthetic identities through the protected Admin bootstrap and Staff Admin role command, sets up four independent offers, then uses separate PostgreSQL `psql` sessions and application names to force lock contention:
 
-The exact expiry tests prove acceptance one microsecond before expiry succeeds; acceptance exactly at the deadline fails with `OFFER_EXPIRED`, marks the offer expired, resets the task to `dispatch_pending`, creates no current assignment, and requires manual reassignment.
+1. Accept wins over simultaneous decline.
+2. Decline wins over simultaneous accept.
+3. Accept just before deadline holds the task lock; expiry sweep attempts expiry at the exact deadline and must return `expired_count=0` via `SKIP LOCKED`.
+4. Expiry sweep wins at the deadline while Rider acceptance is blocked on the same task lock.
 
-## Concurrency tests still outstanding
+For every race, the runner checks a single coherent offer/task/order state, no more than one current assignment, Rider availability, and mutually exclusive accept/decline/expiry audit event counts. The fixture exists only in disposable local Supabase, which the workflow stops afterward.
 
-The next work is true parallel PostgreSQL-session tests for:
-1. Rider accept racing against Rider decline for the same targeted offer.
-2. Rider accept racing against expiry/sweep at the deadline.
+**Verification remains pending.** First retry must finish migration replay, fixture setup and all four session races successfully before the handoff can say concurrency is passed.
 
-Assertions must prove a single valid terminal offer state, at most one current assignment, correct Rider/task/order state, and consistent event history. A test fixture draft was removed before running because its source-schema assumptions were not yet verified; it added no test coverage. Do not claim concurrency tests have passed until separate sessions are exercised and CI reports success.
+## Already verified
 
-## Release boundaries
+Exact deadline: acceptance one microsecond before 60 seconds succeeds; acceptance exactly at the deadline fails closed as `OFFER_EXPIRED`. Existing lifecycle: wrong-Rider denial, accept/idempotency, pickup, delivery/idempotency, failed delivery/return reporting, Rider cannot confirm physical return, Cashier can confirm, and payment ledger remains unchanged. These passed in run `45182331625`.
 
-This QA stage made no changes to the designated Supabase Production project. That project is a pre-launch build environment, not a live operations system. Earlier foundation/catalog setup remains in place. The new delivery command migration and QA fixture remain source-only at this checkpoint; GST remains deferred.
+No writes were made to the designated Supabase Production target in these QA stages. No Vercel/Edge deployment, Realtime configuration or checkout activation occurred.
