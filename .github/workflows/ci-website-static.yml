@@ -21,6 +21,9 @@ on:
       - "supabase/migrations/20261122174500_flame_chick_catalog_database_time_metadata_v1.sql"
       - "supabase/migrations/20261123150000_flame_chick_deal_only_variant_pricing_v1.sql"
       - "tests/fixtures/catalog-v3-fixture.cjs"
+      - "tests/published-menu-v3-draft.test.mjs"
+      - "tests/fixtures/flame-chick-published-menu-v3-fixture.cjs"
+      - "ops/catalog-drafts/flame-chick-published-menu-2026-11-23.v3-draft.json"
       - ".github/workflows/ci-website-static.yml"
 
 permissions:
@@ -61,7 +64,7 @@ jobs:
 
       - name: Run core catalog regression tests
         run: |
-          node --test tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs tests/catalog-v3-view.test.mjs tests/catalog-v3-deal-view.test.mjs tests/catalog-v3-deal-configurator.test.mjs tests/branch-fulfilment-v3.test.mjs tests/catalog-database-time-migration.test.mjs
+          node --test tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs tests/catalog-v3-view.test.mjs tests/catalog-v3-deal-view.test.mjs tests/catalog-v3-deal-configurator.test.mjs tests/branch-fulfilment-v3.test.mjs tests/catalog-database-time-migration.test.mjs tests/published-menu-v3-draft.test.mjs
 
       - name: Run preview regression tests
         run: |
