@@ -78,3 +78,40 @@ test("Staff Admin uses exact-origin policy and the dedicated invite callback", (
   assert.match(sources["flame-chick-staff-admin"], /staffCorsHeaders/);
   assert.match(sources["flame-chick-staff-admin"], /verify_jwt/);
 });
+
+
+test("order API resolves private user_roles through the service key using production role_key", () => {
+  const source = sources["flame-chick-order-api"];
+  assert.match(source, /async function resolveStaffContext\(userId: string\)/);
+  assert.match(source, /roleQuery\.set\("select", "role_key,branch_id,is_active"\)/);
+  assert.match(source, /roleQuery\.set\("restaurant_id"/);
+  assert.match(source, /readAsService\("user_roles\?/);
+  assert.match(source, /view === "staff_context"/);
+  assert.match(source, /query\.set\("branch_id", "eq\." \+ branchId\)/);
+  assert.doesNotMatch(source, /roleQuery\.set\("select", "role,branch_id,is_active"\)/);
+});
+
+test("POS browser obtains its own branch role through order API instead of direct private table access", () => {
+  const source = readFileSync("apps/flame-chick-pos/index.html", "utf8");
+  assert.match(source, /FLAME_CHICK_ALLOWED_POS_ROLES=new Set\(\['owner','admin','manager','cashier'\]\)/);
+  assert.match(source, /API_URL\+'\?view=staff_context'/);
+  assert.doesNotMatch(source, /FLAME_CHICK_REST_URL\+'\/user_roles/);
+  assert.doesNotMatch(source, /'kitchen'/);
+});
+
+test("Rider browser obtains its profile through the authenticated delivery API", () => {
+  const source = readFileSync("apps/flame-chick-rider/index.html", "utf8");
+  assert.match(source, /DELIVERY_API\+'\?view=profile'/);
+  assert.match(source, /ORDER_API\+'\?view=staff_context'/);
+  assert.doesNotMatch(source, /REST_URL\+'\/user_roles/);
+});
+
+test("delivery API checks role_key and reads private role/profile rows server-side", () => {
+  const source = sources["flame-chick-delivery-api"];
+  assert.match(source, /roleQuery\.set\("select", "role_key,branch_id,is_active"\)/);
+  assert.match(source, /roleQuery\.set\("role_key", "eq\.rider"\)/);
+  assert.match(source, /readAsService\("user_roles\?/);
+  assert.match(source, /view === "profile"/);
+  assert.match(source, /readAsService\("rider_profiles\?/);
+  assert.doesNotMatch(source, /readAsUser\("user_roles\?/);
+});
