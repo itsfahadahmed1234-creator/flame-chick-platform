@@ -42,7 +42,7 @@ test('preview page has explicit status, branch, product, deal and validation tar
     'connection-pill', 'connection-message', 'reload-catalog', 'branch-selector',
     'product-category-nav', 'product-catalog', 'products-empty',
     'deal-catalog', 'deals-empty', 'deal-configurator', 'deal-config-result',
-    'close-deal-config'
+    'close-deal-config', 'product-detail-dialog', 'product-detail-content', 'close-product-detail'
   ]) {
     assert.match(page, new RegExp('id="' + id + '"'));
   }
@@ -97,4 +97,25 @@ test('deal configurator supports preview labels without representing a partial b
   const source = await read('js/catalog-v3-deal-configurator.js');
   assert.match(source, /showVariantBasePrice !== false/);
   assert.match(source, /options\.completeButtonLabel/);
+});
+
+
+test('product options open in an accessible read-only detail dialog rather than on the product card', async () => {
+  const page = await read('catalog-preview.html');
+  const source = await read('js/catalog-preview-page.js');
+  assert.match(page, /<dialog id="product-detail-dialog"/);
+  assert.match(page, /aria-label="Product details"/);
+  assert.match(source, /function openProductDetail\(product, currency\)/);
+  assert.match(source, /productDialog\.showModal\(\)/);
+  assert.match(source, /product\.variants\.length > 1 \? 'View options' : 'View details'/);
+  assert.match(source, /Choose an option/);
+  assert.match(source, /No item was added to a cart/);
+  assert.doesNotMatch(source, /add-to-cart|onAdd/);
+});
+
+test('product detail dialog is closed when catalog context changes or the preview reloads', async () => {
+  const source = await read('js/catalog-preview-page.js');
+  assert.match(source, /closeProductDetail\(\)/);
+  assert.match(source, /if \(currentPreviewId !== preview\.previewId\)[\s\S]*?closeProductDetail\(\)/);
+  assert.match(source, /productDialog\.addEventListener\('close'/);
 });
