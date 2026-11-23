@@ -59,6 +59,7 @@
 
       var variants = snapshot.productVariants.filter(function (variant) {
         return variant.productId === product.productId &&
+          variant.standaloneSellable === true &&
           contract.resolveVariantAvailability(snapshot, branchId, product.productId, variant.variantId);
       }).sort(function (a, b) {
         return a.sortOrder - b.sortOrder || a.variantId.localeCompare(b.variantId);
