@@ -708,3 +708,24 @@ Read-only checks on 2026-11-23 confirm:
 ### Production safety statement
 
 No Production SQL/migration, table creation, seed, catalog import/publication, Auth user/role creation, Edge Function deployment, secret change, Storage/Realtime setting, Vercel deployment, checkout activation, or paid-plan upgrade was performed. Production remains read-only. The migration candidate is not approval to apply it. Keep \`main\` and the original HFP/reference repositories untouched.
+
+---
+## 2026-11-23 — Rider delivery flow simplified (source only)
+
+User explicitly confirmed: remove the “At restaurant” step. Required Rider sequence is exactly:
+
+1. Accept the targeted delivery offer once in the Offers panel.
+2. Picked up — this is the next Rider action after acceptance.
+3. Delivered — completes delivery.
+
+There is no separate arrival state, arrival timestamp, “At restaurant” button, or second acceptance button in the active-job card. Offer acceptance remains a distinct accept_offer API command because it consumes the targeted 60-second offer; it is not duplicated as an active-task action.
+
+Source-only edits on work/production-source-audit:
+- Rider UI no longer displays the second Accept button, arrival button, arrival status label, or arrival pickup counter.
+- Delivery API generic task actions no longer accept legacy arrive; targeted accept_offer / decline_offer remain handled by their dedicated guarded branch.
+- POS delivery status labels and active dispatch filters no longer include the arrival state.
+- Operational schema candidate task/assignment status constraints no longer include arrived_at_restaurant; the unused arrival timestamp was removed.
+- Delivery lifecycle contract now records the resolved Accept → Picked up → Delivered sequence.
+- No Production SQL or deployment was performed.
+
+Verification caveat: source files were re-read after changes, but GitHub reported no workflow runs for the Rider/POS/API commits. The simplified flow is therefore source-updated but not yet CI-verified or runtime-verified. Before deployment, run syntax/contract tests and disposable local migration replay, then test accept, pickup, delivery, reject/expiry, failure/physical return and role isolation against local Supabase.
