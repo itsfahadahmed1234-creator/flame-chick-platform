@@ -1,3 +1,51 @@
+# CURRENT CHECKPOINT — 2026-11-23 — Step 2 POS/Rider delivery integration source checks PASSED
+
+**Active branch:** `work/production-source-audit`  
+**Latest POS integration source commit:** `45af748ee2184e58072e90a5fd932ede11416072`  
+**POS/Rider static QA:** [run 45198567593 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45198567593)  
+**Edge Function type/contract QA:** [run 45198081185 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45198081185)  
+**Disposable operational/delivery SQL QA:** [run 45197859536 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45197859536)  
+**Admin source QA:** [run 45198568180 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45198568180)
+
+Flame Chick remains a **pre-launch production build**. The partly provisioned Supabase Production project is the target environment, not a live restaurant operations system. This Step 2 work is source wiring and disposable QA; no Edge/website/POS/Rider deployment or new operational migration was applied to the target Supabase environment.
+
+## Step 2 source integration completed
+
+- POS now keeps Rider-delivered orders in the active third column, renamed **Delivery & Awaiting Payment**, and labels a delivered order **Delivered · awaiting cashier payment collection**. The Order API active board includes `delivered`, so the POS does not lose the order when the Rider marks it delivered.
+- The POS does not offer an automatic “complete” action after Rider delivery. A distinct Cashier payment-collection command and corresponding POS action are still required in the next order-processing phase.
+- Rider completion copy now says delivery was marked delivered and the order remains awaiting Cashier payment collection. Rider steps remain **Accept offer → Picked up → Delivered**; no restaurant-arrival step was reintroduced.
+- Delivery dispatch API now returns `accepting_jobs` and `last_seen_at` in addition to Rider identity and availability. Those are the exact fields the POS uses to filter recent, online, available Riders before showing assignment choices.
+- POS physical-return confirmation now permits **Cashier**, Manager, Admin and Owner, matching the database command authorization. The Cashier confirm button is visible after the Rider reports physical return.
+- Staff physical return continues to update the delivery/order state to `returned`, without treating it as paid or completed. Returned orders leave the active board and appear in the existing **Cancelled Orders** history tab. Cloud, local fallback and status-label handling include `returned`.
+- Existing Rider-specific delivery views remain scoped to that authenticated Rider’s offers and assignments. POS still chooses one Rider explicitly; offer expiry remains 60 seconds and requires manual reassignment.
+
+## Delivery vs payment vs completion — authoritative
+
+Rider `delivered` now sets only delivery facts (`delivery_tasks.status`, assignment release, `orders.status='delivered'`, `delivered_at`, and audit history). It does **not** set `completed_at`, create a payment or change `payment_status`.
+
+The Cashier must later physically receive and record payment as **Collected**, with amount/method/actor/time audit. Only after the payment transaction commits may the order be marked **Completed**, receive `completed_at`, and move into Order History. Physical return remains a separate `returned` state; do not infer payment collection or refund from it. GST remains deferred.
+
+## Verification results
+
+- [Run 45197859536](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45197859536) passed complete disposable migration replay, staff ACL/RLS and role authorization, operational-schema constraints/security, the delivery lifecycle/expiry fixture (including new assertions that Rider delivery and staff-confirmed return remain unpaid and without `completed_at`), all four real concurrent delivery races, and disposable Supabase teardown.
+- [Run 45198081185](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45198081185) passed Deno type-check for all Edge Functions and the Edge contract tests, including dispatch Rider heartbeat fields and delivered/returned board statuses.
+- [Run 45198567593](https://github.com/itsfahamed1234-creator/flame-chick-platform/actions/runs/45198567593) passed POS/Rider inline JavaScript parsing and source-hygiene/integration assertions.
+- [Run 45198568180](https://github.com/itsfahamed1234-creator/flame-chick-platform/actions/runs/45198568180) passed Admin static checks.
+- Preview deployments were skipped by their workflows. These apps/functions are **not deployed from this work**.
+
+## Next — order-processing and payment collection
+
+Build the separate Cashier payment-collection transaction/API:
+1. Lock the order and payment state; validate the collected amount against outstanding balance.
+2. Record payment method, amount, actor and timestamp in the payment ledger with an idempotency key.
+3. Update `paid_amount` and `payment_status`; only when the required balance is fully collected set `orders.status='completed'`, `completed_at`, and let the order move into Order History.
+4. Partial collection must leave the order active in Delivered / awaiting payment and must not complete it.
+5. Duplicate collection, overpayment, retries, cancellation and return/refund reconciliation need explicit DB tests.
+6. Keep Rider API incapable of recording payment or completing orders.
+
+No target Production writes, deployments, Realtime activation or checkout activation occurred during this Step 2 source/QA phase. Continue incrementally toward the pre-launch production system.
+---
+
 # CURRENT CHECKPOINT — 2026-11-23 — Step 1 delivery concurrency QA PASSED
 
 **Active branch:** `work/production-source-audit`  
@@ -48,7 +96,7 @@ Step 1 is complete. Move to **Step 2: POS/Rider app integration review and wirin
 No target Supabase database writes, function deployment, Vercel deployment, Realtime activation or checkout enablement occurred in this QA stage. Continue building the pre-launch production system in controlled, verified increments.
 ---
 
- — 2026-11-23
+# AUTHORITATIVE ORDER DELIVERY VS PAYMENT COLLECTION RULE — 2026-11-23
 
 **Rider marking an order Delivered does NOT mean payment was collected and does NOT complete the order.**
 
