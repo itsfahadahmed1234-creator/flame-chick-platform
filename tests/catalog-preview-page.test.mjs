@@ -71,6 +71,8 @@ test('product cards do not expose an add-to-cart operation or compute a combined
   assert.doesNotMatch(source, /grandTotal/);
   assert.doesNotMatch(source, /cartTotal/);
   assert.doesNotMatch(source, /subtotal/);
+  assert.doesNotMatch(source, /basePriceMinor/);
+  assert.match(source, /showVariantBasePrice: false/);
 });
 
 test('preview CSS has responsive product/deal layouts and explicitly hides legacy add controls', async () => {
@@ -81,4 +83,10 @@ test('preview CSS has responsive product/deal layouts and explicitly hides legac
   assert.match(css, /\.fc-menu-add\s*\{[^}]*display:\s*none\s*!important/s);
   assert.match(css, /:focus-visible/);
   assert.match(css, /prefers-reduced-motion/);
+});
+
+test('deal configurator supports preview labels without representing a partial base price as a final deal price', async () => {
+  const source = await read('js/catalog-v3-deal-configurator.js');
+  assert.match(source, /showVariantBasePrice !== false/);
+  assert.match(source, /options\.completeButtonLabel/);
 });
