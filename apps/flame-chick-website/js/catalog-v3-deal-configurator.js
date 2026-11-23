@@ -435,7 +435,9 @@
       continueButton.disabled = !validation.ok;
       continueButton.addEventListener('click', function () {
         var payload = toPayload();
-        if (!payload.ok) {
+        // Successful payloads are identifier-only objects and intentionally do
+        // not contain an "ok" field. Only explicit failure results carry ok:false.
+        if (!payload || payload.ok === false) {
           lastError = payload;
           render(container, { document: doc, onComplete: options.onComplete, formatMoney: options.formatMoney,
             completeButtonLabel: options.completeButtonLabel, showVariantBasePrice: options.showVariantBasePrice });
