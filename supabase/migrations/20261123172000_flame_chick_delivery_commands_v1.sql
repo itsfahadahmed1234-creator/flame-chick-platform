@@ -3,6 +3,23 @@
 -- and derive permissions from the server-verified Auth subject supplied by the Edge Function.
 BEGIN;
 
+-- All delivery timing decisions use this private clock entry point. The
+-- disposable SQL fixture temporarily replaces this function inside a
+-- rollback-only transaction to test exact timestamp boundaries; production
+-- always delegates to PostgreSQL's real clock_timestamp().
+CREATE OR REPLACE FUNCTION app_private.flame_chick_delivery_clock_now()
+RETURNS timestamptz
+LANGUAGE sql
+VOLATILE
+SET search_path=''
+AS $function$
+  SELECT pg_catalog.clock_timestamp()
+$function$;
+
+ALTER FUNCTION app_private.flame_chick_delivery_clock_now() OWNER TO postgres;
+REVOKE ALL ON FUNCTION app_private.flame_chick_delivery_clock_now()
+  FROM PUBLIC,anon,authenticated,service_role;
+
 -- Idempotency for state-change event and order-history append operations.
 CREATE UNIQUE INDEX delivery_task_events_request_action_uq
   ON public.delivery_task_events(restaurant_id,branch_id,request_id,event_type)
@@ -190,7 +207,7 @@ BEGIN
       'code','DELIVERY_OFFER_ALREADY_RESOLVED','message','This delivery offer has already been resolved.'));
   END IF;
 
-  v_now := pg_catalog.clock_timestamp();
+  v_now := app_private.flame_chick_delivery_clock_now();
   IF v_now>=v_offer.expires_at THEN
     UPDATE public.delivery_task_offers
     SET status='expired',responded_at=v_now,response_reason='No response within 60 seconds'
@@ -448,7 +465,7 @@ BEGIN
       'code','DELIVERY_ORDER_NOT_FOUND','message','The delivery order could not be found.'));
   END IF;
 
-  v_now := pg_catalog.clock_timestamp();
+  v_now := app_private.flame_chick_delivery_clock_now();
 
   -- Staff dispatch: assignment is always an explicit choice of one Rider.
   IF v_action='assign' THEN
@@ -1016,7 +1033,7 @@ BEGIN
     WHERE t.branch_id=p_branch_id
       AND t.status='offering'
       AND o.status='offered'
-      AND o.expires_at<=pg_catalog.clock_timestamp()
+      AND o.expires_at<=app_private.flame_chick_delivery_clock_now()
     ORDER BY o.expires_at,o.id
     LIMIT v_limit
     FOR UPDATE OF t SKIP LOCKED
@@ -1032,11 +1049,11 @@ BEGIN
     WHERE o.id=v_row.offer_id
     FOR UPDATE;
     IF NOT FOUND OR v_offer.status<>'offered'
-       OR v_offer.expires_at>pg_catalog.clock_timestamp() THEN
+       OR v_offer.expires_at>app_private.flame_chick_delivery_clock_now() THEN
       CONTINUE;
     END IF;
 
-    v_now:=pg_catalog.clock_timestamp();
+    v_now:=app_private.flame_chick_delivery_clock_now();
     UPDATE public.delivery_task_offers
     SET status='expired',responded_at=v_now,response_reason='No response within 60 seconds'
     WHERE id=v_offer.id AND status='offered';
@@ -1097,7 +1114,10 @@ BEGIN
   END IF;
   IF pg_catalog.has_function_privilege('service_role','app_private.flame_chick_delivery_staff_role(uuid,uuid,uuid)','EXECUTE')
      OR pg_catalog.has_function_privilege('service_role','app_private.flame_chick_delivery_rider_active(uuid,uuid,uuid)','EXECUTE')
-     OR pg_catalog.has_function_privilege('service_role','app_private.flame_chick_respond_delivery_offer(uuid,uuid,text,text,uuid)','EXECUTE') THEN
+     OR pg_catalog.has_function_privilege('service_role','app_private.flame_chick_respond_delivery_offer(uuid,uuid,text,text,uuid)','EXECUTE')
+     OR pg_catalog.has_function_privilege('anon','app_private.flame_chick_delivery_clock_now()','EXECUTE')
+     OR pg_catalog.has_function_privilege('authenticated','app_private.flame_chick_delivery_clock_now()','EXECUTE')
+     OR pg_catalog.has_function_privilege('service_role','app_private.flame_chick_delivery_clock_now()','EXECUTE') THEN
     RAISE EXCEPTION 'FLAME_CHICK_PRIVATE_DELIVERY_HELPER_EXPOSED';
   END IF;
   IF pg_catalog.to_regprocedure('public.flame_chick_manage_delivery(jsonb)') IS NULL
