@@ -1,0 +1,711 @@
+{
+  "formatVersion": 1,
+  "draftId": "flame-chick-published-menu-2026-11-23",
+  "status": "REVIEW_ONLY_NOT_IMPORTED",
+  "authority": "restaurant-published-menu",
+  "currencyCode": "PKR",
+  "timezone": "Asia/Karachi",
+  "notes": [
+    "This is a review-only V3 catalog draft. It is not a SQL seed or database import instruction.",
+    "The superseded running menu is intentionally excluded.",
+    "Deal-only items use non-standalone variants with nullable price and are linked by product/variant keys.",
+    "All six current offers use fixed components with INCLUDED treatment. No current selectable upgrades or SURCHARGE mappings are enabled.",
+    "The generic Burger component links to deal_burger, not og_crunch. Little Crunch explicitly links to og_crunch.",
+    "The 120 Cold Drink maps only to cold_drink / REGULAR. No ml volume is inferred.",
+    "The Smash is one product with two priced variants; required product popup remains a separate UI task.",
+    "Platter description and restaurant-supplied Juice / 1L Drink identities remain intentionally unspecified.",
+    "Flame Hour's two printed fixed-price offers are represented as two separate deal entries that share the same daily schedule. V3 component groups are deal-scoped, so separate deal records avoid forcing either offer to satisfy the other offer's fixed components."
+  ],
+  "categories": [
+    {
+      "key": "starters",
+      "categoryKind": "menu",
+      "nameEn": "Starters"
+    },
+    {
+      "key": "injected_broast",
+      "categoryKind": "menu",
+      "nameEn": "Injected Broast"
+    },
+    {
+      "key": "whole_chicken_broast",
+      "categoryKind": "menu",
+      "nameEn": "Whole Chicken Broast"
+    },
+    {
+      "key": "chicken_burgers",
+      "categoryKind": "menu",
+      "nameEn": "Chicken Burgers"
+    },
+    {
+      "key": "flame_beef",
+      "categoryKind": "menu",
+      "nameEn": "Flame Beef"
+    },
+    {
+      "key": "wraps",
+      "categoryKind": "menu",
+      "nameEn": "Wraps"
+    },
+    {
+      "key": "beverages",
+      "categoryKind": "menu",
+      "nameEn": "Beverages"
+    },
+    {
+      "key": "deals",
+      "categoryKind": "deal",
+      "nameEn": "Deals"
+    }
+  ],
+  "products": [
+    {
+      "key": "classic_nuggets_12",
+      "categoryKey": "starters",
+      "nameEn": "Classic Nuggets",
+      "variants": [
+        {
+          "variantKey": "PACK_12",
+          "sizeLabel": "12 pcs",
+          "price": 699,
+          "variantKind": "pack",
+          "packQuantity": 12,
+          "packUnit": "pcs",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "injected_nuggets_12",
+      "categoryKey": "starters",
+      "nameEn": "Injected Nuggets",
+      "variants": [
+        {
+          "variantKey": "PACK_12",
+          "sizeLabel": "12 pcs",
+          "price": 749,
+          "variantKind": "pack",
+          "packQuantity": 12,
+          "packUnit": "pcs",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "fire_wings_6",
+      "categoryKey": "starters",
+      "nameEn": "Fire Wings",
+      "variants": [
+        {
+          "variantKey": "PACK_6",
+          "sizeLabel": "6 pcs",
+          "price": 599,
+          "variantKind": "pack",
+          "packQuantity": 6,
+          "packUnit": "pcs",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "injected_wings_6",
+      "categoryKey": "starters",
+      "nameEn": "Injected Wings",
+      "variants": [
+        {
+          "variantKey": "PACK_6",
+          "sizeLabel": "6 pcs",
+          "price": 699,
+          "variantKind": "pack",
+          "packQuantity": 6,
+          "packUnit": "pcs",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "platter",
+      "categoryKey": "starters",
+      "nameEn": "Platter",
+      "descriptionEn": null,
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 1499,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "quarter_broast",
+      "categoryKey": "injected_broast",
+      "nameEn": "Quarter Broast",
+      "descriptionEn": "2 pcs chicken, dips, bun and fries.",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 899,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "half_broast",
+      "categoryKey": "injected_broast",
+      "nameEn": "Half Broast",
+      "descriptionEn": "4 pcs chicken, dips, buns and fries.",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 1599,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "full_broast",
+      "categoryKey": "injected_broast",
+      "nameEn": "Full Broast",
+      "descriptionEn": "8 pcs chicken, dips, buns and fries.",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 2399,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "simple_injected",
+      "categoryKey": "whole_chicken_broast",
+      "nameEn": "Simple Injected",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 2499,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "nashville",
+      "categoryKey": "whole_chicken_broast",
+      "nameEn": "Nashville",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 2699,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "cheetos_butter",
+      "categoryKey": "whole_chicken_broast",
+      "nameEn": "Cheetos Butter",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 2799,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "og_crunch",
+      "categoryKey": "chicken_burgers",
+      "nameEn": "OG Crunch",
+      "descriptionEn": "Crispy fried chicken, lettuce, jalapeño and secret sauce, served with fries.",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 599,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "the_injector",
+      "categoryKey": "chicken_burgers",
+      "nameEn": "The Injector",
+      "descriptionEn": "Juicy injected crispy chicken, jalapeño, fresh lettuce and signature sauce, served with fries.",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 649,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "nashville_fire",
+      "categoryKey": "chicken_burgers",
+      "nameEn": "Nashville Fire",
+      "descriptionEn": "Nashville-spiced crispy chicken, jalapeño, fresh lettuce and signature sauce, served with fries.",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 699,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "the_smash",
+      "categoryKey": "flame_beef",
+      "nameEn": "The Smash",
+      "variants": [
+        {
+          "variantKey": "SINGLE_PATTY",
+          "sizeLabel": "Single Patty",
+          "price": 799,
+          "variantKind": "portion",
+          "standaloneSellable": true
+        },
+        {
+          "variantKey": "DOUBLE_PATTY",
+          "sizeLabel": "Double Patty",
+          "price": 999,
+          "variantKind": "portion",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "the_marrow",
+      "categoryKey": "flame_beef",
+      "nameEn": "The Marrow",
+      "descriptionEn": "Juicy beef patty filled with rich bone marrow butter, served with fries.",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 1199,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "tender_fillet_wrap",
+      "categoryKey": "wraps",
+      "nameEn": "Tender Fillet Wrap",
+      "descriptionEn": "Crispy chicken tender fillet, jalapeño, fresh lettuce and signature sauce wrapped in a soft tortilla.",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 599,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "flame_chick_special",
+      "categoryKey": "wraps",
+      "nameEn": "Flame Chick Special",
+      "descriptionEn": "Crispy injected nuggets, jalapeño, fresh lettuce and signature sauce wrapped in a soft tortilla.",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 649,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "water",
+      "categoryKey": "beverages",
+      "nameEn": "Water",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 99,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        },
+        {
+          "variantKey": "VOLUME_1_5_LTR",
+          "sizeLabel": "1.5 Ltr",
+          "price": 150,
+          "variantKind": "volume",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "cold_drink",
+      "categoryKey": "beverages",
+      "nameEn": "Cold Drink",
+      "variants": [
+        {
+          "variantKey": "REGULAR",
+          "sizeLabel": "Regular",
+          "price": 120,
+          "variantKind": "standard",
+          "standaloneSellable": true
+        },
+        {
+          "variantKey": "VOLUME_1_5_LTR",
+          "sizeLabel": "1.5 Ltr",
+          "price": 250,
+          "variantKind": "volume",
+          "standaloneSellable": true
+        }
+      ]
+    },
+    {
+      "key": "deal_burger",
+      "categoryKey": "chicken_burgers",
+      "nameEn": "Burger",
+      "standaloneSellable": false,
+      "dealOnly": true,
+      "variants": [
+        {
+          "variantKey": "INCLUDED",
+          "sizeLabel": "Included",
+          "price": null,
+          "variantKind": "standard",
+          "standaloneSellable": false
+        }
+      ]
+    },
+    {
+      "key": "deal_classic_nuggets_6",
+      "categoryKey": "starters",
+      "nameEn": "Classic Nuggets (6 pcs)",
+      "standaloneSellable": false,
+      "dealOnly": true,
+      "variants": [
+        {
+          "variantKey": "PACK_6",
+          "sizeLabel": "6 pcs",
+          "price": null,
+          "variantKind": "pack",
+          "packQuantity": 6,
+          "packUnit": "pcs",
+          "standaloneSellable": false
+        }
+      ]
+    },
+    {
+      "key": "deal_fries",
+      "categoryKey": "starters",
+      "nameEn": "Fries",
+      "standaloneSellable": false,
+      "dealOnly": true,
+      "variants": [
+        {
+          "variantKey": "INCLUDED",
+          "sizeLabel": "Included",
+          "price": null,
+          "variantKind": "standard",
+          "standaloneSellable": false
+        }
+      ]
+    },
+    {
+      "key": "deal_juice",
+      "categoryKey": "beverages",
+      "nameEn": "Juice",
+      "standaloneSellable": false,
+      "dealOnly": true,
+      "variants": [
+        {
+          "variantKey": "INCLUDED",
+          "sizeLabel": "Included",
+          "price": null,
+          "variantKind": "standard",
+          "standaloneSellable": false
+        }
+      ]
+    },
+    {
+      "key": "deal_drink_1l",
+      "categoryKey": "beverages",
+      "nameEn": "1L Drink",
+      "standaloneSellable": false,
+      "dealOnly": true,
+      "variants": [
+        {
+          "variantKey": "VOLUME_1_LTR",
+          "sizeLabel": "1 Ltr",
+          "price": null,
+          "variantKind": "volume",
+          "standaloneSellable": false
+        }
+      ]
+    }
+  ],
+  "dealCollection": {
+    "key": "flame_chick_deals",
+    "categoryKey": "deals",
+    "nameEn": "Deals"
+  },
+  "deals": [
+    {
+      "key": "flame_hour_injector",
+      "title": "Flame Hour — The Injector + Cold Drink",
+      "descriptionEn": "The Injector + Cold Drink. Available daily from 3 PM to 5 PM.",
+      "schedule": {
+        "timezone": "Asia/Karachi",
+        "windowKind": "WEEKLY_DAILY",
+        "localStart": "15:00:00",
+        "localEnd": "17:00:00"
+      },
+      "variants": [
+        {
+          "variantKey": "INJECTOR_COLD_DRINK",
+          "labelEn": "The Injector + Cold Drink",
+          "basePrice": 699,
+          "components": [
+            {
+              "displayName": "The Injector",
+              "productKey": "the_injector",
+              "variantKey": "REGULAR",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            },
+            {
+              "displayName": "Cold Drink",
+              "productKey": "cold_drink",
+              "variantKey": "REGULAR",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "flame_hour_quarter_broast",
+      "title": "Flame Hour — Quarter Broast + Burger + Cold Drink",
+      "descriptionEn": "Quarter Broast + Burger + Cold Drink. Available daily from 3 PM to 5 PM.",
+      "schedule": {
+        "timezone": "Asia/Karachi",
+        "windowKind": "WEEKLY_DAILY",
+        "localStart": "15:00:00",
+        "localEnd": "17:00:00"
+      },
+      "variants": [
+        {
+          "variantKey": "QUARTER_BROAST_BURGER_COLD_DRINK",
+          "labelEn": "Quarter Broast + Burger + Cold Drink",
+          "basePrice": 1599,
+          "components": [
+            {
+              "displayName": "Quarter Broast",
+              "productKey": "quarter_broast",
+              "variantKey": "REGULAR",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            },
+            {
+              "displayName": "Burger",
+              "productKey": "deal_burger",
+              "variantKey": "INCLUDED",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            },
+            {
+              "displayName": "Cold Drink",
+              "productKey": "cold_drink",
+              "variantKey": "REGULAR",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "flame_duo",
+      "title": "Flame Duo",
+      "descriptionEn": "2 Burgers + Quarter Broast + 2 Cold Drinks.",
+      "variants": [
+        {
+          "variantKey": "BUNDLE",
+          "labelEn": "Flame Duo",
+          "basePrice": 2099,
+          "components": [
+            {
+              "displayName": "Burger",
+              "productKey": "deal_burger",
+              "variantKey": "INCLUDED",
+              "quantity": 2,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            },
+            {
+              "displayName": "Quarter Broast",
+              "productKey": "quarter_broast",
+              "variantKey": "REGULAR",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            },
+            {
+              "displayName": "Cold Drink",
+              "productKey": "cold_drink",
+              "variantKey": "REGULAR",
+              "quantity": 2,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "flame_feast",
+      "title": "Flame Feast",
+      "descriptionEn": "Half Broast + 3 Burgers + 1L Drink.",
+      "variants": [
+        {
+          "variantKey": "BUNDLE",
+          "labelEn": "Flame Feast",
+          "basePrice": 3599,
+          "components": [
+            {
+              "displayName": "Half Broast",
+              "productKey": "half_broast",
+              "variantKey": "REGULAR",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            },
+            {
+              "displayName": "Burger",
+              "productKey": "deal_burger",
+              "variantKey": "INCLUDED",
+              "quantity": 3,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            },
+            {
+              "displayName": "1L Drink",
+              "productKey": "deal_drink_1l",
+              "variantKey": "VOLUME_1_LTR",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "mini_flame",
+      "title": "Mini Flame",
+      "descriptionEn": "6 Classic Nuggets + Fries + Juice.",
+      "variants": [
+        {
+          "variantKey": "BUNDLE",
+          "labelEn": "Mini Flame",
+          "basePrice": 399,
+          "components": [
+            {
+              "displayName": "Classic Nuggets (6 pcs)",
+              "productKey": "deal_classic_nuggets_6",
+              "variantKey": "PACK_6",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            },
+            {
+              "displayName": "Fries",
+              "productKey": "deal_fries",
+              "variantKey": "INCLUDED",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            },
+            {
+              "displayName": "Juice",
+              "productKey": "deal_juice",
+              "variantKey": "INCLUDED",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "little_crunch",
+      "title": "Little Crunch",
+      "descriptionEn": "6 Classic Nuggets + OG Crunch + Fries + Cold Drink.",
+      "variants": [
+        {
+          "variantKey": "BUNDLE",
+          "labelEn": "Little Crunch",
+          "basePrice": 999,
+          "components": [
+            {
+              "displayName": "Classic Nuggets (6 pcs)",
+              "productKey": "deal_classic_nuggets_6",
+              "variantKey": "PACK_6",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            },
+            {
+              "displayName": "OG Crunch",
+              "productKey": "og_crunch",
+              "variantKey": "REGULAR",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            },
+            {
+              "displayName": "Fries",
+              "productKey": "deal_fries",
+              "variantKey": "INCLUDED",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            },
+            {
+              "displayName": "Cold Drink",
+              "productKey": "cold_drink",
+              "variantKey": "REGULAR",
+              "quantity": 1,
+              "pricingTreatment": "INCLUDED",
+              "unitSurcharge": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
