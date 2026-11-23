@@ -624,8 +624,7 @@ CREATE TABLE public.delivery_tasks (
     FOREIGN KEY(branch_id,restaurant_id)
     REFERENCES public.branches(id,restaurant_id) ON DELETE RESTRICT,
   CONSTRAINT delivery_tasks_status_check CHECK(status IN (
-    'dispatch_pending','offering','assigned','accepted','arrived_at_restaurant',
-    'picked_up','out_for_delivery','failed','delivered','returned','cancelled'
+    'dispatch_pending','offering','accepted','out_for_delivery','failed','delivered','returned','cancelled'
   )),
   CONSTRAINT delivery_tasks_selection_check
     CHECK(delivery_selection_type_snapshot IN ('listed_area','not_listed')),
@@ -713,7 +712,6 @@ CREATE TABLE public.delivery_assignments (
   is_current boolean NOT NULL DEFAULT true,
   assigned_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
   accepted_at timestamptz,
-  arrived_at timestamptz,
   picked_up_at timestamptz,
   delivered_at timestamptz,
   ended_at timestamptz,
@@ -734,10 +732,7 @@ CREATE TABLE public.delivery_assignments (
     FOREIGN KEY(offer_id,delivery_task_id,branch_id,restaurant_id)
     REFERENCES public.delivery_task_offers(id,delivery_task_id,branch_id,restaurant_id) ON DELETE RESTRICT,
   CONSTRAINT delivery_assignments_status_check
-    CHECK(status IN (
-      'assigned','accepted','arrived_at_restaurant','picked_up','out_for_delivery',
-      'failed','delivered','rejected','reassigned','returned'
-    )),
+    CHECK(status IN ('accepted','out_for_delivery','failed','delivered','rejected','reassigned','returned')),
   CONSTRAINT delivery_assignments_current_check
     CHECK((is_current AND ended_at IS NULL) OR (NOT is_current AND ended_at IS NOT NULL))
 );
