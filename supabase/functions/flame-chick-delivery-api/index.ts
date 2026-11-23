@@ -229,10 +229,15 @@ async function isActiveRider(userId: string, token: string, apiKey: string) {
   const roleResult = await readAsService("user_roles?" + roleQuery.toString());
   if (!roleResult.ok) return { ok:false as const, status:roleResult.status, body:roleResult.body };
   const roles = Array.isArray(roleResult.data) ? roleResult.data : [];
-  const riderRole = roles.find((row) => isObject(row) && row.role_key === "rider" && row.is_active === true && typeof row.branch_id === "string");
-  if (!riderRole || typeof riderRole.branch_id !== "string") {
+  const riderRoles = roles.filter((row) => isObject(row) && row.role_key === "rider" && row.is_active === true && typeof row.branch_id === "string");
+  const riderBranches = [...new Set(riderRoles.map((row) => String(row.branch_id)))];
+  if (!riderRoles.length) {
     return { ok:false as const, status:403, body:{ ok:false, error:{ code:"RIDER_ROLE_REQUIRED", message:"This account does not have an active Flame Chick rider role." } } };
   }
+  if (riderBranches.length !== 1) {
+    return { ok:false as const, status:403, body:{ ok:false, error:{ code:"RIDER_BRANCH_SELECTION_REQUIRED", message:"Your rider account is assigned to multiple branches. Ask the administrator to configure a single Rider branch before signing in." } } };
+  }
+  const riderRole = riderRoles[0];
   const profileQuery = new URLSearchParams();
   profileQuery.set("select", "user_id,branch_id,is_active");
   profileQuery.set("user_id", "eq." + userId);
@@ -509,10 +514,15 @@ Deno.serve(async (req: Request) => {
     const rolesResult = await readAsService("user_roles?" + roleQuery.toString());
     if (!rolesResult.ok) return response(rolesResult.body, rolesResult.status);
     const roles = Array.isArray(rolesResult.data) ? rolesResult.data : [];
-    const riderRole = roles.find((row) => isObject(row) && row.role_key === "rider" && row.is_active === true && typeof row.branch_id === "string");
-    if (!riderRole || typeof riderRole.branch_id !== "string") {
+    const riderRoles = roles.filter((row) => isObject(row) && row.role_key === "rider" && row.is_active === true && typeof row.branch_id === "string");
+    const riderBranches = [...new Set(riderRoles.map((row) => String(row.branch_id)))];
+    if (!riderRoles.length) {
       return response({ ok:false, error:{ code:"RIDER_ROLE_REQUIRED", message:"This account does not have an active Flame Chick rider role." } },403);
     }
+    if (riderBranches.length !== 1) {
+      return response({ ok:false, error:{ code:"RIDER_BRANCH_SELECTION_REQUIRED", message:"Your rider account is assigned to multiple branches. Ask the administrator to configure a single Rider branch before signing in." } },403);
+    }
+    const riderRole = riderRoles[0];
     const profileQuery = new URLSearchParams();
     profileQuery.set("select", "user_id,branch_id,is_active");
     profileQuery.set("user_id", "eq." + user.id);
