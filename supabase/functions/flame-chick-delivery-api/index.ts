@@ -635,7 +635,7 @@ Deno.serve(async (req: Request) => {
 
   const allowed = new Set(["assign", "picked_up", "delivered", "reject", "failed", "return_reported", "confirm_return"]);
   if (!allowed.has(action)) {
-    return response({ ok: false, error: { code: "DELIVERY_ACTION_INVALID", message: "Supported actions: assign, accept, accept_offer, decline_offer, arrive, picked_up, delivered, reject, failed, return_reported, confirm_return." } }, 400);
+    return response({ ok: false, error: { code: "DELIVERY_ACTION_INVALID", message: "Supported actions: assign, accept_offer, decline_offer, picked_up, delivered, reject, failed, return_reported, confirm_return." } }, 400);
   }
   const payload: Record<string, unknown> = {
     action,
