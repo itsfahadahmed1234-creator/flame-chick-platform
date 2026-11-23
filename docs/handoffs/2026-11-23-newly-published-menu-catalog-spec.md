@@ -174,3 +174,19 @@ Before any controlled data entry is approved:
 ## Change control
 
 This specification does not authorize database writes, migrations, catalog import, publishing, Edge Function deployment, website deployment, branch enablement, or checkout activation. Those remain separate review and approval gates.
+
+
+## Source implementation checkpoint — 2026-11-23
+
+The first implementation gaps identified above have now been addressed on the working branch:
+
+- Deal view model exposes `branchAvailable` separately from full `available` (orderable) state. Schedule closure and missing fulfilment can leave details browseable without making the deal orderable.
+- Deal cards remain rendered and are visually greyed when not orderable. Their details button remains available only when the deal is valid for the selected branch. Schedule-closed deals open a read-only details view.
+- Read-only deal configurators show detail but cannot change fixed components or emit a selection payload. The completion button is disabled in read-only state.
+- Fixed single-option component groups with an exact required quantity are automatically preselected when the deal variant is selected and their quantity controls are disabled. Programmatic quantity mutation also rejects fixed groups.
+- A single-option component group uses its configured customer-facing group label for the option row. This supports the exact public label "Burger" while the component option remains bound to the internal OG Crunch product and product-variant IDs.
+- Regression coverage added for branch-vs-schedule availability, fixed component preselection/locking, read-only schedule-closed details, generic one-option labels and grey unavailable cards.
+
+**Latest CI:** [Flame Chick Website Static Checks run 45124549443](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45124549443), exact head `9b3698f0e03f00f5999bf1090d662c70db53b42b`, completed successfully. JavaScript syntax, core catalog regression tests, preview regression tests and inline script parsing passed.
+
+This is still preview/source behaviour only. The main customer storefront has not been switched to V3. No menu data has been seeded, no production migration applied, no catalog published, no Edge Function or Vercel deployment performed, and website ordering remains disabled. The next safe source step is review of product popup variants (especially required Smash Single/Double), then an isolated preview UI/manual smoke test before preparing a menu import plan.
