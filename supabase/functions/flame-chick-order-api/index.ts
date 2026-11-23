@@ -151,7 +151,9 @@ async function resolveStaffContext(userId: string): Promise<StaffContext | null>
   const branchScopedRoles = roleRows.filter((row) => typeof row.branch_id === "string");
   const validBranchRoles = branchScopedRoles.filter((row) => branches.some((branch) => branch.id === row.branch_id));
   const scopedBranchIds = [...new Set(validBranchRoles.map((row) => String(row.branch_id)))];
-  if (!globalRoles.length && scopedBranchIds.length !== 1) return null;
+  const scopedRoleKeys = [...new Set(validBranchRoles.map((row) => String(row.role_key)))];
+  if (globalRoles.length && (globalRoles.length !== 1 || branchScopedRoles.length > 0)) return null;
+  if (!globalRoles.length && (scopedBranchIds.length !== 1 || scopedRoleKeys.length !== 1)) return null;
   const usableRoles = [...globalRoles, ...validBranchRoles];
   if (!usableRoles.length) return null;
 
