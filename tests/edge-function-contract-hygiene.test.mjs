@@ -60,8 +60,8 @@ test("order and delivery RPC contracts use Flame Chick names", () => {
 
 test("delivery API no longer queries or selects the retired arrival step", () => {
   const source = sources["flame-chick-delivery-api"];
-  assert.doesNotMatch(source, /arrived_at_restaurant|\\barrived_at\\b/);
-  assert.match(source, /taskQuery\\.set\\("status", "in\\.\\(accepted,out_for_delivery,failed\\)"\\)/);
+  assert.doesNotMatch(source, /arrived_at_restaurant|\barrived_at\b/);
+  assert.match(source, /taskQuery\.set\("status", "in\.\(accepted,out_for_delivery,failed\)"\)/);
 });
 
 test("Staff Admin continues to use its dedicated command RPCs", () => {
