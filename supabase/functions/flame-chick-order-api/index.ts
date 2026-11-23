@@ -137,7 +137,9 @@ async function resolveStaffContext(userId: string): Promise<StaffContext | null>
   branchQuery.set("is_active", "eq.true");
   branchQuery.set("order", "branch_code.asc");
   branchQuery.set("limit", "100");
-  if (branchIds.length) branchQuery.set("id", "in.(" + branchIds.join(",") + ")");
+  if (branchIds.length && roleRows.every((row) => row.branch_id !== null)) {
+    branchQuery.set("id", "in.(" + branchIds.join(",") + ")");
+  }
   const branchResult = await readAsService("branches?" + branchQuery.toString());
   if (!branchResult.ok || !Array.isArray(branchResult.data)) return null;
   const branches = branchResult.data.filter((row): row is Record<string, unknown> =>
@@ -148,6 +150,8 @@ async function resolveStaffContext(userId: string): Promise<StaffContext | null>
   const globalRoles = roleRows.filter((row) => row.branch_id === null);
   const branchScopedRoles = roleRows.filter((row) => typeof row.branch_id === "string");
   const validBranchRoles = branchScopedRoles.filter((row) => branches.some((branch) => branch.id === row.branch_id));
+  const scopedBranchIds = [...new Set(validBranchRoles.map((row) => String(row.branch_id)))];
+  if (!globalRoles.length && scopedBranchIds.length !== 1) return null;
   const usableRoles = [...globalRoles, ...validBranchRoles];
   if (!usableRoles.length) return null;
 
