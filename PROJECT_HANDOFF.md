@@ -1,8 +1,25 @@
+# AUTHORITATIVE PROJECT STATUS CORRECTION — 2026-11-23
+
+**Flame Chick is a pre-launch production build. There is no live restaurant operations system running. We are building it.**
+
+Terminology to use going forward:
+
+- **Supabase Production project** means the designated target project/environment. It is not evidence that a live restaurant operations service is running.
+- That target environment is already partly provisioned: foundational restaurant/branch, staff identity, catalog schema and catalog-related work have been applied in earlier stages. Do not describe the database project as entirely empty or pretend no prior authorized setup occurred.
+- The complete operational product is still being built: trusted order APIs, delivery/rider operations, POS and Rider integration, customer website/checkout connection, related deployment and release checks remain staged work.
+- Disposable local Supabase is for migration replay and repeatable QA. It is a validation tool, not a replacement project and not a reason to indefinitely defer the production build.
+- Phrases such as "Production untouched" in earlier checkpoints mean only that the specific source/QA stage did not make writes to the target Supabase environment. They do **not** mean a live system exists, that production implementation must be avoided, or that building the target system is disallowed.
+- Continue the approved build step by step. Make target-environment changes as required by the implementation plan, using verified project identity, migration history, tested SQL and controlled rollout. Do not make unrelated changes or claim an app/service is live until it is actually deployed and verified.
+
+This correction supersedes any earlier wording that could imply an active restaurant system is running. It does not change the user's menu, role, delivery, payment, GST-deferral, or application requirements.
+
+---
+
 # CURRENT CHECKPOINT — 2026-11-23 — delivery concurrency QA preparation
 
 **Active branch:** `work/production-source-audit`  
 **Verified delivery expiry source commit:** `355a7c38c2abb9232021ac1cfcf0c12796ba3df0`  
-**Production and `main`: untouched.**
+**Scope note:** The Supabase Production project is a pre-launch target environment, not a live restaurant operations system. This source/QA stage did not modify that target project; `main` remains untouched.
 
 ## Current verified state
 
