@@ -4,8 +4,11 @@ const IDS = Object.freeze({
   branch: '10000000-0000-4000-8000-000000000001',
   menuCategory: '20000000-0000-4000-8000-000000000001',
   dealCategory: '20000000-0000-4000-8000-000000000002',
+  drinkCategory: '20000000-0000-4000-8000-000000000003',
   product: '30000000-0000-4000-8000-000000000001',
+  drinkProduct: '30000000-0000-4000-8000-000000000002',
   variant: '40000000-0000-4000-8000-000000000001',
+  drinkVariant: '40000000-0000-4000-8000-000000000002',
   modifierGroup: '50000000-0000-4000-8000-000000000001',
   modifier: '60000000-0000-4000-8000-000000000001',
   assignment: '70000000-0000-4000-8000-000000000001',
@@ -15,8 +18,11 @@ const IDS = Object.freeze({
   deal: 'b0000000-0000-4000-8000-000000000001',
   dealVariant: 'c0000000-0000-4000-8000-000000000001',
   componentGroup: 'd0000000-0000-4000-8000-000000000001',
+  drinkComponentGroup: 'd0000000-0000-4000-8000-000000000002',
   componentOption: 'e0000000-0000-4000-8000-000000000001',
+  drinkComponentOption: 'e0000000-0000-4000-8000-000000000002',
   dealVariantOption: 'f0000000-0000-4000-8000-000000000001',
+  drinkDealVariantOption: 'f0000000-0000-4000-8000-000000000002',
   schedule: '11000000-0000-4000-8000-000000000001',
   window: '12000000-0000-4000-8000-000000000001',
   dealSchedule: '13000000-0000-4000-8000-000000000001'
@@ -41,23 +47,42 @@ function createSnapshot() {
     }],
     categories: [
       { categoryId: id.menuCategory, legacyId: null, categoryKind: 'menu', nameEn: 'Burgers', nameUr: null, sortOrder: 1, categoryFolderKey: null, imageCurrentPath: null, imagePreviousPath: null },
-      { categoryId: id.dealCategory, legacyId: null, categoryKind: 'deal', nameEn: 'Deals', nameUr: null, sortOrder: 2, categoryFolderKey: null, imageCurrentPath: null, imagePreviousPath: null }
+      { categoryId: id.dealCategory, legacyId: null, categoryKind: 'deal', nameEn: 'Deals', nameUr: null, sortOrder: 2, categoryFolderKey: null, imageCurrentPath: null, imagePreviousPath: null },
+      { categoryId: id.drinkCategory, legacyId: null, categoryKind: 'menu', nameEn: 'Drinks', nameUr: null, sortOrder: 3, categoryFolderKey: null, imageCurrentPath: null, imagePreviousPath: null }
     ],
     subcategories: [],
-    products: [{
-      productId: id.product, categoryId: id.menuCategory, subcategoryId: null,
-      legacyId: null, nameEn: 'Classic Burger', nameUr: null,
-      descriptionEn: null, descriptionUr: null, imageFolderKey: null, imageGroupId: null,
-      imagePublished: false, imageExtension: null, imageCurrentPath: null,
-      imagePreviousPath: null, imagePreviousExtension: null, featured: false,
-      sortOrder: 1, available: true
-    }],
-    productVariants: [{
-      variantId: id.variant, productId: id.product, legacyId: null,
-      sizeKey: 'REGULAR', sizeLabel: 'Regular', variantKind: 'standard',
-      price: 550, packQuantity: null, packUnit: null, standaloneSellable: true,
-      sortOrder: 1, available: true
-    }],
+    products: [
+      {
+        productId: id.product, categoryId: id.menuCategory, subcategoryId: null,
+        legacyId: null, nameEn: 'Classic Burger', nameUr: null,
+        descriptionEn: null, descriptionUr: null, imageFolderKey: null, imageGroupId: null,
+        imagePublished: false, imageExtension: null, imageCurrentPath: null,
+        imagePreviousPath: null, imagePreviousExtension: null, featured: false,
+        sortOrder: 1, available: true
+      },
+      {
+        productId: id.drinkProduct, categoryId: id.drinkCategory, subcategoryId: null,
+        legacyId: null, nameEn: 'Cola', nameUr: null,
+        descriptionEn: null, descriptionUr: null, imageFolderKey: null, imageGroupId: null,
+        imagePublished: false, imageExtension: null, imageCurrentPath: null,
+        imagePreviousPath: null, imagePreviousExtension: null, featured: false,
+        sortOrder: 1, available: true
+      }
+    ],
+    productVariants: [
+      {
+        variantId: id.variant, productId: id.product, legacyId: null,
+        sizeKey: 'REGULAR', sizeLabel: 'Regular', variantKind: 'standard',
+        price: 550, packQuantity: null, packUnit: null, standaloneSellable: true,
+        sortOrder: 1, available: true
+      },
+      {
+        variantId: id.drinkVariant, productId: id.drinkProduct, legacyId: null,
+        sizeKey: '500ML', sizeLabel: '500 ml', variantKind: 'standard',
+        price: 150, packQuantity: null, packUnit: null, standaloneSellable: true,
+        sortOrder: 1, available: true
+      }
+    ],
     modifierGroups: [{
       modifierGroupId: id.modifierGroup, legacyId: null, nameEn: 'Cheese',
       nameUr: null, standaloneOnly: false, selectionMode: 'ONE_OPTIONAL',
@@ -78,8 +103,8 @@ function createSnapshot() {
       productVariantId: id.variant, price: 80
     }],
     drinkOptions: [{
-      drinkOptionId: id.drink, productVariantId: id.variant, legacyId: null,
-      displayName: 'Regular', displayNameUr: null, volumeKey: 'REGULAR',
+      drinkOptionId: id.drink, productVariantId: id.drinkVariant, legacyId: null,
+      displayName: 'Cola 500 ml', displayNameUr: null, volumeKey: '500ML',
       volumeMl: 500, sortOrder: 1
     }],
     dealCollections: [{
@@ -97,22 +122,44 @@ function createSnapshot() {
       labelEn: 'Regular', labelUr: null, pricingMode: 'FIXED_BUNDLE',
       basePrice: 750, sortOrder: 1
     }],
-    dealComponentGroups: [{
-      componentGroupId: id.componentGroup, dealId: id.deal,
-      nameEn: 'Choose a drink', nameUr: null, minUnits: 1, maxUnits: 1,
-      allowRepeatOption: false, maxUnitsPerOption: null, sortOrder: 1
-    }],
-    dealComponentOptions: [{
-      componentOptionId: id.componentOption, dealId: id.deal,
-      componentGroupId: id.componentGroup, productId: id.product,
-      productVariantId: id.variant, sortOrder: 1
-    }],
-    dealVariantComponentOptions: [{
-      dealVariantComponentOptionId: id.dealVariantOption, dealId: id.deal,
-      dealVariantId: id.dealVariant, componentOptionId: id.componentOption,
-      pricingTreatment: 'INCLUDED', unitSurcharge: 0,
-      maxQuantityPerDeal: 1, sortOrder: 1
-    }],
+    dealComponentGroups: [
+      {
+        componentGroupId: id.componentGroup, dealId: id.deal,
+        nameEn: 'Choose your burger', nameUr: null, minUnits: 1, maxUnits: 1,
+        allowRepeatOption: false, maxUnitsPerOption: null, sortOrder: 1
+      },
+      {
+        componentGroupId: id.drinkComponentGroup, dealId: id.deal,
+        nameEn: 'Choose your drink', nameUr: null, minUnits: 1, maxUnits: 1,
+        allowRepeatOption: false, maxUnitsPerOption: null, sortOrder: 2
+      }
+    ],
+    dealComponentOptions: [
+      {
+        componentOptionId: id.componentOption, dealId: id.deal,
+        componentGroupId: id.componentGroup, productId: id.product,
+        productVariantId: id.variant, sortOrder: 1
+      },
+      {
+        componentOptionId: id.drinkComponentOption, dealId: id.deal,
+        componentGroupId: id.drinkComponentGroup, productId: id.drinkProduct,
+        productVariantId: id.drinkVariant, sortOrder: 1
+      }
+    ],
+    dealVariantComponentOptions: [
+      {
+        dealVariantComponentOptionId: id.dealVariantOption, dealId: id.deal,
+        dealVariantId: id.dealVariant, componentOptionId: id.componentOption,
+        pricingTreatment: 'INCLUDED', unitSurcharge: 0,
+        maxQuantityPerDeal: 1, sortOrder: 1
+      },
+      {
+        dealVariantComponentOptionId: id.drinkDealVariantOption, dealId: id.deal,
+        dealVariantId: id.dealVariant, componentOptionId: id.drinkComponentOption,
+        pricingTreatment: 'INCLUDED', unitSurcharge: 0,
+        maxQuantityPerDeal: 1, sortOrder: 1
+      }
+    ],
     scheduleSets: [{
       scheduleSetId: id.schedule, name: 'Always', timezone: 'Asia/Karachi',
       windows: Array.from({ length: 7 }, (_, index) => ({
