@@ -1,3 +1,22 @@
+# AUTHORITATIVE ORDER DELIVERY VS PAYMENT COLLECTION RULE — 2026-11-23
+
+**Rider marking an order Delivered does NOT mean payment was collected and does NOT complete the order.**
+
+Required operational flow:
+
+1. Rider marks the delivery task **Delivered** after handing the order to the customer.
+2. POS reflects the order status as **Delivered**, but the order stays in the active POS workload/awaiting-payment view. It must not be removed to history or marked completed just because the Rider delivered it.
+3. The order retains its correct outstanding payment state. Delivery status and payment collection are separate facts. Never create a payment, set payment_status to paid, or imply cash receipt solely from the Rider's Delivered action.
+4. Cashier physically receives/records the payment and explicitly marks the payment as **Collected**. Record the collection event, amount/method and cashier/actor/time audit using the eventual payment model.
+5. Only after the required payment has been collected and recorded does POS mark the order **Completed**, set its completion timestamp, and move it out of the active queue into order history.
+6. If payment remains outstanding, the order stays Delivered and active/awaiting collection. A Rider status update cannot close the cashier's financial responsibility.
+
+**Known source mismatch to fix during order/payment implementation:** the current candidate delivery command migration sets `orders.status='delivered'` and also sets `orders.completed_at=v_now` in the Rider `delivered` action. That is not the final business behavior. Before operational integration, remove that premature completion timestamp, preserve the order in the POS Delivered / payment-awaiting queue, and implement a separate cashier payment-collection command that records the collection before setting `status='completed'` and `completed_at`. Add end-to-end tests proving Rider delivery leaves payment outstanding and only cashier collection completes the order. Do not change the return/refund rule by inference: a physically returned order and its payment/refund ledger remain separate decisions.
+
+This is an authoritative workflow requirement and supersedes any old wording that equates Rider delivery with order completion. GST remains deferred.
+
+---
+
 # AUTHORITATIVE PROJECT STATUS CORRECTION — 2026-11-23
 
 **Flame Chick is a pre-launch production build. There is no live restaurant operations system running. We are building it.**
