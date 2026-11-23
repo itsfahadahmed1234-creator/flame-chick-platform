@@ -387,6 +387,91 @@ async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
   return {ok:true,quote:{canonical,presentation}};
 }
 
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return "[" + value.map(stableJson).join(",") + "]";
+  if (isObject(value)) return "{" + Object.keys(value).sort().map(key =>
+    JSON.stringify(key) + ":" + stableJson(value[key])
+  ).join(",") + "}";
+  return JSON.stringify(value) ?? "null";
+}
+
+function websiteRequestFingerprint(body: Record<string,unknown>, normalizedPhone: string): Record<string,unknown> {
+  const customer = isObject(body.customer) ? body.customer : {};
+  return {
+    schema_version:3,
+    publication_id:body.publication_id ?? body.publicationId ?? null,
+    version_id:body.version_id ?? body.versionId ?? null,
+    branch_id:body.branch_id ?? body.branchId ?? null,
+    fulfillment_type:body.fulfillment_type ?? body.fulfilmentType ?? null,
+    customer:{
+      name:typeof customer.name==="string" ? customer.name.trim() : "",
+      phone:normalizedPhone,
+      email:typeof customer.email==="string" ? customer.email.trim().toLowerCase() || null : null
+    },
+    notes:typeof body.notes==="string" ? body.notes.trim() || null : null,
+    items:body.items,
+    delivery:body.delivery ?? null
+  };
+}
+
+async function lookupWebsiteOrderRetry(
+  branchId: string,
+  requestId: string,
+  requestHash: string
+): Promise<{ok:true;found:boolean;data?:Record<string,unknown>}|{ok:false;status:number;body:Record<string,unknown>}> {
+  const result = await callRpc("flame_chick_get_website_order_by_idempotency",{
+    branch_id:branchId,idempotency_key:requestId,request_hash:requestHash
+  });
+  if(!result.ok) return {ok:false,status:503,body:{ok:false,error:{code:"WEBSITE_ORDER_RETRY_LOOKUP_FAILED",message:"The existing checkout result could not be verified safely. Please retry shortly."}}};
+  if(!isObject(result.data)||result.data.ok!==true){
+    const error = isObject(result.data)&&isObject(result.data.error)?result.data.error:{};
+    const code = String(error.code??"WEBSITE_ORDER_RETRY_LOOKUP_FAILED");
+    return {ok:false,status:code==="WEBSITE_ORDER_IDEMPOTENCY_CONFLICT"?409:400,body:{ok:false,error:{code,message:String(error.message??"The checkout retry could not be verified.")}}};
+  }
+  return {ok:true,found:result.data.found===true,data:result.data};
+}
+
+async function buildWebsiteContext(): Promise<
+  {ok:true;data:Record<string,unknown>}|{ok:false;status:number;body:Record<string,unknown>}
+> {
+  const catalog = await readPublishedV3Catalog();
+  if(!catalog.ok)return catalog;
+  const snapshot = catalog.snapshot;
+  const rawBranches = Array.isArray(snapshot.branches)?snapshot.branches:[];
+  const enabled = rawBranches.filter((row):row is Record<string,unknown> =>
+    isObject(row)&&row.websiteOrderingEnabled===true
+  );
+  const branches: Array<Record<string,unknown>> = [];
+  for(const branch of enabled.slice(0,20)){
+    const branchId = typeof branch.branchId==="string"?branch.branchId:"";
+    if(!branchId)continue;
+    const config = await readBranchDeliveryConfiguration(String(snapshot.restaurantId??""),branchId);
+    if(!config.ok)return websiteError("DELIVERY_CONFIGURATION_UNAVAILABLE","Branch ordering options could not be loaded.",503);
+    branches.push({
+      id:branchId,
+      name:typeof branch.name==="string"?branch.name:"",
+      branchCode:typeof branch.branchCode==="string"?branch.branchCode:"",
+      websiteDeliveryEnabled:branch.websiteDeliveryEnabled===true,
+      websitePickupEnabled:branch.websitePickupEnabled===true,
+      deliveryAreas:config.areas.map(row=>({
+        id:row.id,name:row.name,nameUr:row.name_ur??null,deliveryFee:Number(row.delivery_fee)
+      })),
+      notListedDeliveryFee:config.notListedFee
+    });
+  }
+  const settings=isObject(snapshot.settings)?snapshot.settings:{};
+  return {ok:true,data:{
+    schemaVersion:3,
+    publicationId:snapshot.publicationId,
+    publicationNumber:snapshot.publicationNumber,
+    versionId:snapshot.versionId,
+    databaseNow:snapshot.databaseNow,
+    currencyCode:settings.currency_code??null,
+    branches
+  }};
+}
+
 type StaffContext = {
   user_id: string;
   role: string;
@@ -492,7 +577,7 @@ function getClientIp(req: Request): string {
   return candidate.length <= 45 && /^[0-9a-fA-F:.]+$/.test(candidate) ? candidate : "";
 }
 
-async function callRpc(name: "flame_chick_create_order" | "flame_chick_create_website_order" | "flame_chick_update_order_status" | "flame_chick_check_website_order_rate_limit" | "flame_chick_collect_order_payment", payload: Record<string, unknown>) {
+async function callRpc(name: "flame_chick_create_order" | "flame_chick_create_website_order" | "flame_chick_get_website_order_by_idempotency" | "flame_chick_update_order_status" | "flame_chick_check_website_order_rate_limit" | "flame_chick_collect_order_payment", payload: Record<string, unknown>) {
   const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + name, {
     method: "POST",
     headers: {
@@ -571,12 +656,17 @@ Deno.serve(async (req: Request) => {
   }
 
   if (req.method === "GET") {
+    const url = new URL(req.url);
+    const view = (url.searchParams.get("view") ?? "").toLowerCase();
+    if(view==="website_context"){
+      const context=await buildWebsiteContext();
+      if(!context.ok)return response(context.body,context.status);
+      return response({ok:true,data:context.data});
+    }
     const authorization = req.headers.get("authorization") ?? "";
     const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
     const user = await verifyStaffUser(token, apiKey);
     if (!user) return response({ ok: false, error: { code: "STAFF_AUTH_REQUIRED", message: "Sign in with a Flame Chick staff account." } }, 401);
-    const url = new URL(req.url);
-    const view = (url.searchParams.get("view") ?? "").toLowerCase();
     // This authenticated self-context endpoint is also used by the Rider app;
     // it deliberately runs before POS-only order-board authorization.
     if (view === "staff_context") {
@@ -628,6 +718,75 @@ Deno.serve(async (req: Request) => {
 
   const action = String(body.action ?? "create").toLowerCase();
 
+  if(action==="quote_website_order"){
+    const quote=await buildWebsiteOrderQuote(body);
+    if(!quote.ok)return response(quote.body,quote.status);
+    return response({ok:true,quote:quote.quote.presentation},200);
+  }
+
+  if(action==="create_website_order"){
+    const requestId=typeof body.request_id==="string"?body.request_id.trim():
+      typeof body.idempotency_key==="string"?body.idempotency_key.trim():"";
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)){
+      return response({ok:false,error:{code:"WEBSITE_ORDER_IDEMPOTENCY_REQUIRED",message:"A unique checkout request ID is required for safe retries."}},400);
+    }
+    const customer=isObject(body.customer)?body.customer:{};
+    const normalizedPhone=normalizeCustomerPhone(customer.phone);
+    if(!normalizedPhone){
+      return response({ok:false,error:{code:"CUSTOMER_PHONE_INVALID",message:"Enter a valid customer phone number."}},400);
+    }
+    const branchValue=body.branch_id??body.branchId;
+    if(typeof branchValue!=="string"||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(branchValue)){
+      return response({ok:false,error:{code:"WEBSITE_ORDER_BRANCH_REQUIRED",message:"Choose a valid Flame Chick branch."}},400);
+    }
+    const requestHash=await sha256Hex(stableJson(websiteRequestFingerprint(body,normalizedPhone)));
+    const retry=await lookupWebsiteOrderRetry(branchValue,requestId,requestHash);
+    if(!retry.ok)return response(retry.body,retry.status);
+    if(retry.found&&retry.data){
+      return response({
+        ok:true,already_processed:true,
+        order_id:retry.data.order_id,order_number:retry.data.order_number,
+        status:retry.data.status,payment_status:retry.data.payment_status,
+        subtotal:retry.data.subtotal,delivery_fee:retry.data.delivery_fee,
+        total:retry.data.total,currency_code:retry.data.currency_code,
+        created_at:retry.data.created_at
+      },200);
+    }
+
+    const quote=await buildWebsiteOrderQuote(body);
+    if(!quote.ok)return response(quote.body,quote.status);
+    const phoneDigest=await hmacPhoneDigest(normalizedPhone);
+    if(!phoneDigest){
+      return response({ok:false,error:{code:"WEBSITE_ORDER_PRIVACY_CONFIG_MISSING",message:"Online ordering is temporarily unavailable. Please try again shortly."}},503);
+    }
+    const payload={
+      ...quote.quote.canonical,
+      idempotency_key:requestId,
+      request_hash:requestHash,
+      phone_digest:phoneDigest
+    };
+    const result=await callRpc("flame_chick_create_website_order",payload);
+    if(!result.ok)return response({ok:false,error:{code:"WEBSITE_ORDER_COMMIT_UNAVAILABLE",message:"Your order could not be safely confirmed. Please retry using the same checkout request."}},503);
+    if(isObject(result.data)&&result.data.ok===false){
+      const err=isObject(result.data.error)?result.data.error:{};
+      const code=String(err.code??"WEBSITE_ORDER_CREATE_FAILED");
+      const status=code==="WEBSITE_ORDER_RATE_LIMITED"?429:
+        ["CATALOG_PUBLICATION_CHANGED","WEBSITE_DELIVERY_FEE_CHANGED","WEBSITE_DELIVERY_AREA_UNAVAILABLE","BRANCH_FULFILMENT_UNAVAILABLE","WEBSITE_ORDER_IDEMPOTENCY_CONFLICT"].includes(code)?409:
+        ["WEBSITE_ORDER_BRANCH_UNAVAILABLE","WEBSITE_ORDER_RESTAURANT_UNAVAILABLE"].includes(code)?503:400;
+      const retryAfter=code==="WEBSITE_ORDER_RATE_LIMITED"?
+        Math.max(1,Math.min(3600,Number(err.retry_after_seconds)||60)):null;
+      return response(
+        {ok:false,error:{code,message:String(err.message??"The website order could not be created."),...(retryAfter?{retry_after_seconds:retryAfter}:{})}},
+        status,
+        retryAfter?{"Retry-After":String(retryAfter)}:{}
+      );
+    }
+    if(!isObject(result.data)||result.data.ok!==true||typeof result.data.order_id!=="string"){
+      return response({ok:false,error:{code:"WEBSITE_ORDER_RESPONSE_INVALID",message:"The order result could not be verified. Retry with the same checkout request ID."}},503);
+    }
+    return response(result.data,result.data.already_processed===true?200:201);
+  }
+
   if (action === "create") {
     const sourceType = String(body.source ?? "website").toLowerCase();
     if (!["website", "pos", "whatsapp", "phone", "third_party", "manual", "other"].includes(sourceType)) {
@@ -649,22 +808,8 @@ Deno.serve(async (req: Request) => {
       actorId = user.id;
     }
 
-    if (sourceType === "website") {
-      const limiterPayload: Record<string, unknown> = { ...body, client_ip: getClientIp(req) };
-      const rateLimit = await callRpc("flame_chick_check_website_order_rate_limit", limiterPayload);
-      if (!rateLimit.ok) {
-        return response({ ok: false, error: { code: "RATE_LIMIT_CHECK_UNAVAILABLE", message: "We could not safely validate this order request. Please try again shortly." } }, 503);
-      }
-      if (!isObject(rateLimit.data) || rateLimit.data.allowed !== true) {
-        const retryAfter = isObject(rateLimit.data)
-          ? Math.max(1, Math.min(3600, Number(rateLimit.data.retry_after_seconds) || 60))
-          : 60;
-        return response(
-          { ok: false, error: { code: "RATE_LIMITED", message: "Too many order attempts. Please wait before trying again.", retry_after_seconds: retryAfter } },
-          429,
-          { "Retry-After": String(retryAfter) },
-        );
-      }
+    if(sourceType==="website"){
+      return response({ok:false,error:{code:"WEBSITE_V3_CHECKOUT_REQUIRED",message:"Website orders must use the validated V3 quote and checkout flow."}},410);
     }
 
     const orderPayload: Record<string, unknown> = { ...body, source: sourceType, actor_user_id: actorId };
@@ -740,5 +885,5 @@ Deno.serve(async (req: Request) => {
     return response(result.data, 200);
   }
 
-  return response({ ok: false, error: { code: "ACTION_NOT_FOUND", message: "Supported actions are create, update_status, cancel and reject." } }, 404);
+  return response({ ok: false, error: { code: "ACTION_NOT_FOUND", message: "Supported actions are website_context (GET), quote_website_order, create_website_order, collect_payment, update_status, cancel and reject." } }, 404);
 });
