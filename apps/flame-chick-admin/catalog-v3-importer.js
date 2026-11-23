@@ -487,7 +487,7 @@
 
   function verifyDealState(detail,deal,components,scheduleId,expectedActive){
     const sourceVariant=deal.variants[0];
-    if(!detail||!detail.deal||detail.deal.is_active!==expectedActive)fail('Deal active state does not match the expected staged state.');
+    if(!detail||!detail.deal||detail.deal.is_active!==expectedActive||detail.deal.is_available!==true)fail('Deal active state does not match the expected staged state.');
     if(!Array.isArray(detail.variants)||detail.variants.length!==1)fail('The saved deal must have exactly one fixed-price variant.');
     const variantDoc=detail.variants[0],savedVariant=variantDoc&&variantDoc.variant;
     if(!savedVariant||savedVariant.variant_key!==sourceVariant.variantKey||
