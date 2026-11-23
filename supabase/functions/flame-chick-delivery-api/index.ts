@@ -94,7 +94,7 @@ async function setRiderPresence(userId: string, branchId: string, online: boolea
   taskQuery.set("branch_id", "eq." + branchId);
   taskQuery.set("delivery_assignments.rider_user_id", "eq." + userId);
   taskQuery.set("delivery_assignments.is_current", "eq.true");
-  taskQuery.set("delivery_assignments.status", "in.(assigned,accepted,arrived_at_restaurant,picked_up,out_for_delivery,failed)");
+  taskQuery.set("delivery_assignments.status", "in.(accepted,out_for_delivery,failed)");
   taskQuery.set("status", "in.(assigned,accepted,arrived_at_restaurant,out_for_delivery,failed)");
   taskQuery.set("return_confirmed_at", "is.null");
   taskQuery.set("limit", "1");
@@ -464,9 +464,9 @@ Deno.serve(async (req: Request) => {
       query.set("branch_id", "eq." + riderScope.branchId);
       query.set("delivery_assignments.rider_user_id", "eq." + user.id);
       query.set("delivery_assignments.is_current", "eq.true");
-      query.set("delivery_assignments.status", "in.(assigned,accepted,arrived_at_restaurant,out_for_delivery,picked_up,failed)");
+      query.set("delivery_assignments.status", "in.(accepted,out_for_delivery,failed)");
       query.set("return_confirmed_at", "is.null");
-      query.set("status", "in.(assigned,accepted,arrived_at_restaurant,out_for_delivery,picked_up,failed)");
+      query.set("status", "in.(accepted,out_for_delivery,failed)");
       query.set("orders.fulfillment_type", "eq.delivery");
       query.set("order", "created_at.asc");
       const offersQuery = new URLSearchParams();
@@ -510,7 +510,7 @@ Deno.serve(async (req: Request) => {
     taskQuery.set("select",
       "id,order_id,branch_id,status,recipient_name_snapshot,recipient_phone_snapshot,address_snapshot,area_name_snapshot,delivery_fee_snapshot,delivery_instructions_snapshot,dispatch_started_at,assigned_at,picked_up_at,out_for_delivery_at,delivered_at,failed_at,failure_reason,return_reported_at,return_confirmed_at,created_at,orders!inner(id,order_number,status,fulfillment_type,total,payment_status,customer_name,customer_phone,delivery_address,delivery_instructions,order_items(id,line_number,quantity,product_name_snapshot,variant_label_snapshot,deal_title_snapshot,line_total,item_notes,order_item_modifiers(id,modifier_group_name_snapshot,modifier_name_snapshot,quantity,total_price_snapshot))),delivery_assignments(id,rider_user_id,status,is_current,assigned_at,accepted_at,arrived_at,picked_up_at,delivered_at,created_at,ended_at,end_reason)");
     taskQuery.set("branch_id", "eq." + branchId);
-    taskQuery.set("status", "in.(dispatch_pending,offering,assigned,accepted,arrived_at_restaurant,out_for_delivery,failed)");
+    taskQuery.set("status", "in.(dispatch_pending,offering,accepted,out_for_delivery,failed)");
     taskQuery.set("orders.fulfillment_type", "eq.delivery");
     taskQuery.set("order", "created_at.asc");
     taskQuery.set("limit", "100");
@@ -633,7 +633,7 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  const allowed = new Set(["assign", "accept", "arrive", "picked_up", "delivered", "reject", "failed", "return_reported", "confirm_return"]);
+  const allowed = new Set(["assign", "picked_up", "delivered", "reject", "failed", "return_reported", "confirm_return"]);
   if (!allowed.has(action)) {
     return response({ ok: false, error: { code: "DELIVERY_ACTION_INVALID", message: "Supported actions: assign, accept, accept_offer, decline_offer, arrive, picked_up, delivered, reject, failed, return_reported, confirm_return." } }, 400);
   }
