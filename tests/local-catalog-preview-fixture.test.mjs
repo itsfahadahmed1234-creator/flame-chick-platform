@@ -52,6 +52,8 @@ test('local fixture is valid V3 synthetic data and has no production identifiers
     assert.equal(snapshot.branches.length, 1);
     assert.equal(snapshot.products.length, 1);
     assert.equal(snapshot.deals.length, 1);
+    assert.equal(snapshot.scheduleSets[0].windows.length, 7);
+    assert.deepEqual(snapshot.scheduleSets[0].windows.map((window) => window.weekdayIso), [1, 2, 3, 4, 5, 6, 7]);
     assert.equal(snapshot.restaurantId, '14000000-0000-4000-8000-000000000001');
     assert.equal(snapshot.publicationId, '15000000-0000-4000-8000-000000000001');
   });
@@ -71,7 +73,8 @@ test('local harness replaces production network configuration and client loader'
     const loader = await loaderResponse.text();
     const pageController = await pageControllerResponse.text();
     assert.match(config, /LOCAL_FIXTURE_ONLY/);
-    assert.match(config, /127\.0\.0\.1/);
+    assert.match(config, /LOCAL_FIXTURE_ONLY_DISABLED/);
+    assert.doesNotMatch(config, /https?:\/\//);
     assert.doesNotMatch(config, /supabase\.co/);
     assert.match(loader, /__local-preview-fixture\.json/);
     assert.match(loader, /validateSnapshot/);
