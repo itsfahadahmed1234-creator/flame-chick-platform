@@ -10,6 +10,7 @@ on:
       - "supabase/tests/batch4_staff_admin_security.sql"
       - "supabase/tests/flame_chick_operational_schema_v1.sql"
       - "supabase/tests/flame_chick_delivery_commands_v1.sql"
+      - "supabase/tests/flame_chick_website_order_create_v1.sql"
       - "supabase/tests/flame_chick_delivery_concurrency_setup.sql"
       - "supabase/tests/flame_chick_delivery_concurrency.sh"
       - ".github/workflows/qa-staff-admin-role-boundary.yml"
@@ -57,6 +58,12 @@ jobs:
           grep -q "race 4/4" supabase/tests/flame_chick_delivery_concurrency.sh
           grep -q "payment race 6/6" supabase/tests/flame_chick_delivery_concurrency.sh
           grep -q "test.payment.race_delay" supabase/tests/flame_chick_delivery_concurrency_setup.sql
+          test -s supabase/tests/flame_chick_website_order_create_v1.sql
+          grep -q "WEBSITE_ONE_MINUTE_QUOTA_NOT_ENFORCED" supabase/tests/flame_chick_website_order_create_v1.sql
+          grep -q "WEBSITE_TEN_MINUTE_QUOTA_NOT_ENFORCED" supabase/tests/flame_chick_website_order_create_v1.sql
+          grep -q "WEBSITE_HOURLY_QUOTA_NOT_ENFORCED" supabase/tests/flame_chick_website_order_create_v1.sql
+          grep -q "CREATE OR REPLACE FUNCTION public.flame_chick_create_website_order" supabase/migrations/20261123174000_flame_chick_website_order_create_v1.sql
+          grep -q "CREATE OR REPLACE FUNCTION public.flame_chick_get_website_order_by_idempotency" supabase/migrations/20261123174100_flame_chick_website_order_idempotency_lookup_v1.sql
       - name: Start disposable Supabase with hosted-only helper compatibility
         shell: bash
         run: |
@@ -107,6 +114,8 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_operational_schema_v1.sql
       - name: Exercise delivery offer, pickup, delivery and physical return commands
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_delivery_commands_v1.sql
+      - name: Exercise V3 website order creation, idempotency and phone quotas
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_website_order_create_v1.sql
       - name: Prepare committed fixtures for parallel delivery race tests
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_delivery_concurrency_setup.sql
       - name: Exercise simultaneous accept, decline and expiry sessions
