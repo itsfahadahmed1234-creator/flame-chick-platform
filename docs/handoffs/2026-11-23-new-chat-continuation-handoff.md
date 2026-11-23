@@ -578,3 +578,43 @@ This successful real-DB integration was local/disposable only. No Production mig
 ### Current safe boundary
 
 All Admin action and database integration checks above target disposable local Supabase. No Production catalog writes, Production migration, publication/current-pointer change, Edge Function deployment, Admin or customer Website deployment, Vercel domain change, or checkout activation occurred. The only Git writes were to `work/production-source-audit`; `main` was not written. Current deals remain fixed-price with INCLUDED/zero-surcharge mappings; selectable product/flavour upgrades and +price charges remain future-only. GST remains deferred.
+
+
+## Catalog V3 authoring and product-detail UX implementation — 2026-11-23
+
+### Admin Catalog V3 authoring changes
+
+- The existing V3 Admin workspace now supports editing menu/deal categories through the authenticated `catalog_category_upsert` command. Category kind is immutable in this editor; no direct PostgREST writes were introduced.
+- Product create/edit continues through the finite authenticated product command and supports optional standalone price only when `is_standalone_sellable=false`.
+- Existing fixed deals can now be edited through a dedicated `deal-edit` action. The editor only accepts the currently approved shape: one `FIXED_BUNDLE` deal variant, one product-variant option per active component group, fixed quantities, `INCLUDED` mapping and zero surcharge.
+- Fixed deal edits preserve deal, variant, group, option and mapping IDs for retained records. Removed groups/options/mappings are retained but marked inactive; records are not deleted.
+- Edit workflow: read current detail and capture draft revision; reject stale revisions; temporarily deactivate deal and variant; update fixed component groups; read the deal back; rebuild INCLUDED/zero-surcharge mappings including deactivation of removed mappings; preserve or change the supported Flame Hour global assignment; verify the inactive deal contents; restore its prior active state and prior availability; read back and verify again. Any error leaves a visible partial-operation warning with the exact deal ID/stage; it does not create a replacement deal.
+- The edit form deliberately preserves the active state and lets the user change availability. It does not expose selectable flavours, product alternatives, surcharge fields or future `+Rs.` upgrades.
+- Deal editing fails closed for non-fixed variants, selectable/variable groups, surcharge mappings, multiple/branch-specific schedules, or a schedule other than the exact currently approved Flame Hour schedule.
+- Deal creation now fails closed when duplicate `Deals` categories/collections or duplicate `Flame Hour daily` schedule names exist. A pre-existing Flame Hour schedule must match exactly seven weekly windows, Monday–Sunday, 3 PM–5 PM, `Asia/Karachi`; the editor will not silently create a second schedule to bypass a conflict.
+
+### Customer-facing V3 product detail preview
+
+- The separate non-ordering V3 catalog preview now opens product details in an accessible `<dialog>`, rather than rendering the variant selector inline on each product card.
+- Multi-variant products expose their product-variant selector inside the detail dialog. This supports the published The Smash Single Patty / Double Patty price choice in the correct product detail context.
+- Single-variant products select their sole variant automatically in the dialog.
+- Published option price and any published customization descriptions are shown individually. The preview does not calculate a cart subtotal/final checkout total, add to cart, quote, or submit orders.
+- The preview dialog closes when branch/fulfilment context changes or the catalog reloads. The preview remains a separate no-index page and is not wired into the active V2 customer storefront.
+
+### Verification
+
+- Admin Static Checks run **45142741892**: 58 tests passed, zero failed; Admin asset/invitation wiring checks passed.
+- Disposable local Catalog Importer QA run **45142711936**: complete migration replay passed; 25 products, 28 variants, 6 fixed-price deals and 18 component groups/options/mappings imported; snapshot valid; SQL publication validator returned zero errors; retry created zero further mutations; the no-op Flame Duo edit executed through the actual Admin workspace with 4 authenticated catalog mutation RPCs, preserved price/contents/availability/active state and left strict publication validation passing; publication rows remained zero; disposable stack cleanup passed.
+- Later disposable local Catalog Importer QA run **45142711936** also applied the latest deal/schedule conflict guards and completed with success.
+- Website Static Checks run **45143263591** passed: syntax, core catalog regression tests, preview regression tests and inline-script parsing.
+- Earlier Admin/Website workflow attempts with failures were corrected; use the successful latest runs above as the current evidence. Deployment workflow jobs remain skipped by their explicit release gates.
+
+### Remaining product work / release boundary
+
+- The Admin workspace and V3 product-detail dialog are source changes. Neither the Admin preview nor customer Website preview was deployed; the deployment workflows were intentionally skipped.
+- The product-detail dialog is on the separate read-only `catalog-preview.html` path, not yet the active customer storefront. The active `index.html` still has its old V2/static product/order contract.
+- The current production order API/schema is not deployed/complete. Do not connect the old cart to V3 or enable customer ordering until server-side quote/pricing, order create, idempotency, availability, cancellation and delivery contracts are implemented and tested.
+- No browser-based live Admin sign-in/E2E session has been run. Current Admin integration QA calls the actual workspace handlers with a mocked DOM root and a real disposable Supabase database.
+- Production catalog remains empty and unpublished. No Production migration, catalog import, publication/current pointer change, Edge Function deployment, Vercel deployment/domain change or checkout activation was performed.
+- The only source/documentation writes were on `work/production-source-audit`; `main` was not modified.
+- Current deals remain fixed-price with INCLUDED/zero-surcharge components. Selectable deal products/flavours and +price upgrades remain future-only. GST remains deferred.
