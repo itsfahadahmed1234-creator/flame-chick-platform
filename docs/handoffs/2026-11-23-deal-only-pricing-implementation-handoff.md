@@ -46,7 +46,7 @@ Implement the existing linked product/variant deal model. Do not create a text-o
 
 ## Verification status — passed in disposable CI (2026-11-23)
 
-<badge>Verified</badge> Source implementation and database QA are now passing on `work/production-source-audit`.
+**Status: VERIFIED** Source implementation and database QA are now passing on `work/production-source-audit`.
 
 ### Final automated checks
 
