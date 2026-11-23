@@ -655,3 +655,56 @@ The current exact release report is `docs/handoffs/2026-11-23-two-hour-release-r
 - Vercel has four correct project records and repository links, but no deployments or custom domains. SSO is enabled. Preview workflows skipped due missing GitHub deployment secret/enable variables.
 
 **Release assessment: NO-GO for full operational deployment until the additive operational schema/RPCs are implemented and tested, the current Edge Functions and Catalog V3 Staff Admin code are deployed with verified secrets/CORS, catalog is imported and published after review, and live browser E2E is passed.** No Production DB writes, migration, import/publication, Edge Function deployment, Vercel deployment, domain change, checkout activation or paid-plan upgrade occurred in this sprint. `main` remains untouched. GST remains deferred; future deal selectors/+price choices remain future-only.
+
+
+---
+
+## 2026-11-23 — Operational schema V1 candidate added (source only; not applied)
+
+**Working branch:** \`work/production-source-audit\`  
+**Latest source commit at this checkpoint:** \`8c024c24a1b5eacbd4f3e2f247a333e7171e6cbe\`  
+**Migration:** \`supabase/migrations/20261123160000_flame_chick_operational_schema_v1.sql\`  
+**Disposable QA:** \`supabase/tests/flame_chick_operational_schema_v1.sql\`  
+**Workflow:** \`.github/workflows/qa-staff-admin-role-boundary.yml\` now includes the new QA test path and runs it after the complete local migration replay.
+
+### Corrected live Production baseline — use this instead of older zero-catalog statements
+
+Read-only checks on 2026-11-23 confirm:
+- Supabase project \`adkrxfnawdiljhjaavnj\`, Mumbai \`ap-south-1\`, Free plan, healthy.
+- Current catalog publication **#2**, schema V3, revision 92, checksum \`8062b1961ee2c9e7668ed4039c9d2396c0fe66a7571a2591b1146eea113913c5\`.
+- Publication contains 8 categories, 25 products, 28 product variants, 6 deals, 6 deal variants, and the linked deal component/options/mapping structures.
+- Deal model decision is **Option 1**: actual product/variant UUID links. Deal-only product variants stay non-standalone and may retain NULL standalone price when correctly mapped. Do not introduce a text-only included-item table.
+- Catalog publication and its source records must be preserved. Do not reimport or republish the menu as part of operational schema work.
+- Existing production migration ledger includes the catalog V3 and deal-only pricing work; operational tables are still absent.
+- Website order/delivery/pickup flags remain disabled. Only \`flame-chick-staff-admin\` is deployed (older v1); Catalog/Order/Delivery functions are not deployed.
+- No operational business tables are present; no operational tables are registered in \`supabase_realtime\`; no Storage buckets were configured.
+
+### What the candidate migration adds
+
+- Branch delivery areas and typed Not Listed fee settings. Missing fee stays NULL; explicit Rs. 0 is a valid configured amount. No default-to-zero behavior.
+- Orders with existing POS/API-compatible field names, immutable catalog publication/version references, universal idempotency key + request hash, server-computed money snapshots, cancellation/rejection actor/time/reason fields, and stale POS \`needs_confirmation\` state.
+- Order items, modifier/component snapshots, append-only status history.
+- Append-only payment collection/refund ledger. No payment gateway or automatic refund logic.
+- Delivery tasks, rider profiles, 60-second offer records, current assignments, append-only task events.
+- Rider push subscriptions store encrypted bytea payloads and endpoint digest only. Current cleartext Rider push API must be updated before this table is usable.
+- Private website successful-order events, order number counters, notification outbox and rate-limit buckets.
+- RLS enabled and forced on new public/private tables; no anon/authenticated direct grants. service_role gets only server read access, rider-presence column updates, and limited encrypted-push writes. No direct service_role order/payment/delivery DML.
+- No Realtime publication changes. Realtime is deliberately deferred until branch/rider authorization and event projection are implemented.
+- No GST/tax/service-charge/tip columns. GST remains deferred.
+
+### Important implementation boundaries / known follow-up work
+
+1. This is a **schema candidate only**, not a complete functioning order/delivery backend. Transactional RPCs for \`flame_chick_create_order\`, \`flame_chick_update_order_status\`, website quota, delivery state machine, accept/decline and push-config are not yet authored/deployed.
+2. Order API still calls a separate rate-limit RPC before order creation. Before live use, universal idempotency replay must be resolved before website quota, and successful website quota event insertion must happen in the same transaction as order creation. Current desired quota: 3 per rolling minute, 3 per rolling 10 minutes, 15 per rolling hour per normalized phone; POS and staff orders bypass only this website quota, not universal idempotency.
+3. Order RPC must validate exact V3 publication item/deal IDs and all selected component mappings, server prices, availability, schedules and delivery fees. Never trust client totals/fees.
+4. Stale offline POS catalog/price requests must be held for explicit Cashier/Manager confirmation; never silently reprice.
+5. Rider push Edge Function must encrypt/decrypt using a server-only secret, hash endpoint lookup, and adapt its existing cleartext \`endpoint/p256dh/auth\` REST calls before deployment.
+6. Order API read projection still contains deferred tax/service/tip field names and must be updated before any live integration.
+7. Rider return UI wording and POS return confirmation roles need reconciliation with the approved policy: Rider reports return; Cashier/Manager confirms physical receipt; returned order moves to the cancelled/returned terminal queue, not hard-deleted.
+8. Delivery task/offer/assignment RPCs must enforce branch, role, rider ownership and database-time 60-second expiry; rejected/expired offers return to POS for manual reassignment, never auto-rotate.
+9. Website security audit remains a mandatory stop-gate immediately before attaching/enabling website checkout. Do not enable website ordering/delivery/pickup flags in this stage.
+10. The full local migration QA workflow was wired to run the structural fixture, but this session did not obtain a confirmed workflow-run result. Do **not** claim the migration passed local replay/QA until the Actions run is observed and successful.
+
+### Production safety statement
+
+No Production SQL/migration, table creation, seed, catalog import/publication, Auth user/role creation, Edge Function deployment, secret change, Storage/Realtime setting, Vercel deployment, checkout activation, or paid-plan upgrade was performed. Production remains read-only. The migration candidate is not approval to apply it. Keep \`main\` and the original HFP/reference repositories untouched.
