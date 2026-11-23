@@ -6,6 +6,9 @@ on:
       - work/production-source-audit
     paths:
       - "supabase/functions/**"
+      - "apps/flame-chick-website/js/catalog-v3.js"
+      - "apps/flame-chick-website/js/catalog-v3-deal-view.js"
+      - "tests/flame-chick-order-pricing.test.mjs"
       - "tests/edge-function-contract-hygiene.test.mjs"
       - ".github/workflows/ci-edge-functions.yml"
 
@@ -34,5 +37,5 @@ jobs:
           deno check supabase/functions/flame-chick-delivery-api/index.ts
           deno check supabase/functions/flame-chick-staff-admin/index.ts
 
-      - name: Check Flame Chick RPC and key contracts
-        run: node --test tests/edge-function-contract-hygiene.test.mjs
+      - name: Check Flame Chick RPC, catalog pricing and key contracts
+        run: node --test tests/flame-chick-order-pricing.test.mjs tests/edge-function-contract-hygiene.test.mjs
