@@ -31,7 +31,7 @@
   function fail(message){throw new Error(message);}
   function object(value){return !!value&&typeof value==='object'&&!Array.isArray(value);}
   function key(value,label){
-    if(typeof value!=='string'||!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(value))fail(label+' has an invalid key.');
+    if(typeof value!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(value))fail(label+' has an invalid key.');
     return value;
   }
   function moneyEqual(a,b){
