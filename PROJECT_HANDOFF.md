@@ -2860,3 +2860,17 @@ The standalone V3 preview remains synthetic/non-ordering. The next task is a **r
 No production/Supabase write, migration, seed, Edge Function deployment, catalog publication, Vercel deployment, domain change, storefront cutover or checkout activation occurred in this session. Keep `main` untouched and continue on `work/production-source-audit`. Do not treat synthetic preview tests as live integration or release approval.
 
 For the complete immediate continuation instructions, exact local folder/command, project invariants, upcoming phases and assistant working rules, read `docs/handoffs/2026-11-23-new-chat-continuation-handoff.md` first, then this full historical handoff.
+
+
+# LATEST MENU DECISION OVERRIDE — 2026-11-23
+
+
+The user's latest clarifications supersede any older notes about the newly published Flame Chick menu:
+
+- Whole Chicken Broast is **three separate individual products**, not one product with flavour variants: Simple Injected — Rs. 2,499; Nashville — Rs. 2,699; Cheetos Butter — Rs. 2,799. Do not model these as variants/flavours of one product.
+- GST system implementation is explicitly deferred. Do not add GST calculations, tax fields, checkout tax logic, tax rates or tax rounding behavior now. The menu transcription included a GST statement, and the user previously asked to display the statement below the large MENU heading and replace the old GST heading; that is display copy only, not authorization to implement a GST system. If there is any conflict in how the old heading should be handled, do not implement tax functionality.
+- Existing confirmed deal decisions remain: Flame Hour Injector + Rs.120 Cold Drink at Rs.699; Flame Hour Quarter Broast + OG Crunch + Rs.120 Cold Drink at Rs.1,599; Flame Duo 2 OG Crunch + Quarter Broast + two Rs.120 Cold Drinks at Rs.2,099; Flame Feast Half Broast + 3 OG Crunch + restaurant-managed 1L drink at Rs.3,599; Mini Flame 6 Classic Nuggets + deal-only Fries + restaurant-managed Juice at Rs.399; Little Crunch 6 Classic Nuggets + OG Crunch + deal-only Fries + Rs.120 Cold Drink at Rs.999. No burger substitutions. Fries, juice and Flame Feast 1L drink are deal-only; do not create standalone priced products.
+- Kids deal nuggets are Classic Nuggets. Mini Flame juice choice/details remain restaurant-managed. Flame Feast 1L drink remains restaurant-managed. Platter is Rs.1,499; leave description blank for restaurant completion.
+- Flame Hour is scheduled every day 3:00 PM–5:00 PM Asia/Karachi. Outside this window the deal remains visible but greyed out and cannot be ordered; its popup must also prevent ordering outside the schedule.
+- The Smash is one product with a required popup patty selector: Single Patty Rs.799 or Double Patty Rs.999.
+- Do not add GST system logic now. Keep all production catalog records empty until user separately approves the reviewed import plan. No production write/deployment/publication is authorized by these decisions.
