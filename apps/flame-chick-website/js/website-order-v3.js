@@ -521,9 +521,17 @@
 
   function setBusy(value) {
     state.busy = value === true;
-    $('request-quote').disabled = state.busy || state.cart.length === 0 || !currentContext() || state.checkoutUncertain;
-    $('place-order').disabled = state.busy;
+    var locked = state.busy || state.checkoutUncertain;
+    $('request-quote').disabled = locked || state.cart.length === 0 || !currentContext();
+    $('place-order').disabled = locked;
     $('retry-order').disabled = state.busy;
+    ['customer-name','customer-phone','customer-email','delivery-area','delivery-address',
+      'delivery-instructions','other-locality','not-listed-confirm','order-notes'].forEach(function (id) {
+      if ($(id)) $(id).disabled = locked;
+    });
+    document.querySelectorAll('#branch-selector button, #branch-selector select, #branch-selector input').forEach(function (node) {
+      node.disabled = locked;
+    });
   }
 
   async function requestQuote() {
