@@ -48,9 +48,9 @@ test('requires explicit deal variant and required component selection', () => {
   assert.equal(ui.getState().quantities[IDS.componentGroup][IDS.componentOption], 1);
   assert.equal(ui.getState().quantities[IDS.drinkComponentGroup][IDS.drinkComponentOption], 1);
   assert.equal(ui.validate().ok, true);
-  assert.equal(ui.toPayload().code, 'COMPONENT_GROUP_BOUNDS');
+  assert.equal(ui.toPayload().componentGroups.length, 2);
 
-  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 0).code, 'COMPONENT_QUANTITY_INVALID');
+  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 0).code, 'COMPONENT_FIXED');
   assert.equal(ui.validate().ok, true);
 });
 
@@ -59,9 +59,9 @@ test('rejects variants, component IDs and quantities outside the current deal de
   ui.selectVariant(IDS.dealVariant);
   assert.equal(ui.selectVariant('ffffffff-ffff-4fff-8fff-ffffffffffff').code, 'DEAL_VARIANT_INVALID');
   assert.equal(ui.setOptionQuantity(IDS.componentGroup, 'ffffffff-ffff-4fff-8fff-ffffffffffff', 1).code, 'COMPONENT_OPTION_INVALID');
-  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, -1).code, 'COMPONENT_QUANTITY_INVALID');
-  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 1.5).code, 'COMPONENT_QUANTITY_INVALID');
-  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 2).code, 'COMPONENT_QUANTITY_INVALID');
+  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, -1).code, 'COMPONENT_FIXED');
+  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 1.5).code, 'COMPONENT_FIXED');
+  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 2).code, 'COMPONENT_FIXED');
 });
 
 test('emits stable identifiers only and never emits a client-side total', () => {
