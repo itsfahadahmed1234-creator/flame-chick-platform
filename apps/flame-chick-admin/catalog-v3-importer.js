@@ -286,6 +286,33 @@
     const total=summary.categories+summary.products+summary.deals;
     let completed=0;
 
+    // Preflight every category and product identity before the first write.
+    for(const category of draft.categories){
+      const stable=legacyId(draft,'category',category.key);
+      const found=uniqueBy(categories,'legacy_id',stable,'category');
+      if(found){
+        if(found.category_kind!==category.categoryKind||found.name_en!==category.nameEn||found.is_active!==true){
+          fail('Existing category '+category.nameEn+' differs from the approved draft. Stop before writing.');
+        }
+        categoryIds.set(category.key,found.id);
+      }else{
+        const collision=categories.find(row=>row.category_kind===category.categoryKind&&row.name_en===category.nameEn);
+        if(collision)fail('A category named '+category.nameEn+' exists without the expected stable import key. Stop before writing.');
+      }
+    }
+    for(const product of draft.products){
+      const stable=legacyId(draft,'product',product.key);
+      const existing=uniqueBy(products,'legacy_id',stable,'product');
+      if(!existing)continue;
+      const categoryId=categoryIds.get(product.categoryKey);
+      if(!categoryId||existing.category_id!==categoryId||existing.name_en!==product.nameEn||
+        (existing.description_en??null)!==(product.descriptionEn??null)||
+        existing.is_active!==true||existing.is_available!==true){
+        fail('Existing product '+product.nameEn+' differs from the approved draft. Stop before writing.');
+      }
+      buildProductPayload(draft,{...product,_importSortOrder:draft.products.indexOf(product)+1},categoryId,existing);
+    }
+
     for(const [index,category] of draft.categories.entries()){
       const legacy=legacyId(draft,'category',category.key);
       let found=uniqueBy(categories,'legacy_id',legacy,'category');
