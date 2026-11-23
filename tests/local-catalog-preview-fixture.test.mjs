@@ -51,7 +51,10 @@ test('local fixture is valid V3 synthetic data and has no production identifiers
     assert.equal(snapshot.databaseNow, '2026-11-23T10:00:00.000Z');
     assert.equal(snapshot.settings.restaurant_name, 'Flame Chick');
     assert.equal(snapshot.branches.length, 1);
-    assert.equal(snapshot.products.length, 1);
+    assert.equal(snapshot.products.length, 2);
+    assert.equal(snapshot.products.find((product) => product.productId === '30000000-0000-4000-8000-000000000002').nameEn, 'Cola');
+    assert.equal(snapshot.dealComponentGroups.length, 2);
+    assert.equal(snapshot.dealComponentOptions.find((option) => option.componentOptionId === 'e0000000-0000-4000-8000-000000000002').productId, '30000000-0000-4000-8000-000000000002');
     assert.equal(snapshot.deals.length, 1);
     assert.equal(snapshot.scheduleSets[0].windows.length, 7);
     assert.deepEqual(snapshot.scheduleSets[0].windows.map((window) => window.weekdayIso), [1, 2, 3, 4, 5, 6, 7]);
