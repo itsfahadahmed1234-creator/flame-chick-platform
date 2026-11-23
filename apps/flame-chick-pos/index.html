@@ -4366,7 +4366,7 @@ async function refreshHistoryData(){
     historyServerRows.pos=localRows.filter(o=>o.orderSource==='POS');
     historyServerRows.online=[];
     historyServerRows.all=localRows;
-      historyServerRows.cancelled=localRows.filter(o=>String(o.status||'').trim().toLowerCase()==='cancelled');
+      historyServerRows.cancelled=localRows.filter(o=>['cancelled','returned'].includes(String(o.status||'').trim().toLowerCase()));
     renderHistoryRows(historyServerRows[historyActiveTab]);
     $('historySummary').textContent=(navigator.onLine?'Cloud history unavailable — showing local records':'Offline — showing local POS records');
   }finally{historyLoading=false;}
