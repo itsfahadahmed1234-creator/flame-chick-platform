@@ -155,3 +155,96 @@ test('deal inspection renders the exact product-name field returned by the datab
   assert.match(source, /variant_label/);
   assert.doesNotMatch(source, /product_name\)/);
 });
+
+
+test('deal read-back verifier requires exact fixed contents and INCLUDED mappings before and after activation', () => {
+  const optionA = {
+    id: '30000000-0000-4000-8000-000000000001',
+    product_variant_id: '20000000-0000-4000-8000-000000000001',
+    is_active: true
+  };
+  const optionB = {
+    id: '30000000-0000-4000-8000-000000000002',
+    product_variant_id: '20000000-0000-4000-8000-000000000002',
+    is_active: true
+  };
+  const detail = active => ({
+    deal: { is_active: active },
+    component_groups: [
+      { group: { name_en: 'Burger', min_units: 2, max_units: 2, is_active: true }, options: [optionA] },
+      { group: { name_en: 'Quarter Broast', min_units: 1, max_units: 1, is_active: true }, options: [optionB] }
+    ],
+    variants: [{
+      variant: { id: '40000000-0000-4000-8000-000000000001', pricing_mode: 'FIXED_BUNDLE', base_price: 2099, is_active: active },
+      allowed_options: [
+        { component_option_id: optionA.id, product_variant_id: optionA.product_variant_id, is_active: true, pricing_treatment: 'INCLUDED', unit_surcharge: 0, max_quantity_per_deal: 2 },
+        { component_option_id: optionB.id, product_variant_id: optionB.product_variant_id, is_active: true, pricing_treatment: 'INCLUDED', unit_surcharge: 0, max_quantity_per_deal: 1 }
+      ]
+    }],
+    schedule_assignments: [{
+      branch_id: null, schedule_set_id: '50000000-0000-4000-8000-000000000001', is_active: true
+    }]
+  });
+  const expected = {
+    basePrice: 2099,
+    components: [
+      { display_name: 'Burger', product_variant_id: optionA.product_variant_id, quantity: 2 },
+      { display_name: 'Quarter Broast', product_variant_id: optionB.product_variant_id, quantity: 1 }
+    ],
+    flameHour: true,
+    scheduleId: '50000000-0000-4000-8000-000000000001'
+  };
+  assert.equal(admin.verifyFixedDealDetail(detail(false), { ...expected, active: false }), true);
+  assert.equal(admin.verifyFixedDealDetail(detail(true), { ...expected, active: true }), true);
+});
+
+test('deal read-back verifier rejects altered prices, components, surcharge mappings and missing Flame Hour schedule', () => {
+  const option = {
+    id: '30000000-0000-4000-8000-000000000001',
+    product_variant_id: '20000000-0000-4000-8000-000000000001',
+    is_active: true
+  };
+  const base = {
+    deal: { is_active: false },
+    component_groups: [{
+      group: { name_en: 'Burger', min_units: 1, max_units: 1, is_active: true },
+      options: [option]
+    }],
+    variants: [{
+      variant: { id: '40000000-0000-4000-8000-000000000001', pricing_mode: 'FIXED_BUNDLE', base_price: 699, is_active: false },
+      allowed_options: [{
+        component_option_id: option.id,
+        product_variant_id: option.product_variant_id,
+        is_active: true,
+        pricing_treatment: 'INCLUDED',
+        unit_surcharge: 0,
+        max_quantity_per_deal: 1
+      }]
+    }],
+    schedule_assignments: []
+  };
+  const expected = {
+    basePrice: 699,
+    components: [{ display_name: 'Burger', product_variant_id: option.product_variant_id, quantity: 1 }],
+    flameHour: false,
+    scheduleId: null,
+    active: false
+  };
+  assert.throws(() => admin.verifyFixedDealDetail({ ...base, variants: [{
+    ...base.variants[0], variant: { ...base.variants[0].variant, base_price: 799 }
+  }] }, expected), /fixed base price/i);
+  assert.throws(() => admin.verifyFixedDealDetail({ ...base, variants: [{
+    ...base.variants[0], allowed_options: [{
+      ...base.variants[0].allowed_options[0], pricing_treatment: 'SURCHARGE', unit_surcharge: 50
+    }]
+  }] }, expected), /INCLUDED/i);
+  assert.throws(() => admin.verifyFixedDealDetail(base, {
+    ...expected, flameHour: true, scheduleId: '50000000-0000-4000-8000-000000000001'
+  }), /schedule assignment/i);
+  assert.throws(() => admin.verifyFixedDealDetail({
+    ...base, component_groups: [{
+      group: { ...base.component_groups[0].group, min_units: 2, max_units: 2 },
+      options: [option]
+    }]
+  }, expected), /component failed read-back/i);
+});
