@@ -3,6 +3,20 @@
 -- Role setup deliberately follows the protected production bootstrap + Staff Admin path.
 BEGIN;
 
+-- Deterministic clock override is confined to this rollback-only fixture.
+-- Production migration implementation continues to use clock_timestamp().
+CREATE OR REPLACE FUNCTION app_private.flame_chick_delivery_clock_now()
+RETURNS timestamptz
+LANGUAGE sql
+VOLATILE
+SET search_path=''
+AS $function$
+  SELECT COALESCE(
+    NULLIF(pg_catalog.current_setting('test.delivery.clock_now',true),'')::timestamptz,
+    pg_catalog.clock_timestamp()
+  )
+$function$;
+
 DO $delivery_identity_setup$
 DECLARE
   r uuid:=gen_random_uuid();
@@ -181,12 +195,15 @@ BEGIN
     RAISE EXCEPTION 'WRONG_RIDER_OFFER_GUARD_FAILED: %',result;
   END IF;
 
-  -- Accept is idempotent: same offer creates exactly one assignment.
+  -- The offer is valid one microsecond before its exact 60-second deadline.
+  PERFORM set_config('test.delivery.clock_now',
+    (SELECT expires_at-interval '1 microsecond' FROM public.delivery_task_offers WHERE id=offer1)::text,true);
   result:=public.flame_chick_accept_delivery_offer(offer1,rider_one,gen_random_uuid());
   IF result->>'ok'<>'true' OR result->>'task_status'<>'accepted' THEN
     RAISE EXCEPTION 'RIDER_ACCEPT_FAILED: %',result;
   END IF;
   assignment_id:=(result->>'assignment_id')::uuid;
+  PERFORM set_config('test.delivery.clock_now','',true);
   result:=public.flame_chick_accept_delivery_offer(offer1,rider_one,gen_random_uuid());
   IF result->>'ok'<>'true' OR result->>'already_processed'<>'true'
      OR (SELECT count(*) FROM public.delivery_assignments WHERE delivery_task_id=t1 AND is_current)<>1 THEN
@@ -218,6 +235,26 @@ BEGIN
     'action','assign','delivery_task_id',t2,'actor_user_id',manager,'rider_user_id',rider_two,'request_id',gen_random_uuid()));
   IF result->>'ok'<>'true' OR result->>'task_status'<>'offering' THEN
     RAISE EXCEPTION 'STAFF_ASSIGNMENT_FAILED: %',result;
+  END IF;
+  offer2:=(result->>'offer_id')::uuid;
+
+  -- At the exact expiry instant (>=), accept must fail closed and expire the offer.
+  PERFORM set_config('test.delivery.clock_now',
+    (SELECT expires_at::text FROM public.delivery_task_offers WHERE id=offer2),true);
+  result:=public.flame_chick_accept_delivery_offer(offer2,rider_two,gen_random_uuid());
+  IF result->>'ok'<>'false' OR result#>>'{error,code}'<>'OFFER_EXPIRED'
+     OR (SELECT status FROM public.delivery_task_offers WHERE id=offer2)<>'expired'
+     OR (SELECT status FROM public.delivery_tasks WHERE id=t2)<>'dispatch_pending'
+     OR EXISTS(SELECT 1 FROM public.delivery_assignments WHERE delivery_task_id=t2 AND is_current) THEN
+    RAISE EXCEPTION 'EXACT_EXPIRY_BOUNDARY_FAILED: %',result;
+  END IF;
+
+  -- Restore real DB time, then manually reassign. Expiry never auto-rotates.
+  PERFORM set_config('test.delivery.clock_now','',true);
+  result:=public.flame_chick_manage_delivery(jsonb_build_object(
+    'action','assign','delivery_task_id',t2,'actor_user_id',manager,'rider_user_id',rider_two,'request_id',gen_random_uuid()));
+  IF result->>'ok'<>'true' OR result->>'task_status'<>'offering' THEN
+    RAISE EXCEPTION 'MANUAL_REASSIGN_AFTER_EXPIRY_FAILED: %',result;
   END IF;
   offer2:=(result->>'offer_id')::uuid;
 
