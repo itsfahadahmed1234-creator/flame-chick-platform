@@ -1,3 +1,25 @@
+## Latest checkpoint — standalone V3 non-ordering menu preview page (2026-11-23)
+
+**Status: separate catalog preview entry, product/deal rendering and local selection validation implemented. Static CI passed. Preview deployment skipped; existing storefront is untouched.**
+
+- Added `apps/flame-chick-website/catalog-preview.html`, linked styles `css/catalog-preview.css` and page controller `js/catalog-preview-page.js`.
+- This is a separate entry path. Existing `index.html`, the legacy storefront markup and hidden-menu gate were not changed. The main storefront has no link to this preview page.
+- Page includes `noindex,nofollow,noarchive` metadata. This is search-engine guidance, **not authentication/access control**. The page reads only the current public published catalog and does not fetch draft/admin data. Do not treat it as a secure admin preview or enter secrets.
+- Script dependencies are loaded in verified order: public configuration, V3 validator/client, branch fulfilment, product/deal view-models, deal configurator, preview orchestrator and page renderer.
+- Displays connection/publication state, publication/version identity, database timestamp, branch and fulfilment selector, product categories, available standalone-sellable product variants, individual published prices, per-variant modifier choices, published deal collections, schedule/branch availability and deal component configurator.
+- Product variant selectors require an explicit selection when there are multiple sellable variants; a single variant is selected as the only available choice. Non-standalone variants are excluded from the standalone product list.
+- Product modifiers show their individual fixed or variant-specific price amounts. Required/max selection bounds are validated locally. No combined product total is computed.
+- Deal variant labels and component selections are previewed without representing the deal variant base amount as a final deal price. Deal component/modifier prices remain itemized. Deal selection payloads stay in browser memory only and contain identifiers, not price totals.
+- No add-to-cart action is present; legacy add selectors are hidden in this page's CSS. Deal configurator action is labelled **Validate preview choices**, and its completion message explicitly says no quote/order was created.
+- Product/deal image paths are intentionally not rendered. The Storage media bucket has not yet been provisioned; the page uses neutral placeholders instead of falling back to unrelated legacy/demo images.
+- Added `tests/catalog-preview-page.test.mjs` for noindex/separation, script dependencies, required page targets, safe DOM/no order or persistence calls, no totals, single-variant selector behaviour and responsive/accessibility styles. Added preview page JS syntax check and page inline-script parse check to Website Static Checks.
+- One final UI review removed a duplicate placeholder option for single-variant products. Latest Website Static Checks [45098417842](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45098417842) passed on commit `255c15236e676e6f86ba9916062a641bad2eec2a`: **94 tests passed, 0 failed**, JS syntax checks and both Website/preview inline-script parsing passed.
+- Website preview deployment workflow run [45098406409](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45098406409) was **skipped** because `FLAME_CHICK_WEBSITE_PREVIEW_DEPLOY_ENABLED` is not `true`. No deployment occurred. No SQL migration was applied, Edge Function deployed, menu published, Supabase data changed or checkout enabled.
+
+**Next:** the separate preview page needs a real browser visual/interaction review before it can be considered release-ready. Since it is intentionally not deployed, test it in a controlled local/static preview or wait for explicit approval to enable a protected preview deployment. Before any deployment, agree on access control: `noindex` is not a security boundary. Then provision/validate media storage and implement the authoritative order quote API before considering cart/checkout.
+
+---
+
 ## Latest checkpoint — V3 non-ordering catalog preview orchestrator (2026-11-23)
 
 **Status: isolated orchestration layer added and regression-tested. It is not referenced by the Website HTML and is not deployed.**
