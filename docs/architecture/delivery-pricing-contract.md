@@ -163,18 +163,18 @@ The customer website and POS need area and fee information to display the choice
 - No missing fee is coerced into zero.
 - Existing POS currently requires catalog schemaVersion 2 and expects deliveryAreas plus settings.DefaultDeliveryFee. Any response redesign needs an explicit schema-version compatibility rollout; do not break deployed/offline POS clients without a staged upgrade.
 
-## 6. Existing source mapping and required changes (not yet implemented)
+## 6. Current source mapping and remaining implementation (2026-11-23)
 
-Current branch source inspection shows:
+Source-only touchups now align both Website and POS payloads with the approved request contract:
 
-- **Admin:** area CRUD already exists. The default is currently saved as restaurant_settings.setting_key = DefaultDeliveryFee, with branch_id = NULL and is_public = true; area rows are scoped to the selected branch. The new-area fee form currently defaults to 0. In Production, use a branch-scoped typed setting or a strictly validated equivalent, and make the new fee input blank until Admin explicitly enters a value.
-- **Website:** already lists area names and their displayed fees, shows Not Listed, reads the default fee from public catalog settings, and blocks checkout when the default is unset. The payload currently represents Not Listed with a null area ID and display name; add the explicit selection_type.
-- **POS:** already matches listed areas or uses the Not Listed default and blocks Not Listed delivery when the default is unset. Its adapter currently converts missing area fee values to zero. Change to strict validation and send the explicit selection type.
-- **Catalog Edge Function:** currently queries delivery areas by restaurant without branch filtering and includes DefaultDeliveryFee in a general public settings allowlist. Production must scope by branch and expose only a specific delivery-pricing projection.
-- **Order API/command:** currently forwards the delivery object to the database RPC. Add selection-type validation and calculate listed/default fee server-side. Never accept a browser/POS fee.
-- **Rider:** receives the fee and area snapshot from delivery task data; preserve these fields for rider/manager visibility, but do not expose unrelated customer or internal settings.
+- **Website:** delivery requests send `selection_type: listed_area | not_listed`, the area UUID for listed selections or NULL for Not Listed, plus address/instructions. The payload no longer sends an area display name or fee. The UI preserves a missing listed-area fee as NULL, labels it "Fee not configured", and blocks checkout for both an unset listed fee and an unset Not Listed default.
+- **POS:** delivery requests use the same explicit selection type and omit any client fee/display name. The local adapter preserves NULL for missing/invalid area fees, accepts zero only when explicitly configured, and blocks taking/syncing a delivery order if its selected area's fee is missing.
+- **Admin:** the Production schema currently has no `delivery_areas` or branch delivery-settings tables. Admin area CRUD/default-fee configuration is therefore not live in the current Production backend. The target remains a branch-scoped typed setting (or equivalently strict, scoped representation) with a blank/unset state, not an implicit zero.
+- **Catalog / delivery API:** the current Production database has no delivery areas/default-fee records and no public branch-scoped delivery-pricing projection. The Catalog/Order/Delivery Edge Functions are not deployed. Implement an explicit safe projection and branch scoping when the operational migration is designed; do not expose generic settings.
+- **Order API / database command:** the source Order API currently forwards the delivery object to `flame_chick_create_order`, but the Production database has no such RPC or operational order tables. The transactional command must validate the selection type, resolve the exact active area/default fee for the authorized branch, ignore/reject client-supplied fee fields, and persist immutable snapshots.
+- **Rider:** the source Rider app reads task fee/area snapshots through the Delivery API, but Production has no `delivery_tasks` or `rider_profiles` tables yet. Preserve only the task's operational snapshot in Rider/Manager views once the operational schema exists.
 
-This mapping is from source code in the review branch. It does not mean these changes have been deployed.
+The client payload/UI changes are committed on `work/production-source-audit` and covered by static tests. They are not a live feature until the additive operational schema, secure RPCs, API deployment and delivery-area Admin configuration are completed. No Production migration/data/API deployment occurred.
 
 ## 7. Required acceptance tests
 
