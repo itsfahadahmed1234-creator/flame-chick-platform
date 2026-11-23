@@ -79,8 +79,11 @@
     var variantLabel = element('label', 'fc-menu-variant-label', 'Product option');
     var variantSelect = element('select', 'fc-menu-variant-select');
     variantSelect.setAttribute('aria-label', 'Choose an option for ' + product.name);
-    variantSelect.appendChild(element('option', '', product.variants.length > 1 ? 'Choose an option' : product.variants[0].label));
-    variantSelect.options[0].value = '';
+    if (product.variants.length > 1) {
+      var placeholderOption = element('option', '', 'Choose an option');
+      placeholderOption.value = '';
+      variantSelect.appendChild(placeholderOption);
+    }
     product.variants.forEach(function (variant) {
       var option = element('option', '', variant.label + ' — ' + formatMoney(variant.priceMinor, currency));
       option.value = variant.id;
