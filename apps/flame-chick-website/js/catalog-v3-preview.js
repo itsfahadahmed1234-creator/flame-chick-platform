@@ -251,6 +251,12 @@
         if (selectionState.selectedBranchId) buildCurrentPreview();
         else notify();
 
+        // A view-model failure during the automatic single-branch preview must
+        // be surfaced as a failed load, not a misleading ready result.
+        if (loadState === 'error') {
+          return { state: 'error', error: loadError };
+        }
+
         return {
           state: 'ready',
           selection: selection.getState(),
