@@ -136,3 +136,14 @@ test("delivery dispatch reads are service-side and branch context is derived fro
   assert.match(source, /readAsService\("rider_profiles\?/);
   assert.doesNotMatch(source, /readAsUser\(/);
 });
+
+
+test("order API exposes authenticated self staff-context to Rider before restricting POS order-board roles", () => {
+  const source=sources["flame-chick-order-api"];
+  const getStart=source.indexOf('if (req.method === "GET")');
+  const contextAt=source.indexOf('if (view === "staff_context")',getStart);
+  const boardGateAt=source.indexOf('const canReadBoard = await verifyStaffRole',getStart);
+  assert.ok(getStart>=0&&contextAt>getStart&&boardGateAt>contextAt);
+  assert.match(source,/\["owner", "admin", "manager", "cashier"\]/);
+  assert.doesNotMatch(source,/\["owner", "admin", "manager", "cashier", "kitchen"\]/);
+});
