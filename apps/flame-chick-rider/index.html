@@ -535,7 +535,7 @@ async function performAction(taskId,action){
   if(action==='return_reported'&&!confirm('Confirm that you have physically returned the food to Flame Chick and handed it to the restaurant staff? The manager will still need to confirm the handover.'))return;
   const card=document.querySelector('[data-task-id="'+CSS.escape(taskId)+'"]');
   const buttons=card?[...card.querySelectorAll('button')]:[];buttons.forEach(b=>b.disabled=true);
-  try{await deliveryRequest('POST',null,{action,delivery_task_id:taskId,...(reason?{reason}:{})});toast(action==='picked_up'?'Pickup confirmed. The order is now out for delivery.':action==='delivered'?'Delivery completed. Thank you!':action==='failed'?'Delivery issue saved. Keep the order and return it to the restaurant.':action==='return_reported'?'Return reported. Wait for manager confirmation.':'Delivery updated.');await loadJobs(true);}
+  try{await deliveryRequest('POST',null,{action,delivery_task_id:taskId,...(reason?{reason}:{})});toast(action==='picked_up'?'Pickup confirmed. The order is now out for delivery.':action==='delivered'?'Delivery marked delivered. The order remains awaiting cashier payment collection.':action==='failed'?'Delivery issue saved. Keep the order and return it to the restaurant.':action==='return_reported'?'Return reported. Wait for manager confirmation.':'Delivery updated.');await loadJobs(true);}
   catch(e){toast(e.message);buttons.forEach(b=>b.disabled=false);}
 }
 
