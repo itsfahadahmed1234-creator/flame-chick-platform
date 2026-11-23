@@ -534,7 +534,7 @@ Deno.serve(async (req: Request) => {
     taskQuery.set("select",
       "id,order_id,branch_id,status,recipient_name_snapshot,recipient_phone_snapshot,address_snapshot,area_name_snapshot,delivery_fee_snapshot,delivery_instructions_snapshot,dispatch_started_at,assigned_at,picked_up_at,out_for_delivery_at,delivered_at,failed_at,failure_reason,return_reported_at,return_confirmed_at,created_at,orders!inner(id,order_number,status,fulfillment_type,total,payment_status,customer_name,customer_phone,delivery_address,delivery_instructions,order_items(id,line_number,quantity,product_name_snapshot,variant_label_snapshot,deal_title_snapshot,line_total,item_notes,order_item_modifiers(id,modifier_group_name_snapshot,modifier_name_snapshot,quantity,total_price_snapshot))),delivery_assignments(id,rider_user_id,status,is_current,assigned_at,accepted_at,arrived_at,picked_up_at,delivered_at,created_at,ended_at,end_reason)");
     taskQuery.set("branch_id", "eq." + branchId);
-    taskQuery.set("status", "in.(dispatch_pending,assigned,accepted,arrived_at_restaurant,out_for_delivery,failed)");
+    taskQuery.set("status", "in.(dispatch_pending,offering,assigned,accepted,arrived_at_restaurant,out_for_delivery,failed)");
     taskQuery.set("orders.fulfillment_type", "eq.delivery");
     taskQuery.set("order", "created_at.asc");
     taskQuery.set("limit", "100");
@@ -593,7 +593,7 @@ Deno.serve(async (req: Request) => {
     profileQuery.set("user_id", "eq." + user.id);
     profileQuery.set("branch_id", "eq." + riderRole.branch_id);
     profileQuery.set("is_active", "eq.true");
-    const profileResult = await readAsUser("rider_profiles?" + profileQuery.toString(), token, apiKey);
+    const profileResult = await readAsService("rider_profiles?" + profileQuery.toString());
     if (!profileResult.ok) return response(profileResult.body, profileResult.status);
     const profiles = Array.isArray(profileResult.data) ? profileResult.data : [];
     if (!profiles.some((row) => isObject(row) && row.user_id === user.id && row.branch_id === riderRole.branch_id && row.is_active === true)) {
