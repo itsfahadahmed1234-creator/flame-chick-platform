@@ -1496,15 +1496,16 @@ function renderDeliveryDispatchAction(order){
   return `<span class="pill pending">${esc(dispatchStatusLabel(task.status))}</span>`;
 }
 let paymentCollectionState=null;
-function openPaymentCollection(orderId){
+async function openPaymentCollection(orderId){
   const role=String(flameChickStaffProfile?.role||'').toLowerCase();
   if(!['owner','admin','manager','cashier'].includes(role)){showToast('An authorized Cashier, Manager, Admin or Owner role is required to collect payment.');return;}
+  try{await loadInitialOnlineInbox();}catch(error){showToast('Could not refresh the order balance. '+(error?.message||''));return;}
   const key=String(orderId||'');
   const order=inboxOrders.get(key);
   if(!order||order.Status!=='Delivered'){showToast('Only a delivered order can be settled from this screen.');return;}
   const balance=Number(order.BalanceDue);
   if(!Number.isFinite(balance)||balance<=0){showToast('This order has no outstanding balance. Refresh the order board.');return;}
-  paymentCollectionState={orderId:key,requestId:crypto.randomUUID(),amount:null,method:'cash'};
+  paymentCollectionState={orderId:key,requestId:crypto.randomUUID(),amount:null,method:'cash',sent:false};
   $('paymentCollectionTitle').textContent='Collect Payment · '+(order.OrderNumber||'Flame Chick order');
   $('paymentCollectionSubtitle').textContent=(order.CustomerName||'Customer')+' · '+(order.Phone||'');
   $('paymentCollectionBalance').textContent='Order total Rs. '+money(order.Total)+' · Already paid Rs. '+money(order.PaidAmount)+' · Outstanding Rs. '+money(balance);
@@ -1526,12 +1527,17 @@ async function submitOrderPaymentCollection(){
   if(!Number.isFinite(amount)||amount<=0||Math.round(amount*100)!==amount*100){showToast('Enter an amount greater than zero with no more than two decimal places.');return;}
   if(amount>Number(order.BalanceDue)){showToast('The collected amount cannot exceed the outstanding balance.');return;}
   if(!['cash','card','bank','wallet','other'].includes(method)){showToast('Choose a valid payment method.');return;}
-  // Preserve the request ID after a network failure so retrying the same
-  // amount/method is safe. A changed payload receives a new idempotency key.
-  if(state.amount!==amount||state.method!==method){
-    state.requestId=crypto.randomUUID();
+  // Preserve the request ID after an uncertain network result. Never turn
+  // an ambiguous retry into a fresh financial movement; close and reopen
+  // after refresh before changing the amount or method.
+  if(state.sent&&(state.amount!==amount||state.method!==method)){
+    showToast('This payment request may already have reached the database. Retry the same amount and method, or close and reopen after refreshing the order board.');
+    return;
+  }
+  if(!state.sent){
     state.amount=amount;
     state.method=method;
+    state.sent=true;
   }
   const button=$('submitPaymentCollectionBtn');
   button.disabled=true;button.textContent='Recording…';
