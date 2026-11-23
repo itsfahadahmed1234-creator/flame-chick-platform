@@ -143,6 +143,12 @@ test('Admin read/write actions match the finite authenticated Staff Admin routes
   assert.doesNotMatch(source, /catalog_rollback\s*:/);
 });
 
+test('Catalog V3 navigation remains restricted to verified Admin and Owner sessions', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-admin/app.js', import.meta.url), 'utf8');
+  assert.match(source, /\["admin","owner"\]\.includes\(context\.actor_role\)/);
+  assert.match(source, /\["staff","catalog-v3"\]\.includes\(button\.dataset\.page\)/);
+});
+
 test('deal inspection renders the exact product-name field returned by the database detail DTO', async () => {
   const source = await readFile(new URL('../apps/flame-chick-admin/catalog-v3-admin.js', import.meta.url), 'utf8');
   assert.match(source, /product_name_en/);
