@@ -764,7 +764,7 @@ $('passwordForm').addEventListener('submit',async e=>{
     const next=pendingAuthSession;pendingAuthSession=null;
     const invitedUser=await getUser(next.access_token);
     const roleRows=await getActiveAccountRoles(invitedUser.id,next.access_token);
-    const assigned=roleRows.find(x=>['owner','admin','manager','cashier','kitchen','rider'].includes(x.role));
+    const assigned=roleRows.find(x=>['owner','admin','manager','cashier','rider'].includes(x.role));
     if(!assigned){
       saveSession(null);user=null;rider=null;jobs=[];
       showLogin('Your password is set, but an active Flame Chick role is not yet assigned. Please ask the owner or manager to finish your account setup.');
