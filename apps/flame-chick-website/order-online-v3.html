@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#941a20">
+  <title>Flame Chick — Order Online</title>
+  <meta name="description" content="Browse the current Flame Chick menu and place a delivery or pickup order.">
+  <link rel="icon" href="assets/flame-chick-logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/catalog-preview.css">
+  <style>
+    .order-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start;margin-top:20px}
+    .order-main{min-width:0}.order-panel{padding:20px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:var(--shadow)}
+    .order-panel h2{margin-bottom:8px}.order-panel+.order-panel{margin-top:16px}
+    .order-context{display:grid;gap:12px}.order-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .order-fields .full{grid-column:1/-1}.order-field{display:grid;gap:5px}.order-field label{font-size:12px;font-weight:800}
+    .order-field input,.order-field textarea,.order-field select{width:100%;min-height:42px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+    .order-field textarea{min-height:74px;resize:vertical}.order-hint{font-size:11px;color:var(--muted);line-height:1.45}
+    .order-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+    .order-cart{position:sticky;top:12px}.order-cart-list{display:grid;gap:9px;margin:12px 0}
+    .order-cart-row{border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:7px}
+    .order-cart-row strong{font-size:13px}.order-cart-controls{display:flex;align-items:center;gap:6px}
+    .order-cart-controls input{width:58px;min-height:34px;border:1px solid var(--line);border-radius:8px;text-align:center}
+    .order-cart-controls button{min-height:34px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;font-size:11px;font-weight:800}
+    .order-cart-total{display:flex;justify-content:space-between;gap:8px;padding-top:12px;border-top:1px solid var(--line);font-size:14px;font-weight:900}
+    .order-cart-actions{display:grid;gap:8px;margin-top:12px}
+    .order-primary{width:100%;min-height:46px;padding:10px 14px;border:0;border-radius:10px;background:var(--red);color:white;font-weight:900}
+    .order-primary:disabled{opacity:.5;cursor:not-allowed}.order-secondary{min-height:40px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-weight:800}
+    .order-status{padding:10px 12px;border-radius:10px;background:#f2f0ed;color:var(--muted);font-size:12px;line-height:1.45}
+    .order-status.success{background:#e8f4ec;color:var(--green)}.order-status.error{background:#fae8e8;color:#9e1c26}
+    .order-section-title{margin:0 0 12px;font-size:17px}.order-section-sub{margin:-4px 0 12px;color:var(--muted);font-size:12px}
+    .order-product-dialog{width:min(620px,calc(100% - 24px));max-height:88vh;overflow:auto}
+    .order-product-dialog-head{display:flex;justify-content:space-between;gap:12px;align-items:center}
+    .order-modifier-group{margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:10px}
+    .order-modifier-group legend{padding:0 6px;font-size:12px;font-weight:900}
+    .order-modifier-option{display:flex;gap:9px;align-items:center;padding:6px 0;font-size:13px}
+    .order-quote-lines{display:grid;gap:7px;margin:10px 0}
+    .order-quote-line{display:flex;justify-content:space-between;gap:10px;font-size:12px}
+    .order-confirm{padding:13px;border:1px solid #b7dbc2;border-radius:12px;background:#f0faf3;color:#174f2c}
+    .order-confirm strong{font-size:18px}
+    .not-listed-confirm{display:flex;gap:9px;align-items:flex-start;padding:10px;border:1px solid #e7d7b4;border-radius:10px;background:#fffaf0;font-size:12px;color:#675123}
+    .not-listed-confirm input{margin-top:3px}
+    .order-unavailable{opacity:.58;filter:saturate(.55)}
+    @media(max-width:900px){.order-layout{grid-template-columns:1fr}.order-cart{position:static;order:-1}}
+    @media(max-width:600px){.order-fields{grid-template-columns:1fr}.order-fields .full{grid-column:auto}.order-panel{padding:15px}.order-layout{gap:12px}}
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Flame Chick main website">
+      <img src="assets/flame-chick-logo.svg" alt="Flame Chick" width="210" height="50">
+    </a>
+    <span class="preview-label">Official online ordering</span>
+  </header>
+
+  <main class="page-shell">
+    <section class="preview-intro" aria-labelledby="page-title">
+      <p class="eyebrow">Flame Chick · Published menu</p>
+      <h1 id="page-title">Order online</h1>
+      <p class="intro-copy">Choose your branch, browse the current published menu, configure products and deals, and receive a confirmed order reference.</p>
+      <div class="safety-notice" role="note">
+        <strong>Secure checkout</strong>
+        <span>Prices and availability are rechecked by Flame Chick before an order is accepted. Pay cash on delivery or at pickup.</span>
+      </div>
+    </section>
+
+    <section class="load-panel" aria-labelledby="connection-heading">
+      <div class="section-heading">
+        <div><p class="eyebrow">Live menu connection</p><h2 id="connection-heading">Catalog status</h2></div>
+        <span id="connection-pill" class="status-pill status-pending">Not loaded</span>
+      </div>
+      <p id="connection-message" class="status-message" role="status" aria-live="polite">Verifying the currently published menu and branch ordering settings…</p>
+      <div id="publication-meta" class="publication-meta" hidden></div>
+      <button id="reload-catalog" class="button button-secondary" type="button">Reload menu</button>
+    </section>
+
+    <section class="context-panel" aria-labelledby="context-heading">
+      <div class="section-heading"><div><p class="eyebrow">Step 1</p><h2 id="context-heading">Choose branch and order type</h2></div></div>
+      <p class="order-hint">Branch availability and delivery/pickup options are checked against the current database settings.</p>
+      <div id="branch-selector" class="branch-selector"></div>
+      <div id="catalog-context-label" class="order-status" role="status" aria-live="polite">Select a branch and fulfilment method to view available items.</div>
+    </section>
+
+    <div class="order-layout">
+      <div class="order-main">
+        <section id="catalog-section" class="catalog-section" aria-labelledby="products-heading" hidden>
+          <div class="catalog-toolbar"><div><p class="eyebrow">Step 2</p><h2 id="products-heading">Products</h2></div></div>
+          <div id="product-category-nav" class="category-nav" aria-label="Product categories"></div>
+          <div id="product-catalog" class="product-catalog"></div>
+          <div id="products-empty" class="empty-state" hidden>No standalone products are available for this branch and order type.</div>
+        </section>
+
+        <section id="deals-section" class="deals-section" aria-labelledby="deals-heading" hidden>
+          <div class="section-heading"><div><p class="eyebrow">Published offers</p><h2 id="deals-heading">Deals</h2></div></div>
+          <div id="deal-catalog" class="deal-catalog"></div>
+          <div id="deals-empty" class="empty-state" hidden>No deals are published for this branch.</div>
+        </section>
+
+        <section id="details-section" class="order-panel" hidden aria-labelledby="details-heading">
+          <p class="eyebrow">Step 3</p><h2 id="details-heading" class="order-section-title">Your details</h2>
+          <div class="order-fields">
+            <div class="order-field"><label for="customer-name">Full name</label><input id="customer-name" maxlength="160" autocomplete="name" required></div>
+            <div class="order-field"><label for="customer-phone">Phone number</label><input id="customer-phone" type="tel" maxlength="32" autocomplete="tel" placeholder="03xx xxxxxxx" required></div>
+            <div class="order-field full"><label for="customer-email">Email (optional)</label><input id="customer-email" type="email" maxlength="254" autocomplete="email"></div>
+            <div id="delivery-fields" class="order-fields full" hidden>
+              <div class="order-field"><label for="delivery-area">Delivery area</label><select id="delivery-area"><option value="">Choose your area</option></select></div>
+              <div id="other-locality-field" class="order-field" hidden><label for="other-locality">Your locality</label><input id="other-locality" maxlength="120" placeholder="Enter locality"></div>
+              <div class="order-field full"><label for="delivery-address">Complete delivery address</label><textarea id="delivery-address" maxlength="1000" autocomplete="street-address" placeholder="House, street, building and nearby landmark"></textarea></div>
+              <div class="order-field full"><label for="delivery-instructions">Delivery instructions (optional)</label><input id="delivery-instructions" maxlength="500"></div>
+              <label id="not-listed-confirm-row" class="not-listed-confirm full" hidden><input id="not-listed-confirm" type="checkbox"><span id="not-listed-confirm-text">I understand the Not Listed delivery fee and will confirm this locality with the restaurant.</span></label>
+            </div>
+            <div class="order-field full"><label for="order-notes">Order notes (optional)</label><textarea id="order-notes" maxlength="1000" placeholder="Any additional instructions"></textarea></div>
+          </div>
+        </section>
+      </div>
+
+      <aside class="order-panel order-cart" aria-labelledby="cart-heading">
+        <p class="eyebrow">Your order</p><h2 id="cart-heading" class="order-section-title">Cart <span id="cart-count">(0)</span></h2>
+        <div id="cart-empty" class="empty-state">Your cart is empty. Add products or deal selections from the published menu.</div>
+        <div id="cart-lines" class="order-cart-list"></div>
+        <div id="cart-summary" hidden>
+          <div class="order-cart-total"><span>Server quote total</span><strong id="cart-total">—</strong></div>
+          <p id="cart-quote-detail" class="order-hint">Request a quote to verify your current item prices and delivery fee.</p>
+        </div>
+        <div id="cart-actions" class="order-cart-actions">
+          <button id="request-quote" class="order-primary" type="button" disabled>Get verified total</button>
+          <button id="place-order" class="order-primary" type="button" disabled hidden>Place order</button>
+          <button id="retry-order" class="order-primary" type="button" disabled hidden>Retry confirmation</button>
+        </div>
+        <div id="order-status" class="order-status" role="status" aria-live="polite">Your order is not submitted until you confirm it.</div>
+        <div id="order-success" class="order-confirm" hidden>
+          <p class="eyebrow">Order received</p><h3>Thank you. Your order is confirmed.</h3>
+          <p>Order reference</p><strong id="success-order-number"></strong>
+          <p id="success-order-message" class="order-hint"></p>
+          <button id="continue-ordering" class="order-secondary" type="button">Continue browsing</button>
+        </div>
+      </aside>
+    </div>
+
+    <dialog id="product-dialog" class="product-detail-dialog order-product-dialog" aria-label="Product options">
+      <div class="product-detail-dialog-head order-product-dialog-head"><span class="eyebrow">Customize product</span><button id="close-product-dialog" class="text-button" type="button">Close</button></div>
+      <div id="product-dialog-content" class="product-detail-content"></div>
+    </dialog>
+
+    <section id="deal-config-section" class="config-section" hidden aria-labelledby="deal-config-heading">
+      <div class="section-heading"><div><p class="eyebrow">Customize deal</p><h2 id="deal-config-heading">Deal choices</h2></div><button id="close-deal-config" class="text-button" type="button">Close</button></div>
+      <div id="deal-configurator"></div>
+    </section>
+
+    <footer class="page-footer"><span>Flame Chick · Online orders</span><a href="index.html">Return to main website</a></footer>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/catalog-v3.js"></script>
+  <script src="js/catalog-v3-client.js"></script>
+  <script src="js/branch-fulfilment-v3.js"></script>
+  <script src="js/catalog-v3-view.js"></script>
+  <script src="js/catalog-v3-deal-view.js"></script>
+  <script src="js/catalog-v3-deal-configurator.js"></script>
+  <script src="js/website-order-v3.js"></script>
+</body>
+</html>
