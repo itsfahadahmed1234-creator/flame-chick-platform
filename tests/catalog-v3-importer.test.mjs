@@ -44,7 +44,7 @@ test('draft rejects orphaned unpriced deal-only variants and standalone null pri
 
   const badStandalone = structuredClone(draft);
   badStandalone.products.find(product => product.key === 'og_crunch').variants[0].price = null;
-  assert.throws(() => importer.validatePublishedMenuDraft(badStandalone), /must have its own price/i);
+  assert.throws(() => importer.validatePublishedMenuDraft(badStandalone), /must have its own numeric price/i);
 });
 
 test('stable import keys are scoped to this published menu draft and item identity', () => {
