@@ -271,7 +271,7 @@
       var grid = element('div', 'deal-grid');
       collection.deals.forEach(function (deal) {
         count += 1;
-        var card = element('article', 'deal-card');
+        var card = element('article', 'deal-card' + (deal.available ? '' : ' is-unavailable'));
         card.appendChild(element('div', 'fc-preview-placeholder', 'Deal artwork pending'));
         card.appendChild(element('h3', 'deal-title', deal.title));
         if (deal.description) card.appendChild(element('p', 'deal-description', deal.description));
