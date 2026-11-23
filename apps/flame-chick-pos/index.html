@@ -1442,7 +1442,7 @@ function renderDeliveryDispatchAction(order){
     const name=riderNameFor((current||latest)?.rider_user_id);
     const reported=Boolean(task.return_reported_at);
     const confirmed=Boolean(task.return_confirmed_at);
-    const manager=['owner','admin','manager'].includes(role);
+    const manager=['owner','admin','manager','cashier'].includes(role);
     const confirmButton=reported&&!confirmed&&manager
       ? `<button class="issue-action" type="button" data-confirm-return="${esc(task.id)}">Confirm return &amp; cancel order</button>`
       : '';
