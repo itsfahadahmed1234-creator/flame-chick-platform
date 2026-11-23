@@ -21,6 +21,22 @@ BEGIN
   END IF;
 END
 $preflight$;
+CREATE OR REPLACE FUNCTION app_private.flame_chick_website_order_clock_now()
+RETURNS timestamptz
+LANGUAGE sql
+VOLATILE
+SET search_path=''
+AS $function$
+  SELECT COALESCE(
+    NULLIF(pg_catalog.current_setting('test.website.clock_now',true),'')::timestamptz,
+    pg_catalog.clock_timestamp()
+  )
+$function$;
+
+ALTER FUNCTION app_private.flame_chick_website_order_clock_now() OWNER TO postgres;
+REVOKE ALL ON FUNCTION app_private.flame_chick_website_order_clock_now()
+  FROM PUBLIC,anon,authenticated,service_role;
+
 CREATE OR REPLACE FUNCTION public.flame_chick_create_website_order(p_payload jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -161,7 +177,7 @@ BEGIN
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
     'flame-chick-website-phone:'||v_restaurant_id::text||':'||pg_catalog.encode(v_phone_digest,'hex'),0));
 
-  v_now:=pg_catalog.clock_timestamp();
+  v_now:=app_private.flame_chick_website_order_clock_now();
 
   IF jsonb_typeof(p_payload->'catalog_version') IS DISTINCT FROM 'number'
      OR COALESCE(p_payload->>'catalog_version','') !~ '^[1-9][0-9]*$'
