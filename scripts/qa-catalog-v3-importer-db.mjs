@@ -245,8 +245,35 @@ verifyMenuSpecificMappings();
 assert.ok(readCount>0);
 assert.ok(writeCount>0);
 
-const snapshotText=psql(`SELECT app_private.flame_chick_catalog_compile_snapshot('${RESTAURANT_ID}'::uuid,pg_catalog.clock_timestamp())::text;`);
-const snapshot=JSON.parse(snapshotText);
+// The unpublished compiler returns the deterministic catalog payload. The
+// production publisher normally adds immutable publication metadata after
+// computing the checksum. Build that response envelope in memory only for the
+// V3 contract test; do not insert a publication or move the current pointer.
+const compiledEnvelope=psqlJson(`
+WITH compiled AS MATERIALIZED (
+  SELECT app_private.flame_chick_catalog_compile_snapshot(
+    '${RESTAURANT_ID}'::uuid,pg_catalog.transaction_timestamp()
+  ) AS snapshot
+)
+SELECT pg_catalog.jsonb_build_object(
+  'snapshot',compiled.snapshot,
+  'snapshotSha256',pg_catalog.encode(
+    extensions.digest(pg_catalog.convert_to(compiled.snapshot::text,'UTF8'),'sha256'),'hex'
+  ),
+  'draftRevision',(
+    SELECT revision FROM public.catalog_draft_state
+    WHERE restaurant_id='${RESTAURANT_ID}'
+  )
+)::text
+FROM compiled;
+`);
+const snapshot=compiledEnvelope.snapshot;
+snapshot.snapshotSha256=compiledEnvelope.snapshotSha256;
+snapshot.versionId='sha256:'+compiledEnvelope.snapshotSha256;
+snapshot.publicationId=randomUUID(); // QA-only envelope; no publication row is created.
+snapshot.publicationNumber=1;        // QA-only envelope; no publication sequence is consumed.
+snapshot.draftRevision=Number(compiledEnvelope.draftRevision);
+snapshot.pricingEngineVersion='flame-chick-pricing-v1';
 const snapshotResult=contract.validateSnapshot(snapshot);
 assert.equal(snapshotResult.ok,true,JSON.stringify(snapshotResult.errors,null,2));
 assert.equal(snapshot.products.length,25);
