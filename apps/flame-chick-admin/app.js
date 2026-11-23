@@ -145,7 +145,7 @@ async function catalogV3Request(action,payload,isMutation){
  const response=await staffApi("POST",null,body);
  const result=response&&response.result;
  if(!result||result.ok===false)throw Error(result&&result.error&&result.error.message||"Catalog V3 request failed.");
- if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=result.draft_revision;
+ if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=Math.max(S.catalogV3Revision||0,result.draft_revision);
  return result;
 }
 async function openCatalogV3(){
