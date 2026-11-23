@@ -1,3 +1,41 @@
+# CURRENT CHECKPOINT — 2026-11-23 — Step 3 Cashier payment collection V1 PASSED
+
+**Active branch:** `work/production-source-audit`  
+**Payment migration:** `20261123173000_flame_chick_payment_collection_v1.sql`  
+**Disposable Supabase + six-race QA:** [run 45204886242 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45204886242)  
+**Payment concurrency logs:** [run 45204718345 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45204718345)  
+**POS/Rider static:** [run 45205077273 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45205077273)  
+**Edge Function contracts/type check:** [run 45204896684 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45204896684)  
+**Admin static:** [run 45204904608 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45204904608)
+
+## Step 3 complete — staff payment collection and completion
+
+- Added a service-role-only, row-locked `flame_chick_collect_order_payment(jsonb)` command and an authenticated `collect_payment` Order Edge route. Auth actor is server-derived and branch-scoped role checks are applied in both Edge and database.
+- POS shows paid/due amounts and a Cashier payment collection modal on Delivered orders. It refreshes authoritative balance before opening and retains a request ID for safe retry after uncertain network results.
+- Partial collection records a payment ledger row, keeps order status Delivered with a due balance and leaves completion/collection timestamps unset.
+- Full settlement in the same DB transaction records the last payment, sets payment status paid, status completed, and sets `collected_at` + `completed_at`.
+- The command rejects Rider/unauthorized staff, orders not yet Delivered, returned orders, invalid financial status, unsupported methods, amount precision beyond two decimals, overpayment and request-ID reuse with changed facts.
+- Payment method summary becomes `mixed` when a different method is used on a later collection.
+- Rider delivery and physical return remain separate from payment collection/refund.
+
+## Concurrency evidence
+
+The disposable shell harness proves six actual concurrent Postgres-session races:
+- Four delivery offer accept/decline/expiry races, including `SKIP LOCKED`.
+- Concurrent identical Cashier request retries: exactly one payment row and the second call returns the original payment.
+- Concurrent different collection requests whose combined amount exceeds the balance: order lock serializes them and the second is rejected. The CI log ends with **“all 4 delivery races and 2 payment races produced coherent terminal states and matching ledger/audit records.”**
+
+See the complete [Cashier payment collection handoff](docs/handoffs/2026-11-23-cashier-payment-collection-v1.md) for schema, behavior, tests and boundaries.
+
+## Deployment and release boundary
+
+The POS preview deployment workflow was skipped ([run 45204904731](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45204904731)). All changes are source-tested, not deployed. No target Supabase Production operational migration/write, payment write, Edge deployment, Realtime activation, checkout activation or catalog publication occurred. Flame Chick remains a pre-launch build; GST remains deferred.
+
+## Next project stage
+
+Proceed to customer website/order checkout integration against the published catalogue and tested server-side Order API. Keep prices, delivery fee, rate limiting and idempotency server-authoritative. Payment gateway/online settlement and refunds are separate future designs and must not be invented or activated as part of this website step.
+---
+
 # CURRENT CHECKPOINT — 2026-11-23 — Step 2 POS/Rider delivery integration source checks PASSED
 
 **Active branch:** `work/production-source-audit`  
