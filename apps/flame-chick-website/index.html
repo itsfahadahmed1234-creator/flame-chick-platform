@@ -330,6 +330,7 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
         <a href="#menu" data-act="go" data-target="#menu">Menu</a>
         <a href="#anatomy" data-act="go" data-target="#anatomy">OG Crunch</a>
         <a href="#how" data-act="go" data-target="#how">How to order</a>
+        <a href="order-online-v3.html" class="nav-order-online">Order Online</a>
       </nav>
       <button class="btn btn-cart" id="headCart" type="button" data-act="open-cart" aria-label="Open your order">
         <svg class="ic" aria-hidden="true"><use href="#i-bag"/></svg><span>Order</span><b class="badge" id="badge">0</b>
@@ -345,7 +346,7 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
           <h1><span>Crispy.</span><span class="hot">Juicy.</span><span>Addictive.</span></h1>
           <p class="lead">Big flavour. Fresh crunch.</p>
           <div class="cta">
-            <button class="btn btn-gold" type="button" data-act="go" data-target="#menu">Explore menu</button>
+            <a class="btn btn-gold" href="order-online-v3.html">Order Online</a>
           </div>
         </div>
         <div class="stage" id="heroStage">
@@ -1304,6 +1305,10 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
 
   $('#orderForm').addEventListener('submit', async function (e) {
     e.preventDefault();
+    // Legacy V2 cart payloads are no longer accepted by the order API. Move
+    // any old/dormant form submit to the V3 validated ordering page.
+    window.location.assign('order-online-v3.html');
+    return;
     if (orderSending) return;
 
     var c = readForm();
@@ -1453,18 +1458,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
       case 'details': openProductModal(id); break;
       case 'close-product': closeProductModal(); break;
       case 'modal-add':
-        if (!BY_ID[id] || BY_ID[id].liveAvailable !== true) {
-          toast('This item is currently unavailable.');
-          break;
-        }
-        setQty(id, (cart[id] || 0) + 1);
-        fly(b);
-        closeProductModal();
-        toast('Added ' + BY_ID[id].name);
-        break;
       case 'add':
-        setQty(id, (cart[id] || 0) + 1); fly(b); toast('Added ' + BY_ID[id].name);
-        if (ctx) refocus(ctx, id, 'inc');
+      case 'open-cart':
+        window.location.assign('order-online-v3.html');
         break;
       case 'inc': setQty(id, (cart[id] || 0) + 1); if (ctx) refocus(ctx, id, 'inc'); break;
       case 'dec':
@@ -1472,7 +1468,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
         if (ctx) refocus(ctx, id, cart[id] ? 'dec' : 'add');
         break;
       case 'remove': setQty(id, 0); refocus('line', id, 'x'); break;
-      case 'open-cart': openCart(); break;
+      case 'open-cart': window.location.assign('order-online-v3.html'); break;
       case 'close-cart': closeCart(); break;
       case 'close-cart-go': closeCart(); goTo(b.dataset.target); break;
       case 'clear-cart':
