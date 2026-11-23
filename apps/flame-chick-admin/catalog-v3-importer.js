@@ -161,7 +161,7 @@
       variants
     };
   }
-  function existingComponentGroups(detail,components,variantIds){
+  function existingComponentGroups(detail,components){
     if(!Array.isArray(detail.component_groups)||detail.component_groups.length>components.length)fail('Existing deal has extra component groups. Stop for manual review.');
     let needsWrite=detail.component_groups.length!==components.length;
     const groups=components.map((component,index)=>{
@@ -171,7 +171,7 @@
       if(doc&&(!group||group.name_en!==component.displayName))fail('Existing deal component order/name differs from the approved draft. Stop for manual review.');
       if(doc&&(!Array.isArray(options)||options.length>1))fail('Existing deal component has multiple options. Stop for manual review.');
       const option=doc&&options[0]||null;
-      const expectedVariantId=variantIds.get(component.productKey+':'+component.variantKey);
+      const expectedVariantId=component.product_variant_id;
       if(!expectedVariantId)fail('A deal component variant could not be resolved.');
       if(option&&option.product_variant_id!==expectedVariantId)fail('Existing deal component points to a different product variant. Stop for manual review.');
       const quantity=component.quantity;
@@ -409,7 +409,7 @@
         quantity:component.quantity
       }));
       if(componentRefs.some(item=>!item.product_variant_id))fail('A deal component could not resolve to a saved product variant.');
-      const componentState=existingComponentGroups(detail,componentRefs,variantIds);
+      const componentState=existingComponentGroups(detail,componentRefs);
       if(detail.deal.is_active===true){
         verifyDealState(detail,deal,componentRefs,scheduleId,true);
         completed++;
