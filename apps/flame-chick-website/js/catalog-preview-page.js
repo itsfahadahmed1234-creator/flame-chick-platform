@@ -19,6 +19,9 @@
   var configResult = byId('deal-config-result');
   var reloadButton = byId('reload-catalog');
   var closeConfigButton = byId('close-deal-config');
+  var productDialog = byId('product-detail-dialog');
+  var productDialogContent = byId('product-detail-content');
+  var closeProductButton = byId('close-product-detail');
 
   var app = null;
   var currentPreviewId = null;
@@ -68,18 +71,28 @@
     return null;
   }
 
-  function buildProductCard(product, currency) {
-    var card = element('article', 'fc-menu-product');
-    card.setAttribute('data-product-id', product.id);
-    card.appendChild(element('div', 'fc-preview-placeholder', 'Catalog image pending'));
-    card.appendChild(element('h3', 'fc-menu-product-name', product.name));
-    if (product.description) card.appendChild(element('p', 'fc-menu-product-description', product.description));
-    if (product.nameUr) card.appendChild(element('p', 'fc-preview-status', product.nameUr));
+  function closeProductDetail() {
+    if (productDialog && productDialog.open) productDialog.close();
+    if (productDialogContent) productDialogContent.replaceChildren();
+  }
 
-    var variantLabel = element('label', 'fc-menu-variant-label', 'Product option');
+  function openProductDetail(product, currency) {
+    if (!productDialog || typeof productDialog.showModal !== 'function' || !productDialogContent) return;
+    productDialogContent.replaceChildren();
+    productDialog.setAttribute('aria-labelledby', 'product-detail-heading');
+
+    var art = element('div', 'fc-preview-placeholder product-detail-art', 'Catalog image pending');
+    var title = element('h2', 'product-detail-title', product.name);
+    title.id = 'product-detail-heading';
+    productDialogContent.appendChild(art);
+    productDialogContent.appendChild(title);
+    if (product.description) productDialogContent.appendChild(element('p', 'product-detail-description', product.description));
+    if (product.nameUr) productDialogContent.appendChild(element('p', 'product-detail-name-ur', product.nameUr));
+
+    var variantLabel = element('label', 'fc-menu-variant-label product-detail-variant-label',
+      product.variants.length > 1 ? 'Choose an option' : 'Published option');
     var variantSelect = element('select', 'fc-menu-variant-select');
-    variantSelect.id = 'fc-preview-variant-' + product.id;
-    variantSelect.name = 'product-variant-' + product.id;
+    variantSelect.name = 'product-detail-variant-' + product.id;
     variantSelect.setAttribute('aria-label', 'Choose an option for ' + product.name);
     if (product.variants.length > 1) {
       var placeholderOption = element('option', '', 'Choose an option');
@@ -92,14 +105,17 @@
       variantSelect.appendChild(option);
     });
     if (product.variants.length === 1) variantSelect.value = product.variants[0].id;
+    else variantSelect.selectedIndex = 0;
     variantLabel.appendChild(variantSelect);
-    card.appendChild(variantLabel);
+    productDialogContent.appendChild(variantLabel);
 
-    var priceLine = element('p', 'fc-preview-price');
+    var priceLine = element('p', 'fc-preview-price product-detail-price');
     var modifierTarget = element('div', 'fc-preview-product-modifiers');
-    var validateButton = element('button', 'button button-secondary fc-preview-validate', 'Validate preview choices');
+    var validateButton = element('button', 'button button-secondary fc-preview-validate product-detail-validate',
+      'Validate preview choices');
     validateButton.type = 'button';
-    var status = element('p', 'fc-preview-status', 'Choose the product option to inspect its customization choices.');
+    var status = element('p', 'fc-preview-status product-detail-status',
+      'Choose a product option to inspect its published price and customization choices.');
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
 
@@ -114,30 +130,26 @@
 
       if (!variant) {
         status.textContent = 'A product option must be selected before validating choices.';
-        status.className = 'fc-preview-status';
+        status.className = 'fc-preview-status product-detail-status';
         return;
       }
 
-      var activeGroups = product.modifierGroups.map(function (group) {
+      product.modifierGroups.forEach(function (group) {
         var choices = group.modifiers.map(function (modifier) {
           return { modifier: modifier, priceMinor: availableModifierPrice(modifier, variantId) };
         }).filter(function (item) { return item.priceMinor !== null; });
-        return { group: group, choices: choices };
-      });
-
-      activeGroups.forEach(function (entry) {
         var fieldset = element('fieldset', 'fc-preview-modifiers');
-        fieldset.appendChild(element('legend', '', entry.group.name +
-          (entry.group.minSelect > 0 ? ' · required' : ' · optional')));
-        if (!entry.choices.length) {
+        fieldset.appendChild(element('legend', '', group.name +
+          (group.minSelect > 0 ? ' · required' : ' · optional')));
+        if (!choices.length) {
           fieldset.appendChild(element('p', 'fc-preview-status', 'No valid price is published for this option.'));
         }
-        entry.choices.forEach(function (choice) {
+        choices.forEach(function (choice) {
           var label = element('label', 'fc-preview-modifier');
           var input = element('input');
           input.type = 'checkbox';
           input.value = choice.modifier.id;
-          input.setAttribute('data-modifier-group', entry.group.id);
+          input.setAttribute('data-modifier-group', group.id);
           input.setAttribute('data-modifier-id', choice.modifier.id);
           input.setAttribute('aria-label', choice.modifier.name + ' ' + formatMoney(choice.priceMinor, currency));
           label.appendChild(input);
@@ -148,9 +160,9 @@
       });
 
       status.textContent = product.modifierGroups.length
-        ? 'Modifier amounts are shown individually. No combined total is calculated.'
+        ? 'Customization prices are shown individually. No combined total is calculated.'
         : 'No customization groups are published for this product.';
-      status.className = 'fc-preview-status';
+      status.className = 'fc-preview-status product-detail-status';
     }
 
     variantSelect.addEventListener('change', renderModifiers);
@@ -158,14 +170,12 @@
       var variant = product.variants.find(function (item) { return item.id === variantSelect.value; });
       if (!variant) {
         status.textContent = 'Choose a valid product option.';
-        status.className = 'fc-preview-status is-invalid';
+        status.className = 'fc-preview-status is-invalid product-detail-status';
         return;
       }
       var invalidMessage = null;
       product.modifierGroups.forEach(function (group) {
-        var checks = modifierTarget.querySelectorAll(
-          'input[data-modifier-group="' + group.id + '"]'
-        );
+        var checks = modifierTarget.querySelectorAll('input[data-modifier-group="' + group.id + '"]');
         var selected = Array.prototype.filter.call(checks, function (input) { return input.checked; });
         if (!invalidMessage && selected.length < group.minSelect) {
           invalidMessage = 'Select at least ' + group.minSelect + ' option(s) for ' + group.name + '.';
@@ -175,18 +185,39 @@
       });
       if (invalidMessage) {
         status.textContent = invalidMessage;
-        status.className = 'fc-preview-status is-invalid';
+        status.className = 'fc-preview-status is-invalid product-detail-status';
       } else {
-        status.textContent = 'Preview choices are valid. Nothing was added to a cart or sent to an order service.';
-        status.className = 'fc-preview-status is-valid';
+        status.textContent = 'Product choices validated locally. No item was added to a cart, no quote was requested and no order was created.';
+        status.className = 'fc-preview-status is-valid product-detail-status';
       }
     });
 
-    card.appendChild(priceLine);
-    card.appendChild(modifierTarget);
-    card.appendChild(validateButton);
-    card.appendChild(status);
+    productDialogContent.appendChild(priceLine);
+    productDialogContent.appendChild(modifierTarget);
+    productDialogContent.appendChild(validateButton);
+    productDialogContent.appendChild(status);
     renderModifiers();
+    productDialog.showModal();
+    if (closeProductButton) closeProductButton.focus();
+  }
+
+  function buildProductCard(product, currency) {
+    var card = element('article', 'fc-menu-product');
+    card.setAttribute('data-product-id', product.id);
+    card.appendChild(element('div', 'fc-preview-placeholder', 'Catalog image pending'));
+    card.appendChild(element('h3', 'fc-menu-product-name', product.name));
+    if (product.description) card.appendChild(element('p', 'fc-menu-product-description', product.description));
+    if (product.nameUr) card.appendChild(element('p', 'fc-preview-status', product.nameUr));
+    var summary = product.variants.length > 1
+      ? product.variants.length + ' published options'
+      : (product.variants.length ? product.variants[0].label + ' · ' +
+        formatMoney(product.variants[0].priceMinor, currency) : 'No published option');
+    card.appendChild(element('p', 'fc-preview-variants', summary));
+    var open = element('button', 'button button-secondary fc-menu-product-open',
+      product.variants.length > 1 ? 'View options' : 'View details');
+    open.type = 'button';
+    open.addEventListener('click', function () { openProductDetail(product, currency); });
+    card.appendChild(open);
     return card;
   }
 
@@ -311,9 +342,13 @@
       catalogSection.hidden = true;
       dealsSection.hidden = true;
       closeDealConfigurator();
+      closeProductDetail();
       return;
     }
-    if (currentPreviewId !== preview.previewId) closeDealConfigurator();
+    if (currentPreviewId !== preview.previewId) {
+      closeDealConfigurator();
+      closeProductDetail();
+    }
     currentPreviewId = preview.previewId;
     catalogSection.hidden = false;
     dealsSection.hidden = false;
@@ -465,6 +500,10 @@
       });
     });
     closeConfigButton.addEventListener('click', closeDealConfigurator);
+    if (closeProductButton) closeProductButton.addEventListener('click', closeProductDetail);
+    if (productDialog) productDialog.addEventListener('close', function () {
+      if (productDialogContent) productDialogContent.replaceChildren();
+    });
     begin();
   }
 
