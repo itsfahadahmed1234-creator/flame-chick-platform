@@ -1468,7 +1468,6 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
         if (ctx) refocus(ctx, id, cart[id] ? 'dec' : 'add');
         break;
       case 'remove': setQty(id, 0); refocus('line', id, 'x'); break;
-      case 'open-cart': window.location.assign('order-online-v3.html'); break;
       case 'close-cart': closeCart(); break;
       case 'close-cart-go': closeCart(); goTo(b.dataset.target); break;
       case 'clear-cart':
