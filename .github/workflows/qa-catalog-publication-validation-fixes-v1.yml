@@ -7,6 +7,7 @@ on:
     paths:
       - "supabase/migrations/*.sql"
       - "supabase/tests/catalog_publication_validation_fixes_v1.sql"
+      - "ops/recovery-migrations/catalog-publication-validation-restore-v1.sql"
       - ".github/workflows/qa-catalog-publication-validation-fixes-v1.yml"
       - "ops/triggers/qa-catalog-publication-validation-fixes-v1.txt"
   workflow_dispatch:
@@ -62,6 +63,7 @@ jobs:
           grep -q "018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712" "${migration}"
           grep -q "b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2" "${migration}"
           grep -q "CATALOG_VALIDATION_RESTORE_CANDIDATE_SOURCE_MISMATCH" ops/recovery-migrations/catalog-publication-validation-restore-v1.sql
+          grep -q "270133a76cb649e70190945028b87b916b9e946d63e2794550fef31ad3fec86d" ops/recovery-migrations/catalog-publication-validation-restore-v1.sql
           grep -q "CATALOG_VALIDATION_RESTORE_SOURCE_VERIFICATION_FAILED" ops/recovery-migrations/catalog-publication-validation-restore-v1.sql
           grep -q "018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712" supabase/tests/catalog_publication_validation_recovery_v1.sql
           grep -q "b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2" supabase/tests/catalog_publication_validation_recovery_v1.sql
