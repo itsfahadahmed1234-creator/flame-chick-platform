@@ -139,6 +139,11 @@ BEGIN
       'code','PAYMENT_ORDER_STATE_INVALID','message','Payment collection is available only after a delivery is marked Delivered.'));
   END IF;
 
+  IF v_order.payment_status NOT IN ('unpaid','partially_paid') THEN
+    RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
+      'code','PAYMENT_FINANCIAL_STATE_INVALID','message','This order has a financial state that cannot be settled through Cashier collection.'));
+  END IF;
+
   IF v_order.balance_due<=0 OR v_order.payment_status='paid' THEN
     RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
       'code','PAYMENT_ALREADY_SETTLED','message','This order has no outstanding balance.'));
