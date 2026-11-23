@@ -1,3 +1,37 @@
+# CURRENT CHECKPOINT — 2026-11-23 18:25 PKT — delivery expiry boundary QA added
+
+**Active branch:** `work/production-source-audit`  
+**Latest source commit:** `355a7c38c2abb9232021ac1cfcf0c12796ba3df0`  
+**Production and `main`: untouched.**
+
+## Delivery expiry work in progress
+
+- Added private helper `app_private.flame_chick_delivery_clock_now()` to the source-only delivery command migration. Its production implementation delegates to PostgreSQL `clock_timestamp()`; direct execution is revoked from PUBLIC, anon, authenticated and service_role.
+- All delivery command/sweep expiry decisions now use this private helper consistently.
+- The rollback-only delivery SQL fixture temporarily replaces the helper with a deterministic transaction-local clock and rolls the replacement back with the fixture.
+- Added exact-boundary assertions:
+  - acceptance one microsecond before the 60-second deadline succeeds;
+  - acceptance exactly at the deadline returns `OFFER_EXPIRED`, marks the offer expired, returns the task to `dispatch_pending`, and creates no current assignment;
+  - expiry does not auto-rotate; a staff member must explicitly reassign the Rider.
+- The private helper's execute privileges are included in the migration's security assertions.
+
+## CI status — NOT YET VERIFIED
+
+- Previous complete delivery lifecycle QA remains green: [run 45179371115](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45179371115), commit `28ffba173a989f5f7cd9c3e378ce24a820b13520`.
+- The source commit containing the new deterministic expiry boundary fixture is `355a7c38c2abb9232021ac1cfcf0c12796ba3df0`.
+- Its complete disposable Staff Admin / operational / delivery QA run [45182331625](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45182331625) was still in progress at handoff update time, currently on disposable Supabase startup. **Do not claim the new boundary tests pass until this run completes and the delivery fixture step is green.**
+- An earlier run on the helper-only migration commit `de635aeaf851b093c6d751de3130cd7f9f6219d3` passed, including full migration replay and the prior lifecycle fixture; it did not yet contain the boundary assertions.
+
+## Remaining work
+
+1. Verify run `45182331625`; inspect logs and fix only a demonstrated failure.
+2. Add genuine multi-session race tests for accept-vs-decline and accept-vs-expiry/sweep. The existing SQL locks task before offer and the expiry sweep uses `FOR UPDATE SKIP LOCKED`, but those facts are not a substitute for concurrent execution evidence.
+3. After expiry/race tests pass, update POS/Rider integration against the exact Rider stages **Accept offer → Picked up → Delivered** (no restaurant-arrival step), and confirm Cashier/Manager physical-return UI permissions.
+4. Continue order API and website integration only after backend tests.
+
+No Production migrations, Edge Function deployment, Vercel deployment, Realtime changes, checkout activation, catalog edits/publication or other Production writes are authorized or performed. Candidate migrations remain source-only. GST remains deferred.
+---
+
 # CURRENT CHECKPOINT — 2026-11-23 17:55 PKT — delivery command candidate and behavioral QA
 
 **Active branch:** `work/production-source-audit`  
