@@ -74,10 +74,25 @@
         return fail('CATALOG_NOT_READY', 'A verified published catalog is not available.');
       }
 
+      var selectionState = selection.getState();
       var context = selection.getContext();
       if (!context.ok) {
-        notify();
-        return context;
+        // A selected branch is sufficient for read-only menu browsing. It is
+        // not an order context; no fulfilment method means ordering stays off.
+        if (!selectionState || !selectionState.selectedBranchId || !selectionState.selectedBranch) {
+          notify();
+          return context;
+        }
+        context = {
+          ok: true,
+          schemaVersion: 3,
+          publicationId: snapshot.publicationId,
+          versionId: snapshot.versionId,
+          branchId: selectionState.selectedBranchId,
+          fulfilmentType: null,
+          databaseNow: databaseNow,
+          timezone: selectionState.selectedBranch.timezone
+        };
       }
 
       var productResult = productModule.buildMenuViewModel(snapshot, {
@@ -118,6 +133,9 @@
         versionId: context.versionId,
         branchId: context.branchId,
         fulfilmentType: context.fulfilmentType,
+        availableFulfilmentTypes: selectionState.availableFulfilmentTypes.slice(),
+        orderingEnabled: context.fulfilmentType !== null &&
+          productResult.orderingEnabled === true && dealResult.orderingEnabled === true,
         databaseNow: context.databaseNow,
         timezone: context.timezone,
         products: productResult,
@@ -135,9 +153,9 @@
       }
       var result = selection.selectBranch(branchId);
       if (!result.ok) return result;
-      clearPreview();
-      notify();
-      return { ok: true, state: getState() };
+      var built = buildCurrentPreview();
+      if (!built.ok) return built;
+      return { ok: true, state: getState(), preview: built.preview };
     }
 
     function selectFulfilment(type) {
@@ -157,7 +175,7 @@
       var renderOptions = Object.assign({}, options);
       var callerOnChange = renderOptions.onChange;
       renderOptions.onChange = function (selectionState) {
-        if (selectionState && selectionState.ready) buildCurrentPreview();
+        if (selectionState && selectionState.selectedBranchId) buildCurrentPreview();
         else {
           clearPreview();
           notify();
@@ -230,7 +248,7 @@
         loadError = null;
         clearPreview();
         var selectionState = selection.getState();
-        if (selectionState.ready) buildCurrentPreview();
+        if (selectionState.selectedBranchId) buildCurrentPreview();
         else notify();
 
         return {
