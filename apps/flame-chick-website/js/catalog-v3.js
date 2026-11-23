@@ -363,6 +363,10 @@
     s.productVariants.forEach(function (row, i) {
       checkReference(maps.products, row.productId, 'productVariants[' + i + '].productId', errors);
       checkComposite(productVariantKeys, row.productId + ':' + row.sizeKey, 'productVariants[' + i + ']', errors);
+      if (row.standaloneSellable && row.price === null) {
+        addError(errors, 'productVariants[' + i + '].price', 'STANDALONE_PRICE_REQUIRED',
+          'Standalone-sellable variants must have a price.');
+      }
       if (row.variantKind === 'pack') {
         if (row.packQuantity === null || row.packUnit === null || !row.packUnit.length) addError(errors, 'productVariants[' + i + ']', 'PACK_METADATA_INVALID', 'Pack variants require a positive count and unit.');
       } else if (row.packQuantity !== null || row.packUnit !== null) {
@@ -505,6 +509,26 @@
         addError(errors, 'dealVariantComponentOptions[' + i + '].unitSurcharge', 'SURCHARGE_INVALID', 'Only SURCHARGE treatment may carry a non-zero unit surcharge.');
       }
       checkComposite(dealVariantOptionPairs, row.dealVariantId + ':' + row.componentOptionId, 'dealVariantComponentOptions[' + i + ']', errors);
+    });
+    s.productVariants.forEach(function (variant, variantIndex) {
+      if (variant.standaloneSellable) return;
+      var hasActiveDealMapping = s.dealComponentOptions.some(function (option) {
+        if (option.productId !== variant.productId || option.productVariantId !== variant.variantId) return false;
+        return s.dealVariantComponentOptions.some(function (mapping) {
+          if (mapping.componentOptionId !== option.componentOptionId ||
+              mapping.dealId !== option.dealId ||
+              (mapping.pricingTreatment !== 'INCLUDED' && mapping.pricingTreatment !== 'SURCHARGE')) return false;
+          var deal = maps.deals[option.dealId];
+          var dealVariant = maps.dealVariants[mapping.dealVariantId];
+          var group = maps.componentGroups[option.componentGroupId];
+          return !!deal && !!dealVariant && dealVariant.dealId === deal.dealId &&
+            !!group && group.dealId === deal.dealId;
+        });
+      });
+      if (!hasActiveDealMapping) {
+        addError(errors, 'productVariants[' + variantIndex + ']', 'DEAL_ONLY_VARIANT_NOT_MAPPED',
+          'A non-standalone variant must be included by an active deal component mapping using INCLUDED or SURCHARGE treatment.');
+      }
     });
     s.dealVariants.forEach(function (dealVariant, variantIndex) {
       s.dealComponentGroups.forEach(function (group) {
