@@ -128,7 +128,7 @@
   function checkbox(name,label,checked){return '<label class="fcv3-check"><input type="checkbox" name="'+name+'" data-field="'+name+'"'+(checked?' checked':'')+'> '+label+'</label>';}
   function createWorkspace(){
     let el=null,request=null;
-    const s={loading:false,saving:false,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,components:[],detail:null,partial:null};
+    const s={loading:false,saving:false,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,components:[],detail:null,partial:null,importProgress:null};
     async function read(action,args){const r=await request(action,args||{},false);if(!isObj(r)||r.ok===false)throw Error('Catalog read failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
     async function write(action,payload){const r=await request(action,payload,true);if(!isObj(r)||r.ok===false)throw Error('Catalog save failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
     async function refresh(){
@@ -216,7 +216,10 @@
           '<button class="fcv3-button" data-action="deal-detail" data-id="'+esc(d.id)+'">Inspect</button></article>').join(''):'<p class="fcv3-empty">No deals in this collection.</p>')+'</div></section>';
       }).join('');
       el.innerHTML='<div class="fcv3-head"><div><span class="fcv3-kicker">AUTHENTICATED COMMAND API</span><h2>Catalog V3 workspace</h2><p>Draft authoring through secured Admin/Owner commands; no direct PostgREST table writes.</p></div>'+
-        '<div class="fcv3-head-actions"><span class="fcv3-revision">'+(s.revision==null?'Revision not loaded':'Draft revision '+s.revision)+'</span><button class="fcv3-button" data-action="refresh"'+(s.loading||s.saving?' disabled':'')+'>Refresh</button></div></div>'+
+        '<div class="fcv3-head-actions"><span class="fcv3-revision">'+(s.revision==null?'Revision not loaded':'Draft revision '+s.revision)+'</span>'+
+        '<button class="fcv3-button" data-action="refresh"'+(s.loading||s.saving?' disabled':'')+'>Refresh</button>'+
+        '<button class="fcv3-button fcv3-primary" data-action="import-menu"'+(s.loading||s.saving?' disabled':'')+'>Import published menu draft</button></div></div>'+
+        (s.importProgress?'<div class="fcv3-notice" role="status"><strong>'+esc(s.importProgress.phase)+'</strong> · '+esc(s.importProgress.completed)+' / '+esc(s.importProgress.total)+' · '+esc(s.importProgress.message)+'</div>':'')+
         (s.error?'<div class="fcv3-error" role="alert">'+esc(s.error)+'</div>':'')+(s.notice?'<div class="fcv3-notice" role="status">'+esc(s.notice)+'</div>':'')+
         (s.partial?'<div class="fcv3-warning">A deal record was created but remains inactive. ID: '+esc(s.partial.id)+'. Do not create a duplicate; inspect this draft before continuing.</div>':'')+
         '<div class="fcv3-summary-grid"><article><small>Menu categories</small><strong>'+s.categories.filter(c=>c.category_kind==='menu').length+'</strong></article><article><small>Products</small><strong>'+s.products.length+'</strong></article>'+
@@ -319,11 +322,51 @@
         await createDeal(s.dealDraft);
       }
     }
+    async function importPublishedMenuDraft(){
+      const importer=window.FlameChickCatalogV3Importer;
+      if(!importer||typeof importer.runPublishedMenuImport!=='function')throw Error('The secured Catalog V3 importer module is unavailable.');
+      const response=await fetch('./flame-chick-published-menu-2026-11-23.v3-draft.json',{cache:'no-store',credentials:'same-origin'});
+      if(!response.ok)throw Error('The review-only published menu draft could not be loaded.');
+      const draft=await response.json();
+      const summary=importer.validatePublishedMenuDraft(draft);
+      const message=[
+        'Import this reviewed menu into the UNPUBLISHED Flame Chick catalog draft?',
+        '',
+        summary.products+' products ('+summary.standaloneVariants+' standalone variants; '+summary.dealOnlyVariants+' deal-only variants)',
+        summary.deals+' fixed deals / '+summary.offers+' fixed-price offers',
+        summary.components+' fixed INCLUDED components',
+        '',
+        'This will write catalog draft records only. It will NOT publish the catalog, deploy an app, enable checkout, or create selectable +price upgrades.',
+        '',
+        'If interrupted, the import can be resumed using stable identities. Conflicting or unexpected existing records will stop the process for inspection.',
+        '',
+        'Proceed with draft import?'
+      ].join('\\n');
+      if(!window.confirm(message)){s.notice='Menu draft import was cancelled. No catalog writes were made.';render();return;}
+      s.saving=true;s.error=null;s.notice=null;s.importProgress={phase:'starting',completed:0,total:summary.categories+summary.products+summary.deals,message:'Starting review-only catalog draft import.'};render();
+      try{
+        const result=await importer.runPublishedMenuImport(draft,{
+          request,
+          onProgress:function(progress){s.importProgress=progress;render();}
+        });
+        s.notice='Published menu draft imported and read-back verified. It remains unpublished; no deployment or checkout change occurred.';
+        s.importProgress={phase:'complete',completed:summary.categories+summary.products+summary.deals,total:summary.categories+summary.products+summary.deals,message:'Unpublished catalog draft import finished. Publication was not performed.'};
+        s.lastImportResult=result;
+        await refresh();
+      }catch(error){
+        s.error=(error&&error.message||'Catalog draft import failed.')+' Any completed records remain in the unpublished draft. Refresh and retry only after reviewing the reported mismatch; stable import keys prevent blind duplicate creation.';
+      }finally{
+        s.saving=false;
+        render();
+      }
+    }
+
     function bind(){
       el.onclick=async event=>{
-        const b=event.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action;
+        const b=event.target.closest('[data-action]');if(!b||b.disabled||s.saving)return;const a=b.dataset.action;
         try{
           if(a==='refresh')await refresh();
+          else if(a==='import-menu')await importPublishedMenuDraft();
           else if(a==='category-add'){s.editor={type:'category'};render();}
           else if(a==='product-add')openProduct(null);
           else if(a==='product-edit')openProduct(s.products.find(p=>p.id===b.dataset.id));
