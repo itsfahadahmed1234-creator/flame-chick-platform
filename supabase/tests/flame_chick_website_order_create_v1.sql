@@ -90,6 +90,7 @@ BEGIN
   PERFORM set_config('test.website.variant_id',v_variant::text,true);
   PERFORM set_config('test.website.area_id',v_area::text,true);
   PERFORM set_config('test.website.publication_id',v_publication::text,true);
+  PERFORM set_config('test.website.clock_now',v_now::text,true);
 END
 $fixture$;
 
@@ -102,6 +103,7 @@ DECLARE
   area uuid:=current_setting('test.website.area_id')::uuid;
   publication uuid:=current_setting('test.website.publication_id')::uuid;
   digest text:=repeat('b',64);
+  base_time timestamptz:=current_setting('test.website.clock_now')::timestamptz;
   request_id uuid:=gen_random_uuid();
   changed_request_id uuid:=gen_random_uuid();
   payload jsonb;
@@ -251,8 +253,7 @@ BEGIN
   END IF;
 
   -- Atomic success-order quotas: 3/one minute, 3/ten minutes, 15/hour.
-  -- Move only synthetic committed_at values within this rollback transaction
-  -- to exercise exact rolling windows without sleeping.
+  -- Advance only the test-local DB clock. Success events remain append-only.
   SELECT count(*) INTO events_count FROM app_private.website_order_success_events
   WHERE restaurant_id=r AND phone_digest=decode(digest,'hex');
 
@@ -292,9 +293,7 @@ BEGIN
     RAISE EXCEPTION 'WEBSITE_ONE_MINUTE_QUOTA_NOT_ENFORCED: %',result;
   END IF;
 
-  UPDATE app_private.website_order_success_events
-  SET committed_at=clock_timestamp()-interval '2 minutes'
-  WHERE restaurant_id=r AND phone_digest=decode(digest,'hex');
+  PERFORM set_config('test.website.clock_now',(base_time+interval '2 minutes')::text,true);
 
   changed_request_id:=gen_random_uuid();
   result:=public.flame_chick_create_website_order(
@@ -313,11 +312,8 @@ BEGIN
   END IF;
 
   -- Events are now outside 10 minutes but within one hour. Create twelve more
-  -- successes, shifting the previous synthetic success timestamps before each
-  -- request so neither shorter rolling window masks the hourly check.
-  UPDATE app_private.website_order_success_events
-  SET committed_at=clock_timestamp()-interval '11 minutes'
-  WHERE restaurant_id=r AND phone_digest=decode(digest,'hex');
+  -- successes at this deterministic local DB time, reaching the hourly cap.
+  PERFORM set_config('test.website.clock_now',(base_time+interval '11 minutes')::text,true);
 
   FOR i IN 1..12 LOOP
     changed_request_id:=gen_random_uuid();
@@ -329,11 +325,6 @@ BEGIN
         '{delivery_fee}',to_jsonb(0),true),
       '{total}',to_jsonb(100),true)
       || jsonb_build_object('delivery','null'::jsonb);
-    IF i>1 THEN
-      UPDATE app_private.website_order_success_events
-      SET committed_at=clock_timestamp()-interval '11 minutes'
-      WHERE restaurant_id=r AND phone_digest=decode(digest,'hex');
-    END IF;
     result:=public.flame_chick_create_website_order(payload);
     IF result->>'ok'<>'true' THEN
       RAISE EXCEPTION 'WEBSITE_HOURLY_QUOTA_FIXTURE_ORDER_%_FAILED: %',i,result;
@@ -343,7 +334,7 @@ BEGIN
   -- Fifteenth success committed: the sixteenth is rejected by the hourly cap.
   SELECT count(*) INTO events_count FROM app_private.website_order_success_events
   WHERE restaurant_id=r AND phone_digest=decode(digest,'hex')
-    AND committed_at>=clock_timestamp()-interval '1 hour';
+    AND committed_at>=current_setting('test.website.clock_now')::timestamptz-interval '1 hour';
   IF events_count<>15 THEN
     RAISE EXCEPTION 'WEBSITE_HOURLY_QUOTA_EXPECTED_FIFTEEN_EVENTS: %',events_count;
   END IF;
