@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#941a20">
+  <title>Flame Chick — Catalog Preview</title>
+  <meta name="description" content="Private non-ordering preview of the Flame Chick published catalog.">
+  <link rel="icon" href="assets/flame-chick-logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/catalog-preview.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Flame Chick main website">
+      <img src="assets/flame-chick-logo.svg" alt="Flame Chick" width="210" height="50">
+    </a>
+    <span class="preview-label">Private catalog preview</span>
+  </header>
+
+  <main class="page-shell">
+    <section class="preview-intro" aria-labelledby="page-title">
+      <p class="eyebrow">Catalog V3 · Read-only display</p>
+      <h1 id="page-title">Menu preview</h1>
+      <p class="intro-copy">This page reads the currently published catalog. It is separate from the customer storefront and cannot accept or submit orders.</p>
+      <div class="safety-notice" role="note">
+        <strong>Preview only</strong>
+        <span>No cart, checkout, payment, order submission or customer data collection is enabled here.</span>
+      </div>
+    </section>
+
+    <section class="load-panel" aria-labelledby="connection-heading">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Live catalog connection</p>
+          <h2 id="connection-heading">Catalog status</h2>
+        </div>
+        <span id="connection-pill" class="status-pill status-pending">Not loaded</span>
+      </div>
+      <p id="connection-message" class="status-message" role="status" aria-live="polite">Checking the published catalog is not started yet.</p>
+      <div id="publication-meta" class="publication-meta" hidden></div>
+      <button id="reload-catalog" class="button button-secondary" type="button">Reload catalog</button>
+    </section>
+
+    <section id="context-section" class="context-panel" aria-labelledby="context-heading" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Ordering context</p>
+          <h2 id="context-heading">Branch and fulfilment</h2>
+        </div>
+        <span class="context-hint">Required to evaluate availability</span>
+      </div>
+      <div id="branch-selector" class="branch-selector"></div>
+    </section>
+
+    <section id="catalog-section" class="catalog-section" aria-labelledby="products-heading" hidden>
+      <div class="catalog-toolbar">
+        <div>
+          <p class="eyebrow">Published menu data</p>
+          <h2 id="products-heading">Products</h2>
+        </div>
+        <p id="catalog-context-label" class="catalog-context"></p>
+      </div>
+      <div id="product-category-nav" class="category-nav" aria-label="Product categories"></div>
+      <div id="product-catalog" class="product-catalog"></div>
+      <div id="products-empty" class="empty-state" hidden>No available products are published for this branch and fulfilment method.</div>
+    </section>
+
+    <section id="deals-section" class="deals-section" aria-labelledby="deals-heading" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Published offers</p>
+          <h2 id="deals-heading">Deals</h2>
+        </div>
+        <p class="section-subcopy">Schedule and branch availability are evaluated from the published catalog.</p>
+      </div>
+      <div id="deal-catalog" class="deal-catalog"></div>
+      <div id="deals-empty" class="empty-state" hidden>No deals are currently available for this branch and fulfilment method.</div>
+    </section>
+
+    <section id="deal-config-section" class="config-section" aria-labelledby="deal-config-heading" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Local selection preview</p>
+          <h2 id="deal-config-heading">Configure deal choices</h2>
+        </div>
+        <button id="close-deal-config" class="text-button" type="button">Close</button>
+      </div>
+      <p class="config-explainer">Selections are checked in this browser only. No quote is requested and no order is created.</p>
+      <div id="deal-configurator"></div>
+      <p id="deal-config-result" class="validation-result" role="status" aria-live="polite" hidden></p>
+    </section>
+
+    <footer class="page-footer">
+      <span>Flame Chick · Internal catalog preview</span>
+      <span>Read-only · No ordering functions</span>
+    </footer>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/catalog-v3.js"></script>
+  <script src="js/catalog-v3-client.js"></script>
+  <script src="js/branch-fulfilment-v3.js"></script>
+  <script src="js/catalog-v3-view.js"></script>
+  <script src="js/catalog-v3-deal-view.js"></script>
+  <script src="js/catalog-v3-deal-configurator.js"></script>
+  <script src="js/catalog-v3-preview.js"></script>
+  <script src="js/catalog-preview-page.js"></script>
+</body>
+</html>
