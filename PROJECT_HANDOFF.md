@@ -3303,8 +3303,9 @@ All Admin action and database integration checks above target disposable local S
 The POS and Rider apps are existing substantial applications; work is focused on API connections and targeted touch-ups, not replacement. Source on `work/production-source-audit` now routes POS/Rider role and operational reads through authenticated Edge Functions, uses production `user_roles.role_key`, scopes dispatch by server-resolved branch, and rejects ambiguous Rider multi-branch access. Direct browser reads of private role, order, delivery and rider tables were removed from the affected POS/Rider paths.
 
 Latest static verification:
-- POS/Rider Static Checks #11 passed.
-- Admin Static Checks #75 passed.
-- Edge Function Static Checks #35 passed.
+- POS/Rider Static Checks #14 passed, including authenticated API-only data access and explicit delivery-selection payload checks.
+- Website Static Checks #142 passed, including explicit delivery-selection and server-side fee trust checks.
+- Admin Static Checks #81 passed.
+- Edge Function Static Checks #39 passed.
 
 The detailed checkpoint and remaining release gates are in `docs/handoffs/2026-11-23-two-hour-release-readiness.md`. Full Production deployment remains NO-GO: the live Production DB has no order/delivery/payment/rider operational tables or RPCs; catalog counts and publications are zero; only Staff Admin Edge Function v1 is deployed; ordering flags are disabled; Storage and Realtime are empty; preview credentials/gates remain unconfigured. No Production writes or deployments were made.
