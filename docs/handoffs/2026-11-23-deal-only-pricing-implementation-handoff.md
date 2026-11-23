@@ -103,3 +103,48 @@ All currently published deal components remain fixed and use `INCLUDED`; each de
 No Production SQL or migration was applied. No catalog products, variants, deals, or publication data were inserted. No catalog was published. No Edge Function, website or Vercel deployment occurred. Checkout remains disabled. Do not apply this migration or import the menu without a separate explicit review and approval.
 
 GST remains deferred. Current menu deal choices remain fixed. Future selectable product/flavour/surcharge functionality is not enabled now.
+## Published menu V3 review draft — validated 2026-11-23
+
+A source-only, review-only catalog draft and a synthetic snapshot test suite have been added. **No Production rows have been written.**
+
+### Draft file
+
+ops/catalog-drafts/flame-chick-published-menu-2026-11-23.v3-draft.json
+
+- Status: REVIEW_ONLY_NOT_IMPORTED
+- 8 categories (7 menu categories + Deals).
+- 25 product records: 20 standalone menu products + 5 deal-only products.
+- 28 product variants: 23 standalone variants + 5 deal-only variants.
+- 6 fixed-price offers across 6 deal records.
+- 18 fixed deal component groups/options/mappings.
+- All current deal component mappings are INCLUDED, surcharge = 0.
+- The draft uses stable natural keys, not generated database UUIDs. No product or deal is seeded from this file automatically.
+
+Deal-only products: Burger, Classic Nuggets (6 pcs), Fries, Juice, 1L Drink. Their variants are standaloneSellable=false and price=null; each is linked into the appropriate fixed deal. Generic Burger never maps to OG Crunch. Little Crunch maps to the named OG Crunch standalone product.
+
+### Flame Hour model detail
+
+The two printed Flame Hour packages are represented as two separate deal entries under the same deals collection and the same daily Asia/Karachi 15:00–17:00 schedule:
+- Flame Hour — The Injector + Cold Drink, Rs. 699.
+- Flame Hour — Quarter Broast + Burger + Cold Drink, Rs. 1,599.
+
+Reason: V3 component groups belong to a deal record, not to an individual deal variant. Putting both packages as variants of one deal record would make each variant have to satisfy both package component groups. Separate deal records keep each fixed composition independently valid and orderable, with the same schedule. This creates two clearly named offer cards; it does not introduce a selector.
+
+### Synthetic full-menu validation
+
+- tests/fixtures/flame-chick-published-menu-v3-fixture.cjs creates a deterministic V3 snapshot from the review JSON draft without mutating the draft.
+- tests/published-menu-v3-draft.test.mjs verifies the full V3 snapshot contract, 20 visible standalone products vs five hidden deal-only products, standalone prices and variants (including The Smash pricing data), all six exact offer prices and fixed contents, Burger vs OG Crunch product identity, Flame Hour daily schedule and after-hours read-only configurator behavior.
+- CI is wired to run the new tests and include the draft/fixture in the path filter.
+
+**Passing CI:** [Flame Chick Website Static Checks run 45129861610](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45129861610), head 9b568bcf98fb7bd55eaca43e744dda142782bc4c, success. All 96 core catalog/preview checks passed, including the new end-to-end published-menu draft suite.
+
+### Current implementation boundary and next phase
+
+The pricing contract and full published-menu review draft are source-tested. The next source implementation phase is to connect the Admin panel to the secured V3 catalog command API. The current apps/flame-chick-admin/app.js still uses legacy deal_components / bundle_price REST paths and product-price-required UI; it must not be used to enter this V3 draft. Inspect the V3 command functions and role checks first, then build an Admin V3 editor that supports:
+- standalone products with required prices;
+- non-standalone deal-only products with optional NULL prices;
+- fixed deal variants with fixed component groups/mappings using INCLUDED only for these six current offers;
+- no current selectable +price or product/flavour upgrade options.
+
+After the Admin V3 authoring UI and draft review are complete, add a source-only command/preview test for all six real offers. The Smash's required product popup remains a separate storefront UI blocker. No Production migration, catalog import, publication, Edge Function deployment, website deployment or checkout activation has been performed or authorized. GST remains deferred.
+
