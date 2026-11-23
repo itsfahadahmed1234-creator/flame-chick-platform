@@ -152,6 +152,7 @@ BEGIN
   SELECT o.* INTO v_existing
   FROM public.orders o
   WHERE o.restaurant_id=v_restaurant_id
+    AND o.branch_id=v_branch_id
     AND o.source='website'
     AND o.idempotency_key=v_idempotency_key
   LIMIT 1;
@@ -212,7 +213,8 @@ BEGIN
   WHERE b.id=v_branch_id AND b.restaurant_id=v_restaurant_id
     AND b.is_active AND b.website_ordering_enabled
     AND CASE WHEN v_fulfillment='delivery' THEN b.website_delivery_enabled
-             ELSE b.website_pickup_enabled END;
+             ELSE b.website_pickup_enabled END
+  FOR SHARE OF b;
   IF NOT FOUND THEN
     RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
       'code','BRANCH_FULFILMENT_UNAVAILABLE','message','The selected branch is not accepting this type of website order.'));
@@ -276,7 +278,8 @@ BEGIN
       SELECT da.name,da.delivery_fee INTO v_area_name,v_area_fee
       FROM public.delivery_areas da
       WHERE da.id=v_area_id AND da.restaurant_id=v_restaurant_id
-        AND da.branch_id=v_branch_id AND da.is_active;
+        AND da.branch_id=v_branch_id AND da.is_active
+      FOR SHARE OF da;
       IF NOT FOUND THEN
         RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
           'code','WEBSITE_DELIVERY_AREA_UNAVAILABLE','message','This delivery area is no longer available at the selected branch.'));
@@ -292,7 +295,8 @@ BEGIN
       END IF;
       SELECT s.not_listed_delivery_fee INTO v_area_fee
       FROM public.branch_delivery_settings s
-      WHERE s.restaurant_id=v_restaurant_id AND s.branch_id=v_branch_id;
+      WHERE s.restaurant_id=v_restaurant_id AND s.branch_id=v_branch_id
+      FOR SHARE OF s;
       IF NOT FOUND OR v_area_fee IS NULL THEN
         RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
           'code','WEBSITE_DEFAULT_DELIVERY_FEE_UNCONFIGURED','message','Not Listed delivery is not configured for this branch. Please choose a listed area.'));
