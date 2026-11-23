@@ -753,7 +753,7 @@ BEGIN
       WHERE id=v_assignment.id AND is_current;
 
       UPDATE public.orders
-      SET status='delivered',delivered_at=v_now,completed_at=v_now,
+      SET status='delivered',delivered_at=v_now,
           last_status_changed_by=v_actor_id,last_status_actor_type='rider',
           last_status_change_reason='Delivered to customer',updated_at=v_now
       WHERE id=v_order.id AND status='out_for_delivery';
@@ -785,7 +785,7 @@ BEGIN
         pg_catalog.jsonb_build_object('order_id',v_order.id),v_request_id,v_now
       );
 
-      RETURN pg_catalog.jsonb_build_object('ok',true,'task_status','delivered','order_status','delivered','completed_at',v_now);
+      RETURN pg_catalog.jsonb_build_object('ok',true,'task_status','delivered','order_status','delivered');
     END IF;
 
     IF v_action='reject' THEN
