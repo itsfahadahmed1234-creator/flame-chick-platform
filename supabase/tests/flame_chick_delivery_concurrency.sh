@@ -175,4 +175,70 @@ assert_json "$TMP_DIR/race4_expiry.log" '.ok==true and .expired_count==1' "race4
 assert_json "$TMP_DIR/race4_accept.log" '.ok==false and .error.code=="DELIVERY_OFFER_ALREADY_RESOLVED"' "race4 accept loses cleanly after expiry"
 assert_database_state "$TASK4" "$RIDER4" expired dispatch_pending 0 available 0 0 1 "expiry over accept"
 
-echo "[race verification] all 4 races produced one coherent terminal state, at most one current assignment, and matching audit events"
+
+assert_payment_state() {
+  local order="$1" expected_status="$2" expected_payment="$3"
+  local expected_paid="$4" expected_due="$5" expected_count="$6" expected_history="$7" label="$8" json
+  json="$(query "
+    SELECT pg_catalog.jsonb_build_object(
+      'order_status',o.status,
+      'payment_status',o.payment_status,
+      'paid_amount',o.paid_amount,
+      'balance_due',o.balance_due,
+      'completed_at_is_null',o.completed_at IS NULL,
+      'payment_count',(SELECT count(*) FROM public.payments p WHERE p.order_id=o.id AND p.entry_type='collection'),
+      'payment_total',(SELECT COALESCE(sum(p.amount),0) FROM public.payments p WHERE p.order_id=o.id AND p.entry_type='collection'),
+      'history_count',(SELECT count(*) FROM public.order_status_history h WHERE h.order_id=o.id)
+    )
+    FROM public.orders o WHERE o.id='$order'
+  ")"
+  if ! jq -e "
+    .order_status==\"$expected_status\" and
+    .payment_status==\"$expected_payment\" and
+    .paid_amount==$expected_paid and
+    .balance_due==$expected_due and
+    .completed_at_is_null==true and
+    .payment_count==$expected_count and
+    .payment_total==$expected_paid and
+    .history_count==$expected_history
+  " >/dev/null <<<"$json"; then
+    echo "Payment race database state mismatch: $label" >&2
+    echo "$json" | jq . >&2 || echo "$json" >&2
+    exit 1
+  fi
+}
+
+echo "[payment race 5/6] Concurrent identical Cashier retries create one collection"
+PAYMENT_ORDER5="b7777777-7777-4777-8777-777777777684"
+SHARED_REQUEST="c8888888-8888-4888-8888-888888888881"
+SQL_P5A="BEGIN; SELECT set_config('test.payment.race_delay','on',true); SELECT public.flame_chick_collect_order_payment(jsonb_build_object('order_id','$PAYMENT_ORDER5','actor_user_id','b7777777-7777-4777-8777-777777777673','request_id','$SHARED_REQUEST','amount',60,'payment_method','cash')); COMMIT;"
+SQL_P5B="BEGIN; SELECT public.flame_chick_collect_order_payment(jsonb_build_object('order_id','$PAYMENT_ORDER5','actor_user_id','b7777777-7777-4777-8777-777777777673','request_id','$SHARED_REQUEST','amount',60,'payment_method','cash')); COMMIT;"
+start_session payment5_first "$SQL_P5A" "$TMP_DIR/payment5_first.log"
+PID_P5A="$LAST_PID"
+wait_for_event payment5_first PgSleep "$PID_P5A"
+start_session payment5_retry "$SQL_P5B" "$TMP_DIR/payment5_retry.log"
+PID_P5B="$LAST_PID"
+wait_for_event payment5_retry Lock "$PID_P5B"
+wait "$PID_P5B"
+wait "$PID_P5A"
+assert_json "$TMP_DIR/payment5_first.log" '.ok==true and .already_processed==false and .balance_due==40' "payment race5 original collection succeeds"
+assert_json "$TMP_DIR/payment5_retry.log" '.ok==true and .already_processed==true and .balance_due==40' "payment race5 duplicate request returns original collection"
+assert_payment_state "$PAYMENT_ORDER5" delivered partially_paid 60 40 1 1 "concurrent duplicate payment request"
+
+echo "[payment race 6/6] Concurrent different Cashier submissions cannot over-collect"
+PAYMENT_ORDER6="b7777777-7777-4777-8777-777777777685"
+SQL_P6A="BEGIN; SELECT set_config('test.payment.race_delay','on',true); SELECT public.flame_chick_collect_order_payment(jsonb_build_object('order_id','$PAYMENT_ORDER6','actor_user_id','b7777777-7777-4777-8777-777777777673','request_id','c8888888-8888-4888-8888-888888888882','amount',60,'payment_method','cash')); COMMIT;"
+SQL_P6B="BEGIN; SELECT public.flame_chick_collect_order_payment(jsonb_build_object('order_id','$PAYMENT_ORDER6','actor_user_id','b7777777-7777-4777-8777-777777777673','request_id','c8888888-8888-4888-8888-888888888883','amount',60,'payment_method','card')); COMMIT;"
+start_session payment6_first "$SQL_P6A" "$TMP_DIR/payment6_first.log"
+PID_P6A="$LAST_PID"
+wait_for_event payment6_first PgSleep "$PID_P6A"
+start_session payment6_overpay "$SQL_P6B" "$TMP_DIR/payment6_overpay.log"
+PID_P6B="$LAST_PID"
+wait_for_event payment6_overpay Lock "$PID_P6B"
+wait "$PID_P6B"
+wait "$PID_P6A"
+assert_json "$TMP_DIR/payment6_first.log" '.ok==true and .already_processed==false and .balance_due==40' "payment race6 first collection succeeds"
+assert_json "$TMP_DIR/payment6_overpay.log" '.ok==false and .error.code=="PAYMENT_AMOUNT_EXCEEDS_BALANCE"' "payment race6 second stale collection is rejected"
+assert_payment_state "$PAYMENT_ORDER6" delivered partially_paid 60 40 1 1 "concurrent over-collection rejected"
+
+echo "[race verification] all 4 delivery races and 2 payment races produced coherent terminal states and matching ledger/audit records"
