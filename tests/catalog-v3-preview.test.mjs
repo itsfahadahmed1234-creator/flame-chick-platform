@@ -216,6 +216,22 @@ test('reload invalidates the previous preview before requesting the catalog agai
   assert.equal(app.getSelectionState().fulfilmentType, null);
 });
 
+test('re-renders branch and fulfilment controls after a successful catalog reload', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(
+    new URL('../apps/flame-chick-website/js/catalog-preview-page.js', import.meta.url),
+    'utf8'
+  );
+  assert.match(source, /function renderBranchSelector\(\)/);
+  const reloadStart = source.indexOf("reloadButton.addEventListener('click'");
+  const reloadEnd = source.indexOf("closeConfigButton.addEventListener", reloadStart);
+  assert.ok(reloadStart >= 0 && reloadEnd > reloadStart, 'reload handler must exist');
+  const reloadHandler = source.slice(reloadStart, reloadEnd);
+  assert.match(reloadHandler, /app\.reload\(\)\.then/);
+  assert.match(reloadHandler, /renderBranchSelector\(\)/);
+  assert.match(reloadHandler, /Re-render its controls/);
+});
+
 test('does not depend on customer device time or persistent browser storage', async () => {
   const { readFile } = await import('node:fs/promises');
   const source = await readFile(new URL('../apps/flame-chick-website/js/catalog-v3-preview.js', import.meta.url), 'utf8');
