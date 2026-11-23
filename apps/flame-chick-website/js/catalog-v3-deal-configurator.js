@@ -155,6 +155,7 @@
       var group = findGroup(variant, groupId);
       var option = findOption(group, optionId);
       if (!option) return fail('COMPONENT_OPTION_INVALID', 'This component is not allowed for the selected deal option.');
+      if (isFixedGroup(group)) return fail('COMPONENT_FIXED', 'This deal component is fixed and cannot be changed.');
       if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity > option.maxQuantity) {
         return fail('COMPONENT_QUANTITY_INVALID', 'Enter a whole-number quantity within this option limit.');
       }
