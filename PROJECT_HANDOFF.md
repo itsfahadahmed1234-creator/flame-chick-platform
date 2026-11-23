@@ -1,3 +1,27 @@
+## Latest checkpoint — V3 non-ordering catalog preview orchestrator (2026-11-23)
+
+**Status: isolated orchestration layer added and regression-tested. It is not referenced by the Website HTML and is not deployed.**
+
+- Added `apps/flame-chick-website/js/catalog-v3-preview.js`.
+- Orchestrates V3 catalog client, strict V3 validator, branch/fulfilment selector, product menu view-model and deal/schedule view-model.
+- It accepts only a successful client load with:
+  - A fully validated V3 publication;
+  - matching `versionId`;
+  - valid UTC `databaseNow` returned as response metadata and on the catalog envelope;
+  - branch selector initialized successfully.
+- It does not use the customer device clock, localStorage/sessionStorage, or HTML injection APIs.
+- The preview waits for explicit delivery/pickup selection. Where multiple branches are published, it waits for explicit branch selection. It then builds product and deal view-models against that exact branch/fulfilment context.
+- A branch change clears the current preview and resets fulfilment. A fulfilment change rebuilds product and deal view-models for the updated context. Reload clears the old preview before fetching the catalog again.
+- The exported API deliberately exposes no add-to-cart, checkout or order submission methods. Result view-models are tagged `non-ordering-preview` with `canAddToCart=false`, `canCheckout=false` and `canSubmitOrder=false`.
+- Added `tests/catalog-v3-preview.test.mjs` covering single/multi-branch boot, context selection, branch-change invalidation, fulfilment rebuild, unpublished/network/mismatched catalog state, one view-model failing, subscriptions, reload and absence of browser clock/storage/order dependencies.
+- The first two test runs caught mismatched test-fixture assumptions about the exact public API state shape and response timestamp envelope; tests were corrected while keeping strict production validation intact.
+- Latest Website Static Checks run [45097423061](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45097423061) passed on commit `6633af2f2c20fb3f36220958e18e0f3686928b1f`: **85 tests passed, 0 failed**, JavaScript syntax checks and inline Website script parsing passed.
+- Subsequent handoff update is documentation-only. The preview module and its tests are still unreferenced by `index.html`; the prior hidden-menu safety gate is unchanged. No database migration was applied, Edge Function deployed, catalog published/seeded, Vercel deployment or domain change performed, and no ordering flow enabled.
+
+**Next:** build the actual non-ordering product/deal preview renderer on top of this orchestrator, keeping it as a separate gated preview page/entry rather than altering the legacy storefront page. The preview should present product variants and deal choices while keeping all add/order controls absent. Only after visual and interaction checks pass should an explicit, separate decision be made about connecting the live Website. Checkout remains closed until trusted server quote/order APIs and complete end-to-end checks exist.
+
+---
+
 ## Latest checkpoint — trusted database time and branch/fulfilment selector (2026-11-22)
 
 **Status: isolated V3 branch/fulfilment selector and database-time transport contract implemented; Website Static Checks passed. Candidate SQL migration is committed but NOT applied. No storefront integration or deployment.**
