@@ -1,6 +1,10 @@
 import "../../../apps/flame-chick-website/js/catalog-v3.js";
 import "../../../apps/flame-chick-website/js/catalog-v3-deal-view.js";
 import { calculateWebsiteOrder } from "../_shared/flame-chick-order-pricing.mjs";
+import {
+  createWebsiteOrderQuoteToken,
+  verifyWebsiteOrderQuoteToken,
+} from "../_shared/website-order-quote-token.mjs";
 
 // Flame Chick order API v1.
 // Guest website order creation plus authenticated staff POS status controls.
@@ -31,6 +35,7 @@ const SERVICE_KEY = String(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
   ""
 );
+const WEBSITE_QUOTE_SECRET = Deno.env.get("FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET") ?? "";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -262,6 +267,7 @@ async function readBranchDeliveryConfiguration(
 type WebsiteOrderQuote = {
   canonical: Record<string,unknown>;
   presentation: Record<string,unknown>;
+  databaseNow: string;
 };
 
 async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
@@ -444,7 +450,7 @@ async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
     })),
     notListedDeliveryFee
   };
-  return {ok:true,quote:{canonical,presentation}};
+  return {ok:true,quote:{canonical,presentation,databaseNow:String(snapshot.databaseNow)}};
 }
 
 
@@ -781,7 +787,23 @@ Deno.serve(async (req: Request) => {
   if(action==="quote_website_order"){
     const quote=await buildWebsiteOrderQuote(body);
     if(!quote.ok)return response(quote.body,quote.status);
-    return response({ok:true,quote:quote.quote.presentation},200);
+    const signed=await createWebsiteOrderQuoteToken({
+      canonical:quote.quote.canonical,
+      databaseNow:quote.quote.databaseNow,
+      secret:WEBSITE_QUOTE_SECRET
+    });
+    if(!signed.ok){
+      return response({ok:false,error:{
+        code:signed.code,
+        message:"A secure order quote could not be prepared. Online ordering is temporarily unavailable."
+      }},503);
+    }
+    return response({
+      ok:true,
+      quote:quote.quote.presentation,
+      quote_token:signed.token,
+      quote_expires_at:signed.expiresAt
+    },200);
   }
 
   if(action==="create_website_order"){
@@ -815,6 +837,19 @@ Deno.serve(async (req: Request) => {
 
     const quote=await buildWebsiteOrderQuote(body);
     if(!quote.ok)return response(quote.body,quote.status);
+    const quoteCheck=await verifyWebsiteOrderQuoteToken({
+      token:typeof body.quote_token==="string"?body.quote_token:"",
+      canonical:quote.quote.canonical,
+      databaseNow:quote.quote.databaseNow,
+      secret:WEBSITE_QUOTE_SECRET
+    });
+    if(!quoteCheck.ok){
+      const status=quoteCheck.code==="WEBSITE_ORDER_QUOTE_SIGNING_UNAVAILABLE"?503:409;
+      const message=quoteCheck.code==="WEBSITE_ORDER_QUOTE_EXPIRED"
+        ?"Your quote expired. Request a new verified total before placing the order."
+        :"The order details or delivery fee changed after the quote. Review a fresh verified total before placing the order.";
+      return response({ok:false,error:{code:quoteCheck.code,message}},status);
+    }
     const phoneDigest=await hmacPhoneDigest(normalizedPhone);
     if(!phoneDigest){
       return response({ok:false,error:{code:"WEBSITE_ORDER_PRIVACY_CONFIG_MISSING",message:"Online ordering is temporarily unavailable. Please try again shortly."}},503);

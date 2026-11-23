@@ -10,6 +10,8 @@ on:
       - "apps/flame-chick-website/js/catalog-v3-deal-view.js"
       - "tests/flame-chick-order-pricing.test.mjs"
       - "tests/edge-function-contract-hygiene.test.mjs"
+      - "tests/website-order-quote-token.test.mjs"
+      - "supabase/functions/_shared/website-order-quote-token.mjs"
       - ".github/workflows/ci-edge-functions.yml"
 
 permissions:
@@ -38,4 +40,4 @@ jobs:
           deno check supabase/functions/flame-chick-staff-admin/index.ts
 
       - name: Check Flame Chick RPC, catalog pricing and key contracts
-        run: node --test tests/flame-chick-order-pricing.test.mjs tests/edge-function-contract-hygiene.test.mjs
+        run: node --test tests/flame-chick-order-pricing.test.mjs tests/edge-function-contract-hygiene.test.mjs tests/website-order-quote-token.test.mjs

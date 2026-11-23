@@ -7,6 +7,8 @@ on:
     paths:
       - "apps/flame-chick-website/**"
       - "tests/website-source-hygiene.test.mjs"
+      - "tests/website-order-quote-token.test.mjs"
+      - "supabase/functions/_shared/website-order-quote-token.mjs"
       - "tests/catalog-v3-contract.test.mjs"
       - "tests/catalog-v3-client.test.mjs"
       - "tests/catalog-v3-view.test.mjs"

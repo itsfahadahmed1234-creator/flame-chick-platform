@@ -126,6 +126,17 @@ test("Customer order page uses server quote and preserves the exact checkout ID/
   assert.doesNotMatch(js,/function canEdit\(\) \{ return[^\n]*&& !\$\('order-success'\)\.hidden/);
 });
 
+test("Customer checkout sends the signed server quote and fails closed without session retry persistence", () => {
+  const js=source["js/website-order-v3.js"];
+  assert.match(js,/typeof result\.quote_token !== 'string'/);
+  assert.match(js,/state\.quoteToken = result\.quote_token/);
+  assert.match(js,/state\.checkoutBody\.quote_token = state\.quoteToken/);
+  assert.match(js,/verify a fresh secure server quote/);
+  assert.match(js,/!savePendingRequestId\(state\.checkoutRequestId\)/);
+  assert.match(js,/root\.crypto\.randomUUID/);
+  assert.doesNotMatch(js,/localStorage|indexedDB/);
+});
+
 test("Customer order context keeps Not Listed delivery fee distinct from unconfigured NULL", () => {
   const js=source["js/website-order-v3.js"];
   assert.match(js,/branch\.notListedDeliveryFee !== null/);

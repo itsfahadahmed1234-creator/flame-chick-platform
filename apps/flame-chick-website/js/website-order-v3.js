@@ -18,8 +18,11 @@
     } catch (_) { return null; }
   }
   function savePendingRequestId(value) {
-    if (!validRequestId(value)) return;
-    try { root.sessionStorage.setItem(PENDING_CHECKOUT_STORAGE_KEY, value); } catch (_) {}
+    if (!validRequestId(value)) return false;
+    try {
+      root.sessionStorage.setItem(PENDING_CHECKOUT_STORAGE_KEY, value);
+      return root.sessionStorage.getItem(PENDING_CHECKOUT_STORAGE_KEY) === value;
+    } catch (_) { return false; }
   }
   function clearPendingRequestId() {
     try { root.sessionStorage.removeItem(PENDING_CHECKOUT_STORAGE_KEY); } catch (_) {}
@@ -28,7 +31,7 @@
   var state = {
     snapshot: null, databaseNow: null, websiteContext: null,
     branchSelection: null, preview: null, cart: [],
-    quote: null, quoteBody: null, checkoutRequestId: null,
+    quote: null, quoteBody: null, quoteToken: null, checkoutRequestId: null,
     checkoutBody: null, checkoutUncertain: false,
     productDialog: null, dealConfigurator: null,
     busy: false, loaded: false
@@ -139,6 +142,7 @@
   function resetQuote(message) {
     state.quote = null;
     state.quoteBody = null;
+    state.quoteToken = null;
     if (!state.checkoutUncertain) {
       state.checkoutRequestId = null;
       state.checkoutBody = null;
@@ -543,7 +547,12 @@
       if (!result.quote || result.quote.publicationId !== state.snapshot.publicationId) {
         throw new Error('The published menu changed. Refresh and review your cart before ordering.');
       }
+      if (typeof result.quote_token !== 'string' || !result.quote_token ||
+          typeof result.quote_expires_at !== 'string' || !Number.isFinite(Date.parse(result.quote_expires_at))) {
+        throw new Error('The server did not provide a secure, time-limited quote. Please try again.');
+      }
       state.quote = result.quote;
+      state.quoteToken = result.quote_token;
       state.quoteBody = body;
       // Only a random request UUID is stored, never customer or cart details.
       state.checkoutRequestId = state.checkoutRequestId || readPendingRequestId();
@@ -558,7 +567,7 @@
       $('retry-order').hidden = true;
       status('Your server-verified total is ready. Review your details and place the order.', 'success');
     } catch (error) {
-      state.quote = null; state.quoteBody = null;
+      state.quote = null; state.quoteBody = null; state.quoteToken = null;
       status(error.message || 'Could not verify your order total.', 'error');
       $('cart-summary').hidden = true;
       $('request-quote').hidden = false;
@@ -567,14 +576,24 @@
 
   async function submitOrder(retry) {
     if (state.busy) return;
-    if (!state.quoteBody) { status('Get a verified total first.', 'error'); return; }
+    if (!state.quoteBody || !state.quoteToken) { status('Get a fresh secure server quote before placing the order.', 'error'); return; }
     if (!retry && state.checkoutUncertain) { status('Retry the same checkout request to verify whether it was received.', 'error'); return; }
-    if (!state.checkoutRequestId) state.checkoutRequestId = crypto.randomUUID();
-    savePendingRequestId(state.checkoutRequestId);
+    if (!state.checkoutRequestId) {
+      if (!root.crypto || typeof root.crypto.randomUUID !== 'function') {
+        status('This browser cannot create a secure checkout request ID. No order has been submitted.', 'error');
+        return;
+      }
+      state.checkoutRequestId = root.crypto.randomUUID();
+    }
+    if (!savePendingRequestId(state.checkoutRequestId)) {
+      status('This browser cannot preserve secure retry protection for this session. Enable session storage and try again. No order has been submitted.', 'error');
+      return;
+    }
     if (!state.checkoutBody) {
       state.checkoutBody = clone(state.quoteBody);
       state.checkoutBody.action = 'create_website_order';
       state.checkoutBody.request_id = state.checkoutRequestId;
+      state.checkoutBody.quote_token = state.quoteToken;
     }
     state.checkoutUncertain = true;
     setBusy(true);
@@ -590,6 +609,7 @@
       state.checkoutRequestId = null;
       state.quote = null;
       state.quoteBody = null;
+      state.quoteToken = null;
       state.cart = [];
       renderCart();
       $('cart-summary').hidden = true;
@@ -614,6 +634,7 @@
         state.checkoutBody = null;
         state.checkoutRequestId = null;
         state.checkoutUncertain = false;
+        state.quoteToken = null;
         $('retry-order').hidden = true;
         $('place-order').hidden = false;
         $('place-order').disabled = false;
