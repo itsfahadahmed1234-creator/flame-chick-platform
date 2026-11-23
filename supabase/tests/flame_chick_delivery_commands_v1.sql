@@ -291,8 +291,11 @@ BEGIN
     'reason','Physical handover checked by cashier','request_id',gen_random_uuid()));
   IF result->>'ok'<>'true' OR result->>'task_status'<>'returned'
      OR (SELECT status FROM public.orders WHERE id=o2)<>'returned'
+     OR (SELECT completed_at FROM public.orders WHERE id=o2) IS NOT NULL
+     OR (SELECT payment_status FROM public.orders WHERE id=o2)<>'unpaid'
+     OR (SELECT paid_amount FROM public.orders WHERE id=o2)<>0
      OR (SELECT is_current FROM public.delivery_assignments WHERE delivery_task_id=t2) THEN
-    RAISE EXCEPTION 'CASHIER_RETURN_CONFIRMATION_FAILED: %',result;
+    RAISE EXCEPTION 'CASHIER_RETURN_CONFIRMATION_FAILED_OR_FINANCIAL_STATE_CHANGED: %',result;
   END IF;
 
   result:=public.flame_chick_manage_delivery(jsonb_build_object(
