@@ -1,3 +1,7 @@
+import "../../../apps/flame-chick-website/js/catalog-v3.js";
+import "../../../apps/flame-chick-website/js/catalog-v3-deal-view.js";
+import { calculateWebsiteOrder } from "../_shared/flame-chick-order-pricing.mjs";
+
 // Flame Chick order API v1.
 // Guest website order creation plus authenticated staff POS status controls.
 // All order writes are executed through service-role-only PostgreSQL RPCs.
@@ -88,6 +92,299 @@ async function readAsService(path: string): Promise<{ ok: true; data: unknown } 
   let data: unknown;
   try { data = raw ? JSON.parse(raw) : []; } catch { data = []; }
   return res.ok ? { ok: true, data } : { ok: false, status: res.status, data };
+}
+
+
+type V3CatalogContract = {
+  validateSnapshot(snapshot: unknown): { ok: boolean; code?: string; message?: string };
+  isBranchOrderingEnabled(snapshot: unknown, branchId: string, fulfillmentType: string): boolean;
+  minorUnits(value: unknown): number | null;
+  resolveProductAvailability(snapshot: unknown, branchId: string, productId: string): boolean;
+  resolveVariantAvailability(snapshot: unknown, branchId: string, productId: string, variantId: string): boolean;
+};
+type V3DealView = {
+  buildDealViewModel(snapshot: unknown, context: Record<string, unknown>, contract: V3CatalogContract): any;
+  buildProductModifierGroups(snapshot: unknown, productId: string, variantId: string, contract: V3CatalogContract, options?: Record<string, unknown>): any[];
+  validateModifierSelections(groups: any[], selections: Record<string, string[]>): any;
+  validateDealSelections(variant: any, selections: Record<string, Array<{componentOptionId: string; quantity: number}>>): any;
+};
+const V3_RUNTIME = globalThis as unknown as {
+  FlameChickCatalogV3?: V3CatalogContract;
+  FlameChickCatalogV3DealView?: V3DealView;
+};
+
+function websiteError(code: string, message: string, status = 400) {
+  return { ok:false as const, status, body:{ok:false,error:{code,message}} };
+}
+
+function toHex(bytes: Uint8Array): string {
+  return Array.from(bytes, value => value.toString(16).padStart(2,"0")).join("");
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));
+  return toHex(new Uint8Array(digest));
+}
+
+function normalizeCustomerPhone(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  let digits = value.replace(/\D/g,"");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("0") && digits.length >= 10 && digits.length <= 12) {
+    digits = "92" + digits.slice(1);
+  } else if (digits.length === 10 && digits.startsWith("3")) {
+    digits = "92" + digits;
+  }
+  if (digits.length < 8 || digits.length > 15) return null;
+  return "+" + digits;
+}
+
+async function hmacPhoneDigest(normalizedPhone: string): Promise<string | null> {
+  const secret = Deno.env.get("FLAME_CHICK_ORDER_PHONE_HMAC_SECRET") ?? "";
+  if (secret.length < 32) return null;
+  const key = await crypto.subtle.importKey(
+    "raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]
+  );
+  const signed = await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(normalizedPhone));
+  return toHex(new Uint8Array(signed));
+}
+
+async function readPublishedV3Catalog(): Promise<
+  {ok:true;snapshot:Record<string,unknown>} |
+  {ok:false;status:number;body:Record<string,unknown>}
+> {
+  const contract = V3_RUNTIME.FlameChickCatalogV3;
+  if (!SUPABASE_URL || !SERVICE_KEY || !contract) {
+    return websiteError("CATALOG_RUNTIME_UNAVAILABLE","The current published menu is not available.",503);
+  }
+  const endpoint = new URL("/rest/v1/rpc/flame_chick_catalog_public_read",SUPABASE_URL);
+  const res = await fetch(endpoint,{
+    method:"POST",
+    headers:{
+      apikey:SERVICE_KEY,
+      Authorization:"Bearer "+SERVICE_KEY,
+      "Content-Type":"application/json",
+      Accept:"application/json"
+    },
+    body:JSON.stringify({p_restaurant_slug:"flame-chick"}),
+    cache:"no-store"
+  });
+  const raw = await res.text();
+  let data: unknown = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = null; }
+  if (!res.ok || !isObject(data)) {
+    return websiteError("CATALOG_READ_FAILED","The published menu could not be verified. Please try again.",503);
+  }
+  if (data.published !== true || !isObject(data.snapshot)) {
+    return websiteError("CATALOG_UNPUBLISHED","The Flame Chick menu is not currently published.",503);
+  }
+  if (
+    typeof data.publicationId !== "string" ||
+    !Number.isSafeInteger(data.publicationNumber) ||
+    data.schemaVersion !== 3 ||
+    typeof data.snapshotSha256 !== "string" ||
+    !/^[0-9a-f]{64}$/.test(data.snapshotSha256) ||
+    typeof data.databaseNow !== "string"
+  ) {
+    return websiteError("CATALOG_METADATA_INVALID","The published menu metadata could not be verified.",503);
+  }
+  const snapshot = {
+    ...data.snapshot,
+    versionId:"sha256:"+data.snapshotSha256,
+    publicationId:data.publicationId,
+    publicationNumber:data.publicationNumber,
+    draftRevision:data.draftRevision,
+    pricingEngineVersion:data.pricingEngineVersion,
+    snapshotSha256:data.snapshotSha256,
+    publishedAt:data.publishedAt,
+    databaseNow:data.databaseNow
+  } as Record<string,unknown>;
+  const checked = contract.validateSnapshot(snapshot);
+  if (!checked || checked.ok !== true) {
+    return websiteError("CATALOG_INVALID","The published menu failed validation. Online ordering is temporarily unavailable.",503);
+  }
+  return {ok:true,snapshot};
+}
+
+async function readBranchDeliveryConfiguration(
+  restaurantId: string,
+  branchId: string
+): Promise<{ok:true;areas:Array<Record<string,unknown>>;notListedFee:number|null}|{ok:false}> {
+  const query = new URLSearchParams();
+  query.set("select","id,name,name_ur,delivery_fee,sort_order");
+  query.set("restaurant_id","eq."+restaurantId);
+  query.set("branch_id","eq."+branchId);
+  query.set("is_active","eq.true");
+  query.set("order","sort_order.asc,name.asc");
+  query.set("limit","100");
+  const areas = await readAsService("delivery_areas?"+query.toString());
+  if (!areas.ok || !Array.isArray(areas.data)) return {ok:false};
+  const settingsQuery = new URLSearchParams();
+  settingsQuery.set("select","not_listed_delivery_fee");
+  settingsQuery.set("restaurant_id","eq."+restaurantId);
+  settingsQuery.set("branch_id","eq."+branchId);
+  settingsQuery.set("limit","1");
+  const settings = await readAsService("branch_delivery_settings?"+settingsQuery.toString());
+  if (!settings.ok || !Array.isArray(settings.data)) return {ok:false};
+  const rawFee = isObject(settings.data[0]) ? settings.data[0].not_listed_delivery_fee : null;
+  const parsedFee = rawFee === null || rawFee === undefined ? null : Number(rawFee);
+  if (parsedFee !== null && (!Number.isFinite(parsedFee) || parsedFee < 0)) return {ok:false};
+  return {ok:true,areas:areas.data.filter(isObject),notListedFee:parsedFee};
+}
+
+type WebsiteOrderQuote = {
+  canonical: Record<string,unknown>;
+  presentation: Record<string,unknown>;
+};
+
+async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
+  {ok:true;quote:WebsiteOrderQuote} |
+  {ok:false;status:number;body:Record<string,unknown>}
+> {
+  const catalog = await readPublishedV3Catalog();
+  if (!catalog.ok) return catalog;
+  const snapshot = catalog.snapshot;
+  const contract = V3_RUNTIME.FlameChickCatalogV3;
+  const dealView = V3_RUNTIME.FlameChickCatalogV3DealView;
+  if (!contract || !dealView) return websiteError("CATALOG_RUNTIME_UNAVAILABLE","The trusted menu validator is unavailable.",503);
+
+  const sourceCustomer = isObject(body.customer) ? body.customer : {};
+  const customerName = typeof sourceCustomer.name === "string" ? sourceCustomer.name.trim() : "";
+  const customerPhone = normalizeCustomerPhone(sourceCustomer.phone);
+  const customerEmail = typeof sourceCustomer.email === "string" ? sourceCustomer.email.trim().toLowerCase() : null;
+  if (!customerName || customerName.length > 160 || !customerPhone ||
+      (customerEmail && (customerEmail.length>254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(customerEmail)))) {
+    return websiteError("CUSTOMER_DETAILS_INVALID","Enter a valid customer name and phone number.");
+  }
+
+  const publicationId = typeof body.publication_id === "string" ? body.publication_id : body.publicationId;
+  const versionId = typeof body.version_id === "string" ? body.version_id : body.versionId;
+  const branchId = typeof body.branch_id === "string" ? body.branch_id : body.branchId;
+  const fulfillmentType = typeof body.fulfillment_type === "string" ? body.fulfillment_type : body.fulfilmentType;
+  const pricingRequest = {
+    schemaVersion:3,
+    publicationId,
+    versionId,
+    branchId,
+    fulfilmentType:fulfillmentType,
+    customer:{name:customerName,phone:customerPhone,email:customerEmail},
+    notes:typeof body.notes === "string" ? body.notes.trim() : null,
+    items:body.items
+  };
+  const priced = calculateWebsiteOrder(snapshot,pricingRequest,{contract,dealView,databaseNow:snapshot.databaseNow});
+  if (!isObject(priced) || priced.ok !== true || !isObject(priced.data)) {
+    const err = isObject(priced?.error) ? priced.error : {};
+    const code = String(err.code ?? "ORDER_QUOTE_INVALID");
+    const status = code === "CATALOG_PUBLICATION_CHANGED" ? 409 :
+      ["BRANCH_FULFILMENT_UNAVAILABLE","PRODUCT_UNAVAILABLE","DEAL_UNAVAILABLE","DEAL_VARIANT_UNAVAILABLE"].includes(code) ? 409 : 400;
+    return websiteError(code,String(err.message ?? "The selected menu items could not be validated."),status);
+  }
+
+  const branch = Array.isArray(snapshot.branches)
+    ? snapshot.branches.find((row: any) => row && row.branchId === branchId) as Record<string,unknown>|undefined
+    : undefined;
+  const restaurantId = typeof snapshot.restaurantId === "string" ? snapshot.restaurantId : "";
+  if (!branch || !restaurantId) return websiteError("BRANCH_NOT_FOUND","Choose a valid Flame Chick branch.",400);
+
+  const deliveryRaw = isRecord(body.delivery) ? body.delivery : null;
+  let deliveryFee = 0;
+  let delivery: Record<string,unknown>|null = null;
+  let publicAreas: Array<Record<string,unknown>> = [];
+  let notListedDeliveryFee: number|null = null;
+  if (fulfillmentType === "delivery") {
+    if (!deliveryRaw) return websiteError("DELIVERY_DETAILS_REQUIRED","Enter your delivery address and choose a delivery area.");
+    const config = await readBranchDeliveryConfiguration(restaurantId,branchId as string);
+    if (!config.ok) return websiteError("DELIVERY_CONFIGURATION_UNAVAILABLE","Delivery areas could not be loaded for this branch.",503);
+    publicAreas = config.areas;
+    notListedDeliveryFee = config.notListedFee;
+    const selectionType = String(deliveryRaw.selection_type ?? deliveryRaw.selectionType ?? "").trim();
+    const address = typeof deliveryRaw.address === "string" ? deliveryRaw.address.trim() : "";
+    const instructions = typeof deliveryRaw.instructions === "string" ? deliveryRaw.instructions.trim() : "";
+    if (address.length < 5 || address.length > 1000 || instructions.length > 500) {
+      return websiteError("DELIVERY_ADDRESS_INVALID","Enter a complete delivery address.");
+    }
+    let areaId: string|null = null;
+    let areaName: string;
+    let otherLocality: string|null = null;
+    if (selectionType === "listed_area") {
+      const candidate = typeof deliveryRaw.area_id === "string" ? deliveryRaw.area_id : deliveryRaw.areaId;
+      if (typeof candidate !== "string") return websiteError("DELIVERY_AREA_REQUIRED","Choose a delivery area from this branch.");
+      const area = publicAreas.find(row => row.id === candidate);
+      if (!area) return websiteError("DELIVERY_AREA_UNAVAILABLE","This delivery area is not currently available.",409);
+      areaId = String(area.id);
+      areaName = String(area.name);
+      deliveryFee = Number(area.delivery_fee);
+      if (!Number.isFinite(deliveryFee) || deliveryFee < 0) return websiteError("DELIVERY_FEE_INVALID","The delivery fee is not configured correctly.",503);
+    } else if (selectionType === "not_listed") {
+      otherLocality = typeof deliveryRaw.other_locality === "string" ? deliveryRaw.other_locality.trim() :
+        typeof deliveryRaw.otherLocality === "string" ? deliveryRaw.otherLocality.trim() : "";
+      if (!otherLocality || otherLocality.length>120) return websiteError("DELIVERY_LOCALITY_REQUIRED","Enter your locality for a Not Listed delivery.");
+      if (notListedDeliveryFee === null) return websiteError("DELIVERY_DEFAULT_FEE_UNCONFIGURED","Not Listed delivery is not configured. Choose a listed area.",409);
+      areaName = "Not Listed / Other";
+      deliveryFee = notListedDeliveryFee;
+    } else {
+      return websiteError("DELIVERY_AREA_SELECTION_INVALID","Choose a listed area or Not Listed / Other.");
+    }
+    delivery = {
+      selection_type:selectionType,
+      area_id:areaId,
+      area_name_snapshot:areaName,
+      other_locality:otherLocality,
+      address,
+      instructions:instructions || null
+    };
+  } else if (fulfillmentType === "pickup") {
+    if (deliveryRaw && Object.keys(deliveryRaw).length) {
+      return websiteError("PICKUP_DELIVERY_FIELDS_INVALID","Pickup orders cannot include delivery details.");
+    }
+  } else {
+    return websiteError("FULFILMENT_INVALID","Choose Delivery or Pickup.");
+  }
+
+  const subtotal = Number(priced.data.subtotal);
+  const total = subtotal + deliveryFee;
+  if (!Number.isFinite(subtotal)||subtotal<0||!Number.isFinite(total)||total>9999999999.99) {
+    return websiteError("ORDER_TOTAL_INVALID","The order total exceeds the supported amount.");
+  }
+  const canonical = {
+    source:"website",
+    schema_version:3,
+    publication_id:snapshot.publicationId,
+    catalog_publication_id:snapshot.publicationId,
+    catalog_version:snapshot.publicationNumber,
+    version_id:snapshot.versionId,
+    branch_id:branchId,
+    fulfillment_type:fulfillmentType,
+    currency_code:snapshot.settings?.currency_code,
+    customer_name:customerName,
+    customer_phone:customerPhone,
+    customer_email:customerEmail,
+    notes:typeof body.notes === "string" ? body.notes.trim() || null : null,
+    subtotal,
+    discount_amount:0,
+    delivery_fee:deliveryFee,
+    total,
+    delivery,
+    items:priced.data.items
+  };
+  const presentation = {
+    publicationId:snapshot.publicationId,
+    publicationNumber:snapshot.publicationNumber,
+    versionId:snapshot.versionId,
+    branch:{id:branchId,name:branch.name,branchCode:branch.branchCode},
+    fulfillmentType,
+    currencyCode:snapshot.settings?.currency_code,
+    items:priced.data.items,
+    subtotal,
+    deliveryFee,
+    total,
+    delivery,
+    deliveryAreas:publicAreas.map(row=>({
+      id:row.id,name:row.name,nameUr:row.name_ur??null,deliveryFee:Number(row.delivery_fee)
+    })),
+    notListedDeliveryFee
+  };
+  return {ok:true,quote:{canonical,presentation}};
 }
 
 type StaffContext = {
@@ -195,7 +492,7 @@ function getClientIp(req: Request): string {
   return candidate.length <= 45 && /^[0-9a-fA-F:.]+$/.test(candidate) ? candidate : "";
 }
 
-async function callRpc(name: "flame_chick_create_order" | "flame_chick_update_order_status" | "flame_chick_check_website_order_rate_limit" | "flame_chick_collect_order_payment", payload: Record<string, unknown>) {
+async function callRpc(name: "flame_chick_create_order" | "flame_chick_create_website_order" | "flame_chick_update_order_status" | "flame_chick_check_website_order_rate_limit" | "flame_chick_collect_order_payment", payload: Record<string, unknown>) {
   const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + name, {
     method: "POST",
     headers: {
