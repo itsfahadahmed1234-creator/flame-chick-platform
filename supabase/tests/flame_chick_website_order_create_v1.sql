@@ -205,7 +205,7 @@ BEGIN
   -- consuming a second success quota slot.
   result:=public.flame_chick_create_website_order(payload);
   IF result->>'ok'<>'true' OR result->>'already_processed'<>'true'
-     OR (result->>'order_id')::uuid<>order_id
+     OR (result->>'order_id')::uuid<>v_order_id
      OR (SELECT count(*) FROM public.orders WHERE restaurant_id=r)<>1
      OR (SELECT count(*) FROM app_private.website_order_success_events WHERE restaurant_id=r)<>1 THEN
     RAISE EXCEPTION 'WEBSITE_CREATE_ORDER_IDEMPOTENCY_FAILED: %',result;
