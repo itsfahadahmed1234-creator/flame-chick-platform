@@ -275,16 +275,18 @@ Deno.serve(async (req: Request) => {
     const authorization = req.headers.get("authorization") ?? "";
     const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
     const user = await verifyStaffUser(token, apiKey);
-    if (!user) return response({ ok: false, error: { code: "STAFF_AUTH_REQUIRED", message: "Sign in with an Flame Chick staff account to view incoming orders." } }, 401);
-    const canReadBoard = await verifyStaffRole(user.id, token, apiKey, ["owner", "admin", "manager", "cashier", "kitchen"]);
-    if (!canReadBoard) return response({ ok: false, error: { code: "STAFF_ROLE_REQUIRED", message: "An active Flame Chick staff role is required to view the order board." } }, 403);
+    if (!user) return response({ ok: false, error: { code: "STAFF_AUTH_REQUIRED", message: "Sign in with a Flame Chick staff account." } }, 401);
     const url = new URL(req.url);
     const view = (url.searchParams.get("view") ?? "").toLowerCase();
+    // This authenticated self-context endpoint is also used by the Rider app;
+    // it deliberately runs before POS-only order-board authorization.
     if (view === "staff_context") {
       const context = await resolveStaffContext(user.id);
       if (!context) return response({ ok: false, error: { code: "STAFF_ROLE_OR_BRANCH_REQUIRED", message: "Your account needs an active Flame Chick staff role and a single authorized branch." } }, 403);
       return response({ ok: true, staff: context });
     }
+    const canReadBoard = await verifyStaffRole(user.id, token, apiKey, ["owner", "admin", "manager", "cashier"]);
+    if (!canReadBoard) return response({ ok: false, error: { code: "STAFF_ROLE_REQUIRED", message: "An active Flame Chick Admin, Owner, Manager or Cashier role is required to view the order board." } }, 403);
     const context = await resolveStaffContext(user.id);
     if (!context || !["owner", "admin", "manager", "cashier"].includes(context.role)) {
       return response({ ok: false, error: { code: "STAFF_ROLE_REQUIRED", message: "An active Flame Chick POS role is required to view incoming orders." } }, 403);
