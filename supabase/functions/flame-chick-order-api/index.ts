@@ -329,7 +329,7 @@ async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
     return websiteError("ORDER_QUOTE_INVALID","The selected menu items could not be validated.",400);
   }
   if (priced.ok !== true) {
-    const err = isObject(priced.error) ? priced.error : {};
+    const err: Record<string,unknown> = isObject(priced.error) ? priced.error : {};
     const code = String(err.code ?? "ORDER_QUOTE_INVALID");
     const status = code === "CATALOG_PUBLICATION_CHANGED" ? 409 :
       ["BRANCH_FULFILMENT_UNAVAILABLE","PRODUCT_UNAVAILABLE","DEAL_UNAVAILABLE","DEAL_VARIANT_UNAVAILABLE"].includes(code) ? 409 : 400;
