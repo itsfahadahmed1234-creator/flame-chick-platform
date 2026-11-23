@@ -61,32 +61,6 @@ async function verifyStaffUser(token: string, apiKey: string): Promise<{ id: str
   return isObject(user) && typeof user.id === "string" ? { id: user.id } : null;
 }
 
-async function readAsUser(path: string, token: string, apiKey: string) {
-  const res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
-    method: "GET",
-    headers: { apikey: apiKey, Authorization: "Bearer " + token, Accept: "application/json" },
-    cache: "no-store",
-  });
-  const raw = await res.text();
-  let data: unknown;
-  try { data = raw ? JSON.parse(raw) : []; } catch { data = []; }
-  if (!res.ok) {
-    const err = isObject(data) ? data : {};
-    return {
-      ok: false as const,
-      status: res.status === 401 ? 401 : res.status === 403 ? 403 : 500,
-      body: {
-        ok: false,
-        error: {
-          code: res.status === 401 ? "SESSION_EXPIRED" : res.status === 403 ? "DELIVERY_ACCESS_DENIED" : "DELIVERY_READ_FAILED",
-          message: String(err.message ?? "Unable to read Flame Chick delivery data."),
-        },
-      },
-    };
-  }
-  return { ok: true as const, data };
-}
-
 async function readAsService(path: string) {
   const res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
     method: "GET",
