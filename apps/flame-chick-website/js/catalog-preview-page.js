@@ -244,6 +244,7 @@
       document: document,
       formatMoney: formatMoney,
       completeButtonLabel: 'Validate preview choices',
+      showVariantBasePrice: false,
       onComplete: function (selectionPayload) {
         // Keep the validated identifier-only payload in page memory. Do not
         // persist it, send it to an API, or translate it into an order/cart.
@@ -278,7 +279,7 @@
         card.appendChild(meta);
 
         var variantsText = deal.variants.map(function (variant) {
-          return variant.label + ' · ' + formatMoney(variant.basePriceMinor, model.currencyCode);
+          return variant.label;
         }).join('  |  ');
         if (variantsText) card.appendChild(element('p', 'fc-preview-variants', variantsText));
 
