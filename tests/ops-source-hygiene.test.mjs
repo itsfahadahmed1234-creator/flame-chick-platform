@@ -59,3 +59,17 @@ test("Rider obtains its branch-scoped profile and account roles through authenti
   assert.doesNotMatch(html, /user_roles\?select=role/);
   assert.doesNotMatch(html, /rider_profiles\?select=/);
 });
+
+
+test("POS delivery order payload sends explicit delivery selection without fee or display-name authority", () => {
+  const html=source[0].html;
+  assert.match(html,/selection_type:areaChoice==='not listed'\?'not_listed':'listed_area'/);
+  assert.match(html,/area_id:areaChoice==='not listed'\?null:areaId/);
+  assert.match(html,/address,/);
+  const start=html.indexOf('function flameChickBuildPosDeliveryOrderPayload');
+  const end=html.indexOf('async function flameChickCreatePosDeliveryOrder',start);
+  const payload=html.slice(start,end);
+  assert.doesNotMatch(payload,/area_name\s*:/);
+  assert.doesNotMatch(payload,/delivery_fee\s*:/);
+  assert.doesNotMatch(payload,/fee\s*:\s*area/);
+});
