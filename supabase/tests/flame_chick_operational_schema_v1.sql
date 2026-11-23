@@ -30,7 +30,10 @@ BEGIN
      OR has_schema_privilege('service_role','app_private','USAGE')
      OR NOT has_schema_privilege('authenticated','app_private','USAGE')
   THEN RAISE EXCEPTION 'OPERATIONAL_PRIVATE_SCHEMA_GRANTS_INVALID'; END IF;
-  IF has_table_privilege('service_role','public.orders','INSERT')
+  IF has_table_privilege('service_role','public.user_profiles','SELECT')
+     OR has_table_privilege('service_role','public.user_roles','SELECT')
+     OR has_table_privilege('service_role','public.staff_role_audit','SELECT')
+     OR has_table_privilege('service_role','public.orders','INSERT')
      OR has_table_privilege('service_role','public.orders','UPDATE')
      OR has_table_privilege('service_role','public.orders','DELETE')
      OR has_table_privilege('service_role','public.payments','INSERT')

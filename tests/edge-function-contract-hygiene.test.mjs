@@ -69,6 +69,13 @@ test("Staff Admin continues to use its dedicated command RPCs", () => {
   assert.match(sources["flame-chick-staff-admin"], /flame_chick_staff_admin_system_command/);
 });
 
+test("Order and Delivery APIs resolve staff roles through the service-only role projection RPC", () => {
+  for (const name of ["flame-chick-order-api", "flame-chick-delivery-api"]) {
+    assert.match(sources[name], /flame_chick_get_staff_role_rows/);
+    assert.doesNotMatch(sources[name], /readAsService\("user_roles\?/);
+  }
+});
+
 test("Staff Admin relies on gateway JWT validation plus database actor authorization", () => {
   const config = readFileSync("supabase/config.toml", "utf8");
   assert.match(config, /\[functions\.flame-chick-staff-admin\][\s\S]*?verify_jwt\s*=\s*true/);

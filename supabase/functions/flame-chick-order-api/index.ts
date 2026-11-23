@@ -111,18 +111,18 @@ async function resolveStaffContext(userId: string): Promise<StaffContext | null>
   const restaurant = restaurantResult.data[0];
   if (!isObject(restaurant) || typeof restaurant.id !== "string") return null;
 
-  const roleQuery = new URLSearchParams();
-  roleQuery.set("select", "role_key,branch_id,is_active");
-  roleQuery.set("user_id", "eq." + userId);
-  roleQuery.set("restaurant_id", "eq." + restaurant.id);
-  roleQuery.set("is_active", "eq.true");
-  roleQuery.set("role_key", "in.(owner,admin,manager,cashier,rider)");
-  roleQuery.set("limit", "100");
-  const roleResult = await readAsService("user_roles?" + roleQuery.toString());
-  if (!roleResult.ok || !Array.isArray(roleResult.data)) return null;
-
-  const roleRows = roleResult.data.filter((row): row is Record<string, unknown> =>
+  const roleResult = await fetch(SUPABASE_URL + "/rest/v1/rpc/flame_chick_get_staff_role_rows", {
+    method: "POST",
+    headers: { apikey: SERVICE_KEY, Authorization: "Bearer " + SERVICE_KEY, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ p_user_id: userId }),
+    cache: "no-store",
+  });
+  if (!roleResult.ok) return null;
+  const roleData: unknown = await roleResult.json().catch(() => null);
+  if (!Array.isArray(roleData)) return null;
+  const roleRows = roleData.filter((row): row is Record<string, unknown> =>
     isObject(row) &&
+    row.restaurant_id === restaurant.id &&
     typeof row.role_key === "string" &&
     ["owner", "admin", "manager", "cashier", "rider"].includes(row.role_key) &&
     row.is_active === true &&

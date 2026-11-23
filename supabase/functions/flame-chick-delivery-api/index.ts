@@ -210,17 +210,11 @@ async function resolveDispatchContext(userId: string): Promise<{
 } | { ok: false }> {
   const restaurantId = await flameChickRestaurantId();
   if (!restaurantId) return { ok:false };
-  const rolesQuery = new URLSearchParams();
-  rolesQuery.set("select", "role_key,branch_id,is_active");
-  rolesQuery.set("user_id", "eq." + userId);
-  rolesQuery.set("restaurant_id", "eq." + restaurantId);
-  rolesQuery.set("is_active", "eq.true");
-  rolesQuery.set("role_key", "in.(owner,admin,manager,cashier)");
-  rolesQuery.set("limit", "100");
-  const roleResult = await readAsService("user_roles?" + rolesQuery.toString());
+  const roleResult = await callServiceRpc("flame_chick_get_staff_role_rows", { p_user_id:userId });
   if (!roleResult.ok || !Array.isArray(roleResult.data)) return { ok:false };
   const roleRows = roleResult.data.filter((row): row is Record<string, unknown> =>
-    isObject(row) && ["owner","admin","manager","cashier"].includes(String(row.role_key)) &&
+    isObject(row) && row.restaurant_id === restaurantId &&
+    ["owner","admin","manager","cashier"].includes(String(row.role_key)) &&
     row.is_active === true && (row.branch_id === null || typeof row.branch_id === "string")
   );
   if (!roleRows.length) return { ok:false };
@@ -256,16 +250,10 @@ async function resolveDispatchContext(userId: string): Promise<{
 async function isActiveRider(userId: string, token: string, apiKey: string) {
   const restaurantId = await flameChickRestaurantId();
   if (!restaurantId) return { ok:false as const, status:503, body:{ok:false,error:{code:"RESTAURANT_CONTEXT_UNAVAILABLE",message:"Flame Chick restaurant context is unavailable."}}};
-  const roleQuery = new URLSearchParams();
-  roleQuery.set("select", "role_key,branch_id,is_active");
-  roleQuery.set("user_id", "eq." + userId);
-  roleQuery.set("restaurant_id", "eq." + restaurantId);
-  roleQuery.set("role_key", "eq.rider");
-  roleQuery.set("is_active", "eq.true");
-  const roleResult = await readAsService("user_roles?" + roleQuery.toString());
-  if (!roleResult.ok) return { ok:false as const, status:roleResult.status, body:roleResult.body };
+  const roleResult = await callServiceRpc("flame_chick_get_staff_role_rows", { p_user_id:userId });
+  if (!roleResult.ok) return { ok:false as const, status:roleResult.status, body:{ok:false,error:{code:"RIDER_ROLE_LOOKUP_FAILED",message:"Could not verify your active Rider role."}} };
   const roles = Array.isArray(roleResult.data) ? roleResult.data : [];
-  const riderRoles = roles.filter((row) => isObject(row) && row.role_key === "rider" && row.is_active === true && typeof row.branch_id === "string");
+  const riderRoles = roles.filter((row) => isObject(row) && row.restaurant_id === restaurantId && row.role_key === "rider" && row.is_active === true && typeof row.branch_id === "string");
   const riderBranches = [...new Set(riderRoles.map((row) => String(row.branch_id)))];
   if (!riderRoles.length) {
     return { ok:false as const, status:403, body:{ ok:false, error:{ code:"RIDER_ROLE_REQUIRED", message:"This account does not have an active Flame Chick rider role." } } };
@@ -544,39 +532,10 @@ Deno.serve(async (req: Request) => {
 
   const action = String(body.action ?? "").toLowerCase();
   if (action === "presence") {
-    const restaurantId = await flameChickRestaurantId();
-    if (!restaurantId) return response({ok:false,error:{code:"RESTAURANT_CONTEXT_UNAVAILABLE",message:"Flame Chick restaurant context is unavailable."}},503);
-    const roleQuery = new URLSearchParams();
-    roleQuery.set("select", "role_key,branch_id,is_active");
-    roleQuery.set("user_id", "eq." + user.id);
-    roleQuery.set("restaurant_id", "eq." + restaurantId);
-    roleQuery.set("role_key", "eq.rider");
-    roleQuery.set("is_active", "eq.true");
-    const rolesResult = await readAsService("user_roles?" + roleQuery.toString());
-    if (!rolesResult.ok) return response(rolesResult.body, rolesResult.status);
-    const roles = Array.isArray(rolesResult.data) ? rolesResult.data : [];
-    const riderRoles = roles.filter((row) => isObject(row) && row.role_key === "rider" && row.is_active === true && typeof row.branch_id === "string");
-    const riderBranches = [...new Set(riderRoles.map((row) => String(row.branch_id)))];
-    if (!riderRoles.length) {
-      return response({ ok:false, error:{ code:"RIDER_ROLE_REQUIRED", message:"This account does not have an active Flame Chick rider role." } },403);
-    }
-    if (riderBranches.length !== 1) {
-      return response({ ok:false, error:{ code:"RIDER_BRANCH_SELECTION_REQUIRED", message:"Your rider account is assigned to multiple branches. Ask the administrator to configure a single Rider branch before signing in." } },403);
-    }
-    const riderRole = riderRoles[0];
-    const profileQuery = new URLSearchParams();
-    profileQuery.set("select", "user_id,branch_id,is_active");
-    profileQuery.set("user_id", "eq." + user.id);
-    profileQuery.set("branch_id", "eq." + riderRole.branch_id);
-    profileQuery.set("is_active", "eq.true");
-    const profileResult = await readAsService("rider_profiles?" + profileQuery.toString());
-    if (!profileResult.ok) return response(profileResult.body, profileResult.status);
-    const profiles = Array.isArray(profileResult.data) ? profileResult.data : [];
-    if (!profiles.some((row) => isObject(row) && row.user_id === user.id && row.branch_id === riderRole.branch_id && row.is_active === true)) {
-      return response({ ok:false, error:{ code:"RIDER_PROFILE_REQUIRED", message:"Your active rider profile is missing for this branch." } },403);
-    }
+    const riderScope = await isActiveRider(user.id, token, apiKey);
+    if (!riderScope.ok) return response(riderScope.body, riderScope.status);
     const online = body.online !== false;
-    const result = await setRiderPresence(user.id, riderRole.branch_id, online, body.update_preference === true);
+    const result = await setRiderPresence(user.id, riderScope.branchId, online, body.update_preference === true);
     if (!result.ok) return response({ ok:false, error:{ code:"RIDER_PRESENCE_UPDATE_FAILED", message:result.message } },result.status);
     return response({ ok:true, online, accepting_jobs:result.accepting_jobs, availability_status:result.availability_status, last_seen_at:result.last_seen_at });
   }

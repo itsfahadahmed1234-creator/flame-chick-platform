@@ -43,5 +43,15 @@ BEGIN
  OR pg_catalog.has_table_privilege('service_role','public.user_roles','SELECT')
  OR pg_catalog.has_table_privilege('service_role','public.staff_role_audit','SELECT') THEN
   RAISE EXCEPTION 'BATCH4_DIRECT_TABLE_PRIVILEGES_LEAK'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_catalog.pg_proc p
+   JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='public' AND p.proname='flame_chick_get_staff_role_rows'
+     AND pg_catalog.pg_get_userbyid(p.proowner)='postgres'
+     AND p.prosecdef AND p.proconfig @> ARRAY['search_path=""']
+     AND pg_catalog.has_function_privilege('service_role',p.oid,'EXECUTE')
+     AND NOT pg_catalog.has_function_privilege('anon',p.oid,'EXECUTE')
+     AND NOT pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE')
+     AND NOT pg_catalog.has_function_privilege('public',p.oid,'EXECUTE')) THEN
+   RAISE EXCEPTION 'BATCH4_STAFF_ROLE_LOOKUP_RPC_GRANTS_INVALID'; END IF;
 END
 $assert$;
