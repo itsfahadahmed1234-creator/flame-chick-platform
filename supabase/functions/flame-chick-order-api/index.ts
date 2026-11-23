@@ -117,7 +117,7 @@ async function resolveStaffContext(userId: string): Promise<StaffContext | null>
   roleQuery.set("restaurant_id", "eq." + restaurant.id);
   roleQuery.set("is_active", "eq.true");
   roleQuery.set("role_key", "in.(owner,admin,manager,cashier,rider)");
-  roleQuery.set("limit", "20");
+  roleQuery.set("limit", "100");
   const roleResult = await readAsService("user_roles?" + roleQuery.toString());
   if (!roleResult.ok || !Array.isArray(roleResult.data)) return null;
 
