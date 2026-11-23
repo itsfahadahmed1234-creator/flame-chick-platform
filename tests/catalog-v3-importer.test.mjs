@@ -114,7 +114,7 @@ function detail(active) {
   const optionId = '44444444-4444-4444-8444-444444444444';
   const variantId = '55555555-5555-4555-8555-555555555555';
   return {
-    deal: { is_active: active },
+    deal: { is_active: active, is_available: true },
     variants: [{
       variant: {
         variant_key: 'BUNDLE',
