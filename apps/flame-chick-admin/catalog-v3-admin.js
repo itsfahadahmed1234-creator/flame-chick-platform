@@ -170,7 +170,7 @@
           (s.editor.type==='product'?(s.editor.product?'Edit product':'Add product'):s.editor.type==='category'?'Add category':'Create fixed deal')+'</h3></div><button class="fcv3-button fcv3-muted" data-action="editor-cancel">Close</button></div>'+
           (s.editor.type==='product'?productForm(s.editor.product):s.editor.type==='category'?categoryForm():dealForm())+'</div>':'')+
         (s.detail?'<div class="fcv3-detail"><h3>Deal inspection</h3><strong>'+esc(s.detail.deal.title)+'</strong><small>'+esc(s.detail.deal.id)+'</small>'+
-          '<div>'+s.detail.component_groups.map(g=>'<p>'+esc(g.group.name_en)+' × '+g.group.min_units+' — '+(g.options[0]?esc(g.options[0].product_name_en)+' / '+esc(g.options[0].variant_label):'No option')+'</p>').join('')+'</div>'+
+          '<div>'+s.detail.component_groups.map(g=>'<p>'+esc(g.group.name_en)+' × '+g.group.min_units+' — '+(g.options[0]?esc(g.options[0].product_name)+' / '+esc(g.options[0].variant_label):'No option')+'</p>').join('')+'</div>'+
           '<button class="fcv3-button" data-action="detail-close">Close inspection</button></div>':'');
     }
     function openProduct(p){s.editor={type:'product',product:p?JSON.parse(JSON.stringify(p)):null};s.notice=null;s.error=null;render();}
