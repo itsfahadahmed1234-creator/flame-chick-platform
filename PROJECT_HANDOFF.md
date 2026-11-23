@@ -2,6 +2,7 @@
 
 **Active branch:** `work/production-source-audit`  
 **Latest source commit:** `355a7c38c2abb9232021ac1cfcf0c12796ba3df0`  
+**Latest handoff documentation commit:** `47eae3d3de20658cd1c3e95f0e678fa0cec4c4f4`  
 **Production and `main`: untouched.**
 
 ## Delivery expiry work in progress
