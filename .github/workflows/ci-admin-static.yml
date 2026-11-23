@@ -6,8 +6,12 @@ on:
       - work/production-source-audit
     paths:
       - "apps/flame-chick-admin/**"
+      - "apps/flame-chick-pos/**"
+      - "apps/flame-chick-rider/**"
       - "supabase/config.toml"
       - "supabase/functions/flame-chick-staff-admin/**"
+      - "supabase/functions/flame-chick-order-api/**"
+      - "supabase/functions/flame-chick-delivery-api/**"
       - "supabase/migrations/20261121053647_flame_chick_staff_admin_commands.sql"
       - "supabase/migrations/20261121054852_flame_chick_staff_command_definer_isolation.sql"
       - "tests/admin-invitation-acceptance.test.mjs"
@@ -68,4 +72,23 @@ jobs:
           if (!inviteJs.includes('action: "accept_invitation"')) throw new Error("Invitation page does not invoke the acceptance action.");
           if (!inviteJs.includes('authRequest("user", "GET"')) throw new Error("Invitation page does not verify the authenticated user.");
           console.log("Admin static assets and invitation wiring checks passed.");
+          NODE
+      - name: Verify POS and Rider browser scripts parse
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          import vm from "node:vm";
+          for (const file of ["apps/flame-chick-pos/index.html", "apps/flame-chick-rider/index.html"]) {
+            const html = readFileSync(file, "utf8");
+            let index = 0;
+            for (const chunk of html.split("<script").slice(1)) {
+              const tagEnd = chunk.indexOf(">");
+              if (tagEnd < 0 || chunk.slice(0, tagEnd).toLowerCase().includes("src=")) continue;
+              const close = chunk.indexOf("</script>", tagEnd + 1);
+              if (close < 0) continue;
+              const code = chunk.slice(tagEnd + 1, close).trim();
+              if (code) new vm.Script(code, { filename: file + "-inline-" + index++ + ".js" });
+            }
+          }
+          console.log("POS and Rider inline browser scripts parse successfully.");
           NODE
