@@ -26,6 +26,7 @@ The POS and Rider apps are existing, substantial apps. They are not being rebuil
 - POS rider reassignment now uses the delivery API's `assign` action rather than an old direct legacy RPC.
 - Order API board reads use service-side reads after verifying the signed-in staff role and deriving the branch. They accept bounded optional order ID/source filters for history/status readback.
 - POS and Website delivery order payloads now send explicit `selection_type: listed_area | not_listed`, and send no client-authoritative delivery fee or display area name. The branch-owned fee remains server/database-resolved under the approved delivery-pricing contract.
+- POS and Website delivery-area display adapters preserve missing/invalid fee as NULL, show "Fee not configured", and block checkout/order capture when the fee is unset. An explicitly configured Rs. 0 remains valid.
 
 These changes preserve the intended deny-by-default RLS design. They do not add browser table policies or expose a service key.
 
@@ -48,9 +49,9 @@ Preview workflows remain fail-closed. They require the `flame-chick-preview` Git
 
 Latest successful checks on this working branch:
 
-- POS and Rider Static Checks #14: passed, including API-only reads and explicit delivery-selection payload assertions — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45148072360)
-- Website Static Checks #142: passed, including explicit delivery-selection/fee-trust assertions and inline-script parsing — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45148044799)
-- Admin Static Checks #81: passed — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45147902896)
+- POS and Rider Static Checks #16: passed, including API-only reads, explicit delivery-selection payloads, and missing-vs-zero area-fee handling — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45148723244)
+- Website Static Checks #144: passed, including explicit delivery selection, missing-vs-zero area-fee handling and inline-script parsing — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45148732770)
+- Admin Static Checks #82: passed — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45148624210)
 - Edge Function Static Checks #39: passed — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45147768536)
 
 The POS/Rider static suite checks source hygiene and inline JavaScript syntax. Admin static checks also parse POS/Rider inline scripts. Edge checks parse the Edge Function TypeScript and assert the staff/Rider/dispatch API contracts. These are static/source checks, not live endpoint or browser sign-in tests.
