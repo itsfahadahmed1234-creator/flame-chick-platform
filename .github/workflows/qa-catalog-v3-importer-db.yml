@@ -7,6 +7,7 @@ on:
     paths:
       - "scripts/qa-catalog-v3-importer-db.mjs"
       - "apps/flame-chick-admin/catalog-v3-importer.js"
+      - "apps/flame-chick-admin/catalog-v3-admin.js"
       - "apps/flame-chick-website/js/catalog-v3.js"
       - "ops/catalog-drafts/flame-chick-published-menu-2026-11-23.v3-draft.json"
       - "supabase/functions/flame-chick-staff-admin/catalog-actions.mjs"
@@ -51,8 +52,10 @@ jobs:
           set -euo pipefail
           node --check scripts/qa-catalog-v3-importer-db.mjs
           test -s apps/flame-chick-admin/catalog-v3-importer.js
+          test -s apps/flame-chick-admin/catalog-v3-admin.js
           test -s ops/catalog-drafts/flame-chick-published-menu-2026-11-23.v3-draft.json
           grep -q "buildCatalogRpcCall" scripts/qa-catalog-v3-importer-db.mjs
+          grep -q "createWorkspace" scripts/qa-catalog-v3-importer-db.mjs
           grep -q "flame_chick_catalog_compile_snapshot" scripts/qa-catalog-v3-importer-db.mjs
           grep -q "catalog_publication_validate" scripts/qa-catalog-v3-importer-db.mjs
           grep -q "const second=await importer.runPublishedMenuImport" scripts/qa-catalog-v3-importer-db.mjs
