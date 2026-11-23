@@ -1,14 +1,128 @@
 -- Disposable behavioral QA for Flame Chick delivery commands V1.
--- All synthetic Auth identities, orders, tasks, offers, assignments and events roll back.
+-- Synthetic identities, tenant, staff roles, orders and delivery records all roll back.
+-- Role setup deliberately follows the protected production bootstrap + Staff Admin path.
 BEGIN;
-DO $delivery_commands$
+
+DO $delivery_identity_setup$
 DECLARE
   r uuid:=gen_random_uuid();
   b uuid:=gen_random_uuid();
   a uuid:=gen_random_uuid();
+  admin_user uuid:='a5555555-5555-4555-8555-555555555550';
   rider_one uuid:='a5555555-5555-4555-8555-555555555551';
   rider_two uuid:='a5555555-5555-4555-8555-555555555552';
   manager uuid:='a5555555-5555-4555-8555-555555555553';
+  cashier uuid:='a5555555-5555-4555-8555-555555555554';
+  now_at timestamptz:=transaction_timestamp();
+BEGIN
+  IF current_user<>'postgres' OR session_user<>'postgres' THEN
+    RAISE EXCEPTION 'DELIVERY_COMMAND_FIXTURE_REQUIRES_POSTGRES';
+  END IF;
+
+  IF EXISTS(SELECT 1 FROM public.restaurants WHERE slug='flame-chick') THEN
+    RAISE EXCEPTION 'DELIVERY_COMMAND_FIXTURE_TENANT_CONFLICT';
+  END IF;
+
+  INSERT INTO public.restaurants(id,name,slug,currency_code,timezone,is_active)
+  VALUES(r,'QA Flame Chick Delivery','flame-chick','PKR','Asia/Karachi',true);
+  INSERT INTO public.branches(id,restaurant_id,branch_code,name,is_active)
+  VALUES(b,r,'qa-main','QA Main',true);
+  INSERT INTO public.delivery_areas(id,restaurant_id,branch_id,name,delivery_fee,is_active)
+  VALUES(a,r,b,'QA Zero Fee',0,true);
+
+  PERFORM set_config('test.delivery.restaurant_id',r::text,true);
+  PERFORM set_config('test.delivery.branch_id',b::text,true);
+  PERFORM set_config('test.delivery.area_id',a::text,true);
+
+  INSERT INTO auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,
+    raw_app_meta_data,raw_user_meta_data,created_at,updated_at,is_sso_user,is_anonymous)
+  VALUES
+    (admin_user,'authenticated','authenticated','qa-delivery-admin@example.invalid','',now_at,
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,now_at,now_at,false,false),
+    (rider_one,'authenticated','authenticated','qa-delivery-rider-one@example.invalid','',now_at,
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,now_at,now_at,false,false),
+    (rider_two,'authenticated','authenticated','qa-delivery-rider-two@example.invalid','',now_at,
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,now_at,now_at,false,false),
+    (manager,'authenticated','authenticated','qa-delivery-manager@example.invalid','',now_at,
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,now_at,now_at,false,false),
+    (cashier,'authenticated','authenticated','qa-delivery-cashier@example.invalid','',now_at,
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,now_at,now_at,false,false);
+
+  INSERT INTO public.user_profiles(user_id,display_name,is_active)
+  VALUES
+    (admin_user,'QA Delivery Admin',true),
+    (rider_one,'QA Rider One',true),
+    (rider_two,'QA Rider Two',true),
+    (manager,'QA Manager',true),
+    (cashier,'QA Cashier',true);
+
+  -- First restaurant-wide Admin uses the trusted postgres-only bootstrap route.
+  INSERT INTO public.user_roles(
+    restaurant_id,user_id,role_key,branch_id,is_active,assigned_by,
+    reason,request_id,assignment_method
+  ) VALUES(
+    r,admin_user,'admin',NULL,true,admin_user,
+    'Disposable delivery command fixture',gen_random_uuid(),'initial_bootstrap'
+  );
+END
+$delivery_identity_setup$;
+
+-- Operational staff roles must be assigned by the same authenticated command
+-- used by the Admin application. Direct user_roles inserts are intentionally forbidden.
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.role','authenticated',true);
+SELECT set_config('request.jwt.claim.sub','a5555555-5555-4555-8555-555555555550',true);
+
+DO $delivery_staff_role_setup$
+DECLARE
+  branch_id uuid:=current_setting('test.delivery.branch_id')::uuid;
+  result jsonb;
+BEGIN
+  result:=public.flame_chick_staff_admin_command('assign_role',jsonb_build_object(
+    'target_user_id','a5555555-5555-4555-8555-555555555551',
+    'role_key','rider','branch_ids',jsonb_build_array(branch_id),
+    'request_id',gen_random_uuid(),'reason','Disposable delivery command fixture'));
+  IF result->>'ok' IS DISTINCT FROM 'true' THEN
+    RAISE EXCEPTION 'DELIVERY_FIXTURE_RIDER_ONE_ASSIGNMENT_FAILED: %',result;
+  END IF;
+
+  result:=public.flame_chick_staff_admin_command('assign_role',jsonb_build_object(
+    'target_user_id','a5555555-5555-4555-8555-555555555552',
+    'role_key','rider','branch_ids',jsonb_build_array(branch_id),
+    'request_id',gen_random_uuid(),'reason','Disposable delivery command fixture'));
+  IF result->>'ok' IS DISTINCT FROM 'true' THEN
+    RAISE EXCEPTION 'DELIVERY_FIXTURE_RIDER_TWO_ASSIGNMENT_FAILED: %',result;
+  END IF;
+
+  result:=public.flame_chick_staff_admin_command('assign_role',jsonb_build_object(
+    'target_user_id','a5555555-5555-4555-8555-555555555553',
+    'role_key','manager','branch_ids',jsonb_build_array(branch_id),
+    'request_id',gen_random_uuid(),'reason','Disposable delivery command fixture'));
+  IF result->>'ok' IS DISTINCT FROM 'true' THEN
+    RAISE EXCEPTION 'DELIVERY_FIXTURE_MANAGER_ASSIGNMENT_FAILED: %',result;
+  END IF;
+
+  result:=public.flame_chick_staff_admin_command('assign_role',jsonb_build_object(
+    'target_user_id','a5555555-5555-4555-8555-555555555554',
+    'role_key','cashier','branch_ids',jsonb_build_array(branch_id),
+    'request_id',gen_random_uuid(),'reason','Disposable delivery command fixture'));
+  IF result->>'ok' IS DISTINCT FROM 'true' THEN
+    RAISE EXCEPTION 'DELIVERY_FIXTURE_CASHIER_ASSIGNMENT_FAILED: %',result;
+  END IF;
+END
+$delivery_staff_role_setup$;
+
+RESET ROLE;
+
+DO $delivery_commands$
+DECLARE
+  r uuid:=current_setting('test.delivery.restaurant_id')::uuid;
+  b uuid:=current_setting('test.delivery.branch_id')::uuid;
+  a uuid:=current_setting('test.delivery.area_id')::uuid;
+  rider_one uuid:='a5555555-5555-4555-8555-555555555551';
+  rider_two uuid:='a5555555-5555-4555-8555-555555555552';
+  manager uuid:='a5555555-5555-4555-8555-555555555553';
+  cashier uuid:='a5555555-5555-4555-8555-555555555554';
   o1 uuid:=gen_random_uuid();
   o2 uuid:=gen_random_uuid();
   t1 uuid:=gen_random_uuid();
@@ -19,30 +133,10 @@ DECLARE
   assignment_id uuid;
   payment_count integer;
 BEGIN
-  INSERT INTO public.restaurants(id,name,slug,currency_code,timezone,is_active)
-  VALUES(r,'QA Flame Chick Delivery','qa-flame-chick-delivery-v1','PKR','Asia/Karachi',true);
-  INSERT INTO public.branches(id,restaurant_id,branch_code,name,is_active)
-  VALUES(b,r,'qa-main','QA Main',true);
-  INSERT INTO public.delivery_areas(id,restaurant_id,branch_id,name,delivery_fee,is_active)
-  VALUES(a,r,b,'QA Zero Fee',0,true);
-
-  INSERT INTO auth.users(id,aud,role,email,encrypted_password,email_confirmed_at,
-    raw_app_meta_data,raw_user_meta_data,created_at,updated_at,is_sso_user,is_anonymous)
-  VALUES
-    (rider_one,'authenticated','authenticated','qa-delivery-rider-one@example.invalid','',transaction_timestamp(),
-      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,transaction_timestamp(),transaction_timestamp(),false,false),
-    (rider_two,'authenticated','authenticated','qa-delivery-rider-two@example.invalid','',transaction_timestamp(),
-      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,transaction_timestamp(),transaction_timestamp(),false,false),
-    (manager,'authenticated','authenticated','qa-delivery-manager@example.invalid','',transaction_timestamp(),
-      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,transaction_timestamp(),transaction_timestamp(),false,false);
-
-  INSERT INTO public.user_profiles(user_id,display_name,is_active)
-  VALUES(rider_one,'QA Rider One',true),(rider_two,'QA Rider Two',true),(manager,'QA Manager',true);
-  INSERT INTO public.user_roles(restaurant_id,user_id,role_key,branch_id,is_active,assigned_by,reason,request_id)
-  VALUES
-    (r,rider_one,'rider',b,true,manager,'Disposable delivery command fixture',gen_random_uuid()),
-    (r,rider_two,'rider',b,true,manager,'Disposable delivery command fixture',gen_random_uuid()),
-    (r,manager,'manager',b,true,manager,'Disposable delivery command fixture',gen_random_uuid());
+  IF (SELECT count(*) FROM public.user_roles WHERE restaurant_id=r AND is_active)<>5
+     OR (SELECT count(*) FROM public.staff_role_audit WHERE restaurant_id=r)<>5 THEN
+    RAISE EXCEPTION 'DELIVERY_FIXTURE_STAFF_ROLES_NOT_CREATED_THROUGH_AUDITED_COMMANDS';
+  END IF;
 
   INSERT INTO public.rider_profiles(restaurant_id,branch_id,user_id,rider_code,display_name,
     availability_status,accepting_jobs,last_seen_at,is_active)
@@ -138,22 +232,22 @@ BEGIN
     RAISE EXCEPTION 'RIDER_RETURN_REPORT_WAS_TREATED_AS_STAFF_CONFIRMATION: %',result;
   END IF;
 
-  -- Rider cannot confirm the physical return; Manager must do it.
+  -- Rider cannot confirm the physical return; Cashier must verify receipt.
   result:=public.flame_chick_manage_delivery(jsonb_build_object(
     'action','confirm_return','delivery_task_id',t2,'actor_user_id',rider_two,'request_id',gen_random_uuid()));
   IF COALESCE((result->>'ok')::boolean,true) THEN RAISE EXCEPTION 'RIDER_CONFIRMED_OWN_RETURN'; END IF;
 
   result:=public.flame_chick_manage_delivery(jsonb_build_object(
-    'action','confirm_return','delivery_task_id',t2,'actor_user_id',manager,
-    'reason','Physical handover checked by manager','request_id',gen_random_uuid()));
+    'action','confirm_return','delivery_task_id',t2,'actor_user_id',cashier,
+    'reason','Physical handover checked by cashier','request_id',gen_random_uuid()));
   IF result->>'ok'<>'true' OR result->>'task_status'<>'returned'
      OR (SELECT status FROM public.orders WHERE id=o2)<>'returned'
      OR (SELECT is_current FROM public.delivery_assignments WHERE delivery_task_id=t2) THEN
-    RAISE EXCEPTION 'MANAGER_RETURN_CONFIRMATION_FAILED: %',result;
+    RAISE EXCEPTION 'CASHIER_RETURN_CONFIRMATION_FAILED: %',result;
   END IF;
 
   result:=public.flame_chick_manage_delivery(jsonb_build_object(
-    'action','confirm_return','delivery_task_id',t2,'actor_user_id',manager,'request_id',gen_random_uuid()));
+    'action','confirm_return','delivery_task_id',t2,'actor_user_id',cashier,'request_id',gen_random_uuid()));
   IF result->>'ok'<>'true' OR result->>'already_processed'<>'true' THEN
     RAISE EXCEPTION 'RETURN_CONFIRMATION_RETRY_FAILED: %',result;
   END IF;
@@ -171,12 +265,14 @@ BEGIN
   END IF;
 END;
 $delivery_commands$;
+
 ROLLBACK;
+
 DO $cleanup$
 BEGIN
-  IF EXISTS(SELECT 1 FROM public.restaurants WHERE slug='qa-flame-chick-delivery-v1')
+  IF EXISTS(SELECT 1 FROM public.restaurants WHERE slug='flame-chick')
      OR EXISTS(SELECT 1 FROM auth.users WHERE email LIKE 'qa-delivery-%@example.invalid') THEN
     RAISE EXCEPTION 'DELIVERY_COMMAND_FIXTURE_NOT_ROLLED_BACK';
   END IF;
-END;
+END
 $cleanup$;
