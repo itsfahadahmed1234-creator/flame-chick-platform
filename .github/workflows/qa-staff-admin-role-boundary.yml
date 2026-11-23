@@ -55,6 +55,8 @@ jobs:
           grep -q "pg_sleep" supabase/tests/flame_chick_delivery_concurrency_setup.sql
           grep -q "FOR UPDATE OF t SKIP LOCKED" supabase/migrations/20261123172000_flame_chick_delivery_commands_v1.sql
           grep -q "race 4/4" supabase/tests/flame_chick_delivery_concurrency.sh
+          grep -q "payment race 6/6" supabase/tests/flame-chick_delivery_concurrency.sh
+          grep -q "test.payment.race_delay" supabase/tests/flame-chick_delivery_concurrency_setup.sql
       - name: Start disposable Supabase with hosted-only helper compatibility
         shell: bash
         run: |
