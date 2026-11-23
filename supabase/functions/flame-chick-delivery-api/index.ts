@@ -239,7 +239,9 @@ async function resolveDispatchContext(userId: string): Promise<{
   const globalRoles = roleRows.filter(row=>row.branch_id===null);
   const scopedRoles = roleRows.filter(row=>typeof row.branch_id==="string" && branches.some(branch=>branch.id===row.branch_id));
   const distinctScopedBranches = [...new Set(scopedRoles.map(row=>String(row.branch_id)))];
-  if (!globalRoles.length && distinctScopedBranches.length!==1) return { ok:false };
+  const scopedRoleKeys = [...new Set(scopedRoles.map(row=>String(row.role_key)))];
+  if (globalRoles.length && (globalRoles.length!==1 || roleRows.some(row=>row.branch_id!==null))) return { ok:false };
+  if (!globalRoles.length && (distinctScopedBranches.length!==1 || scopedRoleKeys.length!==1)) return { ok:false };
   if (globalRoles.length && branches.length!==1) return { ok:false };
   const usable=[...globalRoles,...scopedRoles];
   if (!usable.length) return { ok:false };
