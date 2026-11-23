@@ -316,6 +316,13 @@ BEGIN
   PERFORM set_config('test.website.clock_now',(base_time+interval '11 minutes')::text,true);
 
   FOR i IN 1..12 LOOP
+    IF i IN (1,4,7,10) THEN
+      PERFORM set_config(
+        'test.website.clock_now',
+        (base_time+(11*((i+2)/3))*interval '1 minute')::text,
+        true
+      );
+    END IF;
     changed_request_id:=gen_random_uuid();
     payload:=jsonb_set(
       jsonb_set(
