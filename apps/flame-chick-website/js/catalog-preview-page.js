@@ -288,9 +288,10 @@
         }).join('  |  ');
         if (variantsText) card.appendChild(element('p', 'fc-preview-variants', variantsText));
 
-        var configure = element('button', 'button button-primary deal-configure', 'Preview deal choices');
+        var configure = element('button', 'button button-primary deal-configure',
+          deal.available ? 'Preview deal choices' : 'View deal details');
         configure.type = 'button';
-        configure.disabled = !deal.available;
+        configure.disabled = !deal.branchAvailable;
         configure.addEventListener('click', function () {
           closeDealConfigurator();
           openDealConfigurator(deal, preview);
