@@ -114,6 +114,10 @@ test('builds deals only from exact mapped option IDs and respects branch/time av
   assert.equal(group.options[0].productVariantId, IDS.variant);
   assert.equal(group.options[0].pricingTreatment, 'INCLUDED');
   assert.equal(group.options[0].surchargeMinor, 0);
+  assert.equal(variant.groups.length, 2);
+  assert.equal(variant.groups[1].name, 'Choose your drink');
+  assert.equal(variant.groups[1].options[0].productName, 'Cola');
+  assert.equal(variant.groups[1].options[0].productVariantId, IDS.drinkVariant);
 });
 
 test('a missing variant-option mapping is never treated as included or free', () => {
