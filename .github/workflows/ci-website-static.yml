@@ -55,6 +55,7 @@ jobs:
           node --check apps/flame-chick-website/js/branch-fulfilment-v3.js
           node --check apps/flame-chick-website/js/catalog-v3-preview.js
           node --check apps/flame-chick-website/js/catalog-preview-page.js
+          node --check apps/flame-chick-website/js/website-order-v3.js
           node --check apps/flame-chick-website/js/config.js
           node --check apps/flame-chick-website/js/hero-slider.js
           node --check apps/flame-chick-website/js/i18n.js
