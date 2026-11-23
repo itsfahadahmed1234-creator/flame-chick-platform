@@ -185,3 +185,164 @@ test('read-back verifier rejects changed base price and any surcharge mapping', 
     }] }]
   }, { ...sourceDeal, variants: [{ variantKey: 'BUNDLE', basePrice: 2099 }] }, components, null, true), /INCLUDED with zero surcharge/i);
 });
+
+
+function createFakeCatalogApi() {
+  let nextId = 1, revision = 0, writes = 0;
+  const categories = [], products = [], collections = [], schedules = [], deals = [];
+  const makeId = () => '10000000-0000-4000-8000-' + String(nextId++).padStart(12, '0');
+  const ok = extra => ({ ok: true, draft_revision: revision, ...extra });
+  const findVariant = id => {
+    for (const product of products) {
+      const variant = product.variants.find(row => row.id === id);
+      if (variant) return { product, variant };
+    }
+    return null;
+  };
+  const detail = deal => ({
+    ok: true, draft_revision: revision, deal,
+    component_groups: deal.component_groups || [],
+    variants: deal.variants.map(variant => ({ variant, allowed_options: variant.allowed_options || [] })),
+    schedule_assignments: deal.schedule_assignments || [],
+    branch_availability: []
+  });
+  async function request(action, input = {}, mutation = false) {
+    if (!mutation) {
+      if (action === 'catalog_categories_list') return ok({ items: categories, has_more: false });
+      if (action === 'catalog_products_list') return ok({ items: products, has_more: false });
+      if (action === 'catalog_deal_collections_list') return ok({ items: collections, has_more: false });
+      if (action === 'catalog_schedule_sets_list') return ok({ items: schedules, has_more: false });
+      if (action === 'catalog_deals_list') return ok({ items: deals.filter(row => row.collection_id === input.collection_id), has_more: false });
+      if (action === 'catalog_deal_detail_read') {
+        const deal = deals.find(row => row.id === input.deal_id);
+        if (!deal) throw new Error('fake deal missing');
+        return detail(deal);
+      }
+      if (action === 'catalog_schedule_detail_read') {
+        const schedule = schedules.find(row => row.id === input.schedule_set_id);
+        if (!schedule) throw new Error('fake schedule missing');
+        return ok({ schedule_set: schedule, windows: schedule.windows });
+      }
+      throw new Error('Unexpected fake read action: ' + action);
+    }
+    writes++;
+    revision++;
+    if (action === 'catalog_category_upsert') {
+      const row = { id: makeId(), ...input }; categories.push(row);
+      return ok({ entity_id: row.id });
+    }
+    if (action === 'catalog_product_upsert') {
+      const row = { id: makeId(), ...input, variants: input.variants.map(variant => ({ id: makeId(), ...variant })) };
+      products.push(row);
+      return ok({ entity_id: row.id });
+    }
+    if (action === 'catalog_deal_collection_upsert') {
+      const row = { id: makeId(), ...input }; collections.push(row);
+      return ok({ entity_id: row.id });
+    }
+    if (action === 'catalog_schedule_set_upsert') {
+      const row = { id: makeId(), ...input }; schedules.push(row);
+      return ok({ entity_id: row.id });
+    }
+    if (action === 'catalog_deal_upsert') {
+      let row = deals.find(item => item.id === input.id);
+      if (!row) {
+        row = { id: makeId(), component_groups: [], schedule_assignments: [], ...input };
+        row.variants = (input.variants || []).map(variant => ({ id: makeId(), ...variant, allowed_options: [] }));
+        deals.push(row);
+      } else {
+        Object.assign(row, Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'variants')));
+        if (input.variants) {
+          for (const update of input.variants) {
+            let variant = row.variants.find(item => item.id === update.id);
+            if (!variant) { variant = { id: makeId(), allowed_options: [] }; row.variants.push(variant); }
+            Object.assign(variant, update);
+          }
+        }
+      }
+      return ok({ entity_id: row.id });
+    }
+    if (action === 'catalog_deal_components_upsert') {
+      const deal = deals.find(item => item.id === input.deal_id);
+      if (!deal) throw new Error('fake deal missing for components');
+      deal.component_groups = input.groups.map(group => ({
+        group: {
+          id: makeId(), name_en: group.name_en, name_ur: group.name_ur,
+          min_units: group.min_units, max_units: group.max_units,
+          allow_repeat_option: group.allow_repeat_option, max_units_per_option: group.max_units_per_option,
+          sort_order: group.sort_order, is_active: group.is_active
+        },
+        options: group.options.map(option => {
+          const found = findVariant(option.product_variant_id);
+          if (!found) throw new Error('fake component variant missing');
+          return { id: makeId(), product_id: found.product.id, product_variant_id: option.product_variant_id,
+            is_active: option.is_active, sort_order: option.sort_order };
+        })
+      }));
+      return ok({ entity_id: deal.id });
+    }
+    if (action === 'catalog_deal_variant_options_upsert') {
+      const deal = deals.find(item => item.id === input.deal_id);
+      const variant = deal && deal.variants.find(item => item.id === input.deal_variant_id);
+      if (!variant) throw new Error('fake deal variant missing for mappings');
+      variant.allowed_options = input.options.map(mapping => {
+        const option = deal.component_groups.flatMap(doc => doc.options).find(row => row.id === mapping.component_option_id);
+        if (!option) throw new Error('fake component option missing for mapping');
+        return { id: makeId(), component_option_id: mapping.component_option_id, product_variant_id: option.product_variant_id,
+          pricing_treatment: mapping.pricing_treatment, unit_surcharge: mapping.unit_surcharge,
+          max_quantity_per_deal: mapping.max_quantity_per_deal, sort_order: mapping.sort_order, is_active: mapping.is_active };
+      });
+      return ok({ entity_id: deal.id });
+    }
+    if (action === 'catalog_deal_schedule_assignment_upsert') {
+      const deal = deals.find(item => item.id === input.deal_id);
+      if (!deal) throw new Error('fake deal missing for schedule');
+      deal.schedule_assignments = [{ id: makeId(), branch_id: input.branch_id, schedule_set_id: input.schedule_set_id, is_active: input.is_active }];
+      return ok({ entity_id: deal.id });
+    }
+    throw new Error('Unexpected fake write action: ' + action);
+  }
+  return {
+    request,
+    counts: () => ({
+      writes, categories: categories.length, products: products.length,
+      variants: products.reduce((sum, row) => sum + row.variants.length, 0),
+      collections: collections.length, schedules: schedules.length, deals: deals.length,
+      offers: deals.reduce((sum, deal) => sum + deal.variants.length, 0),
+      scheduledDeals: deals.filter(deal => (deal.schedule_assignments || []).some(item => item.is_active)).length,
+      allDealsActive: deals.every(deal => deal.is_active === true && deal.variants.length === 1 && deal.variants[0].is_active === true),
+      allMappingsIncluded: deals.every(deal => deal.variants.every(variant =>
+        variant.allowed_options.length === deal.component_groups.length &&
+        variant.allowed_options.every(mapping => mapping.is_active && mapping.pricing_treatment === 'INCLUDED' && Number(mapping.unit_surcharge) === 0)
+      ))
+    })
+  };
+}
+
+test('full mock catalog import stages and verifies the complete menu, then resumes without duplicate writes', async () => {
+  const api = createFakeCatalogApi();
+  const progress = [];
+  const first = await importer.runPublishedMenuImport(draft, {
+    request: api.request,
+    onProgress: event => progress.push(event.phase)
+  });
+  assert.equal(first.ok, true);
+  assert.equal(first.publicationPerformed, false);
+  assert.equal(first.dealCount, 6);
+  const afterFirst = api.counts();
+  assert.equal(afterFirst.categories, 8);
+  assert.equal(afterFirst.products, 25);
+  assert.equal(afterFirst.variants, 28);
+  assert.equal(afterFirst.collections, 1);
+  assert.equal(afterFirst.schedules, 1);
+  assert.equal(afterFirst.deals, 6);
+  assert.equal(afterFirst.offers, 6);
+  assert.equal(afterFirst.scheduledDeals, 2);
+  assert.equal(afterFirst.allDealsActive, true);
+  assert.equal(afterFirst.allMappingsIncluded, true);
+  assert.ok(progress.includes('complete'));
+
+  const second = await importer.runPublishedMenuImport(draft, { request: api.request });
+  assert.equal(second.ok, true);
+  assert.deepEqual(api.counts(), afterFirst);
+});
