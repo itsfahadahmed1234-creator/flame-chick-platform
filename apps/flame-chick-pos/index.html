@@ -1508,7 +1508,7 @@ function openPaymentCollection(orderId){
   $('paymentCollectionTitle').textContent='Collect Payment · '+(order.OrderNumber||'Flame Chick order');
   $('paymentCollectionSubtitle').textContent=(order.CustomerName||'Customer')+' · '+(order.Phone||'');
   $('paymentCollectionBalance').textContent='Order total Rs. '+money(order.Total)+' · Already paid Rs. '+money(order.PaidAmount)+' · Outstanding Rs. '+money(balance);
-  $('paymentCollectionAmount').value=balance.toFixed(2).replace(/\\.00$/,'');
+  $('paymentCollectionAmount').value=balance.toFixed(2).replace(/\.00$/,'');
   $('paymentCollectionAmount').max=balance.toFixed(2);
   $('paymentCollectionMethod').value='cash';
   $('submitPaymentCollectionBtn').disabled=false;
