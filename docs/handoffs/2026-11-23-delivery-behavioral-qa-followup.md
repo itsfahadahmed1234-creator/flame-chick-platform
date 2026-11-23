@@ -1,45 +1,38 @@
-# Delivery concurrency QA — Step 1 PASSED — 2026-11-23
+# POS/Rider delivery integration — Step 2 source checks PASSED — 2026-11-23
 
 **Branch:** `work/production-source-audit`  
-**Concurrency test source commit:** `eda617341dda21846573e6c4e66c72e190f7fd10`  
-**Passing CI:** [Flame Chick Staff Admin Role Boundary QA — run 45188384720](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45188384720)
+**POS/Rider source:** `45af748ee2184e58072e90a5fd932ede11416072`  
+**POS/Rider static QA:** [45198567593 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45198567593)  
+**Edge TypeScript/contracts:** [45198081185 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45198081185)  
+**Disposable DB lifecycle/payment tests:** [45197859536 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45197859536)  
+**Admin static checks:** [45198568180 — success](https://github.com/itsfahamed1234-creator/flame-chick-platform/actions/runs/45198568180)
 
-## Four real concurrent PostgreSQL-session races — passed
+## Step 2 changes
 
-The disposable local Supabase fixture uses separate `psql` sessions. A test-only trigger scoped to the synthetic `flame-chick` tenant pauses status updates after the delivery command has acquired the task/offer row locks. The competing command is then proven to be waiting on the PostgreSQL lock (or the expiry sweeper must complete using `SKIP LOCKED`).
+1. **Delivered remains active in POS.** The Order API active board includes `delivered`; POS keeps it in the third column renamed **Delivery & Awaiting Payment**, displays **Delivered · awaiting cashier payment collection**, counts it as active and does not complete or hide it.
+2. **Rider confirmation is delivery-only.** Rider toast clarifies that delivery is marked but cashier payment collection is still pending. No at-restaurant stage exists; the flow remains **Accept offer → Picked up → Delivered**.
+3. **POS Rider availability is now fed the expected fields.** Dispatch query returns `accepting_jobs` and `last_seen_at` as well as Rider ID, name, phone, active and availability state. This fixes the mismatch where POS filtered on fields the Edge API did not return.
+4. **Cashier can confirm physical returns.** POS render path and handler permit Cashier alongside Manager/Admin/Owner, matching the database RPC. Rider must still report physical return first; staff physically verifies the handover.
+5. **Returned orders reach Cancelled Orders history.** Order API `all` board exposes `returned`; POS maps its label, and the existing Cancelled Orders history tab includes both `cancelled` and `returned`, including offline/local fallback.
+6. **Delivery SQL no longer prematurely completes orders.** Rider `delivered` sets delivery/order delivered facts and releases the Rider; it no longer sets `completed_at` or returns a completion timestamp. Staff-confirmed physical return sets `returned_at` but not `completed_at`.
+7. **SQL behavioral fixture strengthened.** After Rider delivery, asserts order delivered but `completed_at IS NULL`, `payment_status='unpaid'`, `paid_amount=0`, and `balance_due=total`. After physical return it asserts the order is returned, not completed, still unpaid, with no payment record.
 
-1. **Accept wins over decline.** Rider acceptance succeeds; the concurrent decline returns `DELIVERY_OFFER_ALREADY_RESOLVED`.
-2. **Decline wins over accept.** Rider decline succeeds; the concurrent accept returns `DELIVERY_OFFER_ALREADY_RESOLVED`.
-3. **Accept wins over expiry sweep.** Acceptance occurs one microsecond before expiry while holding the task lock. The sweep tests at the exact deadline and reports `expired_count=0` because it skips the locked task.
-4. **Expiry wins over accept.** The sweep expires the offer at the deadline while holding the task lock; the waiting accept receives `DELIVERY_OFFER_ALREADY_RESOLVED`.
+## Verification
 
-Each race verifies offer/task/order state, no more than one current assignment, Rider availability and the corresponding mutually exclusive accept/decline/expiry audit event counts. Final CI output: **all four races produced one coherent terminal state, at most one current assignment, and matching audit events.**
+- [45197859536](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45197859536): complete local migration replay; staff ACL/RLS + roles; operational schema; delivery lifecycle and expiry; delivered/return financial-state assertions; all four concurrent PostgreSQL races; disposable stack shutdown — all passed.
+- [45198081185](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45198081185): Deno checks on catalog, order, delivery and staff Edge Functions; Edge contract tests — passed.
+- [45198567593](https://github.com/itsfahamed1234-creator/flame-chick-platform/actions/runs/45198567593): POS/Rider JS parse and source-hygiene tests — passed.
+- [45198568180](https://github.com/itsfahmed1234-creator/flame-chick-platform/actions/runs/45198568180): Admin static checks — passed.
+- Preview deployment workflows were skipped. This work has **not been deployed** to Vercel or Supabase Production.
 
-The full workflow also passed complete migration replay, staff ACL/RLS baseline, Admin/Owner/operational-role authorization, synthetic fixture checks, operational schema constraints/security, the previous delivery lifecycle + exact expiry boundary fixture, and disposable Supabase teardown.
+## Authoritative workflow — delivery is not collection
 
-## Existing delivery verification retained
+Rider `Delivered` means food was handed to the customer. It does not imply cash/payment received and does not complete the order. POS keeps it in active **Delivered / awaiting payment collection** until Cashier records the payment as **Collected**. Collection must record amount, method, actor and time. Only after the required balance is collected may the backend mark the order **Completed**, set `completed_at`, and move it into Order History.
 
-- Targeted Rider assignment; no automatic rotation.
-- Wrong-Rider offer denial.
-- Idempotent acceptance; pickup; delivered retry.
-- Failed delivery and Rider return report.
-- Rider cannot confirm physical return; Cashier can confirm.
-- Delivery and physical return do not modify the payment ledger.
-- Offer accepted one microsecond before expiry; offer expires at the exact 60-second boundary; POS must manually reassign.
+A returned order remains `returned`, not paid or completed; payment/refund reconciliation remains a distinct finance decision. GST remains deferred.
 
-## Authoritative delivery/payment workflow
+## Next stage — Cashier payment collection
 
-Rider **Delivered** means the food was handed to the customer. It does not mean payment was received and does not complete the order. POS keeps the order active in **Delivered / awaiting-payment**. The order remains unpaid/outstanding until the Cashier physically receives and explicitly marks payment **Collected**, recording amount, method, actor and time. Only then does POS set **Completed**, set `completed_at`, and move the order into history.
+Implement the separate server-side Cashier payment-collection transaction and the POS action. It must lock the order/payment state, validate outstanding balance, append an auditable payment row, update paid amount/payment status, support partial collection (order remains delivered/active), and complete/history only when fully collected. Add idempotency/duplicate/overpayment/return-reconciliation tests. Rider must never be able to record payment or complete the order.
 
-**Required correction before app integration:** the current candidate `flame_chick_manage_delivery(action='delivered')` sets `orders.completed_at` during the Rider action. Remove this premature completion; Rider delivery must not update payment status. Add a separate Cashier collection command and end-to-end tests proving only recorded collection completes the order. Do not infer refund/payment handling for physically returned orders. GST remains deferred.
-
-## Next
-
-Step 1 is complete. Proceed to **Step 2: review and connect the existing POS and Rider apps** against the verified service contract:
-- POS manually selects one Rider for each targeted offer.
-- Rider flow remains **Accept offer → Picked up → Delivered**; no restaurant-arrival step.
-- Riders see only their own offers/jobs.
-- Cashier and Manager can confirm physical returns, and returned orders appear in the correct POS queue.
-- Keep payment collection separate from delivery before wiring the Delivered action into the active POS order lifecycle.
-
-This run used disposable local Supabase only. Flame Chick is a pre-launch build; the designated Supabase Production project remains the partly provisioned target environment. No target database writes, app deployments, Realtime enablement or checkout activation occurred in this QA stage.
+Flame Chick is a pre-launch build. The partly provisioned Supabase Production project is the target environment; no target DB writes or application deployments occurred in this source/QA stage.
