@@ -61,6 +61,8 @@ Edge Functions that need privileged database access read secrets from the Supaba
 
 These apps are currently plain HTML/CSS/JavaScript applications. Open each app folder with a static web server or use its Vercel preview after the backend is ready.
 
+For a browser-only review of the separate V3 menu preview, use the [loopback-only synthetic fixture runbook](docs/operations/local-catalog-preview-fixture.md). That harness is outside the Website Vercel root, does not load the production config, and uses artificial catalog data only.
+
 For Supabase CLI work:
 
 ```bash
