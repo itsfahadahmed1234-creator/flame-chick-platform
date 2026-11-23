@@ -127,7 +127,7 @@ DECLARE
   o2 uuid:=gen_random_uuid();
   t1 uuid:=gen_random_uuid();
   t2 uuid:=gen_random_uuid();
-  offer1 uuid:=gen_random_uuid();
+  offer1 uuid;
   offer2 uuid;
   result jsonb;
   assignment_id uuid;
@@ -163,14 +163,22 @@ BEGIN
     (t1,r,b,o1,'dispatch_pending','QA Customer One','03000000001','101 QA Road, Karachi','QA Zero Fee',a,'listed_area',0),
     (t2,r,b,o2,'dispatch_pending','QA Customer Two','03000000002','102 QA Road, Karachi','QA Zero Fee',a,'listed_area',0);
 
-  INSERT INTO public.delivery_task_offers(id,restaurant_id,branch_id,delivery_task_id,rider_user_id,
-    offer_round,status,offered_at,expires_at,request_id)
-  VALUES(offer1,r,b,t1,rider_one,1,'offered',clock_timestamp(),clock_timestamp()+interval '60 seconds',gen_random_uuid());
+  -- Create the first offer through the real POS dispatch command. This keeps
+  -- delivery_tasks.status='offering' in sync with the offered row.
+  result:=public.flame_chick_manage_delivery(jsonb_build_object(
+    'action','assign','delivery_task_id',t1,'actor_user_id',manager,
+    'rider_user_id',rider_one,'request_id',gen_random_uuid()));
+  IF result->>'ok'<>'true' OR result->>'task_status'<>'offering'
+     OR result->>'offer_status'<>'offered' THEN
+    RAISE EXCEPTION 'FIRST_STAFF_ASSIGNMENT_FAILED: %',result;
+  END IF;
+  offer1:=(result->>'offer_id')::uuid;
 
-  -- Rider cannot answer another Rider's offer.
+  -- Rider cannot answer another Rider's offer; verify the exact authorization error.
   result:=public.flame_chick_accept_delivery_offer(offer1,rider_two,gen_random_uuid());
-  IF COALESCE((result->>'ok')::boolean,true) THEN
-    RAISE EXCEPTION 'WRONG_RIDER_ACCEPTED_OFFER';
+  IF result->>'ok'<>'false'
+     OR result#>>'{error,code}'<>'DELIVERY_OFFER_NOT_ASSIGNED_TO_RIDER' THEN
+    RAISE EXCEPTION 'WRONG_RIDER_OFFER_GUARD_FAILED: %',result;
   END IF;
 
   -- Accept is idempotent: same offer creates exactly one assignment.
