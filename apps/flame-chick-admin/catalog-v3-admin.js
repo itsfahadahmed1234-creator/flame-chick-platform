@@ -142,6 +142,15 @@
       components
     };
   }
+  function isApprovedFlameHourSchedule(item,detail){
+    if(!isObj(item)||item.name!=='Flame Hour daily'||item.is_active!==true||item.timezone!=='Asia/Karachi'||
+       !isObj(detail)||!isObj(detail.schedule_set)||detail.schedule_set.id!==item.id||
+       detail.schedule_set.name!=='Flame Hour daily'||detail.schedule_set.timezone!=='Asia/Karachi'||
+       !Array.isArray(detail.windows)||detail.windows.length!==7)return false;
+    return detail.windows.every((window,index)=>window&&window.window_kind==='WEEKLY'&&
+      Number(window.weekday_iso)===index+1&&window.local_start==='15:00:00'&&
+      window.local_end==='17:00:00'&&window.is_all_day===false);
+  }
   function moneyMatches(actual, expected) {
     const a = Number(actual), b = Number(expected);
     return Number.isFinite(a) && Number.isFinite(b) && Math.round(a * 100) === Math.round(b * 100);
@@ -327,24 +336,51 @@
       s.detail=null;s.notice=null;s.error=null;s.partial=null;render();
     }
     async function ensureDealCollection(){
-      let cat=s.categories.find(c=>c.category_kind==='deal'&&c.is_active);
-      if(!cat){const r=await write(WRITE.category,{category_kind:'deal',name_en:'Deals',name_ur:null,sort_order:90,is_active:true});await refresh();cat=s.categories.find(c=>c.id===r.entity_id);}
-      if(!cat)throw Error('Active Deals category could not be verified.');
-      let col=s.collections.find(c=>c.category_id===cat.id&&c.is_active);
-      if(!col){const r=await write(WRITE.collection,{category_id:cat.id,name_en:'Deals',name_ur:null,sort_order:0,is_active:true,schedule_set_id:null});await refresh();col=s.collections.find(c=>c.id===r.entity_id);}
-      if(!col)throw Error('Deals collection could not be verified.');
+      let categories=s.categories.filter(c=>c.category_kind==='deal');
+      if(categories.length>1)throw Error('Multiple deal categories exist. Resolve the duplicate categories before creating a deal.');
+      let cat=categories[0]||null;
+      if(cat&&cat.name_en!=='Deals')throw Error('An existing deal category has a different name. Review it instead of creating a second Deals category.');
+      if(!cat){
+        const created=await write(WRITE.category,{category_kind:'deal',name_en:'Deals',name_ur:null,sort_order:90,is_active:true});
+        await refresh();cat=s.categories.find(c=>c.id===created.entity_id);
+      }else if(!cat.is_active){
+        await write(WRITE.category,{id:cat.id,category_kind:'deal',name_en:cat.name_en,name_ur:cat.name_ur??null,sort_order:cat.sort_order,is_active:true});
+        await refresh();cat=s.categories.find(c=>c.id===cat.id);
+      }
+      if(!cat||cat.is_active!==true)throw Error('Active Deals category could not be verified.');
+      let collections=s.collections.filter(c=>c.category_id===cat.id);
+      if(collections.length>1)throw Error('Multiple Deals collections exist for this category. Resolve the duplicates before creating a deal.');
+      let col=collections[0]||null;
+      if(col&&col.name_en!=='Deals')throw Error('An existing deal collection has a different name. Review it instead of creating another.');
+      if(!col){
+        const created=await write(WRITE.collection,{category_id:cat.id,name_en:'Deals',name_ur:null,sort_order:0,is_active:true,schedule_set_id:null});
+        await refresh();col=s.collections.find(c=>c.id===created.entity_id);
+      }else if(!col.is_active){
+        await write(WRITE.collection,{id:col.id,category_id:cat.id,name_en:col.name_en,name_ur:col.name_ur??null,
+          sort_order:col.sort_order,is_active:true,schedule_set_id:col.schedule_set_id??null});
+        await refresh();col=s.collections.find(c=>c.id===col.id);
+      }
+      if(!col||col.is_active!==true)throw Error('Active Deals collection could not be verified.');
       return col;
     }
     async function ensureFlameHourSchedule(){
-      for(const item of s.schedules){
-        if(item.name!=='Flame Hour daily'||!item.is_active||item.timezone!=='Asia/Karachi')continue;
+      const matches=s.schedules.filter(item=>item.name==='Flame Hour daily');
+      if(matches.length>1)throw Error('Multiple Flame Hour daily schedules exist. Resolve the duplicates before attaching this deal.');
+      if(matches.length===1){
+        const item=matches[0];
         const detail=await read(READ.scheduleDetail,{schedule_set_id:item.id});
-        const wins=detail.windows||[];
-        if(wins.length===7&&wins.every((w,i)=>w.window_kind==='WEEKLY'&&Number(w.weekday_iso)===i+1&&w.local_start==='15:00:00'&&w.local_end==='17:00:00'&&!w.is_all_day))return item.id;
+        if(!isApprovedFlameHourSchedule(item,detail))
+          throw Error('An existing Flame Hour daily schedule has different settings. It will not be replaced or duplicated.');
+        return item.id;
       }
       const windows=Array.from({length:7},(_,i)=>({window_kind:'WEEKLY',weekday_iso:i+1,local_start:'15:00:00',local_end:'17:00:00',is_all_day:false,starts_at:null,ends_at:null,effective_from:null,effective_to:null}));
-      const r=await write(WRITE.schedule,{name:'Flame Hour daily',timezone:'Asia/Karachi',is_active:true,windows});
-      await refresh();const found=s.schedules.find(x=>x.id===r.entity_id);if(!found)throw Error('Flame Hour schedule saved but could not be verified.');return found.id;
+      const created=await write(WRITE.schedule,{name:'Flame Hour daily',timezone:'Asia/Karachi',is_active:true,windows});
+      await refresh();
+      const found=s.schedules.find(x=>x.id===created.entity_id);
+      if(!found||found.is_active!==true)throw Error('Flame Hour schedule saved but could not be verified.');
+      const detail=await read(READ.scheduleDetail,{schedule_set_id:found.id});
+      if(!isApprovedFlameHourSchedule(found,detail))throw Error('New Flame Hour schedule failed exact read-back verification.');
+      return found.id;
     }
     async function createDeal(form){
       const title=text(form.title,160,'Deal title',true),desc=text(form.description_en,3000,'Description',false),base=amount(form.base_price,'Deal base price',true);
@@ -570,5 +606,5 @@
     }
     return {mount:async(element,requestFn)=>{if(!element||typeof requestFn!=='function')throw Error('Catalog V3 workspace requires a root and authenticated request handler.');el=element;request=requestFn;bind();await refresh();},refresh,getState:()=>JSON.parse(JSON.stringify(s))};
   }
-  return {READ,WRITE,normalizeProductDraft,buildFixedComponentGroups,buildIncludedMappings,buildFixedDealEditDraft,verifyFixedDealDetail,createWorkspace};
+  return {READ,WRITE,normalizeProductDraft,buildFixedComponentGroups,buildIncludedMappings,buildFixedDealEditDraft,isApprovedFlameHourSchedule,verifyFixedDealDetail,createWorkspace};
 });
