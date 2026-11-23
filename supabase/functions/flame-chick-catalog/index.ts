@@ -1,3 +1,5 @@
+import { isValidDatabaseNow } from "./publication-read-contract.mjs";
+
 // Flame Chick public catalog API.
 // HARD BOUNDARY: public responses are read from the current immutable
 // catalog publication only. This function MUST NOT read draft tables.
@@ -93,6 +95,15 @@ async function readCurrentPublication(): Promise<PublicationRead> {
   if (typeof result.published !== "boolean") {
     throw new Error("Published catalog RPC omitted publication status");
   }
+
+  // A missing or malformed database timestamp is an invalid RPC contract in
+  // both published and unpublished states. Never substitute an empty string
+  // or Edge Function wall-clock time.
+  const databaseNow = result.databaseNow;
+  if (!isValidDatabaseNow(databaseNow)) {
+    throw new Error("Published catalog RPC returned an invalid database timestamp");
+  }
+
   if (result.published === false) {
     return {
       published: false,
@@ -103,7 +114,7 @@ async function readCurrentPublication(): Promise<PublicationRead> {
       pricingEngineVersion: null,
       snapshotSha256: null,
       publishedAt: null,
-      databaseNow: typeof result.databaseNow === 'string' ? result.databaseNow : '',
+      databaseNow,
       snapshot: null,
     };
   }
@@ -117,9 +128,6 @@ async function readCurrentPublication(): Promise<PublicationRead> {
     typeof result.snapshotSha256 !== "string" ||
     !/^[0-9a-f]{64}$/.test(result.snapshotSha256) ||
     typeof result.publishedAt !== "string" ||
-    typeof result.databaseNow !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(result.databaseNow) ||
-    !Number.isFinite(Date.parse(result.databaseNow)) ||
     !result.snapshot ||
     typeof result.snapshot !== "object" ||
     Array.isArray(result.snapshot)
@@ -131,7 +139,7 @@ async function readCurrentPublication(): Promise<PublicationRead> {
     throw new Error("Published catalog snapshot schema version is inconsistent");
   }
 
-  return result as PublicationRead;
+  return { ...result, databaseNow } as PublicationRead;
 }
 
 Deno.serve(async (req: Request) => {
