@@ -1543,15 +1543,12 @@ async function loadDeliveryDispatch(){
     deliveryTasksByOrder.clear();dispatchRiders=[];return;
   }
   const branchId=String(flameChickStaffProfile.branch_id);
-  const [tasks,riders]=await Promise.all([
-    flameChickDirectRest('delivery_tasks',{
-      select:'id,order_id,branch_id,status,recipient_name_snapshot,recipient_phone_snapshot,address_snapshot,area_name_snapshot,delivery_fee_snapshot,delivery_instructions_snapshot,dispatch_started_at,assigned_at,picked_up_at,out_for_delivery_at,delivered_at,failed_at,failure_reason,return_reported_at,return_confirmed_at,created_at,delivery_assignments(id,rider_user_id,status,is_current,assigned_at,accepted_at,arrived_at,picked_up_at,delivered_at,created_at,ended_at,end_reason)',
-      branch_id:'eq.'+branchId,status:'in.(dispatch_pending,offering,assigned,accepted,arrived_at_restaurant,out_for_delivery,failed)',order:'created_at.asc',limit:'100'
-    }),
-    flameChickDirectRest('rider_profiles',{select:'user_id,rider_code,display_name,phone,availability_status,accepting_jobs,is_active,last_seen_at',branch_id:'eq.'+branchId,is_active:'eq.true',order:'display_name.asc'})
-  ]);
-  deliveryTasksByOrder=new Map((Array.isArray(tasks)?tasks:[]).map(task=>[String(task.order_id),task]));
-  dispatchRiders=Array.isArray(riders)?riders:[];
+  const response=await flameChickDeliveryRequest('GET',{view:'dispatch'});
+  const data=response&&response.data?response.data:{};
+  const tasks=Array.isArray(data.tasks)?data.tasks:[];
+  const riders=Array.isArray(data.riders)?data.riders:[];
+  deliveryTasksByOrder=new Map(tasks.map(task=>[String(task.order_id),task]));
+  dispatchRiders=riders;
 }
 function riderNameFor(userId){
   const rider=dispatchRiders.find(x=>String(x.user_id)===String(userId));
@@ -1671,11 +1668,7 @@ async function assignRiderToOrder(orderId,riderUserId,button){
     const assignments=Array.isArray(task.delivery_assignments)?task.delivery_assignments:[];
     const current=assignments.find(x=>x.is_current===true)||null;
     const pendingReassignment=task.status==='assigned'&&current?.status==='assigned'&&!current.accepted_at;
-    if(pendingReassignment){
-      await flameChickDirectRpc('flame_chick_admin_reassign_delivery',{p_delivery_task_id:task.id,p_rider_user_id:riderUserId});
-    }else{
-      await flameChickDeliveryRequest('POST',null,{action:'assign',delivery_task_id:task.id,rider_user_id:riderUserId});
-    }
+    await flameChickDeliveryRequest('POST',null,{action:'assign',delivery_task_id:task.id,rider_user_id:riderUserId});
     closeModal('assignRiderModal');
     await loadInitialOnlineInbox();
     showToast(pendingReassignment?'Delivery reassigned. The new rider has 60 seconds to accept.':'Rider assigned. They have 60 seconds to accept. The order stays Ready until pickup.');
@@ -1892,13 +1885,10 @@ function normalizeNewOrdersResponse(res){
 }
 
 async function fetchWebsiteOrders(cursor,limit=100){
-  const branchId=String(flameChickStaffProfile?.branch_id||'');
-  if(!branchId)throw new Error('Your Flame Chick staff account is not assigned to a branch.');
-  const rows=await flameChickDirectRest('orders',{
-    select:'id,branch_id,order_number,local_order_id,source,fulfillment_type,status,customer_name,customer_phone,delivery_address,delivery_area_name_snapshot,payment_method_summary,payment_status,notes,subtotal,delivery_fee,total,placed_at,created_at,updated_at,order_items(id,line_number,quantity,product_name_snapshot,variant_label_snapshot,deal_title_snapshot,unit_price_snapshot,line_total,item_notes,order_item_modifiers(modifier_name_snapshot,unit_price_snapshot))',
-    branch_id:'eq.'+branchId,status:'in.(new,accepted,preparing,ready,out_for_delivery)',order:'created_at.desc',limit:String(Math.max(1,Math.min(limit,100)))
-  });
-  return {orders:(Array.isArray(rows)?rows:[]).map(flameChickNormalizeOrder),nextCursor:'',hasMore:false,signalVersion:String(Date.now()),success:true};
+  if(!flameChickStaffProfile?.branch_id)throw new Error('Your Flame Chick staff account is not assigned to a branch.');
+  const response=await flameChickOrderRequest('GET',{board:'active',limit:String(Math.max(1,Math.min(limit,100)))});
+  const rows=Array.isArray(response.data)?response.data:[];
+  return {orders:rows.map(flameChickNormalizeOrder),nextCursor:'',hasMore:false,signalVersion:String(Date.now()),success:true};
 }
 
 async function loadInitialOnlineInbox(){
@@ -2019,13 +2009,10 @@ function applyDatabaseOrderStatus(order,row){
   return true;
 }
 async function readCanonicalOrderStatus(orderId){
-  const rows=await flameChickDirectRest('orders',{
-    select:'id,status,updated_at',
-    id:'eq.'+String(orderId),
-    limit:'1'
-  });
-  if(!Array.isArray(rows)||!rows[0]?.status)throw new Error('The saved order status could not be read back from the database.');
-  return rows[0];
+  const response=await flameChickOrderRequest('GET',{board:'all',order_id:String(orderId),limit:'1'});
+  const rows=Array.isArray(response.data)?response.data:[];
+  if(!rows[0]?.status)throw new Error('The saved order status could not be read back from the database.');
+  return {id:rows[0].id,status:rows[0].status,updated_at:rows[0].updated_at};
 }
 async function updateOnlineOrderStatus(orderId,status){
   const key=String(orderId||'').trim(),order=inboxOrders.get(key);
@@ -4398,18 +4385,13 @@ function renderHistoryRows(rows){
 }
 async function fetchServerHistory(source,limit=100){
   if(!FLAME_CHICK_ORDER_API_READY||!flameChickStaffSession?.access_token)return [];
-  const branchId=String(flameChickStaffProfile?.branch_id||'');
-  if(!branchId)throw new Error('Your Flame Chick staff account is not assigned to a branch.');
-  const rows=await flameChickDirectRest('orders',{
-    // History cards and receipt previews need summary fields, not internal snapshots or nested deal-component trees.
-    select:"id,branch_id,order_number,local_order_id,source,fulfillment_type,status,customer_name,customer_phone,delivery_address,delivery_area_name_snapshot,table_number_snapshot,subtotal,discount_amount,delivery_fee,total,payment_status,payment_method_summary,notes,placed_at,created_at,updated_at,order_items(id,line_number,quantity,product_name_snapshot,variant_label_snapshot,deal_title_snapshot,unit_price_snapshot,line_total,order_item_modifiers(modifier_name_snapshot,unit_price_snapshot))",
-    branch_id:'eq.'+branchId,
-    order:'created_at.desc',
-    limit:String(Math.max(1,Math.min(limit,100)))
-  });
-  const normalized=(Array.isArray(rows)?rows:[]).map(flameChickNormalizeOrder).map(normalizeHistoryOrder).filter(Boolean);
+  if(!flameChickStaffProfile?.branch_id)throw new Error('Your Flame Chick staff account is not assigned to a branch.');
+  const query={board:'all',limit:String(Math.max(1,Math.min(limit,100)))};
   const wanted=String(source||'').toLowerCase();
-  return normalized.filter(o=>!wanted||String(o.orderSource||'').toLowerCase()===(wanted==='website'?'website':'pos'));
+  if(wanted)query.source=wanted==='website'?'website':'pos';
+  const response=await flameChickOrderRequest('GET',query);
+  const rows=Array.isArray(response.data)?response.data:[];
+  return rows.map(flameChickNormalizeOrder).map(normalizeHistoryOrder).filter(Boolean);
 }
 async function refreshHistoryData(){
   if(historyLoading)return;
