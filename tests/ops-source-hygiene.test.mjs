@@ -36,3 +36,26 @@ test("POS and Rider inline JavaScript parses", () => {
 test("rider Realtime channel uses the Flame Chick namespace", () => {
   assert.match(source[1].html, /flame-chick-rider-ops-/);
 });
+
+
+test("POS loads private staff context, orders, history, and dispatch only through authorized Edge APIs", () => {
+  const html = source[0].html;
+  assert.match(html, /API_URL\+'\?view=staff_context'/);
+  assert.match(html, /flameChickOrderRequest\('GET',\{board:'active'/);
+  assert.match(html, /flameChickOrderRequest\('GET',\{board:'all'/);
+  assert.match(html, /flameChickDeliveryRequest\('GET',\{view:'dispatch'\}\)/);
+  assert.match(html, /action:'assign',delivery_task_id:/);
+  assert.doesNotMatch(html, /FLAME_CHICK_REST_URL/);
+  assert.doesNotMatch(html, /flameChickDirectRest\(/);
+  assert.doesNotMatch(html, /flameChickDirectRpc\(/);
+});
+
+test("Rider obtains its branch-scoped profile and account roles through authenticated APIs", () => {
+  const html = source[1].html;
+  assert.match(html, /DELIVERY_API\+'\?view=profile'/);
+  assert.match(html, /ORDER_API\+'\?view=staff_context'/);
+  assert.doesNotMatch(html, /REST_URL/);
+  assert.doesNotMatch(html, /riderDirectRead\(/);
+  assert.doesNotMatch(html, /user_roles\?select=role/);
+  assert.doesNotMatch(html, /rider_profiles\?select=/);
+});
