@@ -74,30 +74,113 @@ async function verifyStaffUser(token: string, apiKey: string): Promise<{ id: str
 
 const FLAME_CHICK_MAIN_BRANCH_ID = Deno.env.get("FLAME_CHICK_MAIN_BRANCH_ID") ?? "";
 
-async function verifyStaffRole(
-  userId: string,
-  token: string,
-  apiKey: string,
-  allowedRoles: string[],
-): Promise<boolean> {
-  if (!userId || !token || !apiKey || !SUPABASE_URL || !FLAME_CHICK_MAIN_BRANCH_ID || allowedRoles.length === 0) return false;
-  const query = new URLSearchParams();
-  query.set("select", "role,branch_id");
-  query.set("user_id", "eq." + userId);
-  query.set("is_active", "eq.true");
-  query.set("role", "in.(" + allowedRoles.join(",") + ")");
-  query.set("or", "(branch_id.is.null,branch_id.eq." + FLAME_CHICK_MAIN_BRANCH_ID + ")");
-  query.set("limit", "5");
-  const res = await fetch(SUPABASE_URL + "/rest/v1/user_roles?" + query.toString(), {
+async function readAsService(path: string): Promise<{ ok: true; data: unknown } | { ok: false; status: number; data: unknown }> {
+  const res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
     method: "GET",
-    headers: { apikey: apiKey, Authorization: "Bearer " + token, Accept: "application/json" },
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: "Bearer " + SERVICE_KEY,
+      Accept: "application/json",
+    },
     cache: "no-store",
   });
-  if (!res.ok) return false;
-  const rows: unknown = await res.json();
-  return Array.isArray(rows) && rows.some((row) =>
-    isObject(row) && typeof row.role === "string" && allowedRoles.includes(row.role)
+  const raw = await res.text();
+  let data: unknown;
+  try { data = raw ? JSON.parse(raw) : []; } catch { data = []; }
+  return res.ok ? { ok: true, data } : { ok: false, status: res.status, data };
+}
+
+type StaffContext = {
+  user_id: string;
+  role: string;
+  branch_id: string;
+  restaurant_id: string;
+  roles: Array<{ role: string; branch_id: string | null }>;
+};
+
+async function resolveStaffContext(userId: string): Promise<StaffContext | null> {
+  if (!userId || !SUPABASE_URL || !SERVICE_KEY) return null;
+
+  const restaurantQuery = new URLSearchParams();
+  restaurantQuery.set("select", "id");
+  restaurantQuery.set("slug", "eq.flame-chick");
+  restaurantQuery.set("is_active", "eq.true");
+  restaurantQuery.set("limit", "2");
+  const restaurantResult = await readAsService("restaurants?" + restaurantQuery.toString());
+  if (!restaurantResult.ok || !Array.isArray(restaurantResult.data) || restaurantResult.data.length !== 1) return null;
+  const restaurant = restaurantResult.data[0];
+  if (!isObject(restaurant) || typeof restaurant.id !== "string") return null;
+
+  const roleQuery = new URLSearchParams();
+  roleQuery.set("select", "role_key,branch_id,is_active");
+  roleQuery.set("user_id", "eq." + userId);
+  roleQuery.set("restaurant_id", "eq." + restaurant.id);
+  roleQuery.set("is_active", "eq.true");
+  roleQuery.set("role_key", "in.(owner,admin,manager,cashier,rider)");
+  roleQuery.set("limit", "20");
+  const roleResult = await readAsService("user_roles?" + roleQuery.toString());
+  if (!roleResult.ok || !Array.isArray(roleResult.data)) return null;
+
+  const roleRows = roleResult.data.filter((row): row is Record<string, unknown> =>
+    isObject(row) &&
+    typeof row.role_key === "string" &&
+    ["owner", "admin", "manager", "cashier", "rider"].includes(row.role_key) &&
+    row.is_active === true &&
+    (row.branch_id === null || typeof row.branch_id === "string")
   );
+  if (!roleRows.length) return null;
+
+  const branchIds = [...new Set(roleRows.map((row) => typeof row.branch_id === "string" ? row.branch_id : null).filter((id): id is string => !!id))];
+  const branchQuery = new URLSearchParams();
+  branchQuery.set("select", "id,branch_code,is_active");
+  branchQuery.set("restaurant_id", "eq." + restaurant.id);
+  branchQuery.set("is_active", "eq.true");
+  branchQuery.set("order", "branch_code.asc");
+  branchQuery.set("limit", "100");
+  if (branchIds.length) branchQuery.set("id", "in.(" + branchIds.join(",") + ")");
+  const branchResult = await readAsService("branches?" + branchQuery.toString());
+  if (!branchResult.ok || !Array.isArray(branchResult.data)) return null;
+  const branches = branchResult.data.filter((row): row is Record<string, unknown> =>
+    isObject(row) && typeof row.id === "string" && row.is_active === true
+  );
+  if (!branches.length) return null;
+
+  const globalRoles = roleRows.filter((row) => row.branch_id === null);
+  const branchScopedRoles = roleRows.filter((row) => typeof row.branch_id === "string");
+  const validBranchRoles = branchScopedRoles.filter((row) => branches.some((branch) => branch.id === row.branch_id));
+  const usableRoles = [...globalRoles, ...validBranchRoles];
+  if (!usableRoles.length) return null;
+
+  // This first release is single-branch. Refuse to guess if a global role would
+  // need to choose between multiple active branches; branch selection is a later
+  // explicit UI feature, not a silent cross-branch default.
+  if (globalRoles.length && branches.length !== 1) return null;
+  const priority: Record<string, number> = { owner: 1, admin: 2, manager: 3, cashier: 4, rider: 5 };
+  usableRoles.sort((a, b) => (priority[String(a.role_key)] ?? 99) - (priority[String(b.role_key)] ?? 99));
+  const selected = usableRoles[0];
+  const branchId = typeof selected.branch_id === "string" ? selected.branch_id : String(branches[0].id);
+  if (!branches.some((branch) => branch.id === branchId)) return null;
+
+  return {
+    user_id: userId,
+    role: String(selected.role_key),
+    branch_id: branchId,
+    restaurant_id: String(restaurant.id),
+    roles: usableRoles.map((row) => ({
+      role: String(row.role_key),
+      branch_id: typeof row.branch_id === "string" ? row.branch_id : null,
+    })),
+  };
+}
+
+async function verifyStaffRole(
+  userId: string,
+  _token: string,
+  _apiKey: string,
+  allowedRoles: string[],
+): Promise<boolean> {
+  const context = await resolveStaffContext(userId);
+  return !!context && allowedRoles.includes(context.role);
 }
 
 function getClientIp(req: Request): string {
@@ -134,7 +217,7 @@ async function callRpc(name: "flame_chick_create_order" | "flame_chick_update_or
   return { ok: true as const, data };
 }
 
-async function readOrderBoard(token: string, apiKey: string, board: string, limit: number) {
+async function readOrderBoard(token: string, apiKey: string, board: string, limit: number, branchId: string) {
   const allowedBoards: Record<string, string[]> = {
     orders: ["new", "accepted"],
     preparing: ["preparing", "ready"],
@@ -152,6 +235,7 @@ async function readOrderBoard(token: string, apiKey: string, board: string, limi
     "select",
     "id,branch_id,order_number,local_order_id,source,source_reference,fulfillment_type,status,customer_name,customer_phone,customer_email,delivery_address,delivery_area_id,delivery_area_name_snapshot,delivery_area_fee_snapshot,delivery_instructions,table_id,table_number_snapshot,subtotal,discount_amount,tax_amount,service_charge,delivery_fee,tip_amount,total,paid_amount,balance_due,currency_code,payment_status,payment_method_summary,notes,internal_notes,placed_at,created_at,updated_at,accepted_at,preparing_at,ready_at,out_for_delivery_at,delivered_at,collected_at,served_at,completed_at,rejected_at,cancelled_at,rejection_reason,cancellation_reason,cashier_id,pos_device_id,register_session_id,last_status_changed_by,last_status_actor_type,last_status_change_reason,order_items(id,line_number,product_id,product_variant_id,deal_id,quantity,product_name_snapshot,variant_label_snapshot,deal_title_snapshot,unit_price_snapshot,discount_amount,tax_amount,line_total,item_notes,item_snapshot,order_item_modifiers(id,order_item_component_id,modifier_group_id,modifier_id,quantity,modifier_group_name_snapshot,modifier_name_snapshot,unit_price_snapshot,total_price_snapshot,modifier_snapshot),order_item_components(id,deal_component_id,component_type,selected_product_id,selected_variant_id,selected_drink_option_id,quantity,name_snapshot,variant_snapshot,volume_snapshot,unit_price_snapshot,component_snapshot,order_item_modifiers(id,modifier_group_id,modifier_id,quantity,modifier_group_name_snapshot,modifier_name_snapshot,unit_price_snapshot,total_price_snapshot,modifier_snapshot))),delivery_tasks(id,status,recipient_name_snapshot,recipient_phone_snapshot,address_snapshot,area_name_snapshot,delivery_fee_snapshot,delivery_instructions_snapshot,dispatch_started_at,assigned_at,picked_up_at,out_for_delivery_at,delivered_at,failed_at,failure_reason)"
   );
+  query.set("branch_id", "eq." + branchId);
   query.set("status", "in.(" + statuses.join(",") + ")");
   query.set("order", "created_at.desc");
   query.set("limit", String(Math.max(1, Math.min(limit, 100))));
@@ -193,10 +277,20 @@ Deno.serve(async (req: Request) => {
     const canReadBoard = await verifyStaffRole(user.id, token, apiKey, ["owner", "admin", "manager", "cashier", "kitchen"]);
     if (!canReadBoard) return response({ ok: false, error: { code: "STAFF_ROLE_REQUIRED", message: "An active Flame Chick staff role is required to view the order board." } }, 403);
     const url = new URL(req.url);
+    const view = (url.searchParams.get("view") ?? "").toLowerCase();
+    if (view === "staff_context") {
+      const context = await resolveStaffContext(user.id);
+      if (!context) return response({ ok: false, error: { code: "STAFF_ROLE_OR_BRANCH_REQUIRED", message: "Your account needs an active Flame Chick staff role and a single authorized branch." } }, 403);
+      return response({ ok: true, staff: context });
+    }
+    const context = await resolveStaffContext(user.id);
+    if (!context || !["owner", "admin", "manager", "cashier"].includes(context.role)) {
+      return response({ ok: false, error: { code: "STAFF_ROLE_REQUIRED", message: "An active Flame Chick POS role is required to view incoming orders." } }, 403);
+    }
     const board = (url.searchParams.get("board") ?? "active").toLowerCase();
     const requestedLimit = Number(url.searchParams.get("limit") ?? 50);
     const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(Math.trunc(requestedLimit), 100)) : 50;
-    const result = await readOrderBoard(token, apiKey, board, limit);
+    const result = await readOrderBoard(token, apiKey, board, limit, context.branch_id);
     if (!result.ok) return response(result.body, result.status);
     return response({ ok: true, data: result.data });
   }
