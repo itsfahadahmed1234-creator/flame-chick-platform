@@ -136,7 +136,9 @@ test("POS exposes Cashier payment collection only for delivered orders and prese
   assert.ok(html.includes("state.sent&&(state.amount!==amount||state.method!==method)"));
   assert.match(html,/action:'collect_payment',order_id:state\.orderId,amount/);
   assert.match(html,/payment_method:method,request_id:state\.requestId/);
-  assert.match(html,/state\.requestId=crypto\.randomUUID\(\)/);
+  assert.ok(html.includes("paymentCollectionState={orderId:key,requestId:crypto.randomUUID(),amount:null,method:'cash',sent:false}"));
+  assert.ok(html.includes("state.sent&&(state.amount!==amount||state.method!==method)"));
+  assert.ok(html.includes("state.sent=true"));
   assert.match(html,/A partial collection keeps the order Delivered/);
   assert.match(html,/order\.Status!=='Delivered'/);
   assert.doesNotMatch(html,/public\.payments\?select=|flame_chick_collect_order_payment|INSERT INTO public\.payments/);
