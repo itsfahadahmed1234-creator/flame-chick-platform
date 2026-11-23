@@ -75,6 +75,12 @@ test('product cards do not expose an add-to-cart operation or compute a combined
   assert.match(source, /showVariantBasePrice: false/);
 });
 
+test('single-variant product selector does not render a duplicate placeholder choice', async () => {
+  const source = await read('js/catalog-preview-page.js');
+  assert.match(source, /if \(product\.variants\.length > 1\)\s*\{\s*var placeholderOption/);
+  assert.match(source, /if \(product\.variants\.length === 1\) variantSelect\.value = product\.variants\[0\]\.id/);
+});
+
 test('preview CSS has responsive product/deal layouts and explicitly hides legacy add controls', async () => {
   const css = await read('css/catalog-preview.css');
   assert.match(css, /@media \(max-width: 600px\)/);
