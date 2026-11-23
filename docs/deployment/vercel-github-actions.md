@@ -1,89 +1,54 @@
-# Flame Chick — GitHub Actions to Vercel Preview Deployments
+# Flame Chick — Vercel Preview Deployment Targets
 
-Date: 2026-11-21
-Branch: `work/production-source-audit`
-Repository: `itsfahadahmed1234-creator/flame-chick-platform`
+Date: 2026-11-23  
+Repository: `itsfahadahmed1234-creator/flame-chick-platform`  
+Working branch: `work/production-source-audit`
 
-## Why this pipeline exists
+## Verified Vercel target mapping
 
-Vercel's current GitHub login connection cannot see the private production repository under the second personal GitHub account. Rather than disconnect the existing GitHub account, transfer repository ownership, make the repository public, or upgrade the Vercel Hobby plan, these four new Vercel projects can be deployed through the Vercel CLI from GitHub Actions.
+Vercel team: `fahad-7455` (`team_Rpf9jeGg9r3cmMguFXHtziqz`).
 
-This setup is preview-only. It does not configure Vercel Git integration.
-
-## Vercel targets
-
-All targets are in the existing Vercel Hobby team `team_lrFy9ILYEz9umsBy98GCyQjI`.
-
-| App | Local app root | Vercel project | Project ID |
+| App | Vercel project | Project ID | App root |
 |---|---|---|---|
-| Admin | `apps/flame-chick-admin` | `flame-chick-admin-production` | `prj_139YvQ8CHvwSXsZ2xrno5x55STfz` |
-| POS | `apps/flame-chick-pos` | `flame-chick-pos-production` | `prj_gWdAt4laY3HDNPKRScmBWuYzQLmR` |
-| Rider | `apps/flame-chick-rider` | `flame-chick-rider-production` | `prj_YxlMceDeGpdVmMneGs5GhhPI2hbl` |
-| Website | `apps/flame-chick-website` | `flame-chick-website-production` | `prj_jwin4eFY0BXIgZUgcZGAuntybqkI` |
+| Website | `flame-chick-website-production` | `prj_izBWyrFmPZIm63FHAT4jaLHUTLzu` | `apps/flame-chick-website` |
+| Admin | `flame-chick-admin-production` | `prj_kPEqsepRzivOJhNeA32Io3netjav` | `apps/flame-chick-admin` |
+| POS | `flame-chick-pos-production` | `prj_gh1UnkZKnFnehWEs5eYhiXa40Xj5` | `apps/flame-chick-pos` |
+| Rider | `flame-chick-rider-production` | `prj_U3djCTfZK0Ubl808umChQn7MPPNg` | `apps/flame-chick-rider` |
 
-The Vercel team ID is used as `VERCEL_ORG_ID`; project IDs are pinned in their corresponding workflow files.
+All four Vercel project records are linked to the GitHub repository `itsfahadahmed1234-creator/flame-chick-platform`. The project detail records show SSO protection enabled, no custom domains and no latest deployment. The project deployment lists were empty at the time of this checkpoint.
 
 ## Workflow behavior
 
-- Admin: `.github/workflows/deploy-flame-chick-admin-preview.yml`
-- POS: `.github/workflows/deploy-flame-chick-pos-preview.yml`
-- Rider: `.github/workflows/deploy-flame-chick-rider-preview.yml`
-- Website: `.github/workflows/deploy-flame-chick-website-preview.yml`
+- `.github/workflows/deploy-flame-chick-website-preview.yml`
+- `.github/workflows/deploy-flame-chick-admin-preview.yml`
+- `.github/workflows/deploy-flame-chick-pos-preview.yml`
+- `.github/workflows/deploy-flame-chick-rider-preview.yml`
 
-Each workflow:
-- Runs only on `work/production-source-audit`.
-- Watches only its app folder for push-triggered runs. Manual dispatch is intentionally omitted while the workflow files remain on this non-default working branch.
-- Has an explicit fail-closed repository Actions variable gate.
-- Uses the shared GitHub Environment `flame-chick-preview`.
-- Uses pinned GitHub Actions and Vercel CLI `65.17.0`.
-- Deploys only with `--target=preview`; no production deploy, promotion, domain assignment, Supabase migration, or production release command exists.
-- Deploys from its app's own static root.
-- Reads the Vercel token only from the protected GitHub Environment secret. No token is stored in Git.
+Each workflow is pinned to `work/production-source-audit`, runs from its app working directory, and uses `vercel@65.17.0` with `--target=preview`. No production deployment, domain assignment or promotion command is present.
 
-## Required GitHub configuration — not yet performed
+## Required GitHub configuration (not yet configured)
 
-Before a preview workflow can deploy:
+Each workflow uses a fail-closed gate. Before any preview is deployed, the repository owner must configure:
 
-1. Open repository Settings → Environments and create `flame-chick-preview`.
-2. Add at least one required reviewer (the release owner); prevent self-review if available. Do not bypass protection rules.
-3. Add the secret `VERCEL_TOKEN` to this environment. Create a Vercel token scoped to the existing Hobby team where possible. Never paste it into chat, source, workflow files, or logs.
-4. In repository Settings → Secrets and variables → Actions → Variables, create only the app-specific variable after that app passes its readiness review:
-   - Admin: `FLAME_CHICK_ADMIN_PREVIEW_DEPLOY_ENABLED=true`
-   - POS: `FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED=true`
-   - Rider: `FLAME_CHICK_RIDER_PREVIEW_DEPLOY_ENABLED=true`
-   - Website: `FLAME_CHICK_WEBSITE_PREVIEW_DEPLOY_ENABLED=true`
+1. GitHub Environment `flame-chick-preview`, with a required reviewer.
+2. Environment secret `VERCEL_TOKEN`, scoped to the verified Vercel team.
+3. Repository Actions variables:
+   - `FLAME_CHICK_WEBSITE_PREVIEW_DEPLOY_ENABLED=true`
+   - `FLAME_CHICK_ADMIN_PREVIEW_DEPLOY_ENABLED=true`
+   - `FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED=true`
+   - `FLAME_CHICK_RIDER_PREVIEW_DEPLOY_ENABLED=true`
 
-   Keep all four variables absent or false until their app-specific review. These must be repository-level Actions variables: job-level conditions need to evaluate them before environment approval.
-5. Verify the Vercel token has access to the intended team and all four project IDs. Do not add Supabase secret/service-role keys to GitHub Actions; browser apps must use only the public publishable key.
+Do not set an app variable until that app's backend and app-specific readiness gate passes. The GitHub connector available during this checkpoint could not create Actions secrets or variables. The deployment workflows therefore skipped; do not report them as deployed.
 
-GitHub Actions secrets and variables are configured by the repository owner/maintainer. This setup does not claim they have been created.
+## Current limitations
 
-## Readiness gates — do not bypass
+- Vercel project environment variable listings were empty. App configuration currently embeds only public Supabase URL/publishable key values; no service-role/secret key is included in the apps.
+- An update request was sent to set each Vercel project root directory to its app root. The project-summary API response omits `rootDirectory`, so the setting could not be independently verified; the workflows explicitly use each app's working directory.
+- No Vercel deployment exists yet.
+- Deployment of the customer website, POS and Rider is not a functional release until their required Supabase Edge Functions and operational database tables/RPCs are implemented and verified.
+- Admin's current production Staff Admin Edge Function is version 1; the current Catalog V3 function source has not been deployed.
+- Keep the SSO protection enabled for previews. No custom domain or production alias changes are authorized by this document.
 
-The workflow existing does not mean an app is production-ready. Current app documentation records:
-- Production schema/menu/backend migrations are not yet fully complete and verified.
-- Staff Admin Edge Function is not deployed. The Admin invitation acceptance page is implemented, but its Auth redirect/origin configuration and new-user/existing-user live tests remain outstanding.
-- Admin dashboard, orders, menu, deals, delivery, media and settings APIs are incomplete; those panels remain disabled.
-- POS needs schema/menu, branch/staff-role setup and controlled checkout/dispatch end-to-end testing.
-- Rider needs Production onboarding/Auth/role/profile setup and full assignment-to-return workflow testing.
-- Website needs schema, published menu, storage assets, delivery areas and checkout/availability testing.
+## Release policy
 
-Enable one preview gate only after its app-specific review. Keep Vercel SSO protection enabled while testing.
-
-## Validation and release policy
-
-- The current working branch is the only permitted deployment source. Do not merge these workflows into `main` or widen branch filters without a separate release approval.
-- Preview deployments are for protected QA only. Verify the generated URL is HTTPS on `.vercel.app` and test functionality, authentication, CORS and role isolation.
-- No production deployment or custom domain assignment is authorized by this pipeline.
-- Before designing a production pipeline, establish protected `main`, required checks, a production environment with reviewers, final custom domains, per-app environment configuration, rollback plan and release approval.
-- Never deploy Supabase migrations from these app workflows. Database changes require a separate reviewed and approved migration process.
-- Do not put customer, order, staff, rider or operational data in build artifacts.
-
-## Current status
-
-- Four new Vercel projects exist and were verified in the intended Hobby team.
-- No Git integration is connected to those projects.
-- No deployment has been made. The invitation acceptance page is source-complete but not live-tested against Production Auth.
-- No Vercel token, GitHub Environment secret, repository variable, or app environment variable has been created by this setup.
-- Four workflow files have been committed to `work/production-source-audit` with deploy-enable variables absent by default.
-- Existing Vercel projects and the existing `befahad1234-cmyk` GitHub connection were not changed.
+Production database migrations/import/publication, Edge Function replacement, Auth/Storage/Realtime configuration, custom domains, Vercel production deploy/promotion and checkout activation require a separate reviewed and approved release step. Keep `main` untouched until the PR/release review is completed.
