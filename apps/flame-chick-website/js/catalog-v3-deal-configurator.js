@@ -370,7 +370,8 @@
               var changed = setOptionQuantity(group.id, option.id, next);
               if (!changed.ok) lastError = changed;
               render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: controlKey,
-                formatMoney: options.formatMoney });
+                formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel,
+                showVariantBasePrice: options.showVariantBasePrice });
             });
             optionRow.appendChild(quantity);
             groupSet.appendChild(optionRow);
@@ -437,7 +438,7 @@
         if (!payload.ok) {
           lastError = payload;
           render(container, { document: doc, onComplete: options.onComplete, formatMoney: options.formatMoney,
-            completeButtonLabel: options.completeButtonLabel });
+            completeButtonLabel: options.completeButtonLabel, showVariantBasePrice: options.showVariantBasePrice });
           return;
         }
         options.onComplete(payload);
