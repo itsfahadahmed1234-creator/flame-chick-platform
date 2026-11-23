@@ -1428,7 +1428,7 @@ function riderNameFor(userId){
   return rider?.display_name||rider?.rider_code||'Assigned rider';
 }
 function dispatchStatusLabel(status){
-  return ({dispatch_pending:'Awaiting rider',offering:'Offering to riders',assigned:'Assigned · awaiting response',accepted:'Accepted by rider',arrived_at_restaurant:'Rider at restaurant',picked_up:'Picked up',out_for_delivery:'Out for delivery',delivered:'Delivered',failed:'Delivery issue',cancelled:'Cancelled'})[String(status||'')]||String(status||'Dispatch pending');
+  return ({dispatch_pending:'Awaiting rider',offering:'Offering to riders',accepted:'Accepted by rider',out_for_delivery:'Out for delivery',delivered:'Delivered',failed:'Delivery issue',cancelled:'Cancelled'})[String(status||'')]||String(status||'Dispatch pending');
 }
 function ensureDeliveryAcceptanceTicker(){
   if(deliveryAcceptanceTicker)return;
@@ -1448,7 +1448,7 @@ function renderDeliveryDispatchAction(order){
   if(!task)return '<span class="pill pending">Checking dispatch…</span>';
   const assignments=Array.isArray(task.delivery_assignments)?task.delivery_assignments:[];
   const latest=[...assignments].sort((a,b)=>new Date(b.assigned_at||b.created_at||0)-new Date(a.assigned_at||a.created_at||0))[0]||null;
-  const activeStatuses=['assigned','accepted','arrived_at_restaurant','picked_up','out_for_delivery'];
+  const activeStatuses=['accepted','out_for_delivery'];
   const current=assignments.find(x=>x.is_current===true&&activeStatuses.includes(String(x.status||'')))||null;
   const role=String(flameChickStaffProfile?.role||'').toLowerCase();
   if(task.status==='failed'){
