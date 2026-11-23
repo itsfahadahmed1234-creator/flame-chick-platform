@@ -8,6 +8,11 @@ const names = ["flame-chick-catalog", "flame-chick-order-api", "flame-chick-deli
 const sources = Object.fromEntries(names.map((name) => [name, readFileSync(root + name + "/index.ts", "utf8")]));
 const paymentMigration=readFileSync("supabase/migrations/20261123173000_flame_chick_payment_collection_v1.sql","utf8");
 const deliveryFixture=readFileSync("supabase/tests/flame_chick_delivery_commands_v1.sql","utf8");
+const websiteOrderMigration=readFileSync("supabase/migrations/20261123174000_flame_chick_website_order_create_v1.sql","utf8");
+const websiteRetryMigration=readFileSync("supabase/migrations/20261123174100_flame_chick_website_order_idempotency_lookup_v1.sql","utf8");
+const websiteOrderFixture=readFileSync("supabase/tests/flame_chick_website_order_create_v1.sql","utf8");
+const websitePricing=readFileSync("supabase/functions/_shared/flame-chick-order-pricing.mjs","utf8");
+
 
 
 test("Edge Function sources contain no retired HFP identifiers", () => {
@@ -221,4 +226,92 @@ test("Disposable delivery/payment behavior fixture covers partial/full collectio
     "FINAL_PAYMENT_RETRY_NOT_IDEMPOTENT",
     "RETURNED_ORDER_PAYMENT_COLLECTION_NOT_DENIED"
   ]) assert.ok(deliveryFixture.includes(marker),marker);
+});
+
+
+test("Website order API exposes safe public V3 context and server-calculated quotes without staff authentication", () => {
+  const source=sources["flame-chick-order-api"];
+  const getStart=source.indexOf('if (req.method === "GET")');
+  const contextAt=source.indexOf('if(view==="website_context")',getStart);
+  const authAt=source.indexOf("const user = await verifyStaffUser",getStart);
+  const quoteAt=source.indexOf('if(action==="quote_website_order")');
+  assert.ok(getStart>=0&&contextAt>getStart&&authAt>contextAt);
+  assert.ok(quoteAt>0);
+  assert.match(source,/buildWebsiteContext\(\)/);
+  assert.match(source,/readActiveWebsiteBranches\(/);
+  assert.match(source,/readBranchDeliveryConfiguration\(/);
+  assert.match(source,/buildWebsiteOrderQuote\(body\)/);
+  assert.match(source,/calculateWebsiteOrder\(pricingSnapshot,pricingRequest/);
+  assert.match(source,/databaseNow:snapshot\.databaseNow/);
+  assert.doesNotMatch(source,/branch\.address\s*,|branch\.phone\s*,/);
+});
+
+test("Website create route uses stable request identity, HMAC phone privacy and the transactionally limited commit RPC", () => {
+  const source=sources["flame-chick-order-api"];
+  const start=source.indexOf('if(action==="create_website_order")');
+  const end=source.indexOf('if (action === "create")',start);
+  const route=source.slice(start,end);
+  assert.ok(start>=0&&end>start);
+  assert.match(route,/websiteRequestFingerprint\(body,normalizedPhone\)/);
+  assert.match(route,/lookupWebsiteOrderRetry\(branchValue,requestId,requestHash\)/);
+  assert.ok(route.indexOf("lookupWebsiteOrderRetry")<route.indexOf("buildWebsiteOrderQuote"));
+  assert.match(route,/hmacPhoneDigest\(normalizedPhone\)/);
+  assert.match(route,/phone_digest:phoneDigest/);
+  assert.match(route,/flame_chick_create_website_order/);
+  assert.doesNotMatch(route,/client_ip|x-forwarded-for|cf-connecting-ip/);
+  assert.match(source,/FLAME_CHICK_ORDER_PHONE_HMAC_SECRET/);
+});
+
+test("Legacy Website create payload fails closed and does not enter the V2 order creation path", () => {
+  const source=sources["flame-chick-order-api"];
+  const start=source.indexOf('if (action === "create")');
+  const end=source.indexOf('if (action === "collect_payment")',start);
+  const route=source.slice(start,end);
+  assert.ok(start>=0&&end>start);
+  assert.match(route,/WEBSITE_V3_CHECKOUT_REQUIRED/);
+  assert.doesNotMatch(route,/flame_chick_create_website_order/);
+});
+
+test("Website SQL commit rechecks publication, branch, delivery fee, idempotency and rolling phone quotas atomically", () => {
+  assert.match(websiteOrderMigration,/CREATE OR REPLACE FUNCTION public\.flame_chick_create_website_order\(p_payload jsonb\)/);
+  assert.match(websiteOrderMigration,/FOR SHARE OF cp/);
+  assert.match(websiteOrderMigration,/FOR SHARE OF b/);
+  assert.match(websiteOrderMigration,/FOR SHARE OF da/);
+  assert.match(websiteOrderMigration,/FOR SHARE OF s/);
+  assert.match(websiteOrderMigration,/pg_advisory_xact_lock/);
+  assert.match(websiteOrderMigration,/interval '1 minute'/);
+  assert.match(websiteOrderMigration,/interval '10 minutes'/);
+  assert.match(websiteOrderMigration,/interval '1 hour'/);
+  assert.match(websiteOrderMigration,/INSERT INTO app_private\.website_order_success_events/);
+  assert.match(websiteOrderMigration,/GRANT EXECUTE ON FUNCTION public\.flame_chick_create_website_order\(jsonb\) TO service_role/);
+  assert.match(websiteOrderMigration,/FOR SHARE OF cp[\s\S]*?INSERT INTO public\.orders/);
+  assert.doesNotMatch(websiteOrderMigration,/GRANT .* ON TABLE public\.orders/);
+});
+
+test("Website idempotency replay is a separate service-only read and rollback fixture checks all quota windows", () => {
+  assert.match(websiteRetryMigration,/CREATE OR REPLACE FUNCTION public\.flame_chick_get_website_order_by_idempotency\(p_payload jsonb\)/);
+  assert.match(websiteRetryMigration,/WEBSITE_ORDER_IDEMPOTENCY_CONFLICT/);
+  assert.match(websiteRetryMigration,/GRANT EXECUTE ON FUNCTION public\.flame_chick_get_website_order_by_idempotency\(jsonb\) TO service_role/);
+  for(const marker of [
+    "WEBSITE_DELIVERY_ORDER_COMMIT_FAILED",
+    "WEBSITE_CREATE_ORDER_IDEMPOTENCY_FAILED",
+    "WEBSITE_ORDER_IDEMPOTENCY_CONFLICT",
+    "WEBSITE_DELIVERY_FEE_REVALIDATION_FAILED",
+    "WEBSITE_PICKUP_ORDER_FAILED",
+    "WEBSITE_ONE_MINUTE_QUOTA_NOT_ENFORCED",
+    "WEBSITE_TEN_MINUTE_QUOTA_NOT_ENFORCED",
+    "WEBSITE_HOURLY_QUOTA_NOT_ENFORCED",
+    "ROLLBACK;"
+  ]) assert.ok(websiteOrderFixture.includes(marker),marker);
+});
+
+test("V3 website order pricing module refuses untrusted browser price fields and supports only published sellable variant identities", () => {
+  assert.match(websitePricing,/contract\.validateSnapshot\(snapshot\)/);
+  assert.match(websitePricing,/variant\.standaloneSellable !== true/);
+  assert.match(websitePricing,/variant\.price/);
+  assert.match(websitePricing,/pricingTreatment === "INCLUDED"/);
+  assert.match(websitePricing,/pricingTreatment === "SURCHARGE"/);
+  assert.match(websitePricing,/pricingTreatment === "STANDALONE"/);
+  assert.match(websitePricing,/modifierResult\.totalMinor/);
+  assert.doesNotMatch(websitePricing,/item\.unit_price|item\.line_total|item\.price/);
 });
