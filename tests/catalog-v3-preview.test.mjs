@@ -89,9 +89,9 @@ test('requires branch selection for multiple branches and invalidates views on b
 
   const changed = app.selectBranch(secondBranchId);
   assert.equal(changed.ok, true);
-  assert.equal(changed.state.selectedBranchId, secondBranchId);
-  assert.equal(changed.state.fulfilmentType, null);
-  assert.equal(changed.state.ready, false);
+  assert.equal(changed.state.selection.selectedBranchId, secondBranchId);
+  assert.equal(changed.state.selection.fulfilmentType, null);
+  assert.equal(changed.state.selection.ready, false);
   assert.equal(app.getPreview(), null);
   assert.equal(app.getState().previewReady, false);
 
@@ -202,7 +202,7 @@ test('reload invalidates the previous preview before requesting the catalog agai
     client: {
       load: async () => {
         loadCount += 1;
-        return { state: 'ready', snapshot, versionId: snapshot.versionId, databaseNow };
+        return { state: 'ready', snapshot: { ...snapshot, databaseNow }, versionId: snapshot.versionId, databaseNow };
       }
     }
   });
