@@ -51,6 +51,7 @@
         <button class="nav-item" data-page="deals" disabled title="Awaiting its secure production API"><span class="nav-icon">✳</span>Deals & offers</button>
         <button class="nav-item" data-page="delivery" disabled title="Awaiting its secure production API"><span class="nav-icon">⌁</span>Delivery areas</button>
         <button class="nav-item active" data-page="staff"><span class="nav-icon">♙</span>Staff & riders</button>
+        <button class="nav-item" data-page="catalog-v3" disabled title="Available to verified Admin and Owner accounts"><span class="nav-icon">▦</span>Catalog V3 draft</button>
         <button class="nav-item" data-page="media" disabled title="Awaiting its secure production API"><span class="nav-icon">▧</span>Website images</button>
         <button class="nav-item" data-page="settings" disabled title="Awaiting its secure production API"><span class="nav-icon">⚙</span>Website settings</button>
       </nav>
@@ -156,6 +157,10 @@
         <div id="areasList" class="area-list"><div class="surface empty-state">Loading delivery areas…</div></div>
       </section>
 
+      <section class="page" id="page-catalog-v3" hidden>
+        <div id="catalogV3Root"><div class="surface empty-state">Catalog V3 workspace will load after secure Admin verification.</div></div>
+      </section>
+
       <section class="page" id="page-staff" hidden>
         <div class="page-intro"><div><h2>Staff & riders</h2><p class="muted">Manage restaurant-wide Admin/Owner access and branch-scoped Manager, Cashier and Rider access.</p></div><button class="btn btn-primary" id="inviteStaffButton">＋ Invite team member</button></div>
         <div id="staffPageNote" class="data-note">Loading secured staff records…</div>
@@ -222,6 +227,7 @@
   </dialog>
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
   <script src="config.js"></script>
+  <script src="catalog-v3-admin.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
