@@ -52,6 +52,12 @@ jobs:
           grep -q "a.branch_id IS NULL OR EXISTS" "${migration}"
           grep -q "ACTIVE_DEAL_SCHEDULE_SET_INACTIVE" "${migration}"
           grep -q "CATALOG_VALIDATION_FIX_VERIFICATION_FAILED" "${migration}"
+          deal_only_migration="supabase/migrations/20261123150000_flame_chick_deal_only_variant_pricing_v1.sql"
+          test -s "${deal_only_migration}"
+          grep -q "DEAL_ONLY_VARIANT_NOT_MAPPED" "${deal_only_migration}"
+          grep -q "m.pricing_treatment IN ('INCLUDED','SURCHARGE')" "${deal_only_migration}"
+          grep -q "MAPPED_DEAL_ONLY_NULL_PRICE_WAS_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
+          grep -q "UNMAPPED_DEAL_ONLY_VARIANT_WAS_NOT_REJECTED" supabase/tests/catalog_publication_validation_fixes_v1.sql
           grep -q "CATALOG_PUBLICATION_HELPER_SECURITY_BASELINE_INVALID" "${migration}"
           grep -q "018c71056df82ef92fb0aa92f87713e9a91cba156156c7e2f300c12584b04712" "${migration}"
           grep -q "b79cd02dde2bca71dce7815516017bfc53b3f9e2e2c0deac1bd5c9a7ef2404e2" "${migration}"
