@@ -28,7 +28,8 @@ DECLARE
   v_order_id uuid;
   v_actor_id uuid;
   v_request_id uuid;
-  v_amount numeric(12,2);
+  v_amount numeric;
+  v_amount_input numeric;
   v_method text;
   v_role text;
   v_order public.orders%ROWTYPE;
@@ -66,13 +67,14 @@ BEGIN
     v_order_id := (p_payload->>'order_id')::uuid;
     v_actor_id := (p_payload->>'actor_user_id')::uuid;
     v_request_id := (p_payload->>'request_id')::uuid;
-    v_amount := (p_payload->>'amount')::numeric;
+    v_amount_input := (p_payload->>'amount')::numeric;
+    v_amount := v_amount_input;
   EXCEPTION WHEN OTHERS THEN
     RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
       'code','PAYMENT_REQUEST_INVALID','message','The payment request contains an invalid value.'));
   END;
 
-  IF v_amount<=0 OR v_amount<>pg_catalog.round(v_amount,2) THEN
+  IF v_amount<=0 OR v_amount<>pg_catalog.round(v_amount,2) OR v_amount>9999999999.99 THEN
     RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
       'code','PAYMENT_AMOUNT_INVALID','message','Payment amount must be greater than zero and use at most two decimal places.'));
   END IF;
@@ -149,7 +151,7 @@ BEGIN
 
   v_now := pg_catalog.clock_timestamp();
   v_next_paid := v_order.paid_amount+v_amount;
-  v_next_balance := pg_catalog.greatest(v_order.total-v_next_paid,0::numeric);
+  v_next_balance := GREATEST(v_order.total-v_next_paid,0::numeric);
   v_complete := v_next_balance=0;
   v_method_summary := CASE
     WHEN v_order.paid_amount=0 THEN v_method
