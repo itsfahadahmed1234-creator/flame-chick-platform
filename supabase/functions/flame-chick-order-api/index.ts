@@ -413,7 +413,7 @@ Deno.serve(async (req: Request) => {
       const code = String(err.code ?? "PAYMENT_COLLECTION_FAILED");
       const status = code === "PAYMENT_ORDER_NOT_FOUND" ? 404 :
         ["PAYMENT_STAFF_REQUIRED"].includes(code) ? 403 :
-        ["PAYMENT_ALREADY_SETTLED","PAYMENT_AMOUNT_EXCEEDS_BALANCE","PAYMENT_IDEMPOTENCY_CONFLICT","PAYMENT_ORDER_STATE_INVALID"].includes(code) ? 409 :
+        ["PAYMENT_ALREADY_SETTLED","PAYMENT_AMOUNT_EXCEEDS_BALANCE","PAYMENT_IDEMPOTENCY_CONFLICT","PAYMENT_ORDER_STATE_INVALID","PAYMENT_FINANCIAL_STATE_INVALID"].includes(code) ? 409 :
         ["PAYMENT_REQUEST_INVALID","PAYMENT_IDENTIFIERS_INVALID","PAYMENT_AMOUNT_INVALID","PAYMENT_METHOD_INVALID"].includes(code) ? 400 : 500;
       return response({ ok:false, error:{ code, message:String(err.message ?? "Payment collection could not be completed.") } },status);
     }
