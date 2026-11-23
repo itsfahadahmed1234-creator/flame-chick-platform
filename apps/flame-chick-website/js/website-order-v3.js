@@ -7,6 +7,24 @@
   'use strict';
 
   var $ = function (id) { return document.getElementById(id); };
+  var PENDING_CHECKOUT_STORAGE_KEY = 'flame-chick-v3-pending-checkout-id';
+  function validRequestId(value) {
+    return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  }
+  function readPendingRequestId() {
+    try {
+      var value = root.sessionStorage.getItem(PENDING_CHECKOUT_STORAGE_KEY);
+      return validRequestId(value) ? value : null;
+    } catch (_) { return null; }
+  }
+  function savePendingRequestId(value) {
+    if (!validRequestId(value)) return;
+    try { root.sessionStorage.setItem(PENDING_CHECKOUT_STORAGE_KEY, value); } catch (_) {}
+  }
+  function clearPendingRequestId() {
+    try { root.sessionStorage.removeItem(PENDING_CHECKOUT_STORAGE_KEY); } catch (_) {}
+  }
+
   var state = {
     snapshot: null, databaseNow: null, websiteContext: null,
     branchSelection: null, preview: null, cart: [],
@@ -519,7 +537,9 @@
       }
       state.quote = result.quote;
       state.quoteBody = body;
-      state.checkoutRequestId = null; state.checkoutBody = null;
+      // Only a random request UUID is stored, never customer or cart details.
+      state.checkoutRequestId = state.checkoutRequestId || readPendingRequestId();
+      state.checkoutBody = null;
       $('cart-summary').hidden = false;
       $('cart-total').textContent = money(result.quote.total);
       $('cart-quote-detail').textContent = 'Items ' + money(result.quote.subtotal) +
@@ -542,6 +562,7 @@
     if (!state.quoteBody) { status('Get a verified total first.', 'error'); return; }
     if (!retry && state.checkoutUncertain) { status('Retry the same checkout request to verify whether it was received.', 'error'); return; }
     if (!state.checkoutRequestId) state.checkoutRequestId = crypto.randomUUID();
+    savePendingRequestId(state.checkoutRequestId);
     if (!state.checkoutBody) {
       state.checkoutBody = clone(state.quoteBody);
       state.checkoutBody.action = 'create_website_order';
@@ -556,6 +577,7 @@
       var result = await orderApi('POST', '', state.checkoutBody);
       if (!result.order_id || !result.order_number) throw new Error('The server did not return a confirmed order reference.');
       state.checkoutUncertain = false;
+      clearPendingRequestId();
       state.checkoutBody = null;
       state.checkoutRequestId = null;
       state.quote = null;
@@ -580,6 +602,7 @@
         $('retry-order').hidden = false;
         $('retry-order').disabled = false;
       } else {
+        clearPendingRequestId();
         state.checkoutBody = null;
         state.checkoutRequestId = null;
         state.checkoutUncertain = false;
@@ -652,6 +675,7 @@
         }),
         orderApi('GET', 'view=website_context')
       ]);
+      state.checkoutRequestId = readPendingRequestId();
       var catalog = results[0], contextEnvelope = results[1];
       if (!catalog || catalog.state !== 'ready') {
         throw new Error(catalog?.error?.message || 'The currently published menu is unavailable.');
