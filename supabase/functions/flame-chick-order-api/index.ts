@@ -228,8 +228,8 @@ async function readOrderBoard(board: string, limit: number, branchId: string, fi
     orders: ["new", "accepted"],
     preparing: ["preparing", "ready"],
     out_for_delivery: ["out_for_delivery"],
-    active: ["new", "accepted", "preparing", "ready", "out_for_delivery"],
-    all: ["new", "accepted", "preparing", "ready", "out_for_delivery", "delivered", "collected", "served", "completed", "rejected", "cancelled"],
+    active: ["new", "accepted", "preparing", "ready", "out_for_delivery", "delivered"],
+    all: ["new", "accepted", "preparing", "ready", "out_for_delivery", "delivered", "collected", "served", "completed", "rejected", "cancelled", "returned"],
   };
   const statuses = allowedBoards[board];
   if (!statuses) {
