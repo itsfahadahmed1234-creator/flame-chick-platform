@@ -640,7 +640,7 @@ User clarified that Website, Admin, POS and Rider are already substantially buil
 - POS/Rider Static Checks #16 passed, including API-only reads, explicit delivery-selection payloads, and missing-vs-zero area-fee handling.
 - Website Static Checks #144 passed, including delivery selection and missing-vs-zero fee checks.
 - Admin Static Checks #82 passed.
-- Edge Function Static Checks #39 passed.
+- Edge Function Static Checks #40 passed.
 
 The current exact release report is `docs/handoffs/2026-11-23-two-hour-release-readiness.md`. The Vercel target document is `docs/deployment/vercel-github-actions.md`.
 
