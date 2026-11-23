@@ -240,7 +240,7 @@ BEGIN
           '{fulfillment_type}',to_jsonb('pickup'),true),
         '{delivery_fee}',to_jsonb(0),true),
       '{total}',to_jsonb(100),true)
-      || jsonb_build_object('delivery',NULL)
+      || jsonb_build_object('delivery','null'::jsonb)
   );
   IF result->>'ok'<>'true' OR result->>'fulfillment_type'<>'pickup'
      OR (result->>'delivery_fee')::numeric<>0 OR (result->>'total')::numeric<>100 THEN
@@ -269,7 +269,7 @@ BEGIN
           '{fulfillment_type}',to_jsonb('pickup'),true),
         '{delivery_fee}',to_jsonb(0),true),
       '{total}',to_jsonb(100),true)
-      || jsonb_build_object('delivery',NULL)
+      || jsonb_build_object('delivery','null'::jsonb)
   );
   IF result->>'ok'<>'true' THEN
     RAISE EXCEPTION 'WEBSITE_THIRD_ORDER_WITHIN_QUOTA_FAILED: %',result;
@@ -285,7 +285,7 @@ BEGIN
           '{fulfillment_type}',to_jsonb('pickup'),true),
         '{delivery_fee}',to_jsonb(0),true),
       '{total}',to_jsonb(100),true)
-      || jsonb_build_object('delivery',NULL)
+      || jsonb_build_object('delivery','null'::jsonb)
   );
   IF result->>'ok'<>'false'
      OR result#>>'{error,code}'<>'WEBSITE_ORDER_RATE_LIMITED' THEN
@@ -305,7 +305,7 @@ BEGIN
           '{fulfillment_type}',to_jsonb('pickup'),true),
         '{delivery_fee}',to_jsonb(0),true),
       '{total}',to_jsonb(100),true)
-      || jsonb_build_object('delivery',NULL)
+      || jsonb_build_object('delivery','null'::jsonb)
   );
   IF result->>'ok'<>'false'
      OR result#>>'{error,code}'<>'WEBSITE_ORDER_RATE_LIMITED' THEN
@@ -328,7 +328,7 @@ BEGIN
           '{fulfillment_type}',to_jsonb('pickup'),true),
         '{delivery_fee}',to_jsonb(0),true),
       '{total}',to_jsonb(100),true)
-      || jsonb_build_object('delivery',NULL);
+      || jsonb_build_object('delivery','null'::jsonb);
     IF i>1 THEN
       UPDATE app_private.website_order_success_events
       SET committed_at=clock_timestamp()-interval '11 minutes'
