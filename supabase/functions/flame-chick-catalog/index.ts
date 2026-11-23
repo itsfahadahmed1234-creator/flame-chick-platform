@@ -201,9 +201,10 @@ Deno.serve(async (req: Request) => {
       }, 404);
     }
 
-    // Retain the existing schema-v2 DTO at the top level for Website/POS
-    // consumers, adding publication identity as metadata. The snapshot itself
-    // is copied unchanged; no draft data is merged into it here.
+    // Return the immutable published V3 snapshot to V3 clients.
+    // Do not relabel or coerce it as schema V2: the active Website/POS clients
+    // still require a separate reviewed compatibility adapter before cutover.
+    // No draft data is merged into the published snapshot here.
     return json({
       ok: true,
       data: {
