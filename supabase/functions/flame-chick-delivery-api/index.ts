@@ -219,11 +219,71 @@ async function callServiceRpc(name: string, args: Record<string, unknown> = {}) 
   return { ok:true as const, data };
 }
 
+async function flameChickRestaurantId(): Promise<string | null> {
+  const query = new URLSearchParams();
+  query.set("select", "id");
+  query.set("slug", "eq.flame-chick");
+  query.set("is_active", "eq.true");
+  query.set("limit", "2");
+  const result = await readAsService("restaurants?" + query.toString());
+  if (!result.ok || !Array.isArray(result.data) || result.data.length !== 1) return null;
+  const row = result.data[0];
+  return isObject(row) && typeof row.id === "string" ? row.id : null;
+}
+
+async function resolveDispatchContext(userId: string): Promise<{
+  ok: true; role: string; branchId: string;
+} | { ok: false }> {
+  const restaurantId = await flameChickRestaurantId();
+  if (!restaurantId) return { ok:false };
+  const rolesQuery = new URLSearchParams();
+  rolesQuery.set("select", "role_key,branch_id,is_active");
+  rolesQuery.set("user_id", "eq." + userId);
+  rolesQuery.set("restaurant_id", "eq." + restaurantId);
+  rolesQuery.set("is_active", "eq.true");
+  rolesQuery.set("role_key", "in.(owner,admin,manager,cashier)");
+  rolesQuery.set("limit", "20");
+  const roleResult = await readAsService("user_roles?" + rolesQuery.toString());
+  if (!roleResult.ok || !Array.isArray(roleResult.data)) return { ok:false };
+  const roleRows = roleResult.data.filter((row): row is Record<string, unknown> =>
+    isObject(row) && ["owner","admin","manager","cashier"].includes(String(row.role_key)) &&
+    row.is_active === true && (row.branch_id === null || typeof row.branch_id === "string")
+  );
+  if (!roleRows.length) return { ok:false };
+  const branchQuery = new URLSearchParams();
+  branchQuery.set("select", "id,is_active");
+  branchQuery.set("restaurant_id", "eq." + restaurantId);
+  branchQuery.set("is_active", "eq.true");
+  branchQuery.set("limit", "100");
+  const scopedIds = [...new Set(roleRows.map(row=>typeof row.branch_id==="string"?row.branch_id:null).filter((id):id is string=>!!id))];
+  if (scopedIds.length && roleRows.every(row=>row.branch_id!==null)) branchQuery.set("id","in.("+scopedIds.join(",")+")");
+  const branchResult = await readAsService("branches?" + branchQuery.toString());
+  if (!branchResult.ok || !Array.isArray(branchResult.data)) return { ok:false };
+  const branches = branchResult.data.filter((row): row is Record<string, unknown> =>
+    isObject(row) && typeof row.id==="string" && row.is_active===true
+  );
+  const globalRoles = roleRows.filter(row=>row.branch_id===null);
+  const scopedRoles = roleRows.filter(row=>typeof row.branch_id==="string" && branches.some(branch=>branch.id===row.branch_id));
+  const distinctScopedBranches = [...new Set(scopedRoles.map(row=>String(row.branch_id)))];
+  if (!globalRoles.length && distinctScopedBranches.length!==1) return { ok:false };
+  if (globalRoles.length && branches.length!==1) return { ok:false };
+  const usable=[...globalRoles,...scopedRoles];
+  if (!usable.length) return { ok:false };
+  const priority:Record<string,number>={owner:1,admin:2,manager:3,cashier:4};
+  usable.sort((a,b)=>(priority[String(a.role_key)]??99)-(priority[String(b.role_key)]??99));
+  const selected=usable[0];
+  const branchId=typeof selected.branch_id==="string"?selected.branch_id:String(branches[0].id);
+  if (!branches.some(branch=>branch.id===branchId)) return { ok:false };
+  return {ok:true,role:String(selected.role_key),branchId};
+}
+
 async function isActiveRider(userId: string, token: string, apiKey: string) {
+  const restaurantId = await flameChickRestaurantId();
+  if (!restaurantId) return { ok:false as const, status:503, body:{ok:false,error:{code:"RESTAURANT_CONTEXT_UNAVAILABLE",message:"Flame Chick restaurant context is unavailable."}}};
   const roleQuery = new URLSearchParams();
   roleQuery.set("select", "role_key,branch_id,is_active");
   roleQuery.set("user_id", "eq." + userId);
-  roleQuery.set("restaurant_id", "eq.85b2ffe5-6612-49f3-a102-d3084d0fc6a7");
+  roleQuery.set("restaurant_id", "eq." + restaurantId);
   roleQuery.set("role_key", "eq.rider");
   roleQuery.set("is_active", "eq.true");
   const roleResult = await readAsService("user_roles?" + roleQuery.toString());
@@ -462,10 +522,13 @@ Deno.serve(async (req: Request) => {
       return response({ ok: false, error: { code: "DELIVERY_VIEW_INVALID", message: "Choose dispatch or rider." } }, 400);
     }
 
-    const branchId = (url.searchParams.get("branch_id") ?? "").trim();
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(branchId)) {
-      return response({ ok: false, error: { code: "BRANCH_REQUIRED", message: "A valid Flame Chick branch_id is required for the dispatch board." } }, 400);
+    const staffContext = await resolveDispatchContext(user.id);
+    if (!staffContext.ok) return response({ok:false,error:{code:"DISPATCH_ROLE_OR_BRANCH_REQUIRED",message:"An active Flame Chick Admin, Owner, Manager or Cashier role for one branch is required."}},403);
+    const requestedBranch = (url.searchParams.get("branch_id") ?? "").trim();
+    if (requestedBranch && requestedBranch !== staffContext.branchId) {
+      return response({ok:false,error:{code:"BRANCH_ACCESS_DENIED",message:"You cannot access dispatch data for another branch."}},403);
     }
+    const branchId = staffContext.branchId;
 
     const taskQuery = new URLSearchParams();
     taskQuery.set("select",
@@ -483,8 +546,8 @@ Deno.serve(async (req: Request) => {
     riderQuery.set("order", "display_name.asc");
 
     const [tasks, riders] = await Promise.all([
-      readAsUser("delivery_tasks?" + taskQuery.toString(), token, apiKey),
-      readAsUser("rider_profiles?" + riderQuery.toString(), token, apiKey),
+      readAsService("delivery_tasks?" + taskQuery.toString()),
+      readAsService("rider_profiles?" + riderQuery.toString()),
     ]);
     if (!tasks.ok) return response(tasks.body, tasks.status);
     if (!riders.ok) return response(riders.body, riders.status);
@@ -505,10 +568,12 @@ Deno.serve(async (req: Request) => {
 
   const action = String(body.action ?? "").toLowerCase();
   if (action === "presence") {
+    const restaurantId = await flameChickRestaurantId();
+    if (!restaurantId) return response({ok:false,error:{code:"RESTAURANT_CONTEXT_UNAVAILABLE",message:"Flame Chick restaurant context is unavailable."}},503);
     const roleQuery = new URLSearchParams();
     roleQuery.set("select", "role_key,branch_id,is_active");
     roleQuery.set("user_id", "eq." + user.id);
-    roleQuery.set("restaurant_id", "eq.85b2ffe5-6612-49f3-a102-d3084d0fc6a7");
+    roleQuery.set("restaurant_id", "eq." + restaurantId);
     roleQuery.set("role_key", "eq.rider");
     roleQuery.set("is_active", "eq.true");
     const rolesResult = await readAsService("user_roles?" + roleQuery.toString());
