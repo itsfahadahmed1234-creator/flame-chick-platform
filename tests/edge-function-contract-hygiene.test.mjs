@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { isValidDatabaseNow } from "../supabase/functions/flame-chick-catalog/publication-read-contract.mjs";
 
 const root = "supabase/functions/";
 const names = ["flame-chick-catalog", "flame-chick-order-api", "flame-chick-delivery-api", "flame-chick-staff-admin"];
@@ -16,6 +17,36 @@ test("Edge Function sources contain no retired HFP identifiers", () => {
 test("catalog function reads the current secret-key map", () => {
   assert.match(sources["flame-chick-catalog"], /SUPABASE_SECRET_KEYS/);
   assert.match(sources["flame-chick-catalog"], /SUPABASE_SECRET_KEY/);
+});
+
+test("catalog RPC timestamp metadata is validated in published and unpublished states", () => {
+  const source = sources["flame-chick-catalog"];
+  const captureIndex = source.indexOf("const databaseNow = result.databaseNow;");
+  const validateIndex = source.indexOf("if (!isValidDatabaseNow(databaseNow))");
+  const unpublishedIndex = source.indexOf("if (result.published === false)");
+  assert.ok(captureIndex >= 0, "catalog source must capture the RPC databaseNow field");
+  assert.ok(validateIndex > captureIndex, "catalog source must validate the captured timestamp");
+  assert.ok(unpublishedIndex > validateIndex, "timestamp validation must run before the unpublished branch");
+  assert.match(source, /databaseNow,\s*snapshot: null/);
+  assert.doesNotMatch(source, /databaseNow:\s*typeof result\.databaseNow/);
+});
+
+test("database timestamp validator accepts only real UTC timestamps with up to six fractional digits", () => {
+  assert.equal(isValidDatabaseNow("2026-11-23T04:05:06Z"), true);
+  assert.equal(isValidDatabaseNow("2026-11-23T04:05:06.123456Z"), true);
+
+  for (const value of [
+    null,
+    undefined,
+    "",
+    "not-a-time",
+    "2026-11-23T04:05:06+00:00",
+    "2026-11-23T04:05:06.1234567Z",
+    "2026-02-30T04:05:06Z",
+    "2026-11-23T25:05:06Z"
+  ]) {
+    assert.equal(isValidDatabaseNow(value), false, String(value));
+  }
 });
 
 test("order and delivery RPC contracts use Flame Chick names", () => {
