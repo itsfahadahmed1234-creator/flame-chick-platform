@@ -253,7 +253,10 @@
       const productId=c.product_id||(product&&product.id)||'';
       const variants=product&&product.variants?product.variants.filter(v=>v.is_active!==false):[];
       const variantId=c.product_variant_id||(variants[0]&&variants[0].id)||'';
-      return '<article class="fcv3-component-row" data-component-row><div class="fcv3-component-grid">'+
+      return '<article class="fcv3-component-row" data-component-row>'+
+        (c.group_id?'<input type="hidden" data-field="group_id" value="'+esc(c.group_id)+'">':'')+
+        (c.option_id?'<input type="hidden" data-field="option_id" value="'+esc(c.option_id)+'">':'')+
+        '<div class="fcv3-component-grid">'+
         '<label>Displayed component name<input data-field="display_name" maxlength="120" required value="'+esc(c.display_name||(product&&product.name_en))+'"></label>'+
         '<label>Linked product<select data-field="product_id" data-component-product>'+s.products.filter(p=>p.is_active!==false).map(p=>'<option value="'+esc(p.id)+'"'+(p.id===productId?' selected':'')+'>'+esc(p.name_en)+'</option>').join('')+'</select></label>'+
         '<label>Variant<select data-field="product_variant_id" data-component-variant>'+variants.map(v=>'<option value="'+esc(v.id)+'"'+(v.id===variantId?' selected':'')+'>'+esc(v.size_label)+(v.is_standalone_sellable===false?' · Deal-only':'')+'</option>').join('')+'</select></label>'+
@@ -473,6 +476,8 @@
       }
       if(type==='deal'){
         s.components=Array.from(form.querySelectorAll('[data-component-row]')).map(row=>({
+          group_id:row.querySelector('[data-field="group_id"]')?.value||null,
+          option_id:row.querySelector('[data-field="option_id"]')?.value||null,
           display_name:row.querySelector('[data-field="display_name"]').value,
           product_id:row.querySelector('[data-field="product_id"]').value,
           product_variant_id:row.querySelector('[data-field="product_variant_id"]').value,
