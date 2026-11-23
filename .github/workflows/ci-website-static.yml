@@ -57,7 +57,14 @@ jobs:
           node --check apps/flame-chick-website/js/pricing.js
           node --check apps/flame-chick-website/js/store.js
           node --check scripts/local-catalog-preview-fixture.mjs
-          node --test tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs tests/catalog-v3-view.test.mjs tests/catalog-v3-deal-view.test.mjs tests/catalog-v3-deal-configurator.test.mjs tests/branch-fulfilment-v3.test.mjs tests/catalog-database-time-migration.test.mjs tests/catalog-v3-preview.test.mjs tests/catalog-preview-page.test.mjs tests/local-catalog-preview-fixture.test.mjs
+
+      - name: Run core catalog regression tests
+        run: |
+          node --test tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs tests/catalog-v3-view.test.mjs tests/catalog-v3-deal-view.test.mjs tests/catalog-v3-deal-configurator.test.mjs tests/branch-fulfilment-v3.test.mjs tests/catalog-database-time-migration.test.mjs
+
+      - name: Run preview regression tests
+        run: |
+          node --test tests/catalog-v3-preview.test.mjs tests/catalog-preview-page.test.mjs tests/local-catalog-preview-fixture.test.mjs
 
       - name: Verify website inline scripts parse
         run: |
