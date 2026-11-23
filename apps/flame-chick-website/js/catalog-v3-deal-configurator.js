@@ -377,7 +377,7 @@
             groupSet.appendChild(optionRow);
 
             var count = selectedCount(group, option);
-            for (var unit = 0; unit < count; unit++) {
+            for (let unit = 0; unit < count; unit++) {
               var unitSet = makeElement(doc, 'fieldset', 'fc-deal-component-customization');
               unitSet.appendChild(makeElement(doc, 'legend', '', 'Customize ' + optionLabel + ' — item ' + (unit + 1)));
               option.modifierGroups.forEach(function (modifierGroup) {
