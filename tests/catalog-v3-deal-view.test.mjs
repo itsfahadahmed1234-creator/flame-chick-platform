@@ -158,11 +158,19 @@ test('branch-disabled deals and unavailable component variants cannot be selecte
   assert.equal(result.collections[0].deals[0].available, false);
 });
 
-test('requires branch, fulfilment and database time; rejects disabled branch ordering', () => {
+test('requires branch and database time; supports read-only deal browsing without fulfilment', () => {
   const snapshot = createSnapshot();
   assert.equal(deals.buildDealViewModel(snapshot, { fulfilmentType: 'delivery', databaseNow: monday }, contract).code, 'BRANCH_SELECTION_REQUIRED');
-  assert.equal(deals.buildDealViewModel(snapshot, { branchId: IDS.branch, databaseNow: monday }, contract).code, 'FULFILMENT_REQUIRED');
-  assert.equal(deals.buildDealViewModel(snapshot, { branchId: IDS.branch, fulfilmentType: 'delivery' }, contract).code, 'TRUSTED_TIME_REQUIRED');
+  assert.equal(deals.buildDealViewModel(snapshot, { branchId: IDS.branch, fulfilmentType: 'courier', databaseNow: monday }, contract).code, 'FULFILMENT_INVALID');
+  assert.equal(deals.buildDealViewModel(snapshot, { branchId: IDS.branch }, contract).code, 'TRUSTED_TIME_REQUIRED');
+
+  const browse = deals.buildDealViewModel(snapshot, { branchId: IDS.branch, databaseNow: monday }, contract);
+  assert.equal(browse.ok, true);
+  assert.equal(browse.fulfilmentType, null);
+  assert.equal(browse.orderingEnabled, false);
+  assert.equal(browse.collections[0].deals[0].available, false);
+  assert.equal(browse.collections[0].deals[0].scheduleAvailable, true);
+
   snapshot.branches[0].websiteDeliveryEnabled = false;
   const result = build(snapshot);
   assert.equal(result.ok, true);
