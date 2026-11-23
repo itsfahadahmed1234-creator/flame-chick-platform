@@ -384,7 +384,7 @@
       if(componentRefs.some(item=>!item.product_variant_id))fail('A deal component could not resolve to a saved product variant.');
       const componentState=existingComponentGroups(detail,componentRefs,variantIds);
       if(detail.deal.is_active===true){
-        verifyActive(detail,deal,componentRefs,scheduleId);
+        verifyDealState(detail,deal,componentRefs,scheduleId,true);
         completed++;
         progress('deals',completed,total,'Verified already-active deal: '+deal.title);
         continue;
@@ -407,10 +407,10 @@
           detail=await readDeal(saved.id);
         }
       }
-      verifyActive(detail,deal,componentRefs,scheduleId);
+      verifyDealState(detail,deal,componentRefs,scheduleId,false);
       await write(WRITE.deal,{id:saved.id,is_active:true});
       detail=await readDeal(saved.id);
-      verifyActive(detail,deal,componentRefs,scheduleId);
+      verifyDealState(detail,deal,componentRefs,scheduleId,true);
       completed++;
       progress('deals',completed,total,'Imported and read-back verified deal: '+deal.title);
       deals=await readDeals(collection.id);
@@ -445,39 +445,45 @@
     return {dealVariantId:variant.id,options,needsWrite};
   }
 
-  function verifyActive(detail,deal,components,scheduleId){
-    const variant=deal.variants[0];
-    if(!detail.deal||detail.deal.is_active!==false)fail('Deal must still be inactive before the final pre-activation verification.');
-    if(!detail.variants||detail.variants.length!==1||detail.variants[0].variant.is_active!==false)fail('Deal variant must remain inactive before activation.');
-    // The caller may already have an active record; the active verification is handled separately.
-    return verifyComponentsAndSchedule(detail,deal,components,scheduleId);
-  }
-
-  function verifyComponentsAndSchedule(detail,deal,components,scheduleId){
-    const variant=deal.variants[0];
-    if(!variant||detail.variants.length!==1||variant.variant.pricing_mode!=='FIXED_BUNDLE'||
-      !moneyEqual(variant.variant.base_price,deal.variants[0].basePrice))fail('The fixed deal price or variant does not match the approved draft.');
-    if(detail.component_groups.length!==components.length)fail('The saved deal component count does not match the approved draft.');
-    for(let i=0;i<components.length;i++){
-      const doc=detail.component_groups[i],want=components[i];
-      if(!doc.group||doc.group.name_en!==want.display_name||Number(doc.group.min_units)!==want.quantity||
-        Number(doc.group.max_units)!==want.quantity||doc.group.is_active!==true||!Array.isArray(doc.options)||
-        doc.options.length!==1||doc.options[0].product_variant_id!==want.product_variant_id||doc.options[0].is_active!==true)fail('A saved fixed deal component failed read-back verification: '+want.display_name);
+  function verifyDealState(detail,deal,components,scheduleId,expectedActive){
+    const sourceVariant=deal.variants[0];
+    if(!detail||!detail.deal||detail.deal.is_active!==expectedActive)fail('Deal active state does not match the expected staged state.');
+    if(!Array.isArray(detail.variants)||detail.variants.length!==1)fail('The saved deal must have exactly one fixed-price variant.');
+    const variantDoc=detail.variants[0],savedVariant=variantDoc&&variantDoc.variant;
+    if(!savedVariant||savedVariant.variant_key!==sourceVariant.variantKey||
+      savedVariant.pricing_mode!=='FIXED_BUNDLE'||!moneyEqual(savedVariant.base_price,sourceVariant.basePrice)||
+      savedVariant.is_active!==expectedActive)fail('The saved fixed deal price, variant identity or activation state does not match the approved draft.');
+    if(!Array.isArray(detail.component_groups)||detail.component_groups.length!==components.length)fail('The saved deal component count does not match the approved draft.');
+    for(let index=0;index<components.length;index++){
+      const doc=detail.component_groups[index],wanted=components[index];
+      if(!doc||!doc.group||doc.group.name_en!==wanted.display_name||
+        Number(doc.group.min_units)!==wanted.quantity||Number(doc.group.max_units)!==wanted.quantity||
+        doc.group.allow_repeat_option!==(wanted.quantity>1)||
+        Number(doc.group.max_units_per_option??0)!==(wanted.quantity>1?wanted.quantity:0)||
+        doc.group.is_active!==true||!Array.isArray(doc.options)||doc.options.length!==1||
+        doc.options[0].product_variant_id!==wanted.product_variant_id||doc.options[0].is_active!==true){
+        fail('A saved fixed deal component failed read-back verification: '+wanted.display_name);
+      }
     }
-    const map=variant.allowed_options;
-    if(!Array.isArray(map)||map.length!==components.length)fail('The deal mapping count does not match the fixed component count.');
+    const mappings=variantDoc.allowed_options;
+    if(!Array.isArray(mappings)||mappings.length!==components.length)fail('The deal mapping count does not match the fixed component count.');
     const optionIds=detail.component_groups.map(doc=>doc.options[0].id);
-    for(let i=0;i<map.length;i++){
-      const row=map.find(item=>item.component_option_id===optionIds[i]);
-      if(!row||row.is_active!==true||row.pricing_treatment!=='INCLUDED'||Number(row.unit_surcharge)!==0||
-        Number(row.max_quantity_per_deal)!==components[i].quantity)fail('Every current deal mapping must be active INCLUDED with zero surcharge.');
+    for(let index=0;index<components.length;index++){
+      const row=mappings.find(item=>item.component_option_id===optionIds[index]);
+      if(!row||row.product_variant_id!==components[index].product_variant_id||
+        row.is_active!==true||row.pricing_treatment!=='INCLUDED'||
+        Number(row.unit_surcharge)!==0||Number(row.max_quantity_per_deal)!==components[index].quantity){
+        fail('Every current deal mapping must be active INCLUDED with zero surcharge.');
+      }
     }
     if(deal.schedule){
-      const assignments=(detail.schedule_assignments||[]).filter(item=>item.branch_id==null&&item.is_active===true&&item.schedule_set_id===scheduleId);
+      const assignments=(detail.schedule_assignments||[]).filter(item=>
+        item.branch_id==null&&item.is_active===true&&item.schedule_set_id===scheduleId
+      );
       if(assignments.length!==1)fail('The Flame Hour daily schedule assignment failed read-back verification.');
     }
     return true;
   }
 
-  return {READ,WRITE,validatePublishedMenuDraft,legacyId,buildProductPayload,buildMappings,runPublishedMenuImport};
+  return {READ,WRITE,validatePublishedMenuDraft,legacyId,buildProductPayload,buildMappings,verifyDealState,runPublishedMenuImport};
 });
