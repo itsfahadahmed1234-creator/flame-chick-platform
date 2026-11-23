@@ -267,14 +267,18 @@
     if (!branchId || !snapshot.branches.some(function (branch) { return branch.branchId === branchId; })) {
       return fail('BRANCH_SELECTION_REQUIRED', 'A valid branch must be selected.');
     }
-    if (options.fulfilmentType !== 'delivery' && options.fulfilmentType !== 'pickup') {
-      return fail('FULFILMENT_REQUIRED', 'Choose delivery or pickup before loading branch-specific deal availability.');
+    var fulfilmentType = options.fulfilmentType === undefined ? null : options.fulfilmentType;
+    if (fulfilmentType !== null && fulfilmentType !== 'delivery' && fulfilmentType !== 'pickup') {
+      return fail('FULFILMENT_INVALID', 'Choose delivery or pickup before loading fulfilment-specific deal availability.');
     }
     var instant = options.databaseNow;
     if (instant === undefined || instant === null || !Number.isFinite(new Date(instant).getTime())) {
       return fail('TRUSTED_TIME_REQUIRED', 'A trusted database timestamp is required for scheduled deal availability.');
     }
-    var orderingEnabled = contract.isBranchOrderingEnabled(snapshot, branchId, options.fulfilmentType);
+    // Deals can be displayed while browsing, but are never marked orderable
+    // until a supported fulfilment method has been explicitly selected.
+    var orderingEnabled = fulfilmentType !== null &&
+      contract.isBranchOrderingEnabled(snapshot, branchId, fulfilmentType);
     var collections = sortByOrder(snapshot.dealCollections, 'dealCollectionId').map(function (collection) {
       var category = find(snapshot.categories, 'categoryId', collection.categoryId);
       var deals = snapshot.deals.filter(function (deal) {
@@ -390,7 +394,7 @@
       publicationId: snapshot.publicationId,
       versionId: snapshot.versionId,
       branchId: branchId,
-      fulfilmentType: options.fulfilmentType,
+      fulfilmentType: fulfilmentType,
       databaseNow: new Date(instant).toISOString(),
       orderingEnabled: orderingEnabled,
       currencyCode: snapshot.settings.currency_code,
