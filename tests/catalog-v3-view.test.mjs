@@ -114,6 +114,7 @@ test('rejects invalid snapshots and missing validator instead of falling back to
 test('excludes variants that are not sellable as standalone menu items', () => {
   const snapshot = createSnapshot();
   snapshot.productVariants[0].standaloneSellable = false;
+  snapshot.productVariants[0].price = null;
   const result = view.buildMenuViewModel(snapshot, {}, contract);
   assert.equal(result.ok, true);
   assert.deepEqual(result.categories.map(category => category.id), [IDS.drinkCategory]);
