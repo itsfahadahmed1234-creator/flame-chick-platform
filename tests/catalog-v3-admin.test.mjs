@@ -402,3 +402,27 @@ test('Admin workspace wires category and fixed-deal edit actions through the sec
   assert.match(source,/catalogV3Request|request\(action/);
   assert.doesNotMatch(source,/fetch\([^)]*rest\/v1|service_role|serviceRoleKey/i);
 });
+
+
+test('Flame Hour schedule validator accepts only seven exact daily 3–5 PM Asia/Karachi windows', () => {
+  const item = { id:'67000000-0000-4000-8000-000000000001',
+    name:'Flame Hour daily',timezone:'Asia/Karachi',is_active:true };
+  const windows = Array.from({length:7},(_,i)=>({window_kind:'WEEKLY',weekday_iso:i+1,
+    local_start:'15:00:00',local_end:'17:00:00',is_all_day:false}));
+  const detail = {schedule_set:{id:item.id,name:item.name,timezone:item.timezone},windows};
+  assert.equal(admin.isApprovedFlameHourSchedule(item,detail),true);
+  assert.equal(admin.isApprovedFlameHourSchedule({...item,is_active:false},detail),false);
+  assert.equal(admin.isApprovedFlameHourSchedule({...item,timezone:'UTC'},detail),false);
+  assert.equal(admin.isApprovedFlameHourSchedule(item,{...detail,windows:windows.slice(0,6)}),false);
+  assert.equal(admin.isApprovedFlameHourSchedule(item,{...detail,windows:windows.map((w,i)=>i===2?{...w,local_start:'14:00:00'}:w)}),false);
+  assert.equal(admin.isApprovedFlameHourSchedule(item,{...detail,schedule_set:{...detail.schedule_set,id:'68000000-0000-4000-8000-000000000001'}}),false);
+});
+
+test('fixed-deal creation preflights duplicate Deals categories, collections and schedule names', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-admin/catalog-v3-admin.js', import.meta.url), 'utf8');
+  assert.match(source,/Multiple deal categories exist/);
+  assert.match(source,/Multiple Deals collections exist/);
+  assert.match(source,/Multiple Flame Hour daily schedules exist/);
+  assert.match(source,/An existing Flame Hour daily schedule has different settings/);
+  assert.match(source,/isApprovedFlameHourSchedule\(found,detail\)/);
+});
