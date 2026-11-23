@@ -162,3 +162,15 @@ test("order API exposes authenticated self staff-context to Rider before restric
   assert.match(source,/\["owner", "admin", "manager", "cashier"\]/);
   assert.doesNotMatch(source,/\["owner", "admin", "manager", "cashier", "kitchen"\]/);
 });
+
+
+test("Delivery dispatch provides fields POS uses to determine rider availability", () => {
+  const source=sources["flame-chick-delivery-api"];
+  assert.match(source,/riderQuery\.set\("select", "user_id,rider_code,display_name,phone,availability_status,accepting_jobs,last_seen_at,is_active"\)/);
+});
+
+test("Order API keeps delivered orders active until payment collection and exposes returned orders to history", () => {
+  const source=sources["flame-chick-order-api"];
+  assert.match(source,/active: \["new", "accepted", "preparing", "ready", "out_for_delivery", "delivered"\]/);
+  assert.match(source,/all: \[[^\]]*"returned"\]/);
+});
