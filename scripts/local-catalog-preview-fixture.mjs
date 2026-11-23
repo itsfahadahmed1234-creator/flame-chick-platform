@@ -174,13 +174,12 @@ function localLoaderScript() {
 }
 
 function pageControllerForFixture(source) {
+  if (!source.includes('Published catalog verified')) {
+    throw new Error('Preview controller changed; expected its published-catalog status label.');
+  }
+  source = source.replaceAll('Published catalog verified', 'Synthetic fixture validated');
   return replaceExactlyOnce(
-    replaceExactlyOnce(
-      source,
-      'Published catalog verified',
-      'Synthetic fixture validated',
-      'connection success label'
-    ),
+    source,
     'The published catalog passed V3 validation.',
     'The synthetic fixture passed V3 validation.',
     'connection success message'
