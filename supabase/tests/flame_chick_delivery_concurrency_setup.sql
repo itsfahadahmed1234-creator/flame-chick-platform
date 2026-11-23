@@ -17,27 +17,39 @@ $preflight$;
 -- remains clock_timestamp(); this override exists only in this disposable DB.
 CREATE OR REPLACE FUNCTION app_private.flame_chick_delivery_clock_now()
 RETURNS timestamptz
-LANGUAGE plpgsql
+LANGUAGE sql
 VOLATILE
 SET search_path=''
 AS $function$
-DECLARE
-  v_count integer;
-  v_sleep_call integer;
-  v_delay double precision;
-  v_forced timestamptz;
+  SELECT COALESCE(
+    NULLIF(pg_catalog.current_setting('test.delivery.clock_now',true),'')::timestamptz,
+    pg_catalog.clock_timestamp()
+  )
+$function$;
+
+-- A test-only BEFORE UPDATE trigger pauses after the command has already
+-- locked the delivery task and offer. This guarantees true contention without
+-- sleeping in the expiry sweep's pre-lock candidate query. It is restricted to
+-- this synthetic tenant and exists only on disposable local Supabase.
+CREATE OR REPLACE FUNCTION app_private.test_delivery_offer_race_delay()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path=''
+AS $function$
 BEGIN
-  v_count:=COALESCE(NULLIF(pg_catalog.current_setting('test.delivery.clock_call_count',true),''),'0')::integer+1;
-  PERFORM pg_catalog.set_config('test.delivery.clock_call_count',v_count::text,true);
-  v_sleep_call:=COALESCE(NULLIF(pg_catalog.current_setting('test.delivery.clock_sleep_on_call',true),''),'0')::integer;
-  v_delay:=COALESCE(NULLIF(pg_catalog.current_setting('test.delivery.clock_sleep_seconds',true),''),'0')::double precision;
-  IF v_sleep_call=v_count AND v_delay>0 THEN
-    PERFORM pg_catalog.pg_sleep(v_delay);
+  IF OLD.restaurant_id='b7777777-7777-4777-8777-777777777660'::uuid
+     AND OLD.status='offered'
+     AND NEW.status IN ('accepted','rejected','expired')
+     AND COALESCE(pg_catalog.current_setting('test.delivery.race_delay',true),'')='on' THEN
+    PERFORM pg_catalog.pg_sleep(1.2);
   END IF;
-  v_forced:=NULLIF(pg_catalog.current_setting('test.delivery.clock_now',true),'')::timestamptz;
-  RETURN COALESCE(v_forced,pg_catalog.clock_timestamp());
+  RETURN NEW;
 END
 $function$;
+
+CREATE TRIGGER qa_delivery_offer_race_delay
+BEFORE UPDATE OF status ON public.delivery_task_offers
+FOR EACH ROW EXECUTE FUNCTION app_private.test_delivery_offer_race_delay();
 
 INSERT INTO public.restaurants(id,name,slug,currency_code,timezone,is_active)
 VALUES('b7777777-7777-4777-8777-777777777660','QA Delivery Concurrency','flame-chick','PKR','Asia/Karachi',true);
