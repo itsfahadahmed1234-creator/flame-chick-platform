@@ -11,6 +11,8 @@ on:
       - "supabase/migrations/20261121053647_flame_chick_staff_admin_commands.sql"
       - "supabase/migrations/20261121054852_flame_chick_staff_command_definer_isolation.sql"
       - "tests/admin-invitation-acceptance.test.mjs"
+      - "tests/catalog-v3-admin.test.mjs"
+      - "tests/catalog-v3-importer.test.mjs"
       - "tests/edge-function-contract-hygiene.test.mjs"
       - "tests/staff-admin-origin-policy.test.mjs"
       - "tests/staff-admin-role-boundary.test.mjs"
