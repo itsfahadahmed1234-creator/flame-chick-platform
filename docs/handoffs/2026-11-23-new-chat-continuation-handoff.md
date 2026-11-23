@@ -1,5 +1,35 @@
-# Flame Chick — New-chat continuation handoff (2026-11-23)
+# CURRENT CHECKPOINT — 2026-11-23 16:45 PKT — delivery contract reconciliation
 
+**Active source branch:** `work/production-source-audit`  
+**Implementation commit:** `5c9ae27da91c748fd18fa01499720fd2639c9c1e`  
+**Production status:** unchanged; source-only work. `main` untouched.
+
+## User-confirmed Rider flow
+
+The Rider journey is exactly: **Accept offer → Picked up → Delivered**. Do not add an “At restaurant”/arrival stage or a second Accept action in the active-job card. Offer acceptance is the targeted offer command; after it succeeds, the next Rider action is Picked up. Delivery failure/return remains a separate exception path; rider reports the return, and authorized POS staff confirms physical receipt.
+
+## Changes in implementation commit
+
+- Added `delivery_tasks(id, branch_id, restaurant_id)` composite unique key required by task/offer/assignment/event foreign keys.
+- Changed new `delivery_assignments.status` default to `accepted`, matching the atomic accept-offer outcome and allowed status set.
+- Extended disposable operational-schema SQL QA to assert the composite key, accepted assignment default and absence of retired arrival fields/state.
+- Removed `arrived_at_restaurant` from Delivery API active-task filtering and removed `arrived_at` from Rider/POS assignment selects.
+- Removed Rider active-job second-accept/legacy-assigned countdown state; active actions are Picked up and Delivered (with failure/return exception).
+- Removed POS second acceptance countdown and legacy pending-assignment/reassign branch; POS dispatch now presents targeted offer state.
+- Added Edge Function and POS/Rider source regression assertions.
+
+## Verification state — do not overstate
+
+- Before this fix, disposable migration replay failed at `delivery_task_offers`: missing unique constraint on `delivery_tasks(id, branch_id, restaurant_id)`. Earlier run had caught an order component FK issue, subsequently corrected in the source. No migration reached fixture/recovery steps.
+- Rider/POS/Edge Function static checks had passed for the earlier UI/API commits, and preview deploy workflows were skipped by design.
+- Commit `5c9ae27...` has just been created. **Its new CI and full disposable migration replay have not yet been confirmed.** Do not call the schema or delivery lifecycle verified until the post-commit workflow runs are inspected and successful.
+- Runtime end-to-end testing (offer acceptance race/expiry, pickup, delivery, rejection, return, role and rider isolation) remains outstanding.
+
+## Immediate next task
+
+Inspect GitHub Actions triggered by `5c9ae27...`. If the migration chain fails, read the exact failing SQL/log and fix only the demonstrated defect, then rerun. Confirm Edge Function static checks, POS/Rider static checks and full disposable migration replay. After migration replay passes, extend disposable fixture coverage for offer/assignment/task creation and state constraints before implementing transactional delivery RPCs. Keep all work source-only; no Production migration, deployment, Vercel publish, Realtime activation, menu publication or checkout enablement.
+
+---
 
 ## LATEST CHECKPOINT — 2026-11-23: production integration audit completed
 
