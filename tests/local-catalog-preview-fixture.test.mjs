@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { request as httpRequest } from 'node:http';
 import assert from 'node:assert/strict';
 import { createLocalCatalogPreviewServer } from '../scripts/local-catalog-preview-fixture.mjs';
 import contract from '../apps/flame-chick-website/js/catalog-v3.js';
@@ -94,6 +95,30 @@ test('only an explicit preview asset allowlist is served; production config and 
     assert.match(css.headers.get('content-type'), /text\/css/);
     const notListed = await fetch(base + '/js/staging-guard.js');
     assert.equal(notListed.status, 404);
+  });
+});
+
+test('local harness rejects a host header that does not match its bound port', async () => {
+  await withServer(async (base) => {
+    const target = new URL(base + '/catalog-preview');
+    const response = await new Promise((resolve, reject) => {
+      const request = httpRequest({
+        hostname: target.hostname,
+        port: Number(target.port),
+        path: target.pathname,
+        method: 'GET',
+        headers: { Host: '127.0.0.1:65500' }
+      }, (res) => {
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => { body += chunk; });
+        res.on('end', () => resolve({ statusCode: res.statusCode, body, headers: res.headers }));
+      });
+      request.once('error', reject);
+      request.end();
+    });
+    assert.equal(response.statusCode, 421);
+    assert.match(response.body, /assigned port/);
   });
 });
 
