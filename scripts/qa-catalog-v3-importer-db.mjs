@@ -310,7 +310,9 @@ console.log(JSON.stringify({
   firstRunWrites:writesBeforeResume,
   reads:readCount,
   snapshotValid:snapshotResult.ok,
-  publicationValidationOk:validation.ok,\n  publicationValidationErrorCount:errors.length,\n  publicationPriceErrors:errors.filter(item=>item&&['ACTIVE_VARIANT_PRICE_MISSING','DEAL_ONLY_VARIANT_NOT_MAPPED'].includes(item.code)),
+  publicationValidationOk:validation.ok,
+  publicationValidationErrorCount:errors.length,
+  publicationPriceErrors:errors.filter(item=>item&&['ACTIVE_VARIANT_PRICE_MISSING','DEAL_ONLY_VARIANT_NOT_MAPPED'].includes(item.code)),
   secondRunMutationCount:0,
   databaseCounts:countsAfterResume
 },null,2));
