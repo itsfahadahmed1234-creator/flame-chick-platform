@@ -52,7 +52,7 @@ wait_for_event() {
 
 json_from() {
   local file="$1"
-  grep -E '^\\{' "$file" | tail -n 1
+  grep -E '^[{]' "$file" | tail -n 1
 }
 assert_json() {
   local file="$1" expression="$2" label="$3" json
