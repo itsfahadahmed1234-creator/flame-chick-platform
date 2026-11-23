@@ -310,6 +310,10 @@ async function buildWebsiteOrderQuote(body: Record<string,unknown>): Promise<
     return websiteError("CUSTOMER_DETAILS_INVALID","Enter a valid customer name and phone number.");
   }
 
+  const snapshotSettings=isObject(snapshot.settings)?snapshot.settings:{};
+  if(snapshotSettings.currency_code!==restaurant.currencyCode){
+    return websiteError("CATALOG_CURRENCY_MISMATCH","The published menu currency does not match the active restaurant currency.",503);
+  }
   const pricingRequest = {
     schemaVersion:3,
     publicationId,
