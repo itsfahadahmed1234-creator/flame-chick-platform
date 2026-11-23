@@ -106,7 +106,7 @@ DECLARE
   changed_request_id uuid:=gen_random_uuid();
   payload jsonb;
   result jsonb;
-  order_id uuid;
+  v_order_id uuid;
   events_count integer;
   order_count integer;
   item_count integer;
@@ -180,14 +180,14 @@ BEGIN
      OR result->>'order_number' IS NULL THEN
     RAISE EXCEPTION 'WEBSITE_DELIVERY_ORDER_COMMIT_FAILED: %',result;
   END IF;
-  order_id:=(result->>'order_id')::uuid;
+  v_order_id:=(result->>'order_id')::uuid;
 
-  IF (SELECT count(*) FROM public.orders WHERE id=order_id AND restaurant_id=r)<>1
-     OR (SELECT count(*) FROM public.order_items WHERE order_id=order_id)<>1
-     OR (SELECT count(*) FROM public.order_status_history WHERE order_id=order_id AND action='created')<>1
-     OR (SELECT count(*) FROM public.delivery_tasks WHERE order_id=order_id AND status='dispatch_pending')<>1
+  IF (SELECT count(*) FROM public.orders WHERE id=v_order_id AND restaurant_id=r)<>1
+     OR (SELECT count(*) FROM public.order_items WHERE order_id=v_order_id)<>1
+     OR (SELECT count(*) FROM public.order_status_history WHERE order_id=v_order_id AND action='created')<>1
+     OR (SELECT count(*) FROM public.delivery_tasks WHERE order_id=v_order_id AND status='dispatch_pending')<>1
      OR (SELECT count(*) FROM app_private.website_order_success_events
-         WHERE order_id=order_id AND source='website' AND phone_digest=decode(digest,'hex'))<>1 THEN
+         WHERE order_id=v_order_id AND source='website' AND phone_digest=decode(digest,'hex'))<>1 THEN
     RAISE EXCEPTION 'WEBSITE_DELIVERY_ORDER_RECORDS_INCOMPLETE';
   END IF;
 
@@ -196,7 +196,7 @@ BEGIN
   result:=public.flame_chick_get_website_order_by_idempotency(jsonb_build_object(
     'branch_id',b,'idempotency_key',request_id,'request_hash',repeat('a',64)));
   IF result->>'ok'<>'true' OR result->>'found'<>'true'
-     OR (result->>'order_id')::uuid<>order_id
+     OR (result->>'order_id')::uuid<>v_order_id
      OR result->>'already_processed'<>'true' THEN
     RAISE EXCEPTION 'WEBSITE_IDEMPOTENCY_LOOKUP_REPLAY_FAILED: %',result;
   END IF;
