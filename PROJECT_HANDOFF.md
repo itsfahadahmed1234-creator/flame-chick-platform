@@ -2792,3 +2792,30 @@ Next implementation order:
 8. Deploy only after source/schema contracts align.
 
 Do not deploy any current draft Edge Function yet; order/delivery tables and RPCs do not exist. No new business schema was applied in this architecture phase.
+
+---
+
+## Latest session checkpoint — 2026-11-23: V3 synthetic preview verified; new-chat handoff
+
+**Current continuation note:** `docs/handoffs/2026-11-23-new-chat-continuation-handoff.md`  
+**Handoff commit:** `eb945532e55b490ff3b20389d97d341efba7610d`  
+**Exact source commit tested:** `95fca5b825ff05d88899b4d13855a95f1e0f850e` on `work/production-source-audit`.  
+**GitHub Actions:** [Website Static Checks run 45107009218 — completed / success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45107009218), verified against the exact source SHA above.
+
+### Verified locally by the user in the pinned archive
+
+- Archive extracted under the user's Music folder into the directory documented in the continuation handoff.
+- `node --test`: **136 tests, 136 pass, 0 fail, 0 skipped**.
+- Local synthetic preview opened successfully; menu items appeared.
+- Reload catalog restored/re-rendered items.
+- Pickup displayed items.
+- Burger Meal preview choices validated successfully with optional Extra Cheese omitted; confirmation explicitly stated that no quote or order was created.
+- The older Downloads copy was out of sync (125 pass / 10 fail). Do not patch it or mix files with the pinned archive.
+
+### Current state and next step
+
+The standalone V3 preview remains synthetic/non-ordering. The next task is a **read-only production catalog integration audit** from the database publication/compiler/read RPC through the catalog Edge Function, V3 client/validator, branch/fulfilment flow and product/deal rendering. Verify current live state read-only; produce evidence-backed gaps and a sequenced plan before proposing changes.
+
+No production/Supabase write, migration, seed, Edge Function deployment, catalog publication, Vercel deployment, domain change, storefront cutover or checkout activation occurred in this session. Keep `main` untouched and continue on `work/production-source-audit`. Do not treat synthetic preview tests as live integration or release approval.
+
+For the complete immediate continuation instructions, exact local folder/command, project invariants, upcoming phases and assistant working rules, read `docs/handoffs/2026-11-23-new-chat-continuation-handoff.md` first, then this full historical handoff.
