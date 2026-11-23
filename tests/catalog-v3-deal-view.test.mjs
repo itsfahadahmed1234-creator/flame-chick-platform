@@ -104,6 +104,7 @@ test('builds deals only from exact mapped option IDs and respects branch/time av
   assert.equal(result.collections[0].id, IDS.dealCollection);
   const deal = result.collections[0].deals[0];
   assert.equal(deal.id, IDS.deal);
+  assert.equal(deal.branchAvailable, true);
   assert.equal(deal.available, true);
   const variant = deal.variants[0];
   assert.equal(variant.id, IDS.dealVariant);
@@ -168,6 +169,7 @@ test('requires branch and database time; supports read-only deal browsing withou
   assert.equal(browse.ok, true);
   assert.equal(browse.fulfilmentType, null);
   assert.equal(browse.orderingEnabled, false);
+  assert.equal(browse.collections[0].deals[0].branchAvailable, true);
   assert.equal(browse.collections[0].deals[0].available, false);
   assert.equal(browse.collections[0].deals[0].scheduleAvailable, true);
 
