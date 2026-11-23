@@ -1175,7 +1175,12 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
       notes: String(customer.notes || '').trim(),
       delivery: customer.mode === 'Takeaway'
         ? {}
-        : { address: customer.address, area_name: customer.areaName || '', area_id: customer.areaId || '' },
+        : {
+          selection_type: customer.areaChoice === '__not_listed__' ? 'not_listed' : 'listed_area',
+          area_id: customer.areaChoice === '__not_listed__' ? null : (customer.areaId || null),
+          address: customer.address,
+          instructions: ''
+        },
       items: items
     };
   }
