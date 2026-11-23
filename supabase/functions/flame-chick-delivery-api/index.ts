@@ -517,7 +517,7 @@ Deno.serve(async (req: Request) => {
     taskQuery.set("limit", "100");
 
     const riderQuery = new URLSearchParams();
-    riderQuery.set("select", "user_id,rider_code,display_name,phone,availability_status,is_active");
+    riderQuery.set("select", "user_id,rider_code,display_name,phone,availability_status,accepting_jobs,last_seen_at,is_active");
     riderQuery.set("branch_id", "eq." + branchId);
     riderQuery.set("is_active", "eq.true");
     riderQuery.set("order", "display_name.asc");
