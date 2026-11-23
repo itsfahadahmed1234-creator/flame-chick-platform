@@ -47,6 +47,10 @@ DECLARE
   v_now timestamptz;
   v_status text:='new';
   v_payment_summary text;
+  v_subtotal_raw numeric;
+  v_discount_raw numeric;
+  v_delivery_fee_raw numeric;
+  v_total_raw numeric;
   v_subtotal numeric(12,2);
   v_discount numeric(12,2);
   v_delivery_fee numeric(12,2);
@@ -71,8 +75,8 @@ DECLARE
   v_existing public.orders%ROWTYPE;
   v_ordinal integer:=0;
   v_item_quantity integer;
-  v_line_total numeric(12,2);
-  v_unit_price numeric(12,2);
+  v_line_total numeric;
+  v_unit_price numeric;
   v_phone_count_1m integer;
   v_phone_count_10m integer;
   v_phone_count_1h integer;
@@ -136,7 +140,6 @@ BEGIN
   SELECT o.* INTO v_existing
   FROM public.orders o
   WHERE o.restaurant_id=v_restaurant_id
-    AND o.branch_id=v_branch_id
     AND o.source='website'
     AND o.idempotency_key=v_idempotency_key
   LIMIT 1;
@@ -222,16 +225,30 @@ BEGIN
   END IF;
 
   BEGIN
-    v_subtotal:=(p_payload->>'subtotal')::numeric;
-    v_discount:=COALESCE((p_payload->>'discount_amount')::numeric,0);
-    v_delivery_fee:=(p_payload->>'delivery_fee')::numeric;
-    v_total:=(p_payload->>'total')::numeric;
+    v_subtotal_raw:=(p_payload->>'subtotal')::numeric;
+    v_discount_raw:=COALESCE((p_payload->>'discount_amount')::numeric,0);
+    v_delivery_fee_raw:=(p_payload->>'delivery_fee')::numeric;
+    v_total_raw:=(p_payload->>'total')::numeric;
   EXCEPTION WHEN OTHERS THEN
     RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
       'code','WEBSITE_ORDER_AMOUNT_INVALID','message','The server-calculated order amounts are invalid.'));
   END;
-  IF v_subtotal<0 OR v_discount<>0 OR v_delivery_fee<0
-     OR v_total<>v_subtotal-v_discount+v_delivery_fee THEN
+  IF v_subtotal_raw IS NULL OR v_delivery_fee_raw IS NULL OR v_total_raw IS NULL
+     OR v_subtotal_raw<0 OR v_subtotal_raw>9999999999.99
+     OR v_discount_raw<>0 OR v_delivery_fee_raw<0 OR v_delivery_fee_raw>9999999999.99
+     OR v_total_raw<0 OR v_total_raw>9999999999.99
+     OR v_subtotal_raw<>pg_catalog.round(v_subtotal_raw,2)
+     OR v_discount_raw<>pg_catalog.round(v_discount_raw,2)
+     OR v_delivery_fee_raw<>pg_catalog.round(v_delivery_fee_raw,2)
+     OR v_total_raw<>pg_catalog.round(v_total_raw,2) THEN
+    RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
+      'code','WEBSITE_ORDER_AMOUNT_INVALID','message','Order amounts must be non-negative, use at most two decimal places, and remain within the supported limit.'));
+  END IF;
+  v_subtotal:=v_subtotal_raw;
+  v_discount:=v_discount_raw;
+  v_delivery_fee:=v_delivery_fee_raw;
+  v_total:=v_total_raw;
+  IF v_total<>v_subtotal-v_discount+v_delivery_fee THEN
     RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
       'code','WEBSITE_ORDER_AMOUNT_INVALID','message','The order total or discount does not match the server calculation.'));
   END IF;
@@ -330,7 +347,12 @@ BEGIN
       RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
         'code','WEBSITE_ORDER_LINE_AMOUNT_INVALID','message','An order line has an invalid calculated amount.'));
     END;
-    IF v_unit_price<0 OR v_line_total<v_unit_price*(v_item->>'quantity')::integer THEN
+    IF v_unit_price IS NULL OR v_line_total IS NULL
+       OR v_unit_price<0 OR v_unit_price>9999999999.99
+       OR v_line_total<0 OR v_line_total>9999999999.99
+       OR v_unit_price<>pg_catalog.round(v_unit_price,2)
+       OR v_line_total<>pg_catalog.round(v_line_total,2)
+       OR v_line_total<v_unit_price*(v_item->>'quantity')::integer THEN
       RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
         'code','WEBSITE_ORDER_LINE_AMOUNT_INVALID','message','An order line amount is inconsistent.'));
     END IF;
