@@ -115,7 +115,7 @@ test("Customer order page uses server quote and preserves the exact checkout ID/
   const js=source["js/website-order-v3.js"];
   assert.match(js,/orderApi\('POST', '', body\)/);
   assert.match(js,/result\.quote\.publicationId !== state\.snapshot\.publicationId/);
-  assert.match(js,/state\.checkoutRequestId = crypto\.randomUUID\(\)/);
+  assert.match(js,/state\\.checkoutRequestId = root\\.crypto\\.randomUUID\\(\\)/);
   assert.match(js,/state\.checkoutBody = clone\(state\.quoteBody\)/);
   assert.match(js,/state\.checkoutBody\.request_id = state\.checkoutRequestId/);
   assert.match(js,/var uncertain = !error\.status \|\| error\.status >= 500/);
