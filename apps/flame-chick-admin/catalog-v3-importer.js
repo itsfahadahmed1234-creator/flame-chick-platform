@@ -72,9 +72,9 @@
         local.add(variant.variantKey);
         if(!['standard','portion','flavour','pack','volume'].includes(variant.variantKind))fail('A product variant has an unsupported kind.');
         if(variant.standaloneSellable===true){
-          if(!Number.isFinite(Number(variant.price))||Number(variant.price)<0)fail('A standalone-sellable variant must have its own price.');
+          if(typeof variant.price!=='number'||!Number.isFinite(variant.price)||variant.price<0)fail('A standalone-sellable variant must have its own numeric price.');
         }else if(variant.standaloneSellable===false){
-          if(variant.price!==null&&variant.price!==undefined&&(!Number.isFinite(Number(variant.price))||Number(variant.price)<0))fail('A deal-only variant price must be optional or a valid non-negative amount.');
+          if(variant.price!==null&&variant.price!==undefined&&(typeof variant.price!=='number'||!Number.isFinite(variant.price)||variant.price<0))fail('A deal-only variant price must be NULL or a valid non-negative numeric amount.');
         }else fail('Every product variant must explicitly declare standalone sellability.');
         if(variant.variantKind==='pack'){
           if(!Number.isSafeInteger(variant.packQuantity)||variant.packQuantity<1||typeof variant.packUnit!=='string'||!variant.packUnit.trim())fail('Pack variants require a valid quantity and unit.');
@@ -89,7 +89,7 @@
       if(dealKeys.has(deal.key)||typeof deal.title!=='string'||!deal.title.trim()||!Array.isArray(deal.variants)||deal.variants.length!==1)fail('Each current deal must be one independent fixed-price offer with exactly one variant.');
       dealKeys.add(deal.key);
       const variant=deal.variants[0];
-      if(!Number.isFinite(Number(variant.basePrice))||Number(variant.basePrice)<=0||variant.pricingMode&&variant.pricingMode!=='FIXED_BUNDLE')fail('Each deal needs its own positive fixed bundle price.');
+      if(typeof variant.basePrice!=='number'||!Number.isFinite(variant.basePrice)||variant.basePrice<=0||variant.pricingMode&&variant.pricingMode!=='FIXED_BUNDLE')fail('Each deal needs its own positive fixed bundle price.');
       if(!Array.isArray(variant.components)||!variant.components.length)fail('Every fixed deal needs at least one component.');
       for(const component of variant.components){
         if(typeof component.displayName!=='string'||!component.displayName.trim()||!Number.isSafeInteger(component.quantity)||component.quantity<1||component.quantity>100)fail('A deal component has an invalid name or quantity.');
