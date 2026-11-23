@@ -12,11 +12,16 @@ test('builds menu categories and products only from validated stable IDs', () =>
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.equal(result.schemaVersion, 3);
   assert.equal(result.branchId, IDS.branch);
-  assert.equal(result.categories.length, 1);
-  assert.equal(result.categories[0].id, IDS.menuCategory);
-  assert.equal(result.categories[0].products[0].id, IDS.product);
-  assert.equal(result.categories[0].products[0].variants[0].id, IDS.variant);
-  assert.equal(result.categories[0].products[0].variants[0].priceMinor, 55000);
+  assert.deepEqual(result.categories.map(category => category.id), [IDS.menuCategory, IDS.drinkCategory]);
+  const burgerCategory = result.categories.find(category => category.id === IDS.menuCategory);
+  const drinkCategory = result.categories.find(category => category.id === IDS.drinkCategory);
+  assert.ok(burgerCategory);
+  assert.ok(drinkCategory);
+  assert.equal(burgerCategory.products[0].id, IDS.product);
+  assert.equal(burgerCategory.products[0].variants[0].id, IDS.variant);
+  assert.equal(burgerCategory.products[0].variants[0].priceMinor, 55000);
+  assert.equal(drinkCategory.products[0].id, IDS.drinkProduct);
+  assert.equal(drinkCategory.products[0].variants[0].id, IDS.drinkVariant);
 });
 
 test('requires explicit branch choice when multiple branches exist', () => {
@@ -50,7 +55,8 @@ test('omits unavailable products and variants using branch overlays', () => {
   });
   const productResult = view.buildMenuViewModel(snapshot, {}, contract);
   assert.equal(productResult.ok, true);
-  assert.equal(productResult.categories.length, 0);
+  assert.deepEqual(productResult.categories.map(category => category.id), [IDS.drinkCategory]);
+  assert.equal(productResult.categories[0].products[0].id, IDS.drinkProduct);
 
   const variantSnapshot = createSnapshot();
   variantSnapshot.branchVariantAvailability.push({
@@ -61,7 +67,8 @@ test('omits unavailable products and variants using branch overlays', () => {
   });
   const variantResult = view.buildMenuViewModel(variantSnapshot, {}, contract);
   assert.equal(variantResult.ok, true);
-  assert.equal(variantResult.categories.length, 0);
+  assert.deepEqual(variantResult.categories.map(category => category.id), [IDS.drinkCategory]);
+  assert.equal(variantResult.categories[0].products[0].id, IDS.drinkProduct);
 });
 
 test('retains multiple variants without silently selecting one', () => {
@@ -109,7 +116,8 @@ test('excludes variants that are not sellable as standalone menu items', () => {
   snapshot.productVariants[0].standaloneSellable = false;
   const result = view.buildMenuViewModel(snapshot, {}, contract);
   assert.equal(result.ok, true);
-  assert.equal(result.categories.length, 0);
+  assert.deepEqual(result.categories.map(category => category.id), [IDS.drinkCategory]);
+  assert.equal(result.categories[0].products[0].id, IDS.drinkProduct);
 });
 
 test('formats integer minor units with the publication currency', () => {
