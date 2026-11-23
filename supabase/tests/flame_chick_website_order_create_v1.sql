@@ -220,7 +220,7 @@ BEGIN
   changed_request_id:=gen_random_uuid();
   result:=public.flame_chick_create_website_order(
     jsonb_set(payload,'{idempotency_key}',to_jsonb(changed_request_id),true)
-      #- '{delivery,area_id}'
+      #- '{delivery}'
   );
   IF result->>'ok'<>'false'
      OR result#>>'{error,code}'<>'WEBSITE_DELIVERY_DETAILS_REQUIRED' THEN
@@ -354,11 +354,6 @@ BEGIN
     RAISE EXCEPTION 'WEBSITE_HOURLY_QUOTA_NOT_ENFORCED: %',result;
   END IF;
 
-  IF EXISTS(
-    SELECT 1 FROM public.website_order_success_events
-  ) THEN
-    NULL;
-  END IF;
 END
 $behavior$;
 
