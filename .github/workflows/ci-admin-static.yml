@@ -38,8 +38,9 @@ jobs:
         run: |
           node --check apps/flame-chick-admin/app.js
           node --check apps/flame-chick-admin/catalog-v3-admin.js
+          node --check apps/flame-chick-admin/catalog-v3-importer.js
           node --check apps/flame-chick-admin/accept-invitation.js
-          node --test tests/admin-invitation-acceptance.test.mjs tests/catalog-v3-admin.test.mjs tests/edge-function-contract-hygiene.test.mjs tests/staff-admin-origin-policy.test.mjs tests/staff-admin-role-boundary.test.mjs
+          node --test tests/admin-invitation-acceptance.test.mjs tests/catalog-v3-admin.test.mjs tests/catalog-v3-importer.test.mjs tests/edge-function-contract-hygiene.test.mjs tests/staff-admin-origin-policy.test.mjs tests/staff-admin-role-boundary.test.mjs
 
       - name: Verify static page assets and invitation wiring
         run: |
@@ -49,13 +50,17 @@ jobs:
           const admin = readFileSync(root + "index.html", "utf8");
           const invite = readFileSync(root + "accept-invitation.html", "utf8");
           const inviteJs = readFileSync(root + "accept-invitation.js", "utf8");
-          for (const file of ["config.js", "app.js", "catalog-v3-admin.js", "catalog-v3-admin.css", "styles.css", "assets/flame-chick-mark.svg", "accept-invitation.html", "accept-invitation.js"]) {
+          const adminDraft = readFileSync(root + "flame-chick-published-menu-2026-11-23.v3-draft.json", "utf8");
+          const sourceDraft = readFileSync("ops/catalog-drafts/flame-chick-published-menu-2026-11-23.v3-draft.json", "utf8");
+          if (adminDraft !== sourceDraft) throw new Error("Admin menu draft asset differs from the authoritative review draft.");
+          for (const file of ["config.js", "app.js", "catalog-v3-admin.js", "catalog-v3-importer.js", "flame-chick-published-menu-2026-11-23.v3-draft.json", "catalog-v3-admin.css", "styles.css", "assets/flame-chick-mark.svg", "accept-invitation.html", "accept-invitation.js"]) {
             if (!existsSync(root + file)) throw new Error("Missing Admin asset: " + file);
           }
           if (!admin.includes('href="accept-invitation.html"')) throw new Error("Admin sign-in does not link to invitation acceptance.");
           if (!admin.includes('data-page="catalog-v3"')) throw new Error("Catalog V3 navigation entry is missing.");
           if (!admin.includes('id="page-catalog-v3"')) throw new Error("Catalog V3 page root is missing.");
           if (!admin.includes('src="catalog-v3-admin.js"')) throw new Error("Catalog V3 authoring module is not linked.");
+          if (!admin.includes('src="catalog-v3-importer.js"')) throw new Error("Catalog V3 importer module is not linked.");
           if (!admin.includes('href="catalog-v3-admin.css"')) throw new Error("Catalog V3 workspace stylesheet is not linked.");
           if (!invite.includes('src="accept-invitation.js"')) throw new Error("Invitation page script is not linked.");
           if (!inviteJs.includes('action: "accept_invitation"')) throw new Error("Invitation page does not invoke the acceptance action.");
