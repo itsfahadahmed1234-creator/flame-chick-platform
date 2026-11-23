@@ -24,14 +24,14 @@ test('the review-only draft describes 20 standalone products, five deal-only pro
   assert.equal(draft.status, 'REVIEW_ONLY_NOT_IMPORTED');
   assert.equal(snapshot.categories.length, 8);
   assert.equal(snapshot.products.length, 25);
-  assert.equal(snapshot.productVariants.length, 27);
+  assert.equal(snapshot.productVariants.length, 28);
   assert.equal(snapshot.products.filter(product =>
     snapshot.productVariants.some(variant => variant.productId === product.productId && variant.standaloneSellable)
   ).length, 20);
   assert.equal(snapshot.products.filter(product =>
     snapshot.productVariants.some(variant => variant.productId === product.productId && !variant.standaloneSellable)
   ).length, 5);
-  assert.equal(snapshot.deals.length, 5);
+  assert.equal(snapshot.deals.length, 6);
   assert.equal(snapshot.dealVariants.length, 6);
   assert.equal(snapshot.dealComponentGroups.length, 18);
   assert.equal(snapshot.dealComponentOptions.length, 18);
@@ -108,11 +108,13 @@ test('all six current offers have exact base prices and fixed INCLUDED compositi
   const result = buildDeals(snapshot, DURING_FLAME_HOUR);
   assert.equal(result.ok, true, JSON.stringify(result));
   const deals = result.collections.flatMap(collection => collection.deals);
-  assert.equal(deals.length, 5);
+  assert.equal(deals.length, 6);
 
   const expected = {
-    'Flame Hour': [
-      { price: 69900, components: [['The Injector', 1], ['Cold Drink', 1]] },
+    'Flame Hour — The Injector + Cold Drink': [
+      { price: 69900, components: [['The Injector', 1], ['Cold Drink', 1]] }
+    ],
+    'Flame Hour — Quarter Broast + Burger + Cold Drink': [
       { price: 159900, components: [['Quarter Broast', 1], ['Burger', 1], ['Cold Drink', 1]] }
     ],
     'Flame Duo': [
@@ -194,16 +196,17 @@ test('Flame Hour is scheduled every day from 15:00 inclusive to 17:00 exclusive 
 
   const open = buildDeals(snapshot, DURING_FLAME_HOUR);
   assert.equal(open.ok, true);
-  const openDeal = open.collections[0].deals.find(deal => deal.title === 'Flame Hour');
-  assert.equal(openDeal.branchAvailable, true);
-  assert.equal(openDeal.available, true);
+  const openDeals = open.collections[0].deals.filter(deal => deal.title.startsWith('Flame Hour —'));
+  assert.equal(openDeals.length, 2);
+  assert.ok(openDeals.every(deal => deal.branchAvailable && deal.available));
 
   const closed = buildDeals(snapshot, AFTER_FLAME_HOUR);
   assert.equal(closed.ok, true);
-  const closedDeal = closed.collections[0].deals.find(deal => deal.title === 'Flame Hour');
-  assert.equal(closedDeal.branchAvailable, true);
-  assert.equal(closedDeal.available, false);
-  assert.equal(closedDeal.scheduleAvailable, false);
+  const closedDeals = closed.collections[0].deals.filter(deal => deal.title.startsWith('Flame Hour —'));
+  assert.equal(closedDeals.length, 2);
+  assert.ok(closedDeals.every(deal =>
+    deal.branchAvailable && !deal.available && !deal.scheduleAvailable
+  ));
 });
 
 test('all fixed deal components are preselected and locked in the customer configurator', () => {
@@ -230,14 +233,17 @@ test('Flame Hour popup is read-only and cannot emit a payload outside its schedu
   const snapshot = createPublishedMenuSnapshot();
   const result = buildDeals(snapshot, AFTER_FLAME_HOUR);
   assert.equal(result.ok, true);
-  const flameHour = result.collections[0].deals.find(deal => deal.title === 'Flame Hour');
-  const ui = dealConfigurator.createDealConfigurator(result, flameHour.id, {
-    validateModifierSelections: dealView.validateModifierSelections
-  });
-  assert.equal(ui.ok, true);
-  assert.equal(ui.getState().readOnly, true);
-  assert.equal(ui.selectVariant(flameHour.variants[0].id).ok, true);
-  assert.equal(ui.validate().ok, true);
-  assert.equal(ui.toPayload().code, 'DEAL_READ_ONLY');
+  const flameHourDeals = result.collections[0].deals.filter(deal => deal.title.startsWith('Flame Hour —'));
+  assert.equal(flameHourDeals.length, 2);
+  for (const flameHour of flameHourDeals) {
+    const ui = dealConfigurator.createDealConfigurator(result, flameHour.id, {
+      validateModifierSelections: dealView.validateModifierSelections
+    });
+    assert.equal(ui.ok, true);
+    assert.equal(ui.getState().readOnly, true);
+    assert.equal(ui.selectVariant(flameHour.variants[0].id).ok, true);
+    assert.equal(ui.validate().ok, true);
+    assert.equal(ui.toPayload().code, 'DEAL_READ_ONLY');
+  }
 });
 
