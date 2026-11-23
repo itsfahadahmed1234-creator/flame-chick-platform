@@ -25,8 +25,8 @@ jobs:
     timeout-minutes: 15
     environment: flame-chick-preview
     env:
-      VERCEL_ORG_ID: team_lrFy9ILYEz9umsBy98GCyQjI
-      VERCEL_PROJECT_ID: prj_YxlMceDeGpdVmMneGs5GhhPI2hbl
+      VERCEL_ORG_ID: team_Rpf9jeGg9r3cmMguFXHtziqz
+      VERCEL_PROJECT_ID: prj_U3djCTfZK0Ubl808umChQn7MPPNg
       VERCEL_TELEMETRY_DISABLED: "1"
 
     steps:
