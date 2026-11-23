@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = "apps/flame-chick-website";
-const activeFiles = ["index.html", "js/catalog.js", "js/config.js", "js/hero-slider.js", "js/i18n.js", "js/pricing.js", "js/store.js"];
+const activeFiles = ["index.html", "order-online-v3.html", "js/catalog.js", "js/config.js", "js/hero-slider.js", "js/i18n.js", "js/pricing.js", "js/store.js", "js/website-order-v3.js"];
 const source = Object.fromEntries(activeFiles.map((file) => [file, readFileSync(join(root, file), "utf8")]));
 
 test("active storefront is Flame Chick-branded and has no retired brand/config identifiers", () => {
@@ -71,4 +71,60 @@ test("website keeps a missing listed-area fee separate from explicitly configure
   assert.match(html,/Fee not configured/);
   assert.match(html,/selectedAreaForCheckout\.fee === null/);
   assert.doesNotMatch(html,/Math\.max\(0, Number\(area\.Fee[\s\S]{0,60}\|\| 0\)/);
+});
+
+
+test("Dedicated V3 order page is separate from legacy storefront and remains unindexed until release", () => {
+  const html=source["order-online-v3.html"];
+  assert.match(html,/<meta name="robots" content="noindex,nofollow,noarchive">/);
+  assert.match(html,/js\/catalog-v3-client\.js/);
+  assert.match(html,/js\/branch-fulfilment-v3\.js/);
+  assert.match(html,/js\/catalog-v3-deal-configurator\.js/);
+  assert.match(html,/js\/website-order-v3\.js/);
+  assert.match(html,/id="branch-selector"/);
+  assert.match(html,/id="product-catalog"/);
+  assert.match(html,/id="deal-catalog"/);
+  assert.match(html,/id="cart-lines"/);
+  assert.match(html,/id="request-quote"/);
+  assert.match(html,/id="place-order"/);
+  assert.match(html,/id="retry-order"/);
+  assert.match(html,/id="order-success"/);
+  assert.doesNotMatch(html,/service_role|service_role_key|supabase_service_role/i);
+});
+
+test("Customer ordering page sends published IDs for quote and commit, never browser-calculated prices", () => {
+  const js=source["js/website-order-v3.js"];
+  assert.match(js,/FlameChickCatalogV3Client\.load/);
+  assert.match(js,/FlameChickCatalogV3View\.buildMenuViewModel/);
+  assert.match(js,/FlameChickCatalogV3DealView\.buildDealViewModel/);
+  assert.match(js,/FlameChickCatalogV3DealConfigurator\.createDealConfigurator/);
+  assert.match(js,/action: 'quote_website_order'/);
+  assert.match(js,/action: 'create_website_order'/);
+  assert.match(js,/productVariantId: variantId/);
+  assert.match(js,/item\.quantity = row\.quantity/);
+  assert.match(js,/delivery: delivery/);
+  assert.doesNotMatch(js,/unit_price_snapshot|line_total|price_minor|subtotal_minor|delivery_fee:/);
+  assert.doesNotMatch(js,/localStorage|sessionStorage|indexedDB/);
+});
+
+test("Customer order page uses server quote and preserves the exact checkout ID/body after uncertain responses", () => {
+  const js=source["js/website-order-v3.js"];
+  assert.match(js,/orderApi\('POST', '', body\)/);
+  assert.match(js,/result\.quote\.publicationId !== state\.snapshot\.publicationId/);
+  assert.match(js,/state\.checkoutRequestId = crypto\.randomUUID\(\)/);
+  assert.match(js,/state\.checkoutBody = clone\(state\.quoteBody\)/);
+  assert.match(js,/state\.checkoutBody\.request_id = state\.checkoutRequestId/);
+  assert.match(js,/const uncertain = !error\.status \|\| error\.status >= 500/);
+  assert.match(js,/retry-order/);
+  assert.match(js,/return state\.checkoutUncertain/);
+  assert.doesNotMatch(js,/function canEdit\(\) \{ return[^\n]*&& !\$\('order-success'\)\.hidden/);
+});
+
+test("Customer order context keeps Not Listed delivery fee distinct from unconfigured NULL", () => {
+  const js=source["js/website-order-v3.js"];
+  assert.match(js,/branch\.notListedDeliveryFee !== null/);
+  assert.match(js,/if \(!\$\('not-listed-confirm'\)\.checked\)/);
+  assert.match(js,/selection_type: 'not_listed'/);
+  assert.match(js,/selection_type: 'listed_area'/);
+  assert.match(js,/current database branch settings/);
 });
