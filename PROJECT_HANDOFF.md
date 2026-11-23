@@ -1,33 +1,48 @@
-# CURRENT CHECKPOINT — 2026-11-23 16:45 PKT — delivery contract reconciliation
+# CURRENT CHECKPOINT — 2026-11-23 16:58 PKT — operational schema security replay
 
 **Active source branch:** `work/production-source-audit`  
-**Implementation commit:** `5c9ae27da91c748fd18fa01499720fd2639c9c1e`  
-**Production status:** unchanged; source-only work. `main` untouched.
+**Latest correction commit:** `a30609aac5892d8e55277ad8a434d88633a864ce`  
+**Production:** untouched. **`main`: untouched.**
 
-## User-confirmed Rider flow
+## Delivery lifecycle contract
 
-The Rider journey is exactly: **Accept offer → Picked up → Delivered**. Do not add an “At restaurant”/arrival stage or a second Accept action in the active-job card. Offer acceptance is the targeted offer command; after it succeeds, the next Rider action is Picked up. Delivery failure/return remains a separate exception path; rider reports the return, and authorized POS staff confirms physical receipt.
+Rider flow remains exactly **Accept offer → Picked up → Delivered**. No At restaurant/arrival stage and no second Accept action in the active-job card. Delivery failure/return is a separate exception: rider reports the return; authorized Cashier or Manager confirms physical receipt. Offer timeout is 60 seconds; rejection/expiry returns the task to POS for manual reassignment.
 
-## Changes in implementation commit
+## Fixes made after the previous checkpoint
 
-- Added `delivery_tasks(id, branch_id, restaurant_id)` composite unique key required by task/offer/assignment/event foreign keys.
-- Changed new `delivery_assignments.status` default to `accepted`, matching the atomic accept-offer outcome and allowed status set.
-- Extended disposable operational-schema SQL QA to assert the composite key, accepted assignment default and absence of retired arrival fields/state.
-- Removed `arrived_at_restaurant` from Delivery API active-task filtering and removed `arrived_at` from Rider/POS assignment selects.
-- Removed Rider active-job second-accept/legacy-assigned countdown state; active actions are Picked up and Delivered (with failure/return exception).
-- Removed POS second acceptance countdown and legacy pending-assignment/reassign branch; POS dispatch now presents targeted offer state.
-- Added Edge Function and POS/Rider source regression assertions.
+- Added required unique key `delivery_tasks(id,branch_id,restaurant_id)` to satisfy composite foreign keys from offers, assignments and events.
+- Set the assignment default to `accepted`, matching accepted-offer state and allowed status constraints.
+- Removed obsolete `arrived_at_restaurant` query filter and `arrived_at` assignment projections from the Delivery API.
+- Removed Rider's obsolete assigned/acceptance-countdown stage and POS's second acceptance countdown/reassignment state. POS now displays the targeted offer state.
+- Added Rider/POS/Edge API regression assertions. First CI caught an over-escaped regex in the test; corrected on `c07dd9772137de7c4ce4cdea8826267b5c7d8336`.
+- POS/Rider static checks passed on `5c9ae27...`; Admin and Edge Function static checks passed on `c07dd977...`.
+- Disposable full migration replay then caught a security preflight mismatch: the operational migration/QA incorrectly rejected authenticated USAGE on `app_private`, despite the existing Batch 4 Staff Admin SECURITY INVOKER wrapper explicitly requiring it. Corrected both operational migration and disposable QA to allow only that established authenticated schema USAGE while continuing to deny `anon` and `service_role`; added a fail-closed assertion that authenticated USAGE exists.
+- Latest source correction: `a30609aac5892d8e55277ad8a434d88633a864ce`.
 
-## Verification state — do not overstate
+## Current verification — pending
 
-- Before this fix, disposable migration replay failed at `delivery_task_offers`: missing unique constraint on `delivery_tasks(id, branch_id, restaurant_id)`. Earlier run had caught an order component FK issue, subsequently corrected in the source. No migration reached fixture/recovery steps.
-- Rider/POS/Edge Function static checks had passed for the earlier UI/API commits, and preview deploy workflows were skipped by design.
-- Commit `5c9ae27...` has just been created. **Its new CI and full disposable migration replay have not yet been confirmed.** Do not call the schema or delivery lifecycle verified until the post-commit workflow runs are inspected and successful.
-- Runtime end-to-end testing (offer acceptance race/expiry, pickup, delivery, rejection, return, role and rider isolation) remains outstanding.
+Three workflows were started on `a30609a...` and were still in progress at the time of this handoff update:
+- Catalog importer full local migration chain: run 45169678210
+- Staff Admin role-boundary isolated QA: run 45169678326
+- Catalog publication full local migration chain/fixture: run 45169678223
 
-## Immediate next task
+Do not report these as passed until their conclusions and any failing logs are inspected. Preview deployment jobs remain skipped intentionally. No production migrations or deployments have been made.
 
-Inspect GitHub Actions triggered by `5c9ae27...`. If the migration chain fails, read the exact failing SQL/log and fix only the demonstrated defect, then rerun. Confirm Edge Function static checks, POS/Rider static checks and full disposable migration replay. After migration replay passes, extend disposable fixture coverage for offer/assignment/task creation and state constraints before implementing transactional delivery RPCs. Keep all work source-only; no Production migration, deployment, Vercel publish, Realtime activation, menu publication or checkout enablement.
+## Next implementation stage
+
+1. Confirm the three workflows above.
+2. If replay passes, extend the disposable operational fixture with a test Auth rider, rider profile, delivery order/task, 60-second offer and accepted assignment; assert one pending offer per task, offer uniqueness, tenant/branch FKs, no cross-rider access and rollback.
+3. Implement transactional delivery RPCs in a separate candidate migration:
+   - POS/Admin/Owner/Manager/Cashier targeted rider assignment, branch scoped and idempotent;
+   - atomically create one 60-second offer and move task to offering;
+   - rider-only accept/decline of own offer, with expiry and concurrent accept guarded by row locks;
+   - Picked up and Delivered transitions only for the currently assigned rider;
+   - failure/return report by rider, physical-return confirmation only by Manager/Cashier, with audit;
+   - reject/expiry returns task to POS manual reassignment; never automatically fan out offers.
+4. Match exact action/RPC payloads in `flame-chick-delivery-api`; add contract and disposable SQL concurrency/role tests.
+5. Keep source-only. Do not apply to Production, deploy Edge Functions, configure Realtime, publish Vercel or enable checkout without a separate review/approval.
+
+Do not add GST. Preserve catalog Publication #2 and Option 1 product/variant-linked deal model. New published menu details must come from the user's supplied menu when that stage is reached; do not reconstruct or seed guesses.
 
 ---
 
