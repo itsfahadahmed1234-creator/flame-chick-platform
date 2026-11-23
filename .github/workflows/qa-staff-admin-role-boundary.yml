@@ -9,6 +9,7 @@ on:
       - "supabase/tests/batch4_staff_admin_role_boundary.sql"
       - "supabase/tests/batch4_staff_admin_security.sql"
       - "supabase/tests/flame_chick_operational_schema_v1.sql"
+      - "supabase/tests/flame_chick_delivery_commands_v1.sql"
       - ".github/workflows/qa-staff-admin-role-boundary.yml"
   workflow_dispatch:
 
@@ -94,6 +95,8 @@ jobs:
           test "$(psql "$db" -Atqc "select count(*) from public.staff_role_audit a join public.restaurants r on r.id=a.restaurant_id where r.slug='flame-chick'")" = "0"
       - name: Verify operational schema V1 constraints and security
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_operational_schema_v1.sql
+      - name: Exercise delivery offer, pickup, delivery and physical return commands
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_delivery_commands_v1.sql
       - name: Stop disposable Supabase stack
         if: always()
         run: supabase stop --no-backup
