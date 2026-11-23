@@ -1,3 +1,27 @@
+# CURRENT CHECKPOINT — 2026-11-23 — delivery concurrency QA preparation
+
+**Active branch:** `work/production-source-audit`  
+**Verified delivery expiry source commit:** `355a7c38c2abb9232021ac1cfcf0c12796ba3df0`  
+**Production and `main`: untouched.**
+
+## Current verified state
+
+- Delivery command migration remains source-only.
+- Expiry clock helper and exact 60-second boundary tests passed on disposable Supabase in [workflow run 45182331625](https://github.com/itsfahamed1234-creator/flame-chick-platform/actions/runs/45182331625).
+- Existing delivery lifecycle behavior also passed: targeted Rider assignment, wrong-Rider denial, accept/idempotency, pickup, delivered/idempotency, failed delivery, return report, Rider cannot confirm physical return, Cashier can confirm, and payment ledger unchanged.
+- Full migration replay, staff role boundaries, operational schema constraints/security, fixture rollback, and local stack cleanup passed.
+
+## Concurrency QA status — NOT YET IMPLEMENTED
+
+- The next requested work is genuine parallel-session testing of accept-vs-decline and accept-vs-expiry/sweep.
+- A first committed-fixture draft was removed before workflow use because the source schema and role setup needed further validation; it was not run and must not be treated as test coverage.
+- Do not claim race safety from SQL row-lock inspection alone.
+- Next implementation must use committed disposable fixtures in the isolated local stack, invoke separate PostgreSQL sessions concurrently, assert one valid terminal result / no duplicate current assignment / consistent event rows, and rely on full disposable stack teardown for fixture isolation.
+- Avoid weakening database authorization or production clock behavior to make tests pass.
+
+No Production migrations, DB writes, Edge Function deployments, Vercel deployments, Realtime changes, checkout activation or catalog publication occurred. GST remains deferred.
+---
+
 # CURRENT CHECKPOINT — 2026-11-23 18:25 PKT — delivery expiry boundary QA added
 
 **Active branch:** `work/production-source-audit`  
