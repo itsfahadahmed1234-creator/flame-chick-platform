@@ -221,14 +221,15 @@ async function callServiceRpc(name: string, args: Record<string, unknown> = {}) 
 
 async function isActiveRider(userId: string, token: string, apiKey: string) {
   const roleQuery = new URLSearchParams();
-  roleQuery.set("select", "role,branch_id,is_active");
+  roleQuery.set("select", "role_key,branch_id,is_active");
   roleQuery.set("user_id", "eq." + userId);
-  roleQuery.set("role", "eq.rider");
+  roleQuery.set("restaurant_id", "eq.85b2ffe5-6612-49f3-a102-d3084d0fc6a7");
+  roleQuery.set("role_key", "eq.rider");
   roleQuery.set("is_active", "eq.true");
-  const roleResult = await readAsUser("user_roles?" + roleQuery.toString(), token, apiKey);
+  const roleResult = await readAsService("user_roles?" + roleQuery.toString());
   if (!roleResult.ok) return { ok:false as const, status:roleResult.status, body:roleResult.body };
   const roles = Array.isArray(roleResult.data) ? roleResult.data : [];
-  const riderRole = roles.find((row) => isObject(row) && row.role === "rider" && row.is_active === true && typeof row.branch_id === "string");
+  const riderRole = roles.find((row) => isObject(row) && row.role_key === "rider" && row.is_active === true && typeof row.branch_id === "string");
   if (!riderRole || typeof riderRole.branch_id !== "string") {
     return { ok:false as const, status:403, body:{ ok:false, error:{ code:"RIDER_ROLE_REQUIRED", message:"This account does not have an active Flame Chick rider role." } } };
   }
@@ -237,7 +238,7 @@ async function isActiveRider(userId: string, token: string, apiKey: string) {
   profileQuery.set("user_id", "eq." + userId);
   profileQuery.set("branch_id", "eq." + riderRole.branch_id);
   profileQuery.set("is_active", "eq.true");
-  const profileResult = await readAsUser("rider_profiles?" + profileQuery.toString(), token, apiKey);
+  const profileResult = await readAsService("rider_profiles?" + profileQuery.toString());
   if (!profileResult.ok) return { ok:false as const, status:profileResult.status, body:profileResult.body };
   const profiles = Array.isArray(profileResult.data) ? profileResult.data : [];
   if (!profiles.some((row) => isObject(row) && row.user_id === userId && row.branch_id === riderRole.branch_id && row.is_active === true)) {
@@ -395,6 +396,23 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const view = (url.searchParams.get("view") ?? "dispatch").toLowerCase();
 
+    if (view === "profile") {
+      const riderScope = await isActiveRider(user.id, token, apiKey);
+      if (!riderScope.ok) return response(riderScope.body, riderScope.status);
+      const profileQuery = new URLSearchParams();
+      profileQuery.set("select", "user_id,branch_id,rider_code,display_name,phone,availability_status,accepting_jobs,last_seen_at,is_active");
+      profileQuery.set("user_id", "eq." + user.id);
+      profileQuery.set("branch_id", "eq." + riderScope.branchId);
+      profileQuery.set("is_active", "eq.true");
+      profileQuery.set("limit", "2");
+      const profile = await readAsService("rider_profiles?" + profileQuery.toString());
+      if (!profile.ok) return response(profile.body, profile.status);
+      if (!Array.isArray(profile.data) || profile.data.length !== 1) {
+        return response({ ok:false, error:{ code:"RIDER_PROFILE_REQUIRED", message:"Your active rider profile is missing for this branch." } },403);
+      }
+      return response({ ok:true, profile:profile.data[0] });
+    }
+
     if (view === "rider") {
       const riderScope = await isActiveRider(user.id, token, apiKey);
       if (!riderScope.ok) return response(riderScope.body, riderScope.status);
@@ -483,14 +501,15 @@ Deno.serve(async (req: Request) => {
   const action = String(body.action ?? "").toLowerCase();
   if (action === "presence") {
     const roleQuery = new URLSearchParams();
-    roleQuery.set("select", "role,branch_id,is_active");
+    roleQuery.set("select", "role_key,branch_id,is_active");
     roleQuery.set("user_id", "eq." + user.id);
-    roleQuery.set("role", "eq.rider");
+    roleQuery.set("restaurant_id", "eq.85b2ffe5-6612-49f3-a102-d3084d0fc6a7");
+    roleQuery.set("role_key", "eq.rider");
     roleQuery.set("is_active", "eq.true");
-    const rolesResult = await readAsUser("user_roles?" + roleQuery.toString(), token, apiKey);
+    const rolesResult = await readAsService("user_roles?" + roleQuery.toString());
     if (!rolesResult.ok) return response(rolesResult.body, rolesResult.status);
     const roles = Array.isArray(rolesResult.data) ? rolesResult.data : [];
-    const riderRole = roles.find((row) => isObject(row) && row.role === "rider" && row.is_active === true && typeof row.branch_id === "string");
+    const riderRole = roles.find((row) => isObject(row) && row.role_key === "rider" && row.is_active === true && typeof row.branch_id === "string");
     if (!riderRole || typeof riderRole.branch_id !== "string") {
       return response({ ok:false, error:{ code:"RIDER_ROLE_REQUIRED", message:"This account does not have an active Flame Chick rider role." } },403);
     }
