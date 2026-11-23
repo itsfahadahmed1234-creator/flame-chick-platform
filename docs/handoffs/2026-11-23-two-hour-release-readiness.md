@@ -52,7 +52,7 @@ Latest successful checks on this working branch:
 - POS and Rider Static Checks #16: passed, including API-only reads, explicit delivery-selection payloads, and missing-vs-zero area-fee handling — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45148723244)
 - Website Static Checks #144: passed, including explicit delivery selection, missing-vs-zero area-fee handling and inline-script parsing — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45148732770)
 - Admin Static Checks #82: passed — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45148624210)
-- Edge Function Static Checks #39: passed — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45147768536)
+- Edge Function Static Checks #40: passed — [run](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45149190481)
 
 The POS/Rider static suite checks source hygiene and inline JavaScript syntax. Admin static checks also parse POS/Rider inline scripts. Edge checks parse the Edge Function TypeScript and assert the staff/Rider/dispatch API contracts. These are static/source checks, not live endpoint or browser sign-in tests.
 
