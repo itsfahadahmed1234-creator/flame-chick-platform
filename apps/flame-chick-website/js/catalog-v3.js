@@ -170,7 +170,7 @@
       variantId: 'uuid', productId: 'uuid', legacyId: 'nullableString',
       sizeKey: 'key', sizeLabel: 'string',
       variantKind: 'enum:standard|portion|flavour|pack|volume',
-      price: 'money', packQuantity: 'nullableInteger', packUnit: 'nullableString',
+      price: 'nullableMoney', packQuantity: 'nullableInteger', packUnit: 'nullableString',
       standaloneSellable: 'boolean', sortOrder: 'integer', available: 'boolean'
     },
     modifierGroups: {
