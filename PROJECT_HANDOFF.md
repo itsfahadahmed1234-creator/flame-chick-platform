@@ -3296,3 +3296,15 @@ All Admin action and database integration checks above target disposable local S
 - Production catalog remains empty and unpublished. No Production migration, catalog import, publication/current pointer change, Edge Function deployment, Vercel deployment/domain change or checkout activation was performed.
 - The only source/documentation writes were on `work/production-source-audit`; `main` was not modified.
 - Current deals remain fixed-price with INCLUDED/zero-surcharge components. Selectable deal products/flavours and +price upgrades remain future-only. GST remains deferred.
+
+
+## Two-hour deployability sprint checkpoint — 2026-11-23
+
+The POS and Rider apps are existing substantial applications; work is focused on API connections and targeted touch-ups, not replacement. Source on `work/production-source-audit` now routes POS/Rider role and operational reads through authenticated Edge Functions, uses production `user_roles.role_key`, scopes dispatch by server-resolved branch, and rejects ambiguous Rider multi-branch access. Direct browser reads of private role, order, delivery and rider tables were removed from the affected POS/Rider paths.
+
+Latest static verification:
+- POS/Rider Static Checks #11 passed.
+- Admin Static Checks #75 passed.
+- Edge Function Static Checks #35 passed.
+
+The detailed checkpoint and remaining release gates are in `docs/handoffs/2026-11-23-two-hour-release-readiness.md`. Full Production deployment remains NO-GO: the live Production DB has no order/delivery/payment/rider operational tables or RPCs; catalog counts and publications are zero; only Staff Admin Edge Function v1 is deployed; ordering flags are disabled; Storage and Realtime are empty; preview credentials/gates remain unconfigured. No Production writes or deployments were made.
