@@ -183,7 +183,10 @@ BEGIN
   IF jsonb_typeof(p_payload->'schema_version') IS DISTINCT FROM 'number'
      OR p_payload->>'schema_version'<>'3'
      OR jsonb_typeof(p_payload->'catalog_version') IS DISTINCT FROM 'number'
-     OR COALESCE(p_payload->>'catalog_version','') !~ '^[1-9][0-9]*
+     OR COALESCE(p_payload->>'catalog_version','') !~ '^[1-9][0-9]*$'
+     OR COALESCE(p_payload->>'version_id','') !~ '^sha256:[0-9a-f]{64}$'
+     OR COALESCE(p_payload->>'fulfillment_type','') NOT IN ('delivery','pickup')
+     OR jsonb_typeof(p_payload->'items') IS DISTINCT FROM 'array' THEN
     RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
       'code','WEBSITE_ORDER_PAYLOAD_INVALID','message','The order payload is missing the current catalog version or item list.'));
   END IF;
