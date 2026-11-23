@@ -8,6 +8,12 @@ const draft = JSON.parse(await readFile(
   'utf8'
 ));
 
+test('Admin-served review draft asset is byte-for-byte the authoritative menu draft', async () => {
+  const served = await readFile(new URL('../apps/flame-chick-admin/flame-chick-published-menu-2026-11-23.v3-draft.json', import.meta.url), 'utf8');
+  const source = await readFile(new URL('../ops/catalog-drafts/flame-chick-published-menu-2026-11-23.v3-draft.json', import.meta.url), 'utf8');
+  assert.equal(served, source);
+});
+
 test('approved review draft validates as the complete current fixed-price menu', () => {
   const result = importer.validatePublishedMenuDraft(draft);
   assert.equal(result.ok, true);
