@@ -8,6 +8,7 @@ on:
       - "supabase/migrations/*.sql"
       - "supabase/tests/batch4_staff_admin_role_boundary.sql"
       - "supabase/tests/batch4_staff_admin_security.sql"
+      - "supabase/tests/flame_chick_operational_schema_v1.sql"
       - ".github/workflows/qa-staff-admin-role-boundary.yml"
   workflow_dispatch:
 
