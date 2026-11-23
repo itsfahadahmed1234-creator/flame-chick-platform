@@ -32,14 +32,27 @@ function createPublishedMenuSnapshot() {
   });
 
   let variantCounter = 0;
+  const variantRows = [];
   snapshot.products = draft.products.map((product, productIndex) => {
     const productId = uuid('31000000-0000-4000-8000-', productIndex + 1);
     productIds.set(product.key, productId);
     product.variants.forEach((variant, variantIndex) => {
       const variantId = uuid('41000000-0000-4000-8000-', ++variantCounter);
       variantIds.set(product.key + ':' + variant.variantKey, variantId);
-      variant._fixtureVariantId = variantId;
-      variant._fixtureSortOrder = variantIndex + 1;
+      variantRows.push({
+        variantId,
+        productId,
+        legacyId: null,
+        sizeKey: variant.variantKey,
+        sizeLabel: variant.sizeLabel,
+        variantKind: variant.variantKind,
+        price: variant.price,
+        packQuantity: variant.packQuantity === undefined ? null : variant.packQuantity,
+        packUnit: variant.packUnit === undefined ? null : variant.packUnit,
+        standaloneSellable: variant.standaloneSellable,
+        sortOrder: variantIndex + 1,
+        available: true
+      });
     });
     return {
       productId,
@@ -62,21 +75,7 @@ function createPublishedMenuSnapshot() {
       available: true
     };
   });
-
-  snapshot.productVariants = draft.products.flatMap(product => product.variants.map(variant => ({
-    variantId: variant._fixtureVariantId,
-    productId: productIds.get(product.key),
-    legacyId: null,
-    sizeKey: variant.variantKey,
-    sizeLabel: variant.sizeLabel,
-    variantKind: variant.variantKind,
-    price: variant.price,
-    packQuantity: variant.packQuantity === undefined ? null : variant.packQuantity,
-    packUnit: variant.packUnit === undefined ? null : variant.packUnit,
-    standaloneSellable: variant.standaloneSellable,
-    sortOrder: variant._fixtureSortOrder,
-    available: true
-  })));
+  snapshot.productVariants = variantRows;
 
   snapshot.subcategories = [];
   snapshot.modifierGroups = [];
@@ -180,19 +179,27 @@ function createPublishedMenuSnapshot() {
     });
   });
 
-  const scheduledDeal = draft.deals.find(deal => deal.schedule);
-  if (scheduledDeal) {
+  const scheduledDeals = draft.deals.filter(deal => deal.schedule);
+  if (scheduledDeals.length) {
     const scheduleSetId = uuid('a1000000-0000-4000-8000-', 1);
+    const schedule = scheduledDeals[0].schedule;
+    if (!scheduledDeals.every(deal =>
+      deal.schedule.timezone === schedule.timezone &&
+      deal.schedule.localStart === schedule.localStart &&
+      deal.schedule.localEnd === schedule.localEnd
+    )) {
+      throw new Error('Scheduled draft deals must share the same schedule set in this fixture.');
+    }
     snapshot.scheduleSets = [{
       scheduleSetId,
       name: 'Flame Hour daily',
-      timezone: scheduledDeal.schedule.timezone,
+      timezone: schedule.timezone,
       windows: Array.from({ length: 7 }, (_, index) => ({
         windowId: uuid('a2000000-0000-4000-8000-', index + 1),
         windowKind: 'WEEKLY',
         weekdayIso: index + 1,
-        localStart: scheduledDeal.schedule.localStart,
-        localEnd: scheduledDeal.schedule.localEnd,
+        localStart: schedule.localStart,
+        localEnd: schedule.localEnd,
         isAllDay: false,
         startsAt: null,
         endsAt: null,
@@ -200,12 +207,12 @@ function createPublishedMenuSnapshot() {
         effectiveTo: null
       }))
     }];
-    snapshot.dealScheduleAssignments = [{
-      assignmentId: uuid('a3000000-0000-4000-8000-', 1),
-      dealId: dealIds.get(scheduledDeal.key),
+    snapshot.dealScheduleAssignments = scheduledDeals.map((deal, index) => ({
+      assignmentId: uuid('a3000000-0000-4000-8000-', index + 1),
+      dealId: dealIds.get(deal.key),
       branchId: null,
       scheduleSetId
-    }];
+    }));
   } else {
     snapshot.scheduleSets = [];
     snapshot.dealScheduleAssignments = [];
