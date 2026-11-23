@@ -207,7 +207,8 @@ function requestPort(request) {
 }
 
 export function createLocalCatalogPreviewServer() {
-  return http.createServer(async (request, response) => {
+  let server;
+  server = http.createServer(async (request, response) => {
     try {
       if (!isLoopback(request.socket.remoteAddress) ||
           !isLoopback(request.socket.localAddress)) {
@@ -222,8 +223,8 @@ export function createLocalCatalogPreviewServer() {
       }
 
       const port = requestPort(request);
-      if (port < 1) {
-        send(response, 421, 'text/plain; charset=utf-8', 'Use the 127.0.0.1 local address.', request.method);
+      if (port < 1 || !server.address() || port !== server.address().port) {
+        send(response, 421, 'text/plain; charset=utf-8', 'Use this server on its 127.0.0.1 address and assigned port.', request.method);
         return;
       }
 
@@ -264,6 +265,7 @@ export function createLocalCatalogPreviewServer() {
       send(response, 500, 'text/plain; charset=utf-8', 'Local fixture server error.', request.method);
     }
   });
+  return server;
 }
 
 export function startLocalCatalogPreviewServer(port = 4179) {
