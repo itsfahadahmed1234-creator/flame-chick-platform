@@ -158,7 +158,9 @@ BEGIN
 
   -- A stale or client-forged area fee is rejected without creating any rows.
   result:=public.flame_chick_create_website_order(
-    jsonb_set(payload,'{delivery_fee}',to_jsonb(49),true)
+    jsonb_set(
+      jsonb_set(payload,'{delivery_fee}',to_jsonb(49),true),
+      '{total}',to_jsonb(149),true)
   );
   IF result->>'ok'<>'false'
      OR result#>>'{error,code}'<>'WEBSITE_DELIVERY_FEE_CHANGED'
