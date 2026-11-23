@@ -76,7 +76,19 @@ BEGIN
 END;
 $check$;
 DO $fixtures$
-DECLARE r uuid:=gen_random_uuid(); b uuid:=gen_random_uuid(); a uuid:=gen_random_uuid(); o uuid:=gen_random_uuid(); f numeric;
+DECLARE
+  r uuid:=gen_random_uuid();
+  b uuid:=gen_random_uuid();
+  a uuid:=gen_random_uuid();
+  o uuid:=gen_random_uuid();
+  t uuid:=gen_random_uuid();
+  rider_one uuid:='a5555555-5555-4555-8555-555555555551';
+  rider_two uuid:='a5555555-5555-4555-8555-555555555552';
+  offer uuid:=gen_random_uuid();
+  assignment uuid:=gen_random_uuid();
+  f numeric;
+  duplicate_pending_rejected boolean:=false;
+  wrong_rider_rejected boolean:=false;
 BEGIN
   INSERT INTO public.restaurants(id,name,slug,currency_code,timezone,is_active)
   VALUES(r,'QA Flame Chick','qa-flame-chick-operational-v1','PKR','Asia/Karachi',true);
@@ -91,18 +103,108 @@ BEGIN
   UPDATE public.branch_delivery_settings SET not_listed_delivery_fee=0 WHERE branch_id=b;
   SELECT not_listed_delivery_fee INTO f FROM public.branch_delivery_settings WHERE branch_id=b;
   IF f IS DISTINCT FROM 0::numeric THEN RAISE EXCEPTION 'EXPLICIT_ZERO_FEE_LOST'; END IF;
+
+  -- Synthetic Auth riders are isolated to this rolled-back transaction.
+  INSERT INTO auth.users(
+    id,aud,role,email,encrypted_password,email_confirmed_at,
+    raw_app_meta_data,raw_user_meta_data,created_at,updated_at,
+    is_sso_user,is_anonymous
+  ) VALUES
+    (rider_one,'authenticated','authenticated','qa-rider-one@example.invalid','',transaction_timestamp(),
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,transaction_timestamp(),transaction_timestamp(),false,false),
+    (rider_two,'authenticated','authenticated','qa-rider-two@example.invalid','',transaction_timestamp(),
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,transaction_timestamp(),transaction_timestamp(),false,false);
+
+  INSERT INTO public.rider_profiles(
+    restaurant_id,branch_id,user_id,rider_code,display_name,availability_status,accepting_jobs,is_active
+  ) VALUES
+    (r,b,rider_one,'qa-r1','QA Rider One','available',true,true),
+    (r,b,rider_two,'qa-r2','QA Rider Two','available',true,true);
+
   INSERT INTO public.orders(id,restaurant_id,branch_id,order_number,idempotency_key,request_hash,source,
-    fulfillment_type,status,customer_name,customer_phone,delivery_area_fee_snapshot,
+    fulfillment_type,status,customer_name,customer_phone,delivery_address,delivery_area_id,
+    delivery_area_name_snapshot,delivery_selection_type,delivery_area_fee_snapshot,
     subtotal,discount_amount,delivery_fee,total,currency_code,payment_status)
-  VALUES(o,r,b,'QA-0001','qa-operational-key-0001',repeat('a',64),'pos','pickup','new',
-    'QA Customer','03000000000',0,100,0,0,100,'PKR','unpaid');
+  VALUES(o,r,b,'QA-0001','qa-operational-key-0001',repeat('a',64),'pos','delivery','ready',
+    'QA Customer','03000000000','100 QA Road, Karachi',a,'QA Zero Fee','listed_area',0,
+    100,0,0,100,'PKR','unpaid');
+
   INSERT INTO public.order_status_history(restaurant_id,branch_id,order_id,to_status,action,actor_type,metadata)
-  VALUES(r,b,o,'new','created','system','{}'::jsonb);
+  VALUES(r,b,o,'ready','created','system','{}'::jsonb);
   BEGIN
     UPDATE public.order_status_history SET reason='mutated' WHERE order_id=o;
     RAISE EXCEPTION 'ORDER_STATUS_HISTORY_UPDATE_ALLOWED';
   EXCEPTION WHEN SQLSTATE '55000' THEN NULL;
   END;
+
+  INSERT INTO public.delivery_tasks(
+    id,restaurant_id,branch_id,order_id,status,recipient_name_snapshot,recipient_phone_snapshot,
+    address_snapshot,area_name_snapshot,area_id_snapshot,delivery_selection_type_snapshot,delivery_fee_snapshot
+  ) VALUES(
+    t,r,b,o,'dispatch_pending','QA Customer','03000000000','100 QA Road, Karachi',
+    'QA Zero Fee',a,'listed_area',0
+  );
+
+  INSERT INTO public.delivery_task_offers(
+    id,restaurant_id,branch_id,delivery_task_id,rider_user_id,offer_round,status,offered_at,expires_at,request_id
+  ) VALUES(
+    offer,r,b,t,rider_one,1,'offered',transaction_timestamp(),transaction_timestamp()+interval '60 seconds',
+    'b6666666-6666-4666-8666-666666666661'
+  );
+
+  -- A task can have only one live offer, even if a caller changes offer_round.
+  BEGIN
+    INSERT INTO public.delivery_task_offers(
+      restaurant_id,branch_id,delivery_task_id,rider_user_id,offer_round,status,offered_at,expires_at
+    ) VALUES(
+      r,b,t,rider_two,2,'offered',transaction_timestamp(),transaction_timestamp()+interval '60 seconds'
+    );
+    RAISE EXCEPTION 'DELIVERY_TASK_ALLOWED_TWO_PENDING_OFFERS';
+  EXCEPTION WHEN unique_violation THEN
+    duplicate_pending_rejected:=true;
+  END;
+  IF NOT duplicate_pending_rejected THEN
+    RAISE EXCEPTION 'DELIVERY_TASK_PENDING_OFFER_UNIQUENESS_NOT_ENFORCED';
+  END IF;
+
+  -- An assignment cannot point at a valid offer but name a different rider.
+  BEGIN
+    INSERT INTO public.delivery_assignments(
+      id,restaurant_id,branch_id,delivery_task_id,rider_user_id,offer_id,status,is_current,
+      assigned_at,accepted_at,ended_at,end_reason
+    ) VALUES(
+      gen_random_uuid(),r,b,t,rider_two,offer,'reassigned',false,
+      transaction_timestamp(),transaction_timestamp(),transaction_timestamp(),'QA wrong-rider guard'
+    );
+    RAISE EXCEPTION 'DELIVERY_ASSIGNMENT_ACCEPTED_WRONG_RIDER';
+  EXCEPTION WHEN foreign_key_violation THEN
+    wrong_rider_rejected:=true;
+  END;
+  IF NOT wrong_rider_rejected THEN
+    RAISE EXCEPTION 'DELIVERY_ASSIGNMENT_OFFER_RIDER_BINDING_MISSING';
+  END IF;
+
+  UPDATE public.delivery_task_offers
+  SET status='accepted',responded_at=transaction_timestamp()
+  WHERE id=offer AND status='offered';
+  INSERT INTO public.delivery_assignments(
+    id,restaurant_id,branch_id,delivery_task_id,rider_user_id,offer_id,status,is_current,
+    assigned_at,accepted_at
+  ) VALUES(
+    assignment,r,b,t,rider_one,offer,'accepted',true,
+    transaction_timestamp(),transaction_timestamp()
+  );
+
+  IF NOT EXISTS(
+    SELECT 1 FROM public.delivery_assignments da
+    JOIN public.delivery_task_offers o
+      ON o.id=da.offer_id AND o.delivery_task_id=da.delivery_task_id
+      AND o.branch_id=da.branch_id AND o.restaurant_id=da.restaurant_id
+      AND o.rider_user_id=da.rider_user_id
+    WHERE da.id=assignment
+  ) THEN
+    RAISE EXCEPTION 'DELIVERY_ASSIGNMENT_RIDER_OFFER_BINDING_READBACK_FAILED';
+  END IF;
 END;
 $fixtures$;
 ROLLBACK;
