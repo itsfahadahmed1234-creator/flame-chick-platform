@@ -4017,7 +4017,12 @@ function flameChickBuildPosDeliveryOrderPayload(order){
     customer:{name:customerName,phone:customerPhone},
     payment_method:payment,
     notes:String(order.notes||''),
-    delivery:{address,area_id:areaId||null,area_name:areaName,instructions:''},
+    delivery:{
+      selection_type:areaChoice==='not listed'?'not_listed':'listed_area',
+      area_id:areaChoice==='not listed'?null:areaId,
+      address,
+      instructions:''
+    },
     items
   };
 }
