@@ -115,11 +115,12 @@ function createSnapshot() {
     }],
     scheduleSets: [{
       scheduleSetId: id.schedule, name: 'Always', timezone: 'Asia/Karachi',
-      windows: [{
-        windowId: id.window, windowKind: 'WEEKLY', weekdayIso: 1,
+      windows: Array.from({ length: 7 }, (_, index) => ({
+        windowId: '12000000-0000-4000-8000-00000000000' + String(index + 1),
+        windowKind: 'WEEKLY', weekdayIso: index + 1,
         localStart: null, localEnd: null, isAllDay: true,
         startsAt: null, endsAt: null, effectiveFrom: null, effectiveTo: null
-      }]
+      }))
     }],
     dealScheduleAssignments: [{
       assignmentId: id.dealSchedule, dealId: id.deal, branchId: null,
