@@ -99,7 +99,7 @@ test("Customer ordering page sends published IDs for quote and commit, never bro
   assert.match(js,/FlameChickCatalogV3DealView\.buildDealViewModel/);
   assert.match(js,/FlameChickCatalogV3DealConfigurator\.createDealConfigurator/);
   assert.match(js,/action: 'quote_website_order'/);
-  assert.match(js,/action: 'create_website_order'/);
+  assert.match(js,/state\.checkoutBody\.action = 'create_website_order'/);
   assert.match(js,/productVariantId: variantId/);
   assert.match(js,/item\.quantity = row\.quantity/);
   assert.match(js,/delivery: delivery/);
