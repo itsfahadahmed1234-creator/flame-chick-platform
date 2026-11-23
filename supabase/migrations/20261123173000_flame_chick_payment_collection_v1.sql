@@ -182,6 +182,7 @@ BEGIN
       payment_status=CASE WHEN v_complete THEN 'paid' ELSE 'partially_paid' END,
       payment_method_summary=v_method_summary,
       status=CASE WHEN v_complete THEN 'completed' ELSE 'delivered' END,
+      collected_at=CASE WHEN v_complete THEN v_now ELSE NULL END,
       completed_at=CASE WHEN v_complete THEN v_now ELSE NULL END,
       last_status_changed_by=v_actor_id,
       last_status_actor_type='staff',
