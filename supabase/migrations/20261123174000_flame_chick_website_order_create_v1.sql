@@ -10,7 +10,7 @@ BEGIN
   IF current_user<>'postgres' OR session_user<>'postgres' THEN
     RAISE EXCEPTION 'FLAME_CHICK_WEBSITE_ORDER_MIGRATION_REQUIRES_POSTGRES';
   END IF;
-  IF pg_catalog.to_regprocedure('public.flame_chick_create_order(jsonb)') IS NOT NULL THEN
+  IF pg_catalog.to_regprocedure('public.flame_chick_create_website_order(jsonb)') IS NOT NULL THEN
     RAISE EXCEPTION 'FLAME_CHICK_CREATE_ORDER_RPC_ALREADY_EXISTS';
   END IF;
   IF pg_catalog.to_regclass('public.orders') IS NULL
@@ -22,7 +22,7 @@ BEGIN
 END
 $preflight$;
 
-CREATE OR REPLACE FUNCTION public.flame_chick_create_order(p_payload jsonb)
+CREATE OR REPLACE FUNCTION public.flame_chick_create_website_order(p_payload jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -157,6 +157,8 @@ BEGIN
 
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
     'flame-chick-website-phone:'||v_restaurant_id::text||':'||pg_catalog.encode(v_phone_digest,'hex'),0));
+
+  v_now:=pg_catalog.clock_timestamp();
 
   IF jsonb_typeof(p_payload->'catalog_version') IS DISTINCT FROM 'number'
      OR COALESCE(p_payload->>'catalog_version','') !~ '^[1-9][0-9]*$'
@@ -373,19 +375,19 @@ BEGIN
   IF v_phone_count_1m>=3 OR v_phone_count_10m>=3 OR v_phone_count_1h>=15 THEN
     SELECT
       CASE WHEN v_phone_count_1m>=3 THEN
-        COALESCE(pg_catalog.ceil(pg_catalog.extract(epoch FROM (
+        COALESCE(pg_catalog.ceil(EXTRACT(EPOCH FROM (
           (SELECT pg_catalog.min(e.committed_at) FROM app_private.website_order_success_events e
            WHERE e.restaurant_id=v_restaurant_id AND e.phone_digest=v_phone_digest
              AND e.committed_at>=v_now-interval '1 minute')+interval '1 minute'-v_now
         )))::integer,1) ELSE 0 END,
       CASE WHEN v_phone_count_10m>=3 THEN
-        COALESCE(pg_catalog.ceil(pg_catalog.extract(epoch FROM (
+        COALESCE(pg_catalog.ceil(EXTRACT(EPOCH FROM (
           (SELECT pg_catalog.min(e.committed_at) FROM app_private.website_order_success_events e
            WHERE e.restaurant_id=v_restaurant_id AND e.phone_digest=v_phone_digest
              AND e.committed_at>=v_now-interval '10 minutes')+interval '10 minutes'-v_now
         )))::integer,1) ELSE 0 END,
       CASE WHEN v_phone_count_1h>=15 THEN
-        COALESCE(pg_catalog.ceil(pg_catalog.extract(epoch FROM (
+        COALESCE(pg_catalog.ceil(EXTRACT(EPOCH FROM (
           (SELECT pg_catalog.min(e.committed_at) FROM app_private.website_order_success_events e
            WHERE e.restaurant_id=v_restaurant_id AND e.phone_digest=v_phone_digest
              AND e.committed_at>=v_now-interval '1 hour')+interval '1 hour'-v_now
@@ -401,7 +403,6 @@ BEGIN
     );
   END IF;
 
-  v_now:=pg_catalog.clock_timestamp();
   v_business_date:=(v_now AT TIME ZONE v_branch_timezone)::date;
   INSERT INTO app_private.order_number_counters(restaurant_id,branch_id,business_date,last_value,updated_at)
   VALUES(v_restaurant_id,v_branch_id,v_business_date,1,v_now)
@@ -554,14 +555,14 @@ BEGIN
 END;
 $function$;
 
-ALTER FUNCTION public.flame_chick_create_order(jsonb) OWNER TO postgres;
-REVOKE ALL ON FUNCTION public.flame_chick_create_order(jsonb)
+ALTER FUNCTION public.flame_chick_create_website_order(jsonb) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.flame_chick_create_website_order(jsonb)
   FROM PUBLIC,anon,authenticated,service_role;
-GRANT EXECUTE ON FUNCTION public.flame_chick_create_order(jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.flame_chick_create_website_order(jsonb) TO service_role;
 
 DO $verify$
 DECLARE
-  v_oid oid:=pg_catalog.to_regprocedure('public.flame_chick_create_order(jsonb)');
+  v_oid oid:=pg_catalog.to_regprocedure('public.flame_chick_create_website_order(jsonb)');
 BEGIN
   IF v_oid IS NULL
      OR NOT EXISTS(
