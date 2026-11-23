@@ -1,3 +1,17 @@
+# CURRENT OVERRIDE — 2026-11-23: newly published menu and rollback policy
+
+The restaurant has now published the menu that was previously called the upcoming menu. That newly published menu is the authoritative target catalog. The former running menu is superseded for operational use.
+
+This supersedes the older runbook recommendation to import the former live menu as publication #1 and then publish the upcoming menu as #2. **Do not seed the superseded menu as a compatibility baseline, do not merge its products into the target catalog, and do not use the legacy website as an automatic customer-facing rollback.** The user will supply the actual newly published menu before catalog entry. Until then, keep the Production catalog empty and do not publish or enable ordering.
+
+The legacy Vercel deployment recorded below remains a known technical deployment artifact, but it serves the superseded menu. Reassigning the customer alias to that deployment would restore obsolete menu content and is therefore **not a business-safe rollback** unless the restaurant explicitly re-approves that old menu. Do not use that alias rollback as the default recovery plan. Before first new-menu cutover, prepare a separate recovery deployment that does not present the superseded menu (for example, a tested temporary service-unavailable/maintenance response or a previously validated new-menu deployment). Confirm and rehearse the exact recovery path before cutover.
+
+The new menu's first database publication will be its first approved publication, not publication #2 after importing old menu data. Later changes can use immutable publication history and pointer rollback among approved new-menu publications.
+
+This is a business-source-of-truth update only; it does not authorize database writes, deployment, domain/alias changes, publication or checkout activation.
+
+---
+
 # Flame Chick — Website Cutover and Old-Menu Rollback Runbook
 
 Date: 2026-11-22
