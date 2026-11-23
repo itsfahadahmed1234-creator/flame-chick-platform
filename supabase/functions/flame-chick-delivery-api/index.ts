@@ -155,10 +155,13 @@ async function callDeliveryRpc(payload: Record<string, unknown>) {
     const err = isObject(outer) ? outer : {};
     const message = String(err.message ?? err.details ?? ("Delivery action failed (" + res.status + ")."));
     const code = String(err.code ?? "");
-    const status = code === "P0002" ? 404 :
-      code === "23505" ? 409 :
-      code === "42501" ? 403 :
-      code === "22023" || code === "22P02" ? 400 : 500;
+    const status = code === "P0002" || code.endsWith("_NOT_FOUND") ? 404 :
+      code === "23505" || code === "OFFER_EXPIRED" || code.endsWith("_ALREADY_ASSIGNED") ||
+      code.endsWith("_ALREADY_RESOLVED") || code.endsWith("_STATE_INVALID") ||
+      code === "RIDER_NOT_AVAILABLE" || code === "DELIVERY_NOT_AWAITING_ASSIGNMENT" ? 409 :
+      code === "42501" || code.endsWith("_ROLE_REQUIRED") || code.endsWith("_ACCESS_DENIED") ? 403 :
+      code === "22023" || code === "22P02" || code.endsWith("_INVALID") ||
+      code.endsWith("_REQUIRED") || code.endsWith("_TOO_LONG") ? 400 : 500;
     return {
       ok: false as const,
       status,
@@ -190,7 +193,13 @@ async function callServiceRpc(name: string, args: Record<string, unknown> = {}) 
     const err = isObject(outer) ? outer : {};
     const message = String(err.message ?? err.details ?? "A delivery operation failed.");
     const code = String(err.code ?? "");
-    return { ok:false as const, status:code === "P0002" ? 404 : code === "23505" ? 409 : code === "42501" ? 403 : code === "22023" ? 409 : 500, message, data };
+    const status = code === "P0002" || code.endsWith("_NOT_FOUND") ? 404 :
+      code === "23505" || code === "OFFER_EXPIRED" || code.endsWith("_ALREADY_RESOLVED") ||
+      code.endsWith("_STATE_INVALID") || code === "RIDER_NOT_AVAILABLE" ? 409 :
+      code === "42501" || code.endsWith("_ROLE_REQUIRED") || code.endsWith("_ACCESS_DENIED") ? 403 :
+      code === "22023" || code === "22P02" || code.endsWith("_INVALID") ||
+      code.endsWith("_REQUIRED") || code.endsWith("_TOO_LONG") ? 400 : 500;
+    return { ok:false as const, status, message, data };
   }
   return { ok:true as const, data };
 }
