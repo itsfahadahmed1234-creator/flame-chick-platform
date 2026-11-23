@@ -140,6 +140,32 @@ h3 { font-size: 19px; line-height: 1.2; }
 }
 .empty-state { padding: 22px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 13px; text-align: center; }
 
+.fc-menu-product { display: flex; flex-direction: column; align-items: stretch; }
+.fc-menu-product-open { width: 100%; margin-top: auto; }
+.product-detail-dialog {
+  width: min(760px, calc(100% - 28px)); max-width: 760px; max-height: min(90vh, 900px);
+  margin: auto; padding: 0; overflow: auto; border: 1px solid var(--line);
+  border-radius: 20px; background: var(--paper); color: var(--ink);
+  box-shadow: 0 24px 80px rgba(30, 14, 10, .28);
+}
+.product-detail-dialog::backdrop { background: rgba(24, 12, 10, .66); backdrop-filter: blur(2px); }
+.product-detail-dialog-head {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center;
+  justify-content: space-between; gap: 14px; padding: 15px 20px;
+  border-bottom: 1px solid var(--line); background: rgba(255,255,255,.96);
+}
+.product-detail-dialog-head .eyebrow { margin: 0; }
+.product-detail-content { padding: 20px; }
+.product-detail-art { min-height: 190px; margin-bottom: 18px; }
+.product-detail-title { margin: 0 0 8px; font-size: clamp(23px, 4vw, 30px); }
+.product-detail-description, .product-detail-name-ur { color: var(--muted); font-size: 13px; }
+.product-detail-variant-label { margin: 18px 0 0; }
+.product-detail-variant-label .fc-menu-variant-select { min-height: 48px; font-size: 14px; }
+.product-detail-price { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--line); }
+.product-detail-validate { min-height: 46px; }
+.product-detail-status { margin: 12px 0 0; }
+
+
 .deals-section { border-top: 4px solid var(--red); }
 .deal-card { display: flex; flex-direction: column; align-items: flex-start; }
 .deal-card.is-unavailable { background: #f3f0ed; border-color: #d9d2cc; opacity: .68; filter: grayscale(.45); }
