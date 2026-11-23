@@ -1,43 +1,29 @@
-# Delivery behavioral QA — second fixture correction — 2026-11-23
+# Delivery behavioral QA — expiry boundary extension — 2026-11-23
 
 - Branch: `work/production-source-audit`
-- Latest fixture correction: `28ffba173a989f5f7cd9c3e378ce24a820b13520`
-- Previous failed run: [45177981893](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45177981893)
+- Source commit: `355a7c38c2abb9232021ac1cfcf0c12796ba3df0`
+- Previous fully green lifecycle run: [45179371115](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45179371115)
+- New expiry-boundary run: [45182331625](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45182331625)
 - Production and `main` remain untouched.
 
-## Latest failure and diagnosis
+## Source changes
 
-The previous fixture repair correctly established synthetic roles through the protected bootstrap and Staff Admin path. The run then passed:
-- complete migration replay;
-- staff ACL/RLS baseline;
-- Admin/Owner/operational-role boundary checks;
-- synthetic role cleanup checks;
-- operational schema constraints/security checks.
+- Added private `app_private.flame_chick_delivery_clock_now()`; production implementation delegates to `pg_catalog.clock_timestamp()`.
+- Replaced direct delivery command and expiry-sweep clock calls with the private helper so the acceptance and sweep paths share one authoritative database clock.
+- Revoked direct EXECUTE from PUBLIC, anon, authenticated and service_role; added privilege assertions.
+- The SQL fixture overrides the private helper only inside its rollback-only transaction.
+- Added deterministic boundary checks for one microsecond before expiry and exactly at expiry, including expired offer state, task reset, no assignment, and explicit manual reassignment (no automatic rotation).
 
-It failed inside the delivery lifecycle fixture at the first intended Rider accept:
-`RIDER_ACCEPT_FAILED: DELIVERY_OFFER_ALREADY_RESOLVED`.
+## Verification status
 
-The fixture had directly inserted an `offered` row but left its parent delivery task in `dispatch_pending`. The command correctly requires both offer status `offered` and task status `offering`; therefore the fixture created an impossible/inconsistent state. This is a fixture defect, not yet evidence of a delivery command defect.
+At the time of this handoff, run `45182331625` was still in progress during disposable Supabase startup. It has not yet reached the complete migration replay or delivery fixture steps. **The new exact-boundary assertions are not yet verified.** Do not proceed on the assumption they pass; inspect the run first.
 
-## Correction
+The earlier complete lifecycle fixture passed on run `45179371115`: targeted assignment, wrong-Rider denial, accept/idempotent retry, pickup, delivered/idempotent retry, failed report, return report, Rider return-confirm denial, Cashier physical-return confirmation/retry, unchanged payment ledger and audit history.
 
-Commit `28ffba173a989f5f7cd9c3e378ce24a820b13520` changes the first offer setup to call the real POS `flame_chick_manage_delivery(action='assign')` command, which atomically creates the offer and transitions the task to `offering`. The wrong-Rider check now asserts the exact authorization error `DELIVERY_OFFER_NOT_ASSIGNED_TO_RIDER`, then the intended Rider acceptance proceeds against the valid state.
+## Next
 
-No production migration, role security rule, or delivery runtime function was changed in this correction.
+1. Verify/fix run `45182331625`.
+2. Add true concurrent multi-session accept-vs-decline and accept-vs-expiry/sweep tests; these are not yet covered.
+3. Then proceed to POS/Rider integration checks and Cashier return-confirm UI permissions.
 
-## Verification result — passed
-
-[Flame Chick Staff Admin Role Boundary QA run #26](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45179371115) completed successfully for commit `28ffba173a989f5f7cd9c3e378ce24a820b13520`.
-
-The GitHub Actions job reports success for every step, including:
-- complete migration history replay;
-- staff ACL/RLS baseline;
-- Admin, Owner and operational-role authorization;
-- rollback checks for the earlier staff-role fixture;
-- operational schema V1 constraints and security;
-- **delivery offer, pickup, delivery and physical-return behavioral fixture**;
-- disposable Supabase stack cleanup.
-
-The delivery fixture now actually exercises the command path end-to-end: protected role bootstrap/assignment, targeted dispatch, wrong-Rider denial, intended Rider acceptance and idempotent retry, pickup, delivered and idempotent retry, failed delivery, Rider return reporting, Rider denial of physical-return confirmation, Cashier confirmation and retry, unchanged payment ledger, and history/event audit assertions. All synthetic fixture writes are rolled back.
-
-This closes the initial delivery-command behavioral QA gate. It does **not** yet prove offer-expiry boundary behavior or concurrent accept/decline/expiry races; those remain separate adversarial tests before further integration. Production migrations/deployments, Realtime, checkout and catalog publication remain untouched.
+No Production database writes, migration applications, function deployments, Vercel deployment, Realtime changes, checkout enablement or catalog publication occurred. Candidate migration remains source-only. GST remains deferred.
