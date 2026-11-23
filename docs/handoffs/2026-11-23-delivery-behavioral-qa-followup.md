@@ -1,3 +1,11 @@
+# Authoritative order/payment workflow rule — 2026-11-23
+
+Rider marking **Delivered** is delivery confirmation only; it does not mean that money was received and does not complete the order. POS must show the order as **Delivered** while it remains active/awaiting cashier payment collection. Payment status remains outstanding until the Cashier actually receives/records the payment and explicitly marks it **Collected**, with collection amount/method and cashier/time audit. Only then does POS mark the order **Completed**, set `completed_at`, and move it to order history.
+
+**Known mismatch:** the current candidate `flame_chick_manage_delivery(action='delivered')` sets `orders.completed_at` during the Rider action. This must be corrected in the order/payment processing implementation before integrating this command into the apps. Rider delivery must not update payment status or close the order. Add tests proving only Cashier collection completes the order. GST remains deferred.
+
+---
+
 # Delivery behavioral QA — expiry boundary passed; concurrency next — 2026-11-23
 
 - Branch: `work/production-source-audit`
