@@ -11,6 +11,7 @@ DECLARE
   v_deal_category uuid := gen_random_uuid();
   v_product uuid := gen_random_uuid();
   v_product_variant uuid := gen_random_uuid();
+  v_deal_only_product uuid := gen_random_uuid();
   v_deal_only_variant uuid := gen_random_uuid();
   v_deal_only_option uuid := gen_random_uuid();
   v_deal_only_mapping uuid := gen_random_uuid();
@@ -76,12 +77,14 @@ BEGIN
 
   -- Deal-only variant: no standalone price, not independently sellable, and
   -- explicitly included in an active fixed-price deal variant.
+  INSERT INTO public.products(id,restaurant_id,category_id,name_en,is_active,is_available)
+  VALUES(v_deal_only_product,v_restaurant,v_menu_category,'QA Deal-only Product',true,true);
   INSERT INTO public.product_variants(
     id,restaurant_id,product_id,size_key,size_label,price,is_active,is_available,is_standalone_sellable
-  ) VALUES(v_deal_only_variant,v_restaurant,v_product,'DEAL_PORTION','Deal portion',NULL,true,true,false);
+  ) VALUES(v_deal_only_variant,v_restaurant,v_deal_only_product,'DEAL_PORTION','Deal portion',NULL,true,true,false);
   INSERT INTO public.deal_component_options(
     id,restaurant_id,deal_id,component_group_id,product_id,product_variant_id,pricing_treatment,is_active
-  ) VALUES(v_deal_only_option,v_restaurant,v_optional_deal,v_optional_group,v_product,v_deal_only_variant,'INCLUDED',true);
+  ) VALUES(v_deal_only_option,v_restaurant,v_optional_deal,v_optional_group,v_deal_only_product,v_deal_only_variant,'INCLUDED',true);
   INSERT INTO public.deal_variant_component_options(
     id,restaurant_id,deal_id,deal_variant_id,component_option_id,pricing_treatment,unit_surcharge,is_active
   ) VALUES(v_deal_only_mapping,v_restaurant,v_optional_deal,v_optional_variant,v_deal_only_option,'INCLUDED',0,true);
