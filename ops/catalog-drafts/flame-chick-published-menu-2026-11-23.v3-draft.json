@@ -13,7 +13,8 @@
     "The generic Burger component links to deal_burger, not og_crunch. Little Crunch explicitly links to og_crunch.",
     "The 120 Cold Drink maps only to cold_drink / REGULAR. No ml volume is inferred.",
     "The Smash is one product with two priced variants; required product popup remains a separate UI task.",
-    "Platter description and restaurant-supplied Juice / 1L Drink identities remain intentionally unspecified."
+    "Platter description and restaurant-supplied Juice / 1L Drink identities remain intentionally unspecified.",
+    "Flame Hour's two printed fixed-price offers are represented as two separate deal entries that share the same daily schedule. V3 component groups are deal-scoped, so separate deal records avoid forcing either offer to satisfy the other offer's fixed components."
   ],
   "categories": [
     {
@@ -467,9 +468,9 @@
   },
   "deals": [
     {
-      "key": "flame_hour",
-      "title": "Flame Hour",
-      "descriptionEn": "Two fixed package offers, available daily from 3 PM to 5 PM.",
+      "key": "flame_hour_injector",
+      "title": "Flame Hour — The Injector + Cold Drink",
+      "descriptionEn": "The Injector + Cold Drink. Available daily from 3 PM to 5 PM.",
       "schedule": {
         "timezone": "Asia/Karachi",
         "windowKind": "WEEKLY_DAILY",
@@ -499,7 +500,20 @@
               "unitSurcharge": 0
             }
           ]
-        },
+        }
+      ]
+    },
+    {
+      "key": "flame_hour_quarter_broast",
+      "title": "Flame Hour — Quarter Broast + Burger + Cold Drink",
+      "descriptionEn": "Quarter Broast + Burger + Cold Drink. Available daily from 3 PM to 5 PM.",
+      "schedule": {
+        "timezone": "Asia/Karachi",
+        "windowKind": "WEEKLY_DAILY",
+        "localStart": "15:00:00",
+        "localEnd": "17:00:00"
+      },
+      "variants": [
         {
           "variantKey": "QUARTER_BROAST_BURGER_COLD_DRINK",
           "labelEn": "Quarter Broast + Burger + Cold Drink",
