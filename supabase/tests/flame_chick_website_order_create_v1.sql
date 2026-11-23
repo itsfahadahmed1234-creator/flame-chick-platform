@@ -237,7 +237,7 @@ BEGIN
       jsonb_set(
         jsonb_set(
           jsonb_set(payload,'{idempotency_key}',to_jsonb(changed_request_id),true),
-          '{fulfillment_type}',to_jsonb('pickup'),true),
+          '{fulfillment_type}',to_jsonb('pickup'::text),true),
         '{delivery_fee}',to_jsonb(0),true),
       '{total}',to_jsonb(100),true)
       || jsonb_build_object('delivery','null'::jsonb)
@@ -266,7 +266,7 @@ BEGIN
       jsonb_set(
         jsonb_set(
           jsonb_set(payload,'{idempotency_key}',to_jsonb(changed_request_id),true),
-          '{fulfillment_type}',to_jsonb('pickup'),true),
+          '{fulfillment_type}',to_jsonb('pickup'::text),true),
         '{delivery_fee}',to_jsonb(0),true),
       '{total}',to_jsonb(100),true)
       || jsonb_build_object('delivery','null'::jsonb)
@@ -282,7 +282,7 @@ BEGIN
       jsonb_set(
         jsonb_set(
           jsonb_set(payload,'{idempotency_key}',to_jsonb(changed_request_id),true),
-          '{fulfillment_type}',to_jsonb('pickup'),true),
+          '{fulfillment_type}',to_jsonb('pickup'::text),true),
         '{delivery_fee}',to_jsonb(0),true),
       '{total}',to_jsonb(100),true)
       || jsonb_build_object('delivery','null'::jsonb)
@@ -302,7 +302,7 @@ BEGIN
       jsonb_set(
         jsonb_set(
           jsonb_set(payload,'{idempotency_key}',to_jsonb(changed_request_id),true),
-          '{fulfillment_type}',to_jsonb('pickup'),true),
+          '{fulfillment_type}',to_jsonb('pickup'::text),true),
         '{delivery_fee}',to_jsonb(0),true),
       '{total}',to_jsonb(100),true)
       || jsonb_build_object('delivery','null'::jsonb)
@@ -325,7 +325,7 @@ BEGIN
       jsonb_set(
         jsonb_set(
           jsonb_set(payload,'{idempotency_key}',to_jsonb(changed_request_id),true),
-          '{fulfillment_type}',to_jsonb('pickup'),true),
+          '{fulfillment_type}',to_jsonb('pickup'::text),true),
         '{delivery_fee}',to_jsonb(0),true),
       '{total}',to_jsonb(100),true)
       || jsonb_build_object('delivery','null'::jsonb);
