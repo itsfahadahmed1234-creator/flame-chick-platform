@@ -7,7 +7,10 @@ const MAX_ORDER_LINES = 100;
 const MAX_COMPONENTS_PER_DEAL = 200;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function fail(code, message): { ok: false; error: { code: string; message: string } } {
+/** @typedef {{ok:false,error:{code:string,message:string}}} PricingFailure */
+
+/** @param {string} code @param {string} message @returns {PricingFailure} */
+function fail(code, message) {
   return { ok: false, error: { code, message } };
 }
 
@@ -32,6 +35,7 @@ function validQuantity(value) {
   return Number.isSafeInteger(value) && value >= 1 && value <= 99;
 }
 
+/** @param {any[]} groups @param {any} input @param {any} dealView @returns {PricingFailure | {ok:true,entries:any[],totalMinor:number,selections:Record<string,string[]>}} */
 function validateModifierInput(groups, input, dealView) {
   if (!Array.isArray(input)) return fail("MODIFIER_SELECTION_INVALID", "Modifier selections must be an array.");
   if (input.length > 50) return fail("MODIFIER_SELECTION_LIMIT", "Too many modifier groups were submitted.");
@@ -94,6 +98,7 @@ function buildModifierGroups(snapshot, productId, productVariantId, contract, de
   });
 }
 
+/** @returns {PricingFailure | {ok:true,line:any,lineMinor:number}} */
 function validateProductLine(snapshot, branchId, item, quantity, contract, dealView) {
   const productId = item.product_id ?? item.productId;
   const productVariantId = item.product_variant_id ?? item.productVariantId;
@@ -160,6 +165,7 @@ function validateProductLine(snapshot, branchId, item, quantity, contract, dealV
   };
 }
 
+/** @returns {PricingFailure | {ok:true,line:any,lineMinor:number}} */
 function validateDealLine(snapshot, branchId, item, quantity, dealViewModel, contract, dealView) {
   const dealId = item.deal_id ?? item.dealId;
   const dealVariantId = item.deal_variant_id ?? item.dealVariantId;
@@ -330,6 +336,7 @@ function validateDealLine(snapshot, branchId, item, quantity, dealViewModel, con
   };
 }
 
+/** @returns {PricingFailure | {ok:true,data:any}} */
 export function calculateWebsiteOrder(snapshot, request, dependencies = {}) {
   const contract = dependencies.contract;
   const dealView = dependencies.dealView;
