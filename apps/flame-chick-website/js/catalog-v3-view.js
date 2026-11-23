@@ -40,7 +40,8 @@
       return fail('FULFILMENT_INVALID', 'Choose delivery or pickup.');
     }
 
-    var orderingEnabled = fulfilmentType === null ||
+    // Browsing without a selected fulfilment method is always read-only.
+    var orderingEnabled = fulfilmentType !== null &&
       contract.isBranchOrderingEnabled(snapshot, branchId, fulfilmentType);
     var categories = snapshot.categories.filter(function (c) {
       return c.categoryKind === 'menu';
