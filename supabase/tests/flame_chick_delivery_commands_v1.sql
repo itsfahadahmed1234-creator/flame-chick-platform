@@ -163,7 +163,7 @@ BEGIN
     RAISE EXCEPTION 'DELIVERY_COMMANDS_CHANGED_PAYMENT_LEDGER';
   END IF;
 
-  IF (SELECT count(*) FROM public.order_status_history WHERE order_id IN(o1,o2))<>2 THEN
+  IF (SELECT count(*) FROM public.order_status_history WHERE order_id IN(o1,o2))<>4 THEN
     RAISE EXCEPTION 'ORDER_STATUS_HISTORY_NOT_APPENDED_FOR_PICKUP_DELIVERY_RETURN';
   END IF;
   IF (SELECT count(*) FROM public.delivery_task_events WHERE delivery_task_id IN(t1,t2))<8 THEN
