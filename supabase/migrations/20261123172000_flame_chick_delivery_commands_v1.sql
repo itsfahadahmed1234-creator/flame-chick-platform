@@ -943,7 +943,7 @@ BEGIN
     WHERE id=v_assignment.id AND is_current;
 
     UPDATE public.orders
-    SET status='returned',returned_at=v_now,completed_at=v_now,
+    SET status='returned',returned_at=v_now,
         last_status_changed_by=v_actor_id,last_status_actor_type='staff',
         last_status_change_reason=v_reason,updated_at=v_now
     WHERE id=v_order.id AND status='out_for_delivery';
