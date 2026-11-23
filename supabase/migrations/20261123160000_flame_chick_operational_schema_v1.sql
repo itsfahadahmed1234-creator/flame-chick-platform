@@ -1168,10 +1168,16 @@ BEGIN
     END IF;
   END LOOP;
 
+  -- Batch 4 intentionally grants authenticated USAGE on app_private only
+  -- for the private Staff Admin SECURITY INVOKER wrapper. app_private is not
+  -- Data API exposed, and authenticated has no direct table privileges here.
+  -- anon and service_role must never receive app_private schema USAGE.
   IF pg_catalog.has_schema_privilege('anon','app_private','USAGE')
-     OR pg_catalog.has_schema_privilege('authenticated','app_private','USAGE')
      OR pg_catalog.has_schema_privilege('service_role','app_private','USAGE') THEN
     RAISE EXCEPTION 'FLAME_CHICK_PRIVATE_SCHEMA_EXPOSED';
+  END IF;
+  IF NOT pg_catalog.has_schema_privilege('authenticated','app_private','USAGE') THEN
+    RAISE EXCEPTION 'FLAME_CHICK_STAFF_ADMIN_PRIVATE_SCHEMA_USAGE_MISSING';
   END IF;
 
   IF pg_catalog.has_table_privilege('service_role','public.orders','INSERT')

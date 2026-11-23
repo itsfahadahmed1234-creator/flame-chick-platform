@@ -24,10 +24,12 @@ BEGIN
       THEN RAISE EXCEPTION 'OPERATIONAL_BROWSER_GRANT_PRESENT: % %',v_role,v_table; END IF;
     END LOOP;
   END LOOP;
+  -- authenticated retains only the established Batch 4 schema USAGE needed
+  -- by the Staff Admin invoker wrapper; no direct table grants are present.
   IF has_schema_privilege('anon','app_private','USAGE')
-     OR has_schema_privilege('authenticated','app_private','USAGE')
      OR has_schema_privilege('service_role','app_private','USAGE')
-  THEN RAISE EXCEPTION 'OPERATIONAL_PRIVATE_SCHEMA_EXPOSED'; END IF;
+     OR NOT has_schema_privilege('authenticated','app_private','USAGE')
+  THEN RAISE EXCEPTION 'OPERATIONAL_PRIVATE_SCHEMA_GRANTS_INVALID'; END IF;
   IF has_table_privilege('service_role','public.orders','INSERT')
      OR has_table_privilege('service_role','public.orders','UPDATE')
      OR has_table_privilege('service_role','public.orders','DELETE')
