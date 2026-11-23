@@ -21,23 +21,7 @@ BEGIN
   END IF;
 END
 $preflight$;
-
-CREATE OR REPLACE FUNCTION public.flame_chick_get_website_order_by_idempotency(p_payload jsonb)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path=''
-AS $function$
-DECLARE
-  v_restaurant_id uuid;
-  v_branch_id uuid;
-  v_idempotency_key text;
-  v_request_hash text;
-  v_order public.orders%ROWTYPE;
-BEGIN
-  IF p_payload IS NULL OR jsonb_typeof(p_payload)<>'object'
-     OR COALESCE(p_payload->>'branch_id','') !~*
-       '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}
+CREATE OR REPLACE FUNCTION public.flame_chick_create_website_order(p_payload jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -578,23 +562,6 @@ ALTER FUNCTION public.flame_chick_create_website_order(jsonb) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.flame_chick_create_website_order(jsonb)
   FROM PUBLIC,anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.flame_chick_create_website_order(jsonb) TO service_role;
-
-DO $verify_lookup$
-DECLARE v_oid oid:=pg_catalog.to_regprocedure('public.flame_chick_get_website_order_by_idempotency(jsonb)');
-BEGIN
-  IF v_oid IS NULL
-     OR NOT EXISTS(SELECT 1 FROM pg_catalog.pg_proc p
-       WHERE p.oid=v_oid AND p.prosecdef
-         AND pg_catalog.pg_get_userbyid(p.proowner)='postgres'
-         AND p.proconfig @> ARRAY['search_path=""'])
-     OR NOT pg_catalog.has_function_privilege('service_role',v_oid,'EXECUTE')
-     OR pg_catalog.has_function_privilege('anon',v_oid,'EXECUTE')
-     OR pg_catalog.has_function_privilege('authenticated',v_oid,'EXECUTE')
-     OR pg_catalog.has_function_privilege('public',v_oid,'EXECUTE') THEN
-    RAISE EXCEPTION 'FLAME_CHICK_WEBSITE_IDEMPOTENCY_READ_RPC_SECURITY_INVALID';
-  END IF;
-END;
-$verify_lookup$;
 
 DO $verify$
 DECLARE
