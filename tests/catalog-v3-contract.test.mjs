@@ -179,12 +179,27 @@ test('rejects impossible calendar dates in publication timestamps', () => {
 
 test('optional deal component groups may have no options; required groups must be satisfiable', () => {
   const optional = createSnapshot();
+  const optionalGroupId = optional.dealComponentGroups[0].componentGroupId;
+  const optionalOptionIds = new Set(optional.dealComponentOptions
+    .filter(option => option.componentGroupId === optionalGroupId)
+    .map(option => option.componentOptionId));
   optional.dealComponentGroups[0].minUnits = 0;
-  optional.dealVariantComponentOptions = [];
+  optional.dealComponentOptions = optional.dealComponentOptions
+    .filter(option => option.componentGroupId !== optionalGroupId);
+  optional.dealVariantComponentOptions = optional.dealVariantComponentOptions
+    .filter(mapping => !optionalOptionIds.has(mapping.componentOptionId));
   assert.equal(contract.validateSnapshot(optional).ok, true);
 
   const required = createSnapshot();
-  required.dealVariantComponentOptions = [];
+  const requiredGroupId = required.dealComponentGroups[0].componentGroupId;
+  const requiredOptionIds = new Set(required.dealComponentOptions
+    .filter(option => option.componentGroupId === requiredGroupId)
+    .map(option => option.componentOptionId));
+  required.dealComponentOptions = required.dealComponentOptions
+    .filter(option => option.componentGroupId !== requiredGroupId);
+  required.dealVariantComponentOptions = required.dealVariantComponentOptions
+    .filter(mapping => !requiredOptionIds.has(mapping.componentOptionId));
+  assert.ok(contract.validateSnapshot(required).errors.some(e => e.code === 'DEAL_COMPONENT_OPTIONS_REQUIRED'));
   assert.ok(contract.validateSnapshot(required).errors.some(e => e.code === 'DEAL_REQUIRED_CHOICES_UNSATISFIABLE'));
 });
 
