@@ -87,6 +87,7 @@ test('preview CSS has responsive product/deal layouts and explicitly hides legac
   assert.match(css, /@media \(max-width: 600px\)/);
   assert.match(css, /fc-menu-product-grid/);
   assert.match(css, /deal-grid/);
+  assert.match(css, /\.deal-card\.is-unavailable\s*\{[^}]*grayscale/s);
   assert.match(css, /\.fc-menu-add\s*\{[^}]*display:\s*none\s*!important/s);
   assert.match(css, /:focus-visible/);
   assert.match(css, /prefers-reduced-motion/);
