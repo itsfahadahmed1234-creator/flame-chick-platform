@@ -1,40 +1,38 @@
-# CURRENT CHECKPOINT — 2026-11-23 17:12 PKT — staff role lookup hardening
+# CURRENT CHECKPOINT — 2026-11-23 17:28 PKT — delivery offer identity guard and fixtures
 
 **Active branch:** `work/production-source-audit`  
-**Implementation commit:** `dd993c74accf61dd5494882c4eb8d53b0f2718be`  
+**Latest source commit:** `f66e7baaa3d198dcc06d27eba90b14706e5d8a00`  
 **Production and `main`: untouched.**
 
-## Verified CI status from previous checkpoint
+## Confirmed checks
 
-- Full disposable migration/catalog importer chain on `a30609a`: passed.
-- Catalog publication validation fixture chain on `a30609a`: passed.
-- Staff Admin role-boundary workflow on `a30609a`: failed at `BATCH4_DIRECT_TABLE_PRIVILEGES_LEAK`. Its strict check correctly found service_role had direct SELECT on `public.user_profiles` and `public.user_roles`, contradicting the established Batch 4 security baseline. Do not waive this guard.
+- Commit `dd993c7...`: Staff Admin Role Boundary QA passed; Catalog importer migration replay passed; catalog publication validation replay passed.
+- The Admin static and Edge Function static checks initially failed only because contract tests still asserted the retired direct `user_roles` REST lookup. Their assertions were updated to require the restricted `flame_chick_get_staff_role_rows` RPC.
+- Commit `d5c1fb79c096499926d45e3841fcb679a114a42b`: both Admin Static Checks and Edge Function Static Checks passed.
 
-## Current source correction
+## Latest delivery integrity changes (not yet CI-verified)
 
-Commit `dd993c7...` adds `20261123170000_flame_chick_staff_role_projection_rpc_v1.sql`:
-- Revokes service_role direct SELECT on `user_profiles` and `user_roles`.
-- Adds a SECURITY DEFINER, empty-search-path, service_role-only RPC `flame_chick_get_staff_role_rows(p_user_id)` returning only active Flame Chick role rows for the supplied subject, with active profile/Auth/restaurant checks.
-- Leaves anon/authenticated/public without EXECUTE.
-- Updates Order and Delivery Edge Functions to resolve staff/rider roles via the narrow RPC, rather than direct `user_roles` REST queries.
-- Reuses the shared rider-role guard for presence instead of duplicating direct role lookup.
-- Adds regression checks to the Batch 4 and operational SQL tests and Edge Function contract test.
+Commit `f66e7ba...`:
+- Adds `20261123171000_flame_chick_delivery_offer_identity_guard_v1.sql`.
+- Requires a delivery assignment to reference the exact rider who was targeted by its source offer (five-column composite FK). Prevents an assignment from attaching Rider B to Rider A's offer.
+- Adds branch-scoped offer request idempotency uniqueness.
+- Extends the disposable operational SQL fixture with two synthetic Auth riders, a real delivery order/task, one 60-second offer, duplicate pending-offer rejection, wrong-rider assignment rejection, and valid accepted assignment read-back. All fixtures are rolled back.
+- CI for this latest migration/fixture must be inspected before calling it verified. The existing QA workflow watches all `supabase/migrations/*.sql` and should trigger on this branch push; if no run appears, inspect trigger behavior and add a dedicated operational QA workflow rather than skipping validation.
 
-**Important:** This commit has just been pushed. Its CI has not yet been inspected. Do not claim the new migration, role tests or TypeScript checks pass until Actions for `dd993c7...` complete.
+## Next steps
 
-## Delivery workflow still next
+1. Confirm a full disposable migration replay including the new identity-guard migration.
+2. Run `supabase/tests/flame_chick_operational_schema_v1.sql` against that replay; correct any fixture/schema mismatch.
+3. Then implement the transactional delivery command RPCs in a separate candidate migration, with idempotency, row locks, role/branch checks, and audit:
+   - targeted POS assignment to one active branch rider;
+   - exactly one offer for 60 seconds;
+   - rider accepts/declines own offer only; expiry/rejection returns task to POS for manual reassignment, no auto-broadcast;
+   - accepted → picked_up → delivered only;
+   - rider may report failed/return; Cashier or Manager confirms physical return.
+4. Add concurrent accept/expiry/duplicate request tests and Edge Function API contract tests.
+5. Preserve no "At restaurant" stage. No Realtime setup, Production migration, Edge Function deploy, Vercel deploy, checkout activation or catalog publication.
 
-After role QA passes, add disposable operational fixtures and then implement transactional delivery commands:
-- POS targeted rider assignment, branch scoped and idempotent.
-- One 60-second offer, no broadcast or automatic reoffer.
-- Rider may accept/decline only their own offer; expiry/rejection returns task to POS for manual reassignment.
-- Rider transitions accepted → picked_up → delivered only.
-- Rider may report failure/return; Manager/Cashier confirms physical return and audit.
-- Protect concurrent acceptance and duplicate requests with row locks/idempotency.
-- No "At restaurant" stage or second Accept action.
-- No Realtime enablement, deployments, Production migration, checkout activation or menu publication.
-
-Catalog Publication #2 and Option 1 linked product/variant deal model remain unchanged. GST remains deferred.
+Catalog Publication #2 and Option 1 product/variant-linked deal model remain unchanged. GST remains deferred.
 ---
 
 ## LATEST CHECKPOINT — 2026-11-23: production integration audit completed
