@@ -118,7 +118,8 @@ test("POS allows Cashier and Manager to confirm physical returns", () => {
 test("POS routes physically returned orders into the Cancelled Orders history tab", () => {
   const html=source[0].html;
   assert.match(html,/returned:'Returned'/);
-  assert.match(html,/\['cancelled','returned'\]\.includes\(String\(o\.status\|\|'\)\.trim\(\)\.toLowerCase\(\)\)/);
+  assert.ok(html.includes("['cancelled','returned'].includes(String(o.status||'').trim().toLowerCase())"));
+  assert.ok(html.includes("historyServerRows.cancelled=localRows.filter(o=>['cancelled','returned']"));
 });
 
 test("Rider delivered confirmation explicitly distinguishes delivery from cashier payment collection", () => {
