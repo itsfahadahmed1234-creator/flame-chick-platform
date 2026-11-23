@@ -175,7 +175,7 @@ test('fixed single-option deal groups are preselected and locked', () => {
   assert.equal(state.quantities[IDS.componentGroup][IDS.componentOption], 1);
   assert.equal(state.quantities[IDS.drinkComponentGroup][IDS.drinkComponentOption], 1);
   assert.equal(ui.validate().ok, true);
-  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 0).code, 'COMPONENT_QUANTITY_INVALID');
+  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 0).code, 'COMPONENT_FIXED');
 });
 
 test('schedule-closed deal can be opened read-only but cannot emit a payload', () => {
