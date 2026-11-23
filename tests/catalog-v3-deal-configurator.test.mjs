@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import contract from '../apps/flame-chick-website/js/catalog-v3.js';
 import deals from '../apps/flame-chick-website/js/catalog-v3-deal-view.js';
 import configurator from '../apps/flame-chick-website/js/catalog-v3-deal-configurator.js';
@@ -168,8 +169,8 @@ test('refuses to render without a DOM target and an explicit completion handler'
   assert.equal(ui.render({ replaceChildren() {} }, { document: {} }).code, 'COMPLETION_HANDLER_REQUIRED');
 });
 
-test('fixed single-option deal groups are preselected and locked', () => {
-  const source = require('node:fs').readFileSync(new URL('../apps/flame-chick-website/js/catalog-v3-deal-configurator.js', import.meta.url), 'utf8');
+test('fixed single-option deal groups are preselected and locked', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-website/js/catalog-v3-deal-configurator.js', import.meta.url), 'utf8');
   assert.match(source, /group\.options\.length === 1\s*\?\s*group\.name/);
   assert.match(source, /quantity\.disabled = readOnly \|\| fixedGroup/);
   const ui = create();
