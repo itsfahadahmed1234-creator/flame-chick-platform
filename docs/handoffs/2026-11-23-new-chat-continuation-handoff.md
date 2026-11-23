@@ -1,36 +1,48 @@
-# CURRENT CHECKPOINT — 2026-11-23 17:28 PKT — delivery offer identity guard and fixtures
+# CURRENT CHECKPOINT — 2026-11-23 17:55 PKT — delivery command candidate and behavioral QA
 
 **Active branch:** `work/production-source-audit`  
-**Latest source commit:** `f66e7baaa3d198dcc06d27eba90b14706e5d8a00`  
+**Latest source commit before this handoff update:** `182e8aa6aa43dda6e73b7ae4e9a1f4396b2aac0d`  
 **Production and `main`: untouched.**
 
-## Confirmed checks
+## Completed source work
 
-- Commit `dd993c7...`: Staff Admin Role Boundary QA passed; Catalog importer migration replay passed; catalog publication validation replay passed.
-- The Admin static and Edge Function static checks initially failed only because contract tests still asserted the retired direct `user_roles` REST lookup. Their assertions were updated to require the restricted `flame_chick_get_staff_role_rows` RPC.
-- Commit `d5c1fb79c096499926d45e3841fcb679a114a42b`: both Admin Static Checks and Edge Function Static Checks passed.
+- Delivery schema V1 and offer identity guard are in the migration history.
+- Added candidate migration `20261123172000_flame_chick_delivery_commands_v1.sql`:
+  - service-only command RPCs for targeted assignment, Rider accept/decline, pickup, delivered, reject-before-pickup, failed delivery, Rider return report, staff physical-return confirmation, and bounded lazy expiry;
+  - locks task/offer/profile rows to serialize competing actions;
+  - validates active Flame Chick role/profile and branch scope through the restricted staff-role projection;
+  - creates exactly one targeted offer with database `offered_at + 60 seconds`;
+  - no automatic rider rotation; staff must manually select a new rider;
+  - preserves offer/assignment/event/order histories; payment ledger is not changed;
+  - delivered completes order/task and releases Rider; failed report leaves order non-delivered; staff confirmation marks order/task returned and releases Rider;
+  - RPC EXECUTE grants are service_role-only; helper functions remain private.
+- Updated Delivery Edge Function to pass request IDs, map command error envelopes/statuses, and lazily expire due offers when POS dispatch is loaded.
+- Added disposable behavioral fixture `supabase/tests/flame_chick_delivery_commands_v1.sql` for:
+  - wrong-rider offer rejection;
+  - idempotent accept;
+  - pickup and delivered;
+  - targeted staff assignment;
+  - failed delivery and Rider return report;
+  - Rider cannot confirm physical return;
+  - Manager confirmation and retry;
+  - unchanged payment ledger and order/task audit.
+- Added this fixture to the Staff Admin/operational QA workflow.
 
-## Latest delivery integrity changes (not yet CI-verified)
+## CI status
 
-Commit `f66e7ba...`:
-- Adds `20261123171000_flame_chick_delivery_offer_identity_guard_v1.sql`.
-- Requires a delivery assignment to reference the exact rider who was targeted by its source offer (five-column composite FK). Prevents an assignment from attaching Rider B to Rider A's offer.
-- Adds branch-scoped offer request idempotency uniqueness.
-- Extends the disposable operational SQL fixture with two synthetic Auth riders, a real delivery order/task, one 60-second offer, duplicate pending-offer rejection, wrong-rider assignment rejection, and valid accepted assignment read-back. All fixtures are rolled back.
-- CI for this latest migration/fixture must be inspected before calling it verified. The existing QA workflow watches all `supabase/migrations/*.sql` and should trigger on this branch push; if no run appears, inspect trigger behavior and add a dedicated operational QA workflow rather than skipping validation.
+- Delivery Edge Function Static Checks: passed on `0d2695c...`.
+- Admin Static Checks: passed on `0d2695c...`.
+- Full disposable migration/catalog replay and previous structural/role boundary checks passed on `9e87504...`, including the new command migration.
+- New behavioral workflow run `45176716756` on `182e8aa...` is in progress. **Do not claim the delivery behavior fixture passes until this run completes.** Inspect the exact failing step/log and repair any fixture or SQL issues before proceeding.
 
 ## Next steps
 
-1. Confirm a full disposable migration replay including the new identity-guard migration.
-2. Run `supabase/tests/flame_chick_operational_schema_v1.sql` against that replay; correct any fixture/schema mismatch.
-3. Then implement the transactional delivery command RPCs in a separate candidate migration, with idempotency, row locks, role/branch checks, and audit:
-   - targeted POS assignment to one active branch rider;
-   - exactly one offer for 60 seconds;
-   - rider accepts/declines own offer only; expiry/rejection returns task to POS for manual reassignment, no auto-broadcast;
-   - accepted → picked_up → delivered only;
-   - rider may report failed/return; Cashier or Manager confirms physical return.
-4. Add concurrent accept/expiry/duplicate request tests and Edge Function API contract tests.
-5. Preserve no "At restaurant" stage. No Realtime setup, Production migration, Edge Function deploy, Vercel deploy, checkout activation or catalog publication.
+1. Finish/repair run `45176716756`.
+2. Re-run the updated workflow on the final migration/fixture commit and verify rollback of synthetic identities and tenant.
+3. Add adversarial expiry boundary and concurrent accept-vs-decline/expiry tests.
+4. Update POS dispatch UI for return-confirm permissions and returned/cancelled queue behavior only after verifying the current UI handler wiring.
+5. Update Rider/Edge API idempotency keys and response handling as needed; keep Rider flow **Accept offer → Picked up → Delivered**. No restaurant-arrival step.
+6. Then perform a source integration review of POS/Rider/Order APIs. Production migration, Edge Function deploy, Vercel deploy, Realtime enablement, checkout activation and catalog publication remain gated and have not occurred.
 
 Catalog Publication #2 and Option 1 product/variant-linked deal model remain unchanged. GST remains deferred.
 ---
