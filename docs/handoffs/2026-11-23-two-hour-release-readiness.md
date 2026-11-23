@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-23  
 **Branch:** `work/production-source-audit`  
-**Repository:** `itsfahadahmed1234-creator/flame-chick-platform/flame-chick-platform`  
+**Repository:** `itsfahadahmed1234-creator/flame-chick-platform`  
 **Production project:** `adkrxfnawdiljhjaavnj` — Mumbai `ap-south-1`  
 **Status:** Source integration improved; full operational deployment is **NO-GO** until the backend and release prerequisites below are implemented.
 
