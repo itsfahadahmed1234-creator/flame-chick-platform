@@ -238,11 +238,16 @@
         '<div class="fcv3-subhead"><div><h4>Variants</h4><p>Standalone prices are required; deal-only variant prices may be NULL.</p></div><button type="button" class="fcv3-button" data-action="variant-add">+ Add variant</button></div>'+
         '<div class="fcv3-variants">'+variantRows(p)+'</div><div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">Save product</button></div></form>';
     }
-    function categoryForm(){return '<form class="fcv3-editor" data-form="category"><div class="fcv3-form-grid">'+
-      '<label>Kind<select name="category_kind"><option value="menu">Menu</option><option value="deal">Deals</option></select></label>'+
-      '<label>English name<input name="name_en" maxlength="120" required></label><label>Urdu name<input name="name_ur" maxlength="120"></label>'+
-      '<label>Sort order<input name="sort_order" type="number" min="0" step="1" value="0"></label></div>'+
-      '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">Save category</button></div></form>';}
+    function categoryForm(category){
+      const editing=!!(category&&category.id);
+      return '<form class="fcv3-editor" data-form="category">'+(editing?'<input type="hidden" name="id" value="'+esc(category.id)+'">':'')+'<div class="fcv3-form-grid">'+
+        (editing?'<input type="hidden" name="category_kind" value="'+esc(category.category_kind)+'"><label>Kind<input value="'+(category.category_kind==='deal'?'Deals':'Menu')+'" disabled></label>':
+          '<label>Kind<select name="category_kind"><option value="menu">Menu</option><option value="deal">Deals</option></select></label>')+
+        '<label>English name<input name="name_en" maxlength="120" required value="'+esc(category&&category.name_en)+'"></label><label>Urdu name<input name="name_ur" maxlength="120" value="'+esc(category&&category.name_ur)+'"></label>'+
+        '<label>Sort order<input name="sort_order" type="number" min="0" step="1" value="'+esc(category?category.sort_order:0)+'"></label>'+
+        (editing?'<label class="fcv3-check"><input type="checkbox" name="is_active"'+(category.is_active?' checked':'')+'> Active</label>':'')+'</div>'+
+        '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save category changes':'Save category')+'</button></div></form>';
+    }
     function componentForm(c){
       const product=s.products.find(p=>p.id===c.product_id)||s.products.find(p=>p.is_active!==false);
       const productId=c.product_id||(product&&product.id)||'';
@@ -256,14 +261,16 @@
         '<button type="button" class="fcv3-button fcv3-danger" data-action="component-remove">Remove component</button></article>';
     }
     function dealForm(){
-      return '<form class="fcv3-editor" data-form="deal"><div class="fcv3-warning">Fixed-price deal only. Every component is locked and INCLUDED. No selectable upgrades or +price options are created.</div>'+
+      const editing=!!(s.dealDraft&&s.dealDraft.id);
+      return '<form class="fcv3-editor" data-form="deal"><div class="fcv3-warning">Fixed-price deal only. Every component is locked and INCLUDED. No selectable upgrades or +price options are created. Removed components are retained inactive for audit.</div>'+
         '<div class="fcv3-form-grid"><label>Deal title<input name="title" maxlength="160" required value="'+esc(s.dealDraft&&s.dealDraft.title)+'"></label>'+
         '<label>Deal price (PKR)<input name="base_price" type="number" min="0" step="0.01" required value="'+esc(s.dealDraft&&s.dealDraft.base_price)+'"></label>'+
         '<label class="fcv3-wide">Description<textarea name="description_en" maxlength="3000" rows="2">'+esc(s.dealDraft&&s.dealDraft.description_en)+'</textarea></label>'+
-        '<label class="fcv3-check"><input type="checkbox" name="flame_hour"'+(s.dealDraft&&s.dealDraft.flame_hour?' checked':'')+'> Flame Hour daily 3–5 PM (Asia/Karachi)</label></div>'+
+        '<label class="fcv3-check"><input type="checkbox" name="flame_hour"'+(s.dealDraft&&s.dealDraft.flame_hour?' checked':'')+'> Flame Hour daily 3–5 PM (Asia/Karachi)</label>'+
+        (editing?'<label class="fcv3-check"><input type="checkbox" name="deal_available"'+(s.dealDraft.is_available?' checked':'')+'> Available to order</label><p class="fcv3-wide">Active status is preserved automatically. The deal is temporarily disabled while its contents are being verified.</p>':'')+'</div>'+
         '<div class="fcv3-subhead"><div><h4>Fixed components</h4><p>Each component links to one exact product variant.</p></div><button type="button" class="fcv3-button" data-action="component-add">+ Add component</button></div>'+
         '<div class="fcv3-components">'+s.components.map(componentForm).join('')+'</div>'+
-        '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">Create fixed deal</button></div></form>';
+        '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save fixed deal changes':'Create fixed deal')+'</button></div></form>';
     }
     function render(){
       if(!el)return;
@@ -279,7 +286,7 @@
         const deals=s.deals.filter(d=>d.collection_id===c.id);
         return '<section class="fcv3-collection"><h4>'+esc(c.name_en)+'</h4><div class="fcv3-deals">'+
           (deals.length?deals.map(d=>'<article class="fcv3-deal-card"><div><strong>'+esc(d.title)+'</strong><small>'+(d.active_variant_count||0)+' active variant(s) · '+(d.is_active?'Active':'Draft / hidden')+'</small></div>'+
-          '<button class="fcv3-button" data-action="deal-detail" data-id="'+esc(d.id)+'">Inspect</button></article>').join(''):'<p class="fcv3-empty">No deals in this collection.</p>')+'</div></section>';
+          '<div class="fcv3-card-actions"><button class="fcv3-button" data-action="deal-detail" data-id="'+esc(d.id)+'">Inspect</button><button class="fcv3-button" data-action="deal-edit" data-id="'+esc(d.id)+'">Edit</button></div></article>').join(''):'<p class="fcv3-empty">No deals in this collection.</p>')+'</div></section>';
       }).join('');
       el.innerHTML='<div class="fcv3-head"><div><span class="fcv3-kicker">AUTHENTICATED COMMAND API</span><h2>Catalog V3 workspace</h2><p>Draft authoring through secured Admin/Owner commands; no direct PostgREST table writes.</p></div>'+
         '<div class="fcv3-head-actions"><span class="fcv3-revision">'+(s.revision==null?'Revision not loaded':'Draft revision '+s.revision)+'</span>'+
@@ -293,20 +300,28 @@
         '<div class="fcv3-toolbar"><div><h3>Products and variants</h3><p>Standalone variants require prices. Deal-only variants may be unpriced and stay out of standalone menu cards.</p></div><button class="fcv3-button fcv3-primary" data-action="product-add">+ Add product</button></div>'+
         '<div class="fcv3-table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Standalone prices</th><th>Status</th><th></th></tr></thead><tbody>'+(productRows||'<tr><td colspan="5">No products in draft.</td></tr>')+'</tbody></table></div>'+
         '<div class="fcv3-toolbar"><div><h3>Categories</h3><p>Menu and deal categories are distinct.</p></div><button class="fcv3-button" data-action="category-add">+ Add category</button></div>'+
-        '<div class="fcv3-category-grid">'+s.categories.map(c=>'<article><strong>'+esc(c.name_en)+'</strong><small>'+esc(c.category_kind)+' · '+(c.is_active?'Active':'Inactive')+'</small></article>').join('')+'</div>'+
+        '<div class="fcv3-category-grid">'+s.categories.map(c=>'<article><strong>'+esc(c.name_en)+'</strong><small>'+esc(c.category_kind)+' · '+(c.is_active?'Active':'Inactive')+'</small><button class="fcv3-button" data-action="category-edit" data-id="'+esc(c.id)+'">Edit</button></article>').join('')+'</div>'+
         '<div class="fcv3-toolbar"><div><h3>Deals and offers</h3><p>Each deal has its own fixed price and fixed INCLUDED component list. No selectable upgrades are enabled.</p></div><button class="fcv3-button fcv3-primary" data-action="deal-add">+ Create fixed deal</button></div>'+
         (collectionHtml||'<p class="fcv3-empty">No deal collection yet. The first deal creates the Deals category and collection.</p>')+
         (s.editor?'<div class="fcv3-editor-shell"><div class="fcv3-editor-head"><div><span class="fcv3-kicker">DRAFT EDITOR</span><h3>'+
           (s.editor.type==='product'?(s.editor.product?'Edit product':'Add product'):s.editor.type==='category'?'Add category':'Create fixed deal')+'</h3></div><button class="fcv3-button fcv3-muted" data-action="editor-cancel">Close</button></div>'+
-          (s.editor.type==='product'?productForm(s.editor.product):s.editor.type==='category'?categoryForm():dealForm())+'</div>':'')+
+          (s.editor.type==='product'?productForm(s.editor.product):s.editor.type==='category'?categoryForm(s.editor.category):dealForm())+'</div>':'')+
         (s.detail?'<div class="fcv3-detail"><h3>Deal inspection</h3><strong>'+esc(s.detail.deal.title)+'</strong><small>'+esc(s.detail.deal.id)+'</small>'+
           '<div>'+s.detail.component_groups.map(g=>'<p>'+esc(g.group.name_en)+' × '+g.group.min_units+' — '+(g.options[0]?esc(g.options[0].product_name_en)+' / '+esc(g.options[0].variant_label):'No option')+'</p>').join('')+'</div>'+
-          '<button class="fcv3-button" data-action="detail-close">Close inspection</button></div>':'');
+          '<button class="fcv3-button" data-action="deal-edit" data-id="'+esc(s.detail.deal.id)+'">Edit fixed deal</button> <button class="fcv3-button" data-action="detail-close">Close inspection</button></div>':'');
     }
     function openProduct(p){s.editor={type:'product',product:p?JSON.parse(JSON.stringify(p)):null};s.notice=null;s.error=null;render();}
     function openDeal(){
       if(!s.products.some(p=>p.is_active!==false&&p.variants.some(v=>v.is_active!==false))){s.error='Add active products and variants before creating a deal.';render();return;}
-      s.editor={type:'deal'};s.components=[{display_name:'',product_id:'',product_variant_id:'',quantity:1}];s.dealDraft={title:'',description_en:'',base_price:'',flame_hour:false};s.notice=null;s.error=null;s.partial=null;render();
+      s.editor={type:'deal'};s.editorRevision=s.revision;s.components=[{display_name:'',product_id:'',product_variant_id:'',quantity:1}];s.dealDraft={title:'',description_en:'',base_price:'',flame_hour:false,is_available:true};s.notice=null;s.error=null;s.partial=null;render();
+    }
+    async function openDealEdit(dealId){
+      const detail=await read(READ.dealDetail,{deal_id:dealId});
+      const assignment=(detail.schedule_assignments||[]).find(item=>item.is_active===true&&item.branch_id===null);
+      const scheduleDetail=assignment?await read(READ.scheduleDetail,{schedule_set_id:assignment.schedule_set_id}):null;
+      const draft=buildFixedDealEditDraft(detail,s.schedules,scheduleDetail);
+      s.editor={type:'deal',deal:true};s.editorRevision=s.revision;s.components=draft.components;s.dealDraft=draft.dealDraft;
+      s.detail=null;s.notice=null;s.error=null;s.partial=null;render();
     }
     async function ensureDealCollection(){
       let cat=s.categories.find(c=>c.category_kind==='deal'&&c.is_active);
@@ -356,6 +371,75 @@
         s.partial=null;s.editor=null;s.notice='Fixed deal saved and read-back verified. Components are locked and use INCLUDED pricing.';await refresh();
       }catch(error){if(dealId)s.partial={id:dealId,variantId:dealVariantId};throw error;}
     }
+    async function editDeal(form){
+      const dealId=s.dealDraft&&s.dealDraft.id;
+      if(!dealId)throw Error('The deal ID is missing. Reopen the deal before saving.');
+      const latest=await read(READ.dealDetail,{deal_id:dealId});
+      if(Number.isSafeInteger(s.editorRevision)&&s.revision!==s.editorRevision)
+        throw Error('This catalog changed while the deal editor was open. Reload the deal before saving; no edit was made.');
+      const assignmentBefore=(latest.schedule_assignments||[]).find(item=>item.is_active===true&&item.branch_id===null);
+      const scheduleDetailBefore=assignmentBefore?await read(READ.scheduleDetail,{schedule_set_id:assignmentBefore.schedule_set_id}):null;
+      const currentDraft=buildFixedDealEditDraft(latest,s.schedules,scheduleDetailBefore);
+      const base=amount(form.base_price,'Deal base price',true);
+      const title=text(form.title,160,'Deal title',true);
+      const desc=text(form.description_en,3000,'Description',false);
+      const isAvailable=form.is_available===true;
+      const wasActive=currentDraft.dealDraft.is_active===true;
+      const variant=latest.variants[0].variant;
+      let stage='deactivate';
+      try{
+        await write(WRITE.deal,{
+          id:dealId,title,description_en:desc,is_active:false,is_available:isAvailable,
+          variants:[{id:variant.id,variant_key:variant.variant_key,label_en:title,
+            label_ur:variant.label_ur??null,pricing_mode:'FIXED_BUNDLE',base_price:base,
+            sort_order:variant.sort_order,is_active:false}]
+        });
+        stage='components';
+        const groups=buildFixedComponentGroups(s.components,latest.component_groups);
+        await write(WRITE.components,{deal_id:dealId,groups:groups.groups});
+        stage='mappings';
+        const afterComponents=await read(READ.dealDetail,{deal_id:dealId});
+        const mapped=buildIncludedMappings(afterComponents);
+        await write(WRITE.mappings,{deal_id:dealId,deal_variant_id:variant.id,options:mapped.options});
+        stage='schedule';
+        const oldAssignment=(latest.schedule_assignments||[]).find(item=>item.is_active===true&&item.branch_id===null);
+        if(form.flame_hour===true){
+          if(!oldAssignment){
+            const scheduleId=await ensureFlameHourSchedule();
+            await write(WRITE.assignment,{deal_id:dealId,branch_id:null,schedule_set_id:scheduleId,is_active:true});
+          }
+        }else if(oldAssignment){
+          await write(WRITE.assignment,{id:oldAssignment.id,deal_id:dealId,branch_id:null,
+            schedule_set_id:oldAssignment.schedule_set_id,is_active:false});
+        }
+        stage='pre-activation verification';
+        const beforeActivation=await read(READ.dealDetail,{deal_id:dealId});
+        const activeSchedule=(beforeActivation.schedule_assignments||[]).find(item=>item.is_active===true&&item.branch_id===null);
+        verifyFixedDealDetail(beforeActivation,{
+          basePrice:base,components:s.components,flameHour:form.flame_hour===true,
+          scheduleId:activeSchedule?activeSchedule.schedule_set_id:null,active:false,isAvailable
+        });
+        stage='restore activation state';
+        await write(WRITE.deal,{
+          id:dealId,title,description_en:desc,is_active:wasActive,is_available:isAvailable,
+          variants:[{id:variant.id,variant_key:variant.variant_key,label_en:title,
+            label_ur:variant.label_ur??null,pricing_mode:'FIXED_BUNDLE',base_price:base,
+            sort_order:variant.sort_order,is_active:wasActive}]
+        });
+        const finalDetail=await read(READ.dealDetail,{deal_id:dealId});
+        const finalSchedule=(finalDetail.schedule_assignments||[]).find(item=>item.is_active===true&&item.branch_id===null);
+        verifyFixedDealDetail(finalDetail,{
+          basePrice:base,components:s.components,flameHour:form.flame_hour===true,
+          scheduleId:finalSchedule?finalSchedule.schedule_set_id:null,active:wasActive,isAvailable
+        });
+        s.partial=null;s.editor=null;s.editorRevision=null;
+        s.notice='Fixed deal changes saved, read back and verified. Removed components are inactive; all active components remain INCLUDED with zero surcharge.';
+        await refresh();
+      }catch(error){
+        s.partial={id:dealId,variantId:variant.id,editStage:stage};
+        throw new Error((error&&error.message||'Deal edit failed.')+' The deal may remain inactive at stage "'+stage+'". Inspect this exact deal before retrying; do not create a replacement.');
+      }
+    }
     function readVariantRows(form){
       return Array.from(form.querySelectorAll('[data-variant-row]')).map(row=>({
         id:row.querySelector('[data-field="id"]')?.value||undefined,
@@ -372,7 +456,17 @@
     }
     async function submit(form){
       const fd=new FormData(form),type=form.dataset.form;
-      if(type==='category'){await write(WRITE.category,{category_kind:fd.get('category_kind'),name_en:text(fd.get('name_en'),120,'Category name',true),name_ur:text(fd.get('name_ur'),120,'Urdu name',false),sort_order:Number(fd.get('sort_order')||0),is_active:true});s.editor=null;s.notice='Category saved to catalog draft.';await refresh();return;}
+      if(type==='category'){
+        await write(WRITE.category,{
+          ...(fd.get('id')?{id:fd.get('id')}:{}),
+          category_kind:fd.get('category_kind'),
+          name_en:text(fd.get('name_en'),120,'Category name',true),
+          name_ur:text(fd.get('name_ur'),120,'Urdu name',false),
+          sort_order:Number(fd.get('sort_order')||0),
+          is_active:fd.get('id')?fd.has('is_active'):true
+        });
+        s.editor=null;s.editorRevision=null;s.notice='Category saved to catalog draft.';await refresh();return;
+      }
       if(type==='product'){
         const payload=normalizeProductDraft({id:fd.get('id')||undefined,category_id:fd.get('category_id'),name_en:fd.get('name_en'),name_ur:fd.get('name_ur'),description_en:fd.get('description_en'),description_ur:fd.get('description_ur'),sort_order:Number(fd.get('sort_order')||0),featured:fd.has('featured'),is_active:fd.has('is_active'),is_available:fd.has('is_available'),variants:readVariantRows(form)});
         await write(WRITE.product,payload);s.editor=null;s.notice='Product and variants saved to catalog draft.';await refresh();return;
@@ -384,8 +478,14 @@
           product_variant_id:row.querySelector('[data-field="product_variant_id"]').value,
           quantity:Number(row.querySelector('[data-field="quantity"]').value)
         }));
-        s.dealDraft={title:fd.get('title'),description_en:fd.get('description_en'),base_price:fd.get('base_price'),flame_hour:fd.has('flame_hour')};
-        await createDeal(s.dealDraft);
+        const existing=s.dealDraft&&s.dealDraft.id?s.dealDraft:null;
+        s.dealDraft={
+          ...(existing?existing:{}),title:fd.get('title'),description_en:fd.get('description_en'),
+          base_price:fd.get('base_price'),flame_hour:fd.has('flame_hour'),
+          is_available:existing?fd.has('deal_available'):true
+        };
+        if(existing)await editDeal(s.dealDraft);
+        else await createDeal(s.dealDraft);
       }
     }
     async function importPublishedMenuDraft(){
@@ -433,7 +533,8 @@
         try{
           if(a==='refresh')await refresh();
           else if(a==='import-menu')await importPublishedMenuDraft();
-          else if(a==='category-add'){s.editor={type:'category'};render();}
+          else if(a==='category-add'){s.editor={type:'category'};s.editorRevision=s.revision;render();}
+          else if(a==='category-edit'){const category=s.categories.find(c=>c.id===b.dataset.id);if(!category)throw Error('Category could not be found.');s.editor={type:'category',category};s.editorRevision=s.revision;render();}
           else if(a==='product-add')openProduct(null);
           else if(a==='product-edit')openProduct(s.products.find(p=>p.id===b.dataset.id));
           else if(a==='deal-add')openDeal();
@@ -443,6 +544,7 @@
           else if(a==='component-remove'){b.closest('[data-component-row]')?.remove();}
           else if(a==='editor-cancel'){s.editor=null;render();}
           else if(a==='deal-detail'){s.detail=await read(READ.dealDetail,{deal_id:b.dataset.id});render();}
+          else if(a==='deal-edit'){await openDealEdit(b.dataset.id);}
           else if(a==='detail-close'){s.detail=null;render();}
         }catch(e){s.error=e.message||'Catalog action failed.';render();}
       };
