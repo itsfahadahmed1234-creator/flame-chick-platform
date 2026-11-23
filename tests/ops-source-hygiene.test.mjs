@@ -98,3 +98,31 @@ test("POS keeps an unset delivery-area fee distinct from an explicitly free area
   assert.match(html,/getDeliveryFeeForArea\(order\.area\)===null/);
   assert.doesNotMatch(html,/function deliveryAreaFee\(row\)[^\n]*:0\}/);
 });
+
+
+test("POS keeps Rider-delivered orders active until Cashier payment collection", () => {
+  const html=source[0].html;
+  assert.match(html,/active: \["new", "accepted", "preparing", "ready", "out_for_delivery", "delivered"\]/);
+  assert.match(html,/return st==='Out for Delivery'\|\|st==='Delivered'/);
+  assert.match(html,/Delivered · awaiting cashier payment collection/);
+  assert.match(html,/\['Pending','Accepted','Preparing','Ready','Out for Delivery','Delivered'\]/);
+  assert.doesNotMatch(html,/status==='Delivered'[^\\n]*data-order-status="Completed"/);
+});
+
+test("POS allows Cashier and Manager to confirm physical returns", () => {
+  const html=source[0].html;
+  assert.match(html,/const manager=\['owner','admin','manager','cashier'\]\.includes\(role\)/);
+  assert.match(html,/if\(!\['owner','admin','manager','cashier'\]\.includes\(role\)\)/);
+  assert.match(html,/action:'confirm_return',delivery_task_id:taskId/);
+});
+
+test("POS routes physically returned orders into the Cancelled Orders history tab", () => {
+  const html=source[0].html;
+  assert.match(html,/returned:'Returned'/);
+  assert.match(html,/\['cancelled','returned'\]\.includes\(String\(o\.status\|\|'\)\.trim\(\)\.toLowerCase\(\)\)/);
+});
+
+test("Rider delivered confirmation explicitly distinguishes delivery from cashier payment collection", () => {
+  const html=source[1].html;
+  assert.match(html,/Delivery marked delivered\. The order remains awaiting cashier payment collection\./);
+});
