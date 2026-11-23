@@ -341,7 +341,7 @@
         'If interrupted, the import can be resumed using stable identities. Conflicting or unexpected existing records will stop the process for inspection.',
         '',
         'Proceed with draft import?'
-      ].join('\\n');
+      ].join('\n');
       if(!window.confirm(message)){s.notice='Menu draft import was cancelled. No catalog writes were made.';render();return;}
       s.saving=true;s.error=null;s.notice=null;s.importProgress={phase:'starting',completed:0,total:summary.categories+summary.products+summary.deals,message:'Starting review-only catalog draft import.'};render();
       try{
