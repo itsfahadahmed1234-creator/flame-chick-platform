@@ -52,3 +52,13 @@ test("storefront menu is hidden until a verified live catalog succeeds", () => {
   assert.match(html, /fcSetMenuCatalogState\(true\)/);
   assert.match(html, /published menu is unavailable or uses an unsupported format/i);
 });
+
+
+test("website delivery submission carries explicit area selection and no client-authoritative fee", () => {
+  const html = source["index.html"];
+  assert.match(html,/selection_type:\s*customer\.areaChoice === '__not_listed__' \? 'not_listed' : 'listed_area'/);
+  assert.match(html,/area_id:\s*customer\.areaChoice === '__not_listed__' \? null : \(customer\.areaId \|\| null\)/);
+  assert.match(html,/address:\s*customer\.address/);
+  assert.doesNotMatch(html,/delivery:\s*customer\.mode === 'Takeaway'[\s\S]{0,250}area_name:/);
+  assert.doesNotMatch(html,/delivery:\s*customer\.mode === 'Takeaway'[\s\S]{0,250}delivery_fee:/);
+});
