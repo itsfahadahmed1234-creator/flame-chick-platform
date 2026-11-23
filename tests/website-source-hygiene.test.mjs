@@ -104,7 +104,11 @@ test("Customer ordering page sends published IDs for quote and commit, never bro
   assert.match(js,/item\.quantity = row\.quantity/);
   assert.match(js,/delivery: delivery/);
   assert.doesNotMatch(js,/unit_price_snapshot|line_total|price_minor|subtotal_minor|delivery_fee:/);
-  assert.doesNotMatch(js,/localStorage|sessionStorage|indexedDB/);
+  assert.doesNotMatch(js,/localStorage|indexedDB/);
+  assert.match(js,/PENDING_CHECKOUT_STORAGE_KEY = 'flame-chick-v3-pending-checkout-id'/);
+  assert.match(js,/savePendingRequestId\(state\.checkoutRequestId\)/);
+  assert.match(js,/sessionStorage\.setItem\(PENDING_CHECKOUT_STORAGE_KEY, value\)/);
+  assert.match(js,/sessionStorage\.removeItem\(PENDING_CHECKOUT_STORAGE_KEY\)/);
 });
 
 test("Customer order page uses server quote and preserves the exact checkout ID/body after uncertain responses", () => {
