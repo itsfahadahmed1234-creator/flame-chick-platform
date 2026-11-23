@@ -52,12 +52,12 @@
     if(!isObj(detail)||!Array.isArray(detail.component_groups)||!Array.isArray(detail.variants)||detail.variants.length!==1)throw Error('Saved deal structure could not be verified.');
     const variant=detail.variants[0]&&detail.variants[0].variant;
     if(!variant||!variant.id||variant.pricing_mode!=='FIXED_BUNDLE')throw Error('Deal must have one fixed-price variant.');
-    const options=detail.component_groups.map(doc=>{
+    const options=detail.component_groups.map((doc,index)=>{
       const group=doc&&doc.group,rows=doc&&doc.options;
       if(!group||!Array.isArray(rows)||rows.length!==1||!rows[0].id)throw Error('Each fixed component must have exactly one linked product variant.');
       const q=Number(group.min_units);
       if(!Number.isSafeInteger(q)||q<1||Number(group.max_units)!==q)throw Error('Component quantity is not fixed.');
-      return {component_option_id:rows[0].id,pricing_treatment:'INCLUDED',unit_surcharge:0,max_quantity_per_deal:q,sort_order:options.length+1,is_active:true};
+      return {component_option_id:rows[0].id,pricing_treatment:'INCLUDED',unit_surcharge:0,max_quantity_per_deal:q,sort_order:index+1,is_active:true};
     });
     if(!options.length)throw Error('Deal has no components.');
     return {deal_variant_id:variant.id,options};
