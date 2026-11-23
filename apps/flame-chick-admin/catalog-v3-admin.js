@@ -297,7 +297,7 @@
         '<button class="fcv3-button fcv3-primary" data-action="import-menu"'+(s.loading||s.saving?' disabled':'')+'>Import published menu draft</button></div></div>'+
         (s.importProgress?'<div class="fcv3-notice" role="status"><strong>'+esc(s.importProgress.phase)+'</strong> · '+esc(s.importProgress.completed)+' / '+esc(s.importProgress.total)+' · '+esc(s.importProgress.message)+'</div>':'')+
         (s.error?'<div class="fcv3-error" role="alert">'+esc(s.error)+'</div>':'')+(s.notice?'<div class="fcv3-notice" role="status">'+esc(s.notice)+'</div>':'')+
-        (s.partial?'<div class="fcv3-warning">A deal record was created but remains inactive. ID: '+esc(s.partial.id)+'. Do not create a duplicate; inspect this draft before continuing.</div>':'')+
+        (s.partial?'<div class="fcv3-warning">A deal operation stopped and the deal may remain inactive. ID: '+esc(s.partial.id)+'. Do not create a duplicate; inspect this draft before continuing.</div>':'')+
         '<div class="fcv3-summary-grid"><article><small>Menu categories</small><strong>'+s.categories.filter(c=>c.category_kind==='menu').length+'</strong></article><article><small>Products</small><strong>'+s.products.length+'</strong></article>'+
         '<article><small>Deal-only variants</small><strong>'+s.products.reduce((n,p)=>n+p.variants.filter(v=>v.is_standalone_sellable===false).length,0)+'</strong></article><article><small>Fixed deals</small><strong>'+s.deals.length+'</strong></article></div>'+
         '<div class="fcv3-toolbar"><div><h3>Products and variants</h3><p>Standalone variants require prices. Deal-only variants may be unpriced and stay out of standalone menu cards.</p></div><button class="fcv3-button fcv3-primary" data-action="product-add">+ Add product</button></div>'+
@@ -307,10 +307,10 @@
         '<div class="fcv3-toolbar"><div><h3>Deals and offers</h3><p>Each deal has its own fixed price and fixed INCLUDED component list. No selectable upgrades are enabled.</p></div><button class="fcv3-button fcv3-primary" data-action="deal-add">+ Create fixed deal</button></div>'+
         (collectionHtml||'<p class="fcv3-empty">No deal collection yet. The first deal creates the Deals category and collection.</p>')+
         (s.editor?'<div class="fcv3-editor-shell"><div class="fcv3-editor-head"><div><span class="fcv3-kicker">DRAFT EDITOR</span><h3>'+
-          (s.editor.type==='product'?(s.editor.product?'Edit product':'Add product'):s.editor.type==='category'?'Add category':'Create fixed deal')+'</h3></div><button class="fcv3-button fcv3-muted" data-action="editor-cancel">Close</button></div>'+
+          (s.editor.type==='product'?(s.editor.product?'Edit product':'Add product'):s.editor.type==='category'?(s.editor.category?'Edit category':'Add category'):(s.dealDraft&&s.dealDraft.id?'Edit fixed deal':'Create fixed deal'))+'</h3></div><button class="fcv3-button fcv3-muted" data-action="editor-cancel">Close</button></div>'+
           (s.editor.type==='product'?productForm(s.editor.product):s.editor.type==='category'?categoryForm(s.editor.category):dealForm())+'</div>':'')+
         (s.detail?'<div class="fcv3-detail"><h3>Deal inspection</h3><strong>'+esc(s.detail.deal.title)+'</strong><small>'+esc(s.detail.deal.id)+'</small>'+
-          '<div>'+s.detail.component_groups.map(g=>'<p>'+esc(g.group.name_en)+' × '+g.group.min_units+' — '+(g.options[0]?esc(g.options[0].product_name_en)+' / '+esc(g.options[0].variant_label):'No option')+'</p>').join('')+'</div>'+
+          '<div>'+s.detail.component_groups.filter(g=>g.group&&g.group.is_active).map(g=>'<p>'+esc(g.group.name_en)+' × '+g.group.min_units+' — '+(g.options[0]?esc(g.options[0].product_name_en)+' / '+esc(g.options[0].variant_label):'No option')+'</p>').join('')+'</div>'+
           '<button class="fcv3-button" data-action="deal-edit" data-id="'+esc(s.detail.deal.id)+'">Edit fixed deal</button> <button class="fcv3-button" data-action="detail-close">Close inspection</button></div>':'');
     }
     function openProduct(p){s.editor={type:'product',product:p?JSON.parse(JSON.stringify(p)):null};s.notice=null;s.error=null;render();}
