@@ -9,12 +9,44 @@
 BEGIN;
 
 DO $preflight$
+DECLARE
+  v_signature oid;
+  v_source_sha256 text;
 BEGIN
   IF current_user <> 'postgres' OR session_user <> 'postgres' THEN
     RAISE EXCEPTION 'CATALOG_DATABASE_TIME_MIGRATION_REQUIRES_POSTGRES';
   END IF;
-  IF pg_catalog.to_regprocedure('public.flame_chick_catalog_public_read(text)') IS NULL THEN
+
+  v_signature := pg_catalog.to_regprocedure('public.flame_chick_catalog_public_read(text)');
+  IF v_signature IS NULL THEN
     RAISE EXCEPTION 'CATALOG_PUBLIC_READ_RPC_MISSING';
+  END IF;
+
+  SELECT pg_catalog.encode(
+    extensions.digest(pg_catalog.convert_to(p.prosrc, 'UTF8'), 'sha256'),
+    'hex'
+  )
+  INTO v_source_sha256
+  FROM pg_catalog.pg_proc AS p
+  WHERE p.oid = v_signature;
+
+  -- Pin the exact read-RPC body that was inspected in Production. Refuse to
+  -- replace an unexpected function version or silently overwrite unrelated work.
+  IF v_source_sha256 IS DISTINCT FROM
+    '450bb2ea8671bcc581240c7af2400f49323efeef2aa3f1d2e6e5c9dbe6c919e4' THEN
+    RAISE EXCEPTION 'CATALOG_PUBLIC_READ_FUNCTION_BASELINE_MISMATCH';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_proc AS p
+    WHERE p.oid = v_signature
+      AND pg_catalog.pg_get_userbyid(p.proowner) = 'postgres'
+      AND p.prosecdef
+      AND p.proconfig IS NOT DISTINCT FROM ARRAY['search_path=""']::text[]
+      AND p.proacl::text IS NOT DISTINCT FROM '{postgres=X/postgres,service_role=X/postgres}'
+  ) THEN
+    RAISE EXCEPTION 'CATALOG_PUBLIC_READ_FUNCTION_SECURITY_BASELINE_INVALID';
   END IF;
 END;
 $preflight$;
@@ -168,6 +200,7 @@ BEGIN
       AND pg_catalog.pg_get_userbyid(p.proowner) = 'postgres'
       AND p.prosecdef
       AND p.proconfig @> ARRAY['search_path=""']
+      AND p.proacl::text = '{postgres=X/postgres,service_role=X/postgres}'
   ) THEN
     RAISE EXCEPTION 'CATALOG_PUBLIC_READ_FUNCTION_SECURITY_INVALID';
   END IF;
