@@ -120,6 +120,14 @@ test('excludes variants that are not sellable as standalone menu items', () => {
   assert.equal(result.categories[0].products[0].id, IDS.drinkProduct);
 });
 
+test('does not imply online ordering when no fulfilment method has been selected', () => {
+  const snapshot = createSnapshot();
+  const result = view.buildMenuViewModel(snapshot, {}, contract);
+  assert.equal(result.ok, true);
+  assert.equal(result.fulfilmentType, null);
+  assert.equal(result.orderingEnabled, false);
+});
+
 test('formats integer minor units with the publication currency', () => {
   const formatted = view.formatMoney(55000, 'PKR', 'en-PK');
   assert.match(formatted, /550/);
