@@ -92,8 +92,8 @@ test('current deal editor produces only fixed component groups with one linked o
 test('fixed deal mapping builder enforces INCLUDED treatment and zero surcharge only', () => {
   const detail = {
     component_groups: [
-      { group: { name_en: 'Burger', min_units: 2, max_units: 2 }, options: [{ id: '30000000-0000-4000-8000-000000000001' }] },
-      { group: { name_en: 'Cold Drink', min_units: 2, max_units: 2 }, options: [{ id: '30000000-0000-4000-8000-000000000002' }] }
+      { group: { name_en: 'Burger', min_units: 2, max_units: 2, is_active: true }, options: [{ id: '30000000-0000-4000-8000-000000000001', is_active: true }] },
+      { group: { name_en: 'Cold Drink', min_units: 2, max_units: 2, is_active: true }, options: [{ id: '30000000-0000-4000-8000-000000000002', is_active: true }] }
     ],
     variants: [{ variant: { id: '40000000-0000-4000-8000-000000000001', pricing_mode: 'FIXED_BUNDLE' } }]
   };
@@ -109,7 +109,7 @@ test('fixed deal mapping builder enforces INCLUDED treatment and zero surcharge 
 
 test('mapping builder fails closed for missing component options or non-fixed deal variants', () => {
   assert.throws(() => admin.buildIncludedMappings({
-    component_groups: [{ group: { min_units: 1, max_units: 1 }, options: [] }],
+    component_groups: [{ group: { min_units: 1, max_units: 1, is_active: true }, options: [] }],
     variants: [{ variant: { id: '40000000-0000-4000-8000-000000000001', pricing_mode: 'FIXED_BUNDLE' } }]
   }), /exactly one linked product variant/i);
 
