@@ -271,6 +271,14 @@ BEGIN
   END IF;
   partial_payment_id:=(result->>'payment_id')::uuid;
 
+  result:=public.flame_chick_collect_order_payment(jsonb_build_object(
+    'order_id',o1,'actor_user_id',cashier,'request_id',gen_random_uuid(),
+    'amount',20.001,'payment_method','cash'));
+  IF result->>'ok'<>'false' OR result#>>'{error,code}'<>'PAYMENT_AMOUNT_INVALID'
+     OR (SELECT count(*) FROM public.payments WHERE order_id=o1 AND entry_type='collection')<>1 THEN
+    RAISE EXCEPTION 'PAYMENT_AMOUNT_PRECISION_NOT_ENFORCED: %',result;
+  END IF;
+
   -- Same request ID and same payment facts return the original ledger row.
   result:=public.flame_chick_collect_order_payment(jsonb_build_object(
     'order_id',o1,'actor_user_id',cashier,'request_id',partial_request,
@@ -304,7 +312,7 @@ BEGIN
   -- ledger entries have committed in this same transaction.
   result:=public.flame_chick_collect_order_payment(jsonb_build_object(
     'order_id',o1,'actor_user_id',cashier,'request_id',full_request,
-    'amount',60,'payment_method','cash'));
+    'amount',60,'payment_method','card'));
   IF result->>'ok'<>'true' OR result->>'completed'<>'true'
      OR result->>'order_status'<>'completed'
      OR result->>'payment_status'<>'paid'
@@ -314,13 +322,14 @@ BEGIN
      OR (SELECT balance_due FROM public.orders WHERE id=o1)<>0
      OR (SELECT completed_at FROM public.orders WHERE id=o1) IS NULL
      OR (SELECT collected_at FROM public.orders WHERE id=o1) IS NULL
+     OR (SELECT payment_method_summary FROM public.orders WHERE id=o1)<>'mixed'
      OR (SELECT count(*) FROM public.payments WHERE order_id=o1 AND entry_type='collection')<>2 THEN
     RAISE EXCEPTION 'FINAL_PAYMENT_COLLECTION_DID_NOT_COMPLETE_ORDER: %',result;
   END IF;
 
   result:=public.flame_chick_collect_order_payment(jsonb_build_object(
     'order_id',o1,'actor_user_id',cashier,'request_id',full_request,
-    'amount',60,'payment_method','cash'));
+    'amount',60,'payment_method','card'));
   IF result->>'ok'<>'true' OR result->>'already_processed'<>'true'
      OR result->>'order_status'<>'completed'
      OR (SELECT count(*) FROM public.payments WHERE order_id=o1 AND entry_type='collection')<>2 THEN
@@ -395,6 +404,14 @@ BEGIN
     'action','confirm_return','delivery_task_id',t2,'actor_user_id',cashier,'request_id',gen_random_uuid()));
   IF result->>'ok'<>'true' OR result->>'already_processed'<>'true' THEN
     RAISE EXCEPTION 'RETURN_CONFIRMATION_RETRY_FAILED: %',result;
+  END IF;
+
+  result:=public.flame_chick_collect_order_payment(jsonb_build_object(
+    'order_id',o2,'actor_user_id',cashier,'request_id',gen_random_uuid(),
+    'amount',10,'payment_method','cash'));
+  IF result->>'ok'<>'false' OR result#>>'{error,code}'<>'PAYMENT_ORDER_STATE_INVALID'
+     OR EXISTS(SELECT 1 FROM public.payments WHERE order_id=o2) THEN
+    RAISE EXCEPTION 'RETURNED_ORDER_PAYMENT_COLLECTION_NOT_DENIED: %',result;
   END IF;
 
   SELECT count(*) INTO payment_count FROM public.payments WHERE order_id IN(o1,o2);
