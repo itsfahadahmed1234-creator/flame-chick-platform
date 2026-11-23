@@ -84,6 +84,40 @@ test('validates modifier selection bounds and exact variant pricing references',
   assert.ok(contract.validateSnapshot(wrongMode).errors.some(e => e.code === 'MODIFIER_PRICE_MODE_INVALID'));
 });
 
+test('allows a nullable-price non-standalone variant only when mapped into a deal', () => {
+  const included = createSnapshot();
+  included.productVariants[0].price = null;
+  included.productVariants[0].standaloneSellable = false;
+  assert.equal(contract.validateSnapshot(included).ok, true,
+    JSON.stringify(contract.validateSnapshot(included).errors));
+
+  const surcharge = createSnapshot();
+  surcharge.productVariants[0].price = null;
+  surcharge.productVariants[0].standaloneSellable = false;
+  surcharge.dealVariantComponentOptions[0].pricingTreatment = 'SURCHARGE';
+  surcharge.dealVariantComponentOptions[0].unitSurcharge = 50;
+  assert.equal(contract.validateSnapshot(surcharge).ok, true,
+    JSON.stringify(contract.validateSnapshot(surcharge).errors));
+});
+
+test('rejects standalone null prices and unmapped non-standalone variants', () => {
+  const standalone = createSnapshot();
+  standalone.productVariants[0].price = null;
+  assert.ok(contract.validateSnapshot(standalone).errors.some(e => e.code === 'STANDALONE_PRICE_REQUIRED'));
+
+  const orphan = createSnapshot();
+  orphan.productVariants[0].standaloneSellable = false;
+  orphan.dealVariantComponentOptions = [];
+  assert.ok(contract.validateSnapshot(orphan).errors.some(e => e.code === 'DEAL_ONLY_VARIANT_NOT_MAPPED'));
+
+  const standaloneTreatment = createSnapshot();
+  standaloneTreatment.productVariants[0].standaloneSellable = false;
+  standaloneTreatment.dealVariants[0].pricingMode = 'BASE_PLUS_SELECTED_ITEMS';
+  standaloneTreatment.dealVariantComponentOptions[0].pricingTreatment = 'STANDALONE';
+  assert.ok(contract.validateSnapshot(standaloneTreatment).errors.some(e => e.code === 'DEAL_ONLY_VARIANT_NOT_MAPPED'));
+  assert.ok(contract.validateSnapshot(standaloneTreatment).errors.some(e => e.code === 'STANDALONE_VARIANT_INVALID'));
+});
+
 test('validates deal pricing treatment and component limits', () => {
   const fixedStandalone = createSnapshot();
   fixedStandalone.dealVariantComponentOptions[0].pricingTreatment = 'STANDALONE';
