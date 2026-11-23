@@ -169,6 +169,9 @@ test('refuses to render without a DOM target and an explicit completion handler'
 });
 
 test('fixed single-option deal groups are preselected and locked', () => {
+  const source = require('node:fs').readFileSync(new URL('../apps/flame-chick-website/js/catalog-v3-deal-configurator.js', import.meta.url), 'utf8');
+  assert.match(source, /group\.options\.length === 1\s*\?\s*group\.name/);
+  assert.match(source, /quantity\.disabled = readOnly \|\| fixedGroup/);
   const ui = create();
   ui.selectVariant(IDS.dealVariant);
   const state = ui.getState();
