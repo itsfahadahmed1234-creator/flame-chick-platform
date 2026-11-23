@@ -354,6 +354,104 @@ assert.equal(draftRevision,revisionBeforeResume,'A fully completed retry must no
 assert.equal(writeCount,writesBeforeResume,'A fully completed retry must not issue mutation RPCs.');
 verifyDatabaseCounts(countsAfterResume);
 
+// Exercise an existing fixed deal edit through the real Admin workspace and
+// authenticated catalog RPCs. This is a no-op edit: it must preserve the exact
+// deal price, customer-facing names, variant links, Flame Hour state, and active
+// state while exercising the safe deactivate/rebuild/verify/restore sequence.
+const flameDuoDraft=draft.deals.find(item=>/flame duo/i.test(item.title));
+assert.ok(flameDuoDraft,'The authoritative draft must contain Flame Duo for edit QA.');
+const flameDuoId=psqlJson(
+  "SELECT pg_catalog.jsonb_build_object('id',id,'title',title)::text FROM public.deals " +
+  "WHERE restaurant_id=" + sqlQuote(RESTAURANT_ID) + " AND legacy_id=" +
+  sqlQuote('flame-chick:'+DRAFT_ID+':deal:'+flameDuoDraft.key) + " LIMIT 1;"
+);
+assert.ok(flameDuoId&&flameDuoId.id,'Flame Duo deal must exist in the disposable catalog.');
+const previousFormData=globalThis.FormData;
+class QaFormData {
+  constructor(form){this.values=form.values||{};}
+  get(name){return Object.hasOwn(this.values,name)?this.values[name]:null;}
+  has(name){return Object.hasOwn(this.values,name)&&this.values[name]!==false&&this.values[name]!==null;}
+}
+try{
+  globalThis.FormData=QaFormData;
+  const root={innerHTML:'',onclick:null,onchange:null,onsubmit:null};
+  const workspace=admin.createWorkspace();
+  await workspace.mount(root,request);
+  const editButton={dataset:{action:'deal-edit',id:flameDuoId.id},disabled:false};
+  await root.onclick({target:{closest(selector){assert.equal(selector,'[data-action]');return editButton;}}});
+  const editorState=workspace.getState();
+  assert.equal(editorState.editor.type,'deal');
+  assert.equal(editorState.dealDraft.id,flameDuoId.id);
+  assert.ok(editorState.components.length>0);
+  const originalDetail=await request('catalog_deal_detail_read',{deal_id:flameDuoId.id},false);
+  const originalVariant=originalDetail.variants[0].variant;
+  const originalGroups=originalDetail.component_groups.filter(doc=>doc.group.is_active===true);
+  const form={
+    dataset:{form:'deal'},
+    values:{
+      title:editorState.dealDraft.title,
+      description_en:editorState.dealDraft.description_en,
+      base_price:editorState.dealDraft.base_price,
+      flame_hour:editorState.dealDraft.flame_hour,
+      deal_available:editorState.dealDraft.is_available
+    },
+    querySelectorAll(selector){
+      assert.equal(selector,'[data-component-row]');
+      return editorState.components.map(component=>({
+        querySelector(field){
+          const values={
+            '[data-field="group_id"]':component.group_id,
+            '[data-field="option_id"]':component.option_id,
+            '[data-field="display_name"]':component.display_name,
+            '[data-field="product_id"]':component.product_id,
+            '[data-field="product_variant_id"]':component.product_variant_id,
+            '[data-field="quantity"]':String(component.quantity)
+          };
+          return Object.hasOwn(values,field)?{value:values[field]}:null;
+        }
+      }));
+    }
+  };
+  await root.onsubmit({
+    target:{closest(selector){assert.equal(selector,'form[data-form]');return form;}},
+    preventDefault(){}
+  });
+  const editedState=workspace.getState();
+  assert.match(editedState.notice,/Fixed deal changes saved, read back and verified/i,
+    'The Admin fixed-deal editor must complete its authenticated no-op edit.');
+  assert.equal(editedState.error,null);
+  const editedDetail=await request('catalog_deal_detail_read',{deal_id:flameDuoId.id},false);
+  assert.equal(editedDetail.deal.title,originalDetail.deal.title);
+  assert.equal(editedDetail.deal.is_active,originalDetail.deal.is_active);
+  assert.equal(editedDetail.deal.is_available,originalDetail.deal.is_available);
+  assert.equal(editedDetail.variants[0].variant.base_price,originalVariant.base_price);
+  assert.equal(editedDetail.variants[0].variant.is_active,originalVariant.is_active);
+  const editedGroups=editedDetail.component_groups.filter(doc=>doc.group.is_active===true);
+  assert.equal(editedGroups.length,originalGroups.length);
+  assert.deepEqual(editedGroups.map(doc=>({
+    name:doc.group.name_en,quantity:doc.group.min_units,variant:doc.options[0].product_variant_id
+  })),originalGroups.map(doc=>({
+    name:doc.group.name_en,quantity:doc.group.min_units,variant:doc.options[0].product_variant_id
+  })));
+  const activeMappings=editedDetail.variants[0].allowed_options.filter(item=>item.is_active===true);
+  assert.equal(activeMappings.length,originalGroups.length);
+  assert.ok(activeMappings.every(item=>item.pricing_treatment==='INCLUDED'&&Number(item.unit_surcharge)===0));
+} finally {
+  if(previousFormData===undefined)delete globalThis.FormData;
+  else globalThis.FormData=previousFormData;
+}
+const countsAfterAdminEdit=countsFromDatabase();
+assert.equal(Number(countsAfterAdminEdit.products),Number(countsAfterResume.products));
+assert.equal(Number(countsAfterAdminEdit.deals),Number(countsAfterResume.deals));
+assert.equal(Number(countsAfterAdminEdit.publication_rows),0);
+assert.equal(Number(countsAfterAdminEdit.active_deals),6);
+assert.equal(Number(countsAfterAdminEdit.active_deal_variants),6);
+const validationAfterAdminEdit=psqlJson(
+  "SELECT app_private.flame_chick_catalog_publication_validate(" + sqlQuote(RESTAURANT_ID) + "::uuid)::text;"
+);
+assert.equal(validationAfterAdminEdit.ok,true,'The no-op Admin edit must leave the catalog draft publication-valid: '+JSON.stringify(validationAfterAdminEdit.errors));
+assert.equal((validationAfterAdminEdit.errors||[]).length,0);
+
 console.log(JSON.stringify({
   ok:true,
   summary,
@@ -364,5 +462,8 @@ console.log(JSON.stringify({
   publicationValidationErrorCount:errors.length,
   publicationPriceErrors:errors.filter(item=>item&&['ACTIVE_VARIANT_PRICE_MISSING','DEAL_ONLY_VARIANT_NOT_MAPPED'].includes(item.code)),
   secondRunMutationCount:0,
-  databaseCounts:countsAfterResume
+  adminFixedDealEditVerified:true,
+  adminFixedDealEditMutationCount:writeCount-writesBeforeResume,
+  publicationValidationAfterAdminEdit:validationAfterAdminEdit.ok,
+  databaseCounts:countsAfterAdminEdit
 },null,2));
