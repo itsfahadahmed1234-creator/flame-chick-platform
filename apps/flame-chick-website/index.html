@@ -855,16 +855,21 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
     deliveryAreas = (Array.isArray(rows) ? rows : []).filter(function (area) {
       return area && area.Active === true && (area.ID || area.AreaID);
     }).map(function (area) {
+      var rawFee = area.Fee;
+      if (rawFee === null || rawFee === undefined || rawFee === '') rawFee = area.DeliveryFee;
+      var parsedFee = rawFee === null || rawFee === undefined || rawFee === '' ? null : Number(rawFee);
+      var fee = Number.isFinite(parsedFee) && parsedFee >= 0 ? parsedFee : null;
       return {
         id: String(area.ID || area.AreaID),
         name: String(area.AreaName || area.NameEn || area.Name || ''),
-        fee: Math.max(0, Number(area.Fee !== undefined ? area.Fee : area.DeliveryFee) || 0)
+        fee: fee
       };
     }).filter(function (area) { return area.name.length > 0; });
 
     var options = '<option value="">Choose a delivery area</option>' +
       deliveryAreas.map(function (area) {
-        return '<option value="' + esc(area.id) + '">' + esc(area.name) + ' · ' + esc(C.money(area.fee)) + '</option>';
+        var feeLabel = area.fee === null ? 'Fee not configured' : C.money(area.fee);
+        return '<option value="' + esc(area.id) + '">' + esc(area.name) + ' · ' + esc(feeLabel) + '</option>';
       }).join('') +
       '<option value="__not_listed__">Not Listed</option>';
     f.area.disabled = false;
@@ -1303,10 +1308,13 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
 
     var c = readForm();
     var errs = C.validate(c) || {};
+    var selectedAreaForCheckout = selectedDeliveryArea();
     if (c.mode !== 'Takeaway' && !c.areaChoice) {
       errs.area = 'Choose a listed delivery area or select Not Listed.';
     } else if (c.mode !== 'Takeaway' && c.areaChoice === '__not_listed__' && defaultDeliveryFee === null) {
       errs.area = 'The Not Listed default delivery fee has not been configured yet. Please contact Flame Chick.';
+    } else if (c.mode !== 'Takeaway' && selectedAreaForCheckout && !selectedAreaForCheckout.isNotListed && selectedAreaForCheckout.fee === null) {
+      errs.area = 'The delivery fee for this area has not been configured yet. Please contact Flame Chick.';
     }
     setErr('name', errs.name);
     setErr('phone', errs.phone);
