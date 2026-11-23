@@ -120,7 +120,9 @@ test("Customer order page uses server quote and preserves the exact checkout ID/
   assert.match(js,/state\.checkoutBody\.request_id = state\.checkoutRequestId/);
   assert.match(js,/var uncertain = !error\.status \|\| error\.status >= 500/);
   assert.match(js,/retry-order/);
-  assert.match(js,/return state\.checkoutUncertain/);
+  assert.match(js,/state\.checkoutUncertain = uncertain/);
+  assert.match(js,/var locked = state\.busy \|\| state\.checkoutUncertain/);
+  assert.match(js,/Retry the same checkout request to verify whether it was received/);
   assert.doesNotMatch(js,/function canEdit\(\) \{ return[^\n]*&& !\$\('order-success'\)\.hidden/);
 });
 
@@ -130,5 +132,6 @@ test("Customer order context keeps Not Listed delivery fee distinct from unconfi
   assert.match(js,/if \(!\$\('not-listed-confirm'\)\.checked\)/);
   assert.match(js,/selection_type: 'not_listed'/);
   assert.match(js,/selection_type: 'listed_area'/);
-  assert.match(js,/current database branch settings/);
+  assert.match(js,/branch && branch\.notListedDeliveryFee !== null/);
+  assert.match(js,/other\.disabled = !branch \|\| branch\.notListedDeliveryFee === null/);
 });
