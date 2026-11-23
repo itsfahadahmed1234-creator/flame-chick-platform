@@ -1410,6 +1410,347 @@ async function flameChickDeliveryRequest(method,query,body){
   if(!r.ok||data.ok===false)throw new Error(data?.error?.message||'Flame Chick delivery request failed.');
   return data;
 }
+async function loadDeliveryDispatch(){
+  const role=String(flameChickStaffProfile?.role||'').toLowerCase();
+  if(!['owner','admin','manager','cashier'].includes(role)||!flameChickStaffProfile?.branch_id){
+    deliveryTasksByOrder.clear();dispatchRiders=[];return;
+  }
+  const branchId=String(flameChickStaffProfile.branch_id);
+  const response=await flameChickDeliveryRequest('GET',{view:'dispatch'});
+  const data=response&&response.data?response.data:{};
+  const tasks=Array.isArray(data.tasks)?data.tasks:[];
+  const riders=Array.isArray(data.riders)?data.riders:[];
+  deliveryTasksByOrder=new Map(tasks.map(task=>[String(task.order_id),task]));
+  dispatchRiders=riders;
+}
+function riderNameFor(userId){
+  const rider=dispatchRiders.find(x=>String(x.user_id)===String(userId));
+  return rider?.display_name||rider?.rider_code||'Assigned rider';
+}
+function dispatchStatusLabel(status){
+  return ({dispatch_pending:'Awaiting rider',offering:'Offering to riders',assigned:'Assigned · awaiting response',accepted:'Accepted by rider',arrived_at_restaurant:'Rider at restaurant',picked_up:'Picked up',out_for_delivery:'Out for delivery',delivered:'Delivered',failed:'Delivery issue',cancelled:'Cancelled'})[String(status||'')]||String(status||'Dispatch pending');
+}
+function ensureDeliveryAcceptanceTicker(){
+  if(deliveryAcceptanceTicker)return;
+  deliveryAcceptanceTicker=setInterval(()=>{
+    const nodes=[...document.querySelectorAll('[data-pos-acceptance-deadline]')];
+    nodes.forEach(el=>{
+      const deadline=Date.parse(el.dataset.posAcceptanceDeadline||'');
+      const left=Number.isFinite(deadline)?Math.max(0,Math.ceil((deadline-Date.now())/1000)):0;
+      el.textContent=left>0?left+'s left':'Time elapsed';
+      el.classList.toggle('expired',left===0);
+    });
+    if(!nodes.length){clearInterval(deliveryAcceptanceTicker);deliveryAcceptanceTicker=null;}
+  },500);
+}
+function renderDeliveryDispatchAction(order){
+  const task=deliveryTasksByOrder.get(String(order.OrderID));
+  if(!task)return '<span class="pill pending">Checking dispatch…</span>';
+  const assignments=Array.isArray(task.delivery_assignments)?task.delivery_assignments:[];
+  const latest=[...assignments].sort((a,b)=>new Date(b.assigned_at||b.created_at||0)-new Date(a.assigned_at||a.created_at||0))[0]||null;
+  const activeStatuses=['assigned','accepted','arrived_at_restaurant','picked_up','out_for_delivery'];
+  const current=assignments.find(x=>x.is_current===true&&activeStatuses.includes(String(x.status||'')))||null;
+  const role=String(flameChickStaffProfile?.role||'').toLowerCase();
+  if(task.status==='failed'){
+    const name=riderNameFor((current||latest)?.rider_user_id);
+    const reported=Boolean(task.return_reported_at);
+    const confirmed=Boolean(task.return_confirmed_at);
+    const manager=['owner','admin','manager'].includes(role);
+    const confirmButton=reported&&!confirmed&&manager
+      ? `<button class="issue-action" type="button" data-confirm-return="${esc(task.id)}">Confirm return &amp; cancel order</button>`
+      : '';
+    const wait=confirmed?'Return confirmed and order cancelled.':reported?'Rider says the order has been returned. Please physically check the handover before confirming.':'Waiting for rider to return the order and report handover.';
+    return `<div class="delivery-issue-alert"><strong>⚠ Delivery issue reported · ${esc(name)}</strong><span><b>Reason:</b> ${esc(task.failure_reason||'Reason not recorded')}</span><span class="issue-meta"><b>Reported:</b> ${task.failed_at?new Date(task.failed_at).toLocaleString('en-PK',{dateStyle:'medium',timeStyle:'short'}):'Time unavailable'}</span><span class="issue-wait">${esc(wait)}</span>${confirmButton}</div>`;
+  }
+  if(task.status==='dispatch_pending'||task.status==='offering'){
+    if(['owner','admin','manager','cashier'].includes(role)){
+      const declined=latest&&latest.status==='reassigned'&&latest.is_current!==true
+        ? `<small class="dispatch-last-offer">${esc(riderNameFor(latest.rider_user_id))} ${String(latest.end_reason||'').startsWith('No response within 60 seconds')?'did not respond · assignment expired':latest.accepted_at?'released the assignment before pickup':'declined the offer'}${latest.end_reason?' · '+esc(latest.end_reason):''}</small>`
+        : '';
+      return `<div class="dispatch-pending-wrap">${task.status==='offering'?'<small class="dispatch-offer-note">Offers sent to all online, available riders · first acceptance wins</small>':''}<button class="btn primary dispatch-assign-btn" type="button" data-assign-rider="${esc(order.OrderID)}">${task.status==='offering'?'Manual override · Assign rider':'Assign rider'}</button>${declined}</div>`;
+    }
+    return '<span class="pill pending">Ready for rider dispatch</span>';
+  }
+  if(current){
+    const name=riderNameFor(current.rider_user_id);
+    if(current.status==='assigned'&&!current.accepted_at){
+      const assignedAt=Date.parse(current.assigned_at||'');
+      const deadline=Number.isFinite(assignedAt)?new Date(assignedAt+60000).toISOString():'';
+      const reassignmentButton=['owner','admin','manager','cashier'].includes(role)
+        ? `<button class="btn primary dispatch-assign-btn" type="button" data-assign-rider="${esc(order.OrderID)}">Reassign rider</button>`
+        : '';
+      const html=`<div class="dispatch-pending-wrap"><span class="dispatch-rider-pill">${esc(name)} · Awaiting acceptance <b class="pos-acceptance-countdown" data-pos-acceptance-deadline="${esc(deadline)}">60s left</b></span>${reassignmentButton}</div>`;
+      setTimeout(ensureDeliveryAcceptanceTicker,0);
+      return html;
+    }
+    return `<span class="dispatch-rider-pill">${esc(name)} · ${esc(dispatchStatusLabel(current.status))}</span>`;
+  }
+  return `<span class="pill pending">${esc(dispatchStatusLabel(task.status))}</span>`;
+}
+async function confirmDeliveryReturn(taskId,button){
+  const role=String(flameChickStaffProfile?.role||'').toLowerCase();
+  if(!['owner','admin','manager'].includes(role)){showToast('Only an Flame Chick manager, admin or owner can confirm a returned delivery.');return;}
+  const task=[...deliveryTasksByOrder.values()].find(x=>String(x.id)===String(taskId));
+  if(!task||task.status!=='failed'||!task.return_reported_at){showToast('The rider has not yet reported the return.');return;}
+  if(button)button.disabled=true;
+  try{
+    await flameChickDeliveryRequest('POST',null,{action:'confirm_return',delivery_task_id:taskId});
+    await loadInitialOnlineInbox();
+    showToast('Returned order cancelled. Rider is now available.');
+  }catch(e){showToast(e?.message||'Could not confirm the returned delivery.');if(button)button.disabled=false;}
+}
+async function openRiderAssignment(orderId){
+  const key=String(orderId||'');
+  try{
+    $('assignRiderBody').innerHTML='<div class="empty">Checking who is online…</div>';
+    openModal('assignRiderModal');
+    await loadDeliveryDispatch();
+  }catch(error){
+    closeModal('assignRiderModal');
+    showToast(error?.message||'Could not refresh rider availability.');
+    return;
+  }
+  const task=deliveryTasksByOrder.get(key);
+  const order=inboxOrders.get(key);
+  if(!task||!order){closeModal('assignRiderModal');showToast('Dispatch details are not loaded yet. Refresh and try again.');return;}
+  const taskAssignments=Array.isArray(task.delivery_assignments)?task.delivery_assignments:[];
+  const currentAssignment=taskAssignments.find(x=>x.is_current===true)||null;
+  const reassignPending=task.status==='assigned'&&currentAssignment?.status==='assigned'&&!currentAssignment.accepted_at;
+  if(!['dispatch_pending','offering'].includes(task.status)&&!reassignPending){closeModal('assignRiderModal');showToast('This delivery is no longer awaiting rider assignment.');return;}
+  $('assignRiderTitle').textContent=(reassignPending?'Reassign rider · ':'Assign rider · ')+(order.OrderNumber||'Flame Chick order');
+  $('assignRiderSubtitle').textContent=(reassignPending?'Current rider: '+riderNameFor(currentAssignment.rider_user_id)+' · choose a replacement':'Choose an online rider')+' · '+(order.CustomerName||'Customer')+' · '+(order.Area||'Delivery')+' · Rs. '+money(order.Total);
+  const now=Date.now();
+  const available=dispatchRiders.filter(r=>{
+    const seen=Date.parse(r.last_seen_at||'');
+    const fresh=Number.isFinite(seen)&&(now-seen)>=-15000&&(now-seen)<=240000;
+    return r.is_active===true&&r.accepting_jobs===true&&r.availability_status==='available'&&fresh;
+  });
+  $('assignRiderBody').innerHTML=available.length?available.map(r=>`<button type="button" class="dispatch-rider-option" data-rider-user="${esc(r.user_id)}"><span><strong>${esc(r.display_name||r.rider_code||'Flame Chick Rider')}</strong><small>${esc(r.phone||r.rider_code||'Online now')}</small></span><span class="pill synced">Online · Available</span></button>`).join(''):'<div class="dispatch-no-riders"><strong>No riders are currently online and available</strong><p>Ask the rider to open the Flame Chick Rider Portal and keep it online. Riders on an active delivery remain busy, and profiles without a recent heartbeat are not offered.</p></div>';
+  $('assignRiderBody').onclick=async e=>{
+    const btn=e.target.closest('[data-rider-user]');if(!btn||btn.disabled)return;
+    await assignRiderToOrder(key,btn.dataset.riderUser,btn);
+  };
+}
+async function assignRiderToOrder(orderId,riderUserId,button){
+  if(deliveryAssignInProgress)return;
+  const task=deliveryTasksByOrder.get(String(orderId));
+  if(!task)return;
+  deliveryAssignInProgress=true;
+  if(button){button.disabled=true;button.setAttribute('aria-busy','true');}
+  try{
+    const assignments=Array.isArray(task.delivery_assignments)?task.delivery_assignments:[];
+    const current=assignments.find(x=>x.is_current===true)||null;
+    const pendingReassignment=task.status==='assigned'&&current?.status==='assigned'&&!current.accepted_at;
+    await flameChickDeliveryRequest('POST',null,{action:'assign',delivery_task_id:task.id,rider_user_id:riderUserId});
+    closeModal('assignRiderModal');
+    await loadInitialOnlineInbox();
+    showToast(pendingReassignment?'Delivery reassigned. The new rider has 60 seconds to accept.':'Rider assigned. They have 60 seconds to accept. The order stays Ready until pickup.');
+  }catch(e){
+    showToast(e?.message||'Rider assignment failed.');
+    if(button){button.disabled=false;button.removeAttribute('aria-busy');}
+  }finally{deliveryAssignInProgress=false;}
+}
+
+function flameChickNormalizeOrder(row){
+  const items=(row.order_items||[]).map(it=>{
+    const mods=(it.order_item_modifiers||[]).map(m=>m.modifier_name_snapshot+(Number(m.unit_price_snapshot)>0?' (+Rs. '+money(m.unit_price_snapshot)+')':''));
+    const comps=(it.order_item_components||[]).map(c=>c.name_snapshot+(c.variant_snapshot?' '+c.variant_snapshot:'')+(c.volume_snapshot?' '+c.volume_snapshot:''));
+    const name=it.product_name_snapshot||it.deal_title_snapshot||'Order item';
+    const variantLabel=String(it.variant_label_snapshot||'').trim();
+    // The default REGULAR price row is internal; show only genuine options like sizes or piece counts.
+    const variant=/^regular$/i.test(variantLabel)?'':(variantLabel?' ('+variantLabel+')':'');
+    return {itemName:name+variant+(mods.length?' — '+mods.join(', '):''),quantity:Number(it.quantity)||1,price:Number(it.unit_price_snapshot)||0,lineTotal:Number(it.line_total)||0,description:[...mods,...comps].join(', '),contents:[...mods,...comps]};
+  });
+  const statusMap={new:'Pending',accepted:'Accepted',preparing:'Preparing',ready:'Ready','out_for_delivery':'Out for Delivery',delivered:'Delivered',collected:'Collected',served:'Served',completed:'Completed',rejected:'Rejected',cancelled:'Cancelled'};
+  return {OrderID:row.id,OrderNumber:row.order_number,DateTime:row.created_at||row.placed_at,UpdatedAt:row.updated_at,OrderSource:row.source,LocalOrderID:row.local_order_id||'',Status:statusMap[row.status]||row.status,CustomerName:row.customer_name,Phone:row.customer_phone,Address:row.delivery_address||'',Area:row.delivery_area_name_snapshot||'',FulfillmentType:row.fulfillment_type==='delivery'?'Delivery':row.fulfillment_type==='dine_in'?'Dine-in':'Takeaway',PaymentMethod:row.payment_method_summary,PaymentStatus:row.payment_status,Notes:row.notes,Subtotal:Number(row.subtotal)||0,DeliveryFee:Number(row.delivery_fee)||0,Total:Number(row.total)||0,items,itemsReady:true,raw:row};
+}
+
+let recoveryInFlight=new Set();
+const $=id=>document.getElementById(id);
+const money=n=>(Number(n)||0).toLocaleString('en-PK',{maximumFractionDigits:0});
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+function showToast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(showToast.t);showToast.t=setTimeout(()=>el.classList.remove('show'),2200)}
+let receiptEditContext=null;
+let dineInMode='immediate';
+let arrivalOffsetMin=0;
+let customArrivalISO=null;
+let kitchenTiming='now';
+let defaultPrepMinutes=30;
+let printSettings={counterEnabled:true,kitchenEnabled:false,counterLabel:'Counter Receipt',kitchenLabel:'Kitchen KOT'};
+let scheduledCheckTimer=null;
+function closeModal(id){$(id)?.classList.remove('open');if(id==='choiceModal'){posPizzaChoice=null;posModifierChoice=null;posDealChoice=null}}
+function openModal(id){$(id)?.classList.add('open')}
+function applyPrintSettings(){
+  const ce=$('counterEnabled');if(ce)ce.checked=printSettings.counterEnabled;
+  const ke=$('kitchenEnabled');if(ke)ke.checked=printSettings.kitchenEnabled;
+  const cl=$('counterLabel');if(cl)cl.value=printSettings.counterLabel;
+  const kl=$('kitchenLabel');if(kl)kl.value=printSettings.kitchenLabel;
+}
+function printOnlineOrderReceipt(order){
+  if(!order)return;
+  if(!printSettings.counterEnabled&&!printSettings.kitchenEnabled){showToast('All printing destinations are disabled. Enable one in System settings.');return false;}
+  const hasItems=Array.isArray(order.items)&&order.items.length>0;
+  const o={serverOrderId:order.OrderID||order.serverOrderId||'',customerName:order.CustomerName||order.customerName||'',phone:order.Phone||order.phone||'',address:order.Address||order.address||'',area:order.Area||order.area||'',fulfillmentType:order.FulfillmentType||order.fulfillmentType||'Delivery',paymentMethod:order.PaymentMethod||order.paymentMethod||'Cash',paymentStatus:order.PaymentStatus||order.paymentStatus||'',notes:order.Notes||order.notes||'',items:hasItems?order.items.map(it=>({itemName:it['Item Name']||it.ItemName||it.itemName||it.name||'Item',quantity:Number(it.Quantity??it.quantity)||1,price:Number(it.Price??it.price)||0,lineTotal:Number(it['Line Total']??it.LineTotal??it.lineTotal)||0,description:it.Description||it.description||'',contents:Array.isArray(it.contents)?it.contents:[]})):[]};
+  const subtotal=o.items.reduce((s,it)=>s+(it.lineTotal||it.price*it.quantity||0),0);
+  o.subtotal=Number(order.Subtotal||order.subtotal)||subtotal;
+  o.deliveryFee=Number(order.DeliveryFee||order.deliveryFee)||0;
+  o.discount=Number(order.Discount||order.discount)||0;
+  o.total=Number(order.Total||order.total)||o.subtotal+o.deliveryFee-o.discount;
+  o.createdAt=order.DateTime||order.createdAt||new Date().toISOString();
+  showPrintPreview(o);
+}
+let _pendingPrintOrder=null;
+function showPrintPreview(o){
+  _pendingPrintOrder=o;
+  $('printPreviewBody').innerHTML=buildReceiptHtml(o);
+  const dests=[];
+  if(printSettings.counterEnabled)dests.push(printSettings.counterLabel);
+  if(printSettings.kitchenEnabled)dests.push(printSettings.kitchenLabel);
+  $('printPreviewSub').textContent=dests.length?`Printing to: ${dests.join(' + ')}`:'No destinations enabled';
+  $('printPreviewConfirmBtn').onclick=()=>{closeModal('printPreviewModal');doPrintOrder(_pendingPrintOrder);_pendingPrintOrder=null;};
+  openModal('printPreviewModal');
+}
+function doPrintOrder(o){
+  if(!o)return;
+  let printed=false;
+  if(printSettings.counterEnabled){printed=printReceiptWithLabel(o,printSettings.counterLabel)||printed;}
+  if(printSettings.kitchenEnabled){printed=printReceiptWithLabel(o,printSettings.kitchenLabel)||printed;}
+  return printed;
+}
+function printReceiptWithLabel(o,label){
+  const receiptHtml=`<div style="font-family:Arial,Segoe UI,sans-serif;font-size:11px;color:#111;width:72mm;padding:5mm 4mm;box-sizing:border-box">
+    <div style="text-align:center;font-size:19px;font-weight:900">Flame Chick</div>
+    <div style="text-align:center;font-size:9px;color:#444;margin-top:2px">${esc(label||'Receipt')}</div>
+    <div style="border-top:1px dashed #777;margin:9px 0"></div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:4px 8px;font-size:11px">
+      <span>Order</span><strong style="text-align:right;overflow-wrap:anywhere">${esc(o.serverOrderId)}</strong>
+      <span>Date</span><strong style="text-align:right">${esc(new Date(o.createdAt).toLocaleDateString())}</strong>
+      <span>Time</span><strong style="text-align:right">${esc(new Date(o.createdAt).toLocaleTimeString())}</strong>
+      <span>Type</span><strong style="text-align:right">${esc(o.fulfillmentType)}</strong>
+      <span>Payment</span><strong style="text-align:right">${esc(o.paymentMethod)}</strong>
+      ${o.customerName?`<span>Customer</span><strong style="text-align:right">${esc(o.customerName)}</strong>`:''}
+      ${o.phone?`<span>Phone</span><strong style="text-align:right">${esc(o.phone)}</strong>`:''}
+      ${o.address?`<span>Address</span><strong style="text-align:right">${esc(o.address)}</strong>`:''}
+      ${o.area?`<span>Area</span><strong style="text-align:right">${esc(o.area)}</strong>`:''}
+    </div>
+    <div style="border-top:1px dashed #777;margin:9px 0"></div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 22px 58px;gap:4px;font-weight:900;font-size:9px;color:#444"><span>ITEM</span><span>QTY</span><span style="text-align:right">AMOUNT</span></div>
+    ${o.items.map(it=>`<div style="display:grid;grid-template-columns:minmax(0,1fr) 22px 58px;gap:4px;margin:4px 0;font-size:11px"><span>${esc(it.itemName)}</span><span style="text-align:center">${it.quantity}</span><span style="text-align:right;font-weight:700">Rs. ${money(it.lineTotal||it.price*it.quantity)}</span></div>`).join('')}
+    <div style="border-top:1px dashed #777;margin:8px 0;padding-top:6px;display:grid;gap:4px;font-size:11px">
+      <div style="display:flex;justify-content:space-between"><span>Subtotal</span><strong>Rs. ${money(o.subtotal)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Delivery</span><strong>Rs. ${money(o.deliveryFee)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Discount</span><strong>Rs. ${money(o.discount)}</strong></div>
+      <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:900;margin-top:3px"><span>TOTAL</span><strong>Rs. ${money(o.total)}</strong></div>
+    </div>
+    ${o.notes?`<div style="margin-top:8px;border:1px solid #bbb;padding:5px;font-size:11px"><strong>Note:</strong> ${esc(o.notes)}</div>`:''}
+    <div style="text-align:center;font-size:9px;color:#555;margin-top:10px;line-height:1.35">Thank you for ordering from Flame Chick</div>
+  </div>`;
+  const area=$('printArea');
+  area.innerHTML=receiptHtml;
+  window.print();
+  setTimeout(()=>{area.innerHTML='';},1000);
+  return true;
+}
+
+function openDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,DB_VERSION);req.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains(STORES.settings))d.createObjectStore(STORES.settings,{keyPath:'key'});if(!d.objectStoreNames.contains(STORES.menu))d.createObjectStore(STORES.menu,{keyPath:'ID'});if(!d.objectStoreNames.contains(STORES.categories))d.createObjectStore(STORES.categories,{keyPath:'ID'});if(!d.objectStoreNames.contains(STORES.deliveryAreas))d.createObjectStore(STORES.deliveryAreas,{keyPath:'ID'});if(!d.objectStoreNames.contains(STORES.orders))d.createObjectStore(STORES.orders,{keyPath:'localOrderId'});if(!d.objectStoreNames.contains(STORES.queue))d.createObjectStore(STORES.queue,{keyPath:'localOrderId'});if(!d.objectStoreNames.contains(STORES.statusQueue))d.createObjectStore(STORES.statusQueue,{keyPath:'key'});if(!d.objectStoreNames.contains(STORES.tables))d.createObjectStore(STORES.tables,{keyPath:'id'});if(!d.objectStoreNames.contains(STORES.catalog))d.createObjectStore(STORES.catalog,{keyPath:'key'});};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)} )}
+function tx(store,mode='readonly'){return db.transaction(store,mode).objectStore(store)}
+function put(store,value){return new Promise((res,rej)=>{const r=tx(store,'readwrite').put(value);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
+function get(store,key){return new Promise((res,rej)=>{const r=tx(store).get(key);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+function all(store){return new Promise((res,rej)=>{const r=tx(store).getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error)})}
+function clearStore(store){return new Promise((res,rej)=>{const r=tx(store,'readwrite').clear();r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
+function del(store,key){return new Promise((res,rej)=>{const r=tx(store,'readwrite').delete(key);r.onsuccess=()=>res();r.onerror=()=>rej(r.error)})}
+
+
+
+const ONLINE_ORDER_MAX_AGE_DAYS=1;
+const SYNC_RETRY_BASE_MS=10000;
+const SYNC_BATCH_SIZE=20;
+const SYNC_RETRY_MAX_MS=120000;
+let syncRetryTimer=null;
+function localDayStart(date){const d=new Date(date);return new Date(d.getFullYear(),d.getMonth(),d.getDate())}
+function isRecentWebsiteOrder(o){if(!isWebsiteOrder(o))return false;const ms=Date.parse(String(o.DateTime??o.CreatedAt??''));return !Number.isFinite(ms)||((Date.now()-ms)<=30*86400000);}
+function getOnlineInboxStartCursor(){const d=new Date();d.setDate(d.getDate()-ONLINE_ORDER_MAX_AGE_DAYS);d.setHours(0,0,0,0);return d.toISOString()}
+function pruneInboxOrders(){for(const [key,o] of inboxOrders){if(!isRecentWebsiteOrder(o))inboxOrders.delete(key)}}
+function isWebsiteOrder(o){return !!o&&typeof o==='object'&&!!(o.OrderID||o.orderId);}
+
+function orderChangeTime(o){
+  const raw=o?.UpdatedAt ?? o?.updatedAt ?? o?.DateTime ?? o?.CreatedAt ?? '';
+  const ms=Date.parse(raw);
+  return Number.isFinite(ms)?ms:0;
+}
+function mergeInboxOrder(o){
+  if(!o || !isRecentWebsiteOrder(o)) return;
+  const key=String(o.OrderID ?? o.orderId ?? '').trim();
+  if(!key) return;
+  const existing=inboxOrders.get(key);
+  const merged=existing ? {...existing,...o} : {...o};
+  if((!Array.isArray(o.items)||!o.items.length) && Array.isArray(existing?.items)&&existing.items.length) merged.items=existing.items;
+  if(!merged.Status && existing?.Status) merged.Status=existing.Status;
+  inboxOrders.set(key,merged);
+}
+async function recoverOrderItems(orderId){
+  if(FLAME_CHICK_ORDER_API_READY)return;
+  const key=String(orderId||'').trim();
+  if(!key) return;
+  if(recoveryAttemptedOrders.has(key)) return;
+  if(recoveryInFlight.has(key)) return;
+  recoveryAttemptedOrders.add(key);
+  recoveryInFlight.add(key);
+  try{
+    const res=await fetchJSON(API_URL+'?action=order&orderId='+encodeURIComponent(key)+'&key='+encodeURIComponent(STAFF_API_KEY),{timeoutMs:12000});
+    const order=res?.order;
+    if(!order) return;
+    const serverItems=Array.isArray(order.items)?order.items:[];
+    if(!serverItems.length) return;
+    const existing=inboxOrders.get(key);
+    if(!existing) return;
+    const merged={...existing,items:serverItems};
+    if(order.itemsReady!==undefined) merged.itemsReady=order.itemsReady;
+    if(order.expectedItems!==undefined) merged.expectedItems=order.expectedItems;
+    if(order.actualItems!==undefined) merged.actualItems=serverItems.length;
+    inboxOrders.set(key,merged);
+    renderKanban();
+  }catch(e){
+    console.debug('item recovery failed for',key,e.message);
+    recoveryAttemptedOrders.delete(key);
+  }finally{
+    recoveryInFlight.delete(key);
+  }
+}
+async function compactStatusQueue(){
+  const rows=await all(STORES.statusQueue);
+  const latest=new Map();
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];
+    const orderId=String(r?.orderId||'').trim();
+    const status=String(r?.status||'').trim();
+    if(!orderId||!status) continue;
+    const ts=Date.parse(String(r?.createdAt||r?.updatedAt||''));
+    const score=Number.isFinite(ts)?ts:i;
+    const prev=latest.get(orderId);
+    if(!prev || score>=prev.__score) latest.set(orderId,{...r,orderId,status,createdAt:r.createdAt||new Date().toISOString(),__score:score});
+  }
+  for(const r of rows){
+    try{await del(STORES.statusQueue,r.key)}catch(e){}
+  }
+  const cleaned=[];
+  for(const r of latest.values()){
+    // Preserve a unique queue key. An in-flight request for an older status must
+    // never be allowed to delete or overwrite a newer status queued meanwhile.
+    const uniqueKey=String(r.key||'').trim() || (r.orderId+'::'+Date.now()+'::'+Math.random().toString(36).slice(2,8));
+    const clean={key:uniqueKey,orderId:r.orderId,status:r.status,createdAt:r.createdAt,previous:r.previous||''};
+    try{await put(STORES.statusQueue,clean); cleaned.push(clean)}catch(e){}
+  }
+  return cleaned;
+}
+async function loadStatusOverrides(){
+  try{
+    pendingOrderStatus.clear();
+    const rows=await compactStatusQueue();
+    for(const r of rows){ if(r?.orderId && r?.status) pendingOrderStatus.set(String(r.orderId),String(r.status)); }
+  }catch(e){ console.debug('status overrides load skipped',e.message); }
+}
+
 function normalizeNewOrdersResponse(res){
   if(Array.isArray(res)) return {orders:res,nextCursor:'',hasMore:false,signalVersion:''};
   if(res && Array.isArray(res.orders)) return res;
