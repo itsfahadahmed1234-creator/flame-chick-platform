@@ -570,5 +570,5 @@
     }
     return {mount:async(element,requestFn)=>{if(!element||typeof requestFn!=='function')throw Error('Catalog V3 workspace requires a root and authenticated request handler.');el=element;request=requestFn;bind();await refresh();},refresh,getState:()=>JSON.parse(JSON.stringify(s))};
   }
-  return {READ,WRITE,normalizeProductDraft,buildFixedComponentGroups,buildIncludedMappings,verifyFixedDealDetail,createWorkspace};
+  return {READ,WRITE,normalizeProductDraft,buildFixedComponentGroups,buildIncludedMappings,buildFixedDealEditDraft,verifyFixedDealDetail,createWorkspace};
 });
