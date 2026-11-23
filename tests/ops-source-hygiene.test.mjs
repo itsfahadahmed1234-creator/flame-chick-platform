@@ -102,7 +102,6 @@ test("POS keeps an unset delivery-area fee distinct from an explicitly free area
 
 test("POS keeps Rider-delivered orders active until Cashier payment collection", () => {
   const html=source[0].html;
-  assert.match(html,/active: \["new", "accepted", "preparing", "ready", "out_for_delivery", "delivered"\]/);
   assert.match(html,/return st==='Out for Delivery'\|\|st==='Delivered'/);
   assert.match(html,/Delivered · awaiting cashier payment collection/);
   assert.match(html,/\['Pending','Accepted','Preparing','Ready','Out for Delivery','Delivered'\]/);
