@@ -19,6 +19,7 @@ on:
       - "tests/local-catalog-preview-fixture.test.mjs"
       - "scripts/local-catalog-preview-fixture.mjs"
       - "supabase/migrations/20261122174500_flame_chick_catalog_database_time_metadata_v1.sql"
+      - "supabase/migrations/20261123150000_flame_chick_deal_only_variant_pricing_v1.sql"
       - "tests/fixtures/catalog-v3-fixture.cjs"
       - ".github/workflows/ci-website-static.yml"
 
