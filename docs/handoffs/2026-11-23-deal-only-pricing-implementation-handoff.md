@@ -44,15 +44,59 @@ Implement the existing linked product/variant deal model. Do not create a text-o
 - The configurator emits IDs and quantities, not a browser-calculated total. The current fixed groups remain auto-selected and locked. No optional selector has been introduced.
 - Current menu data still must use fixed component groups and `INCLUDED` mappings only.
 
-## Verification status / next steps
+## Verification status — passed in disposable CI (2026-11-23)
 
-**Not yet verified as passing.** The source commits and regression fixtures have been created, but a complete CI/local disposable migration-chain run has not been confirmed in this handoff. Do not describe this implementation as production-ready until:
-1. Run the full website static checks and contract/deal/view tests.
-2. Run the complete local Supabase migration chain from an empty disposable database.
-3. Run `supabase/tests/catalog_publication_validation_fixes_v1.sql` and the existing forward-compensation/recovery fixture; verify the migration ledger and test tenant are clean.
-4. Review the final SQL diff, including function owner, SECURITY DEFINER, empty search_path and ACL preservation.
-5. Review the final snapshot shape and ensure nullable variant price is only allowed for correctly mapped non-standalone variants.
-6. Update all project handoffs with final CI run IDs/results.
+<badge>Verified</badge> Source implementation and database QA are now passing on `work/production-source-audit`.
+
+### Final automated checks
+
+- **Website Static Checks:** [run 45128810592](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45128810592), head `c03a08c152013cd6f73715809294adb4db52cab7`, success.
+  - JavaScript syntax checks passed.
+  - Core catalog contract/client/view/deal-view/configurator/branch/time tests passed.
+  - Preview regression tests passed.
+  - Inline website and preview scripts parsed successfully.
+- **Disposable Supabase migration-chain QA:** [run 45128650772](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45128650772), head `2d1ffdbb1452016a7f5605ca5bfd90dc2c98bbc1`, success.
+  - Full migration history applied to a fresh local disposable Supabase stack.
+  - Deal-only nullable-price publication fixture passed.
+  - Standalone NULL-price rejection passed.
+  - Future-only explicit `SURCHARGE` compatibility check passed, with the mapping restored to `INCLUDED` before fixture completion.
+  - Snapshot compiler serialized the deal-only `price: null` and `standaloneSellable: false` correctly.
+  - Unmapped non-standalone variant was rejected.
+  - Forward compensation restored the original validator/compiler source hashes and preserved helper security metadata.
+  - Test tenant was rolled back/absent and the migration ledger count matched the complete migration file count.
+  - Disposable Supabase stack shut down successfully.
+
+### Source implementation
+
+- `supabase/migrations/20261123150000_flame_chick_deal_only_variant_pricing_v1.sql`
+  - Uses exact pre-migration validator/compiler source hashes from the post-2026-11-22 baseline.
+  - Preflights both helpers' security metadata before replacement.
+  - Keeps active standalone-sellable variants price-required.
+  - Requires every active non-standalone variant to be mapped by an active deal option and active deal-variant mapping.
+  - Allows that deal-only mapping to use `INCLUDED` now or explicit `SURCHARGE` as future-only compatibility. No current menu choice is configured as surcharge.
+- `apps/flame-chick-website/js/catalog-v3.js`
+  - Snapshot schema accepts nullable variant price, but rejects NULL for standalone-sellable variants and rejects non-standalone variants without a valid active INCLUDED/SURCHARGE deal mapping or with only STANDALONE treatment.
+- `supabase/tests/catalog_publication_validation_fixes_v1.sql`
+  - Rollback-only fixture covers mapped deal-only NULL price, explicit future surcharge mapping, standalone NULL-price rejection, snapshot serialization and orphan rejection.
+- `tests/catalog-v3-contract.test.mjs`, `tests/catalog-v3-view.test.mjs`, `tests/catalog-v3-deal-view.test.mjs`
+  - Cover nullable deal-only snapshot validation, standalone exclusion from the menu, fixed deal price independence from the component's normal product price and deal popup resolution of NULL-priced included components.
+- `ops/recovery-migrations/catalog-publication-validation-restore-v1.sql`
+  - Updated its source-hash guard to recognize this new candidate validator; the restored end state still verifies the previous validator/compiler source hashes.
+- `.github/workflows/qa-catalog-publication-validation-fixes-v1.yml`
+  - Includes the recovery-script path in its trigger and checks the reviewed candidate hash.
+
+### Confirmed current menu rule
+
+All currently published deal components remain fixed and use `INCLUDED`; each deal uses its own single printed `base_price`. The future `SURCHARGE` compatibility is not a current customer selector and must not be configured in the six current deals. Generic Burger is a separate deal-only product (not OG Crunch); OG Crunch is used as a named standalone product only in Little Crunch.
+
+## Remaining implementation stages
+
+1. Prepare a reviewed V3 catalog draft/import package for the standalone menu and all six fixed deals, including the deal-only Burger, Classic Nuggets (6 pcs), Fries, Juice and 1L Drink records. Do not seed Production.
+2. Build/integrate the Admin catalog authoring surface with the new secured V3 catalog command API. The existing `apps/flame-chick-admin/app.js` still references legacy `deal_components`/`bundle_price` paths and required product-price inputs; do not treat that legacy UI as the V3 deal-only catalog editor.
+3. Add an end-to-end synthetic snapshot/preview fixture for all six actual deals and verify exact IDs, quantities, fixed prices, generic Burger display vs OG Crunch, Flame Hour schedule and read-only behavior.
+4. Separately implement and test The Smash's required product detail popup before any storefront cutover.
+5. Only after separate review/approval may a production migration be applied, catalog draft rows entered, a catalog published, or any deployment/checkout activation be considered.
+
 
 ## Production boundary
 
