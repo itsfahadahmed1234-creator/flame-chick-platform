@@ -1,3 +1,26 @@
+# LATEST VERIFIED CHECKPOINT — 2026-11-23: production integration audit complete
+
+**Detailed audit:** [docs/handoffs/2026-11-23-production-integration-audit.md](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/blob/work/production-source-audit/docs/handoffs/2026-11-23-production-integration-audit.md)  
+**Audit outcome:** NO-GO for full production deployment from current state. Supabase is healthy and catalog foundation is applied, but order/delivery/rider backend, live V3 customer storefront integration, client authorization migrations, private Realtime, Storage, and release rehearsal are not complete.
+
+Verified Production:
+- 24 migrations through `20261122105821`; the `20261122174500` database-time candidate is not applied.
+- One active restaurant/Main branch, website delivery/pickup/ordering flags all false.
+- Catalog tables and publication structures exist but are empty; no current publication.
+- Production catalog read RPC has no `databaseNow`; its live source SHA matches the candidate migration's strict preflight.
+- Only `flame-chick-staff-admin` version 1 is deployed; catalog/order/delivery functions are not deployed.
+- Order/delivery/rider tables and required order/delivery RPCs are absent.
+- Existing website homepage is still V2/legacy hardcoded mapping; V3 is only a separate synthetic read-only preview.
+- POS/Rider clients still assume direct role/data REST access and old role schema; POS has broad offer/assignment Realtime subscriptions; Rider has Postgres Changes and two-minute heartbeat.
+- No Storage bucket, no business Realtime publication or private-message policies; leaked-password protection is disabled.
+- Current Vercel connection exposes only HFP team `fahad-7455`; no Flame Chick project appears. Do not deploy Flame Chick to HFP. Reauthorize the correct Flame Chick Vercel team.
+
+**No production changes were performed during this audit.** No SQL writes/migrations/seeds, Auth settings, Storage/Realtime setup, Edge Function deployment, secret change, Vercel deployment, domain changes, menu publication or checkout activation. Audit documentation only was committed on `work/production-source-audit`; leave `main` untouched.
+
+**Three-hour constraint:** a safe full-system deployment is not achievable from this state in three hours. Do not bypass security, schema, end-to-end tests or release gates. Continue with source-only contract fixes and staged implementation; each Production write/deployment remains a separate review and explicit approval.
+
+---
+
 # CURRENT OVERRIDE — 2026-11-23: newly published menu is the authoritative target
 
 The user confirms that the restaurant has now published the menu that was previously described as the upcoming menu. That newly published menu is now the current/authoritative Flame Chick menu to implement. The formerly running menu is superseded for operational catalog purposes: do not import it, merge it into the new catalog, use it as a fallback, or assume old-only products remain in the target menu.
