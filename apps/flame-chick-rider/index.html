@@ -203,6 +203,7 @@ body.rider-active .toast{bottom:calc(10px + env(safe-area-inset-bottom));font-si
 const SUPABASE_URL='https://adkrxfnawdiljhjaavnj.supabase.co';
 const PUBLISHABLE_KEY='sb_publishable_89MQIj_drF15IrF05ZLt0w_txUjPMxy';
 const DELIVERY_API=SUPABASE_URL+'/functions/v1/flame-chick-delivery-api';
+const ORDER_API=SUPABASE_URL+'/functions/v1/flame-chick-order-api';
 const AUTH_URL=SUPABASE_URL+'/auth/v1';
 const REST_URL=SUPABASE_URL+'/rest/v1';
 const SESSION_KEY='flame_chick_rider_session_v1';
@@ -263,17 +264,15 @@ async function parseResponse(r){const data=await r.json().catch(()=>({}));if(!r.
 async function getUser(token){const r=await fetch(AUTH_URL+'/user',{headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+token,'Accept':'application/json'},cache:'no-store'});return parseResponse(r)}
 async function refreshSessionIfNeeded(current){if(!current?.access_token)return null;const expires=Number(current.expires_at||0);if(expires*1000>Date.now()+60000){try{await getUser(current.access_token);return current}catch(e){}}if(!current.refresh_token)return null;const r=await fetch(AUTH_URL+'/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:current.refresh_token}),cache:'no-store'});const next=await parseResponse(r);if(!next.expires_at&&next.expires_in)next.expires_at=Math.floor(Date.now()/1000)+Number(next.expires_in);return next}
 async function getRiderProfile(userId,token){
-  const roleUrl=REST_URL+'/user_roles?select=role,branch_id,is_active&user_id=eq.'+encodeURIComponent(userId)+'&is_active=eq.true&role=eq.rider';
-  const roleRes=await fetch(roleUrl,{headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+token,'Accept':'application/json'},cache:'no-store'});
-  const roles=await parseResponse(roleRes);
-  const active=Array.isArray(roles)?roles.find(x=>x.role==='rider'&&x.is_active===true&&x.branch_id):null;
-  if(!active)throw new Error('This account does not have an active Flame Chick rider role. Ask the manager to set up your rider account.');
-  const profileUrl=REST_URL+'/rider_profiles?select=user_id,branch_id,rider_code,display_name,phone,availability_status,accepting_jobs,last_seen_at,is_active&user_id=eq.'+encodeURIComponent(userId)+'&branch_id=eq.'+encodeURIComponent(active.branch_id)+'&is_active=eq.true';
-  const profileRes=await fetch(profileUrl,{headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+token,'Accept':'application/json'},cache:'no-store'});
-  const profiles=await parseResponse(profileRes);
-  const found=Array.isArray(profiles)?profiles[0]:null;
-  if(!found)throw new Error('Your rider profile is missing or inactive. Ask the Flame Chick manager to complete rider setup.');
-  return found;
+  const response=await fetch(DELIVERY_API+'?view=profile',{
+    method:'GET',
+    headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+token,'Accept':'application/json'},
+    cache:'no-store'
+  });
+  const data=await parseResponse(response);
+  if(data.ok!==true||!data.profile||data.profile.user_id!==userId)
+    throw new Error('Your active Flame Chick rider profile could not be verified. Ask the manager to complete your rider setup.');
+  return data.profile;
 }
 async function deliveryRequest(method,query,body,options={}){
   if(!session?.access_token)throw new Error('Please sign in again.');
@@ -702,10 +701,14 @@ function readAuthCallback(){
   return {type,session:next};
 }
 async function getActiveAccountRoles(userId,token){
-  const url=REST_URL+'/user_roles?select=role,branch_id,is_active&user_id=eq.'+encodeURIComponent(userId)+'&is_active=eq.true';
-  const response=await fetch(url,{headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+token,'Accept':'application/json'},cache:'no-store'});
-  const rows=await parseResponse(response);
-  return Array.isArray(rows)?rows.filter(x=>x&&x.is_active===true&&typeof x.role==='string'):[];
+  const response=await fetch(ORDER_API+'?view=staff_context',{
+    headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+token,'Accept':'application/json'},
+    cache:'no-store'
+  });
+  const data=await parseResponse(response);
+  if(data.ok!==true||!data.staff||data.staff.user_id!==userId)
+    throw new Error(data.error?.message||'Your Flame Chick staff role could not be verified.');
+  return Array.isArray(data.staff.roles)?data.staff.roles.map(x=>({role:x.role,branch_id:x.branch_id,is_active:true})):[];
 }
 async function signOut(message=''){
   const token=session?.access_token;
