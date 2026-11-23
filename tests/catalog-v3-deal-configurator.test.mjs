@@ -48,6 +48,8 @@ test('requires explicit deal variant and required component selection', () => {
   assert.equal(ui.toPayload().code, 'COMPONENT_GROUP_BOUNDS');
 
   assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 1).ok, true);
+  assert.equal(ui.validate().code, 'COMPONENT_GROUP_BOUNDS');
+  assert.equal(ui.setOptionQuantity(IDS.drinkComponentGroup, IDS.drinkComponentOption, 1).ok, true);
   assert.equal(ui.validate().ok, true);
 });
 
@@ -65,6 +67,7 @@ test('emits stable identifiers only and never emits a client-side total', () => 
   const ui = create();
   ui.selectVariant(IDS.dealVariant);
   ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 1);
+  ui.setOptionQuantity(IDS.drinkComponentGroup, IDS.drinkComponentOption, 1);
   const payload = ui.toPayload();
   assert.equal(payload.ok, undefined);
   assert.deepEqual(payload, {
@@ -82,6 +85,14 @@ test('emits stable identifiers only and never emits a client-side total', () => 
         productId: IDS.product,
         productVariantId: IDS.variant,
         modifiers: [{ modifierGroupId: IDS.modifierGroup, modifierIds: [] }]
+      }]
+    }, {
+      componentGroupId: IDS.drinkComponentGroup,
+      components: [{
+        componentOptionId: IDS.drinkComponentOption,
+        productId: IDS.drinkProduct,
+        productVariantId: IDS.drinkVariant,
+        modifiers: []
       }]
     }]
   });
@@ -107,6 +118,7 @@ test('supports separate modifier choices for each repeated component instance', 
     IDS.componentGroup, IDS.componentOption, 1, IDS.modifierGroup, []
   ).ok, true);
 
+  ui.setOptionQuantity(IDS.drinkComponentGroup, IDS.drinkComponentOption, 1);
   const payload = ui.toPayload();
   assert.equal(payload.componentGroups[0].components.length, 2);
   assert.deepEqual(payload.componentGroups[0].components.map(item => item.modifiers), [
@@ -119,6 +131,7 @@ test('rejects modifier groups and modifier IDs not assigned to a selected compon
   const ui = create();
   ui.selectVariant(IDS.dealVariant);
   ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 1);
+  ui.setOptionQuantity(IDS.drinkComponentGroup, IDS.drinkComponentOption, 1);
   assert.equal(ui.setModifierSelection(
     IDS.componentGroup, IDS.componentOption, 0,
     'ffffffff-ffff-4fff-8fff-ffffffffffff', []
@@ -140,6 +153,7 @@ test('clearing component quantity also clears customizations for removed instanc
   const ui = create(createView(snapshot));
   ui.selectVariant(IDS.dealVariant);
   ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 2);
+  ui.setOptionQuantity(IDS.drinkComponentGroup, IDS.drinkComponentOption, 1);
   ui.setModifierSelection(IDS.componentGroup, IDS.componentOption, 1, IDS.modifierGroup, [IDS.modifier]);
   ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 1);
   assert.equal(ui.toPayload().componentGroups[0].components.length, 1);
