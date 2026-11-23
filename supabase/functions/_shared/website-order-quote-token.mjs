@@ -59,6 +59,7 @@ function fingerprintInput(quoteId, issuedAt, expiresAt, canonical) {
   });
 }
 
+/** @param {{canonical: Record<string, unknown>, databaseNow: string, secret: string, quoteId?: string}} options */
 export async function createWebsiteOrderQuoteToken({
   canonical,
   databaseNow,
@@ -103,6 +104,7 @@ export async function createWebsiteOrderQuoteToken({
   };
 }
 
+/** @param {{token: string, canonical: Record<string, unknown>, databaseNow: string, secret: string}} options */
 export async function verifyWebsiteOrderQuoteToken({
   token,
   canonical,

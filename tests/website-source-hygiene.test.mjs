@@ -131,7 +131,7 @@ test("Customer checkout sends the signed server quote and fails closed without s
   assert.match(js,/typeof result\.quote_token !== 'string'/);
   assert.match(js,/state\.quoteToken = result\.quote_token/);
   assert.match(js,/state\.checkoutBody\.quote_token = state\.quoteToken/);
-  assert.match(js,/verify a fresh secure server quote/);
+  assert.match(js,/Get a fresh secure server quote/);
   assert.match(js,/!savePendingRequestId\(state\.checkoutRequestId\)/);
   assert.match(js,/root\.crypto\.randomUUID/);
   assert.doesNotMatch(js,/localStorage|indexedDB/);
