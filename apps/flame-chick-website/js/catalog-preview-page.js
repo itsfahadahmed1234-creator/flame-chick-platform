@@ -78,6 +78,8 @@
 
     var variantLabel = element('label', 'fc-menu-variant-label', 'Product option');
     var variantSelect = element('select', 'fc-menu-variant-select');
+    variantSelect.id = 'fc-preview-variant-' + product.id;
+    variantSelect.name = 'product-variant-' + product.id;
     variantSelect.setAttribute('aria-label', 'Choose an option for ' + product.name);
     if (product.variants.length > 1) {
       var placeholderOption = element('option', '', 'Choose an option');
@@ -322,6 +324,9 @@
     renderProducts(preview.products);
     renderDeals(preview.deals, preview);
     publicationMeta.hidden = false;
+    // Reveal only after both product and deal view models have rendered.
+    catalogSection.hidden = false;
+    dealsSection.hidden = false;
     publicationMeta.textContent = 'Publication ' + preview.publicationId +
       ' · Version ' + preview.versionId +
       ' · Database time ' + preview.databaseNow +
@@ -398,6 +403,13 @@
           onChange: function (selectionState) {
             renderPreview(app.getPreview());
             if (selectionState && selectionState.ready) {
+              // Apply visibility after rendering so the selected-context view is
+              // not left hidden by an earlier empty-preview state.
+              var currentPreview = app.getPreview();
+              if (currentPreview && currentPreview.ok === true) {
+                catalogSection.hidden = false;
+                dealsSection.hidden = false;
+              }
               connectionMessage.textContent = 'Published catalog verified for the selected branch and fulfilment method.';
             } else if (selectionState && selectionState.branchRequired) {
               connectionMessage.textContent = 'Choose a branch to continue. Delivery and pickup will be shown according to its published settings.';
