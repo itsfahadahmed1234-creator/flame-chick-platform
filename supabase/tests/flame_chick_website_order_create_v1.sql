@@ -118,9 +118,11 @@ DECLARE
 BEGIN
   payload:=jsonb_build_object(
     'source','website',
+    'schema_version',3,
     'branch_id',b,
     'catalog_publication_id',publication,
     'catalog_version',1,
+    'version_id','sha256:'||repeat('a',64),
     'idempotency_key',request_id,
     'request_hash',repeat('a',64),
     'phone_digest',digest,
