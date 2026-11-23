@@ -36,14 +36,18 @@ function createPreview(snapshot = createSnapshot(), overrides = {}) {
   return previewModule.createCatalogPreview(createDependencies(snapshot, overrides));
 }
 
-test('loads verified catalog but waits for explicit fulfilment before producing a preview', async () => {
+test('allows read-only menu browsing after branch verification and requires fulfilment for ordering', async () => {
   const app = createPreview();
   assert.equal(app.ok, true);
   const loaded = await app.start();
   assert.equal(loaded.state, 'ready');
   assert.equal(loaded.selection.selectedBranchId, IDS.branch);
   assert.equal(loaded.selection.fulfilmentType, null);
-  assert.equal(app.getPreview(), null);
+  assert.ok(app.getPreview());
+  assert.equal(app.getPreview().fulfilmentType, null);
+  assert.equal(app.getPreview().orderingEnabled, false);
+  assert.equal(app.getPreview().products.orderingEnabled, false);
+  assert.equal(app.getPreview().deals.orderingEnabled, false);
 
   const built = app.selectFulfilment('delivery');
   assert.equal(built.ok, true);
@@ -63,7 +67,7 @@ test('loads verified catalog but waits for explicit fulfilment before producing 
   assert.equal('submitOrder' in app, false);
 });
 
-test('requires branch selection for multiple branches and invalidates views on branch change', async () => {
+test('requires branch selection for multiple branches and rebuilds read-only view on branch change', async () => {
   const snapshot = createSnapshot();
   snapshot.branches.push({
     ...snapshot.branches[0],
@@ -80,7 +84,10 @@ test('requires branch selection for multiple branches and invalidates views on b
   assert.equal(app.getPreview(), null);
   assert.equal(app.selectFulfilment('delivery').code, 'BRANCH_REQUIRED');
 
-  assert.equal(app.selectBranch(IDS.branch).ok, true);
+  const firstBrowse = app.selectBranch(IDS.branch);
+  assert.equal(firstBrowse.ok, true);
+  assert.ok(firstBrowse.preview);
+  assert.equal(firstBrowse.preview.fulfilmentType, null);
   const first = app.selectFulfilment('delivery');
   assert.equal(first.ok, true);
   const firstPreview = first.preview;
@@ -92,8 +99,10 @@ test('requires branch selection for multiple branches and invalidates views on b
   assert.equal(changed.state.selection.selectedBranchId, secondBranchId);
   assert.equal(changed.state.selection.fulfilmentType, null);
   assert.equal(changed.state.selection.ready, false);
-  assert.equal(app.getPreview(), null);
-  assert.equal(app.getState().previewReady, false);
+  assert.ok(changed.preview);
+  assert.equal(changed.preview.fulfilmentType, null);
+  assert.equal(changed.preview.orderingEnabled, false);
+  assert.equal(app.getState().previewReady, true);
 
   assert.equal(app.selectFulfilment('delivery').code, 'FULFILMENT_UNAVAILABLE');
   const second = app.selectFulfilment('pickup');
@@ -166,9 +175,9 @@ test('fails closed if either branch-scoped view model cannot be built', async ()
       buildDealViewModel: () => ({ ok: false, code: 'DEAL_VIEW_FAILED', message: 'Rejected' })
     }
   });
-  await app.start();
-  const result = app.selectFulfilment('delivery');
-  assert.equal(result.code, 'DEAL_VIEW_FAILED');
+  const result = await app.start();
+  assert.equal(result.state, 'error');
+  assert.equal(result.error.code, 'DEAL_VIEW_FAILED');
   assert.equal(app.getState().loadState, 'error');
   assert.equal(app.getPreview(), null);
 });
@@ -207,12 +216,15 @@ test('reload invalidates the previous preview before requesting the catalog agai
     }
   });
   await app.start();
+  assert.ok(app.getPreview());
+  assert.equal(app.getPreview().fulfilmentType, null);
   assert.equal(app.selectFulfilment('delivery').ok, true);
   assert.ok(app.getPreview());
   const result = await app.reload();
   assert.equal(result.state, 'ready');
   assert.equal(loadCount, 2);
-  assert.equal(app.getPreview(), null);
+  assert.ok(app.getPreview());
+  assert.equal(app.getPreview().fulfilmentType, null);
   assert.equal(app.getSelectionState().fulfilmentType, null);
 });
 
