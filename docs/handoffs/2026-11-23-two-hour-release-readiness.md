@@ -67,18 +67,20 @@ The POS/Rider static suite checks source hygiene and inline JavaScript syntax. A
 - No tables are in `supabase_realtime`; no Storage buckets exist.
 - Only `flame-chick-staff-admin` is deployed, and it is version 1. Its deployed source predates the current Catalog V3 command implementation.
 - The current database function inventory contains catalog/staff functions, but no `flame_chick_create_order`, `flame_chick_update_order_status`, `flame_chick_check_website_order_rate_limit`, `flame_chick_manage_delivery`, `flame_chick_accept_delivery_offer` or `flame_chick_decline_delivery_offer` operational RPCs.
+- The active Website `js/catalog.js` and POS `adaptFlameChickCatalog` still require schema V2. The current public Catalog Edge Function source returns the immutable V3 snapshot. The separate Website V3 preview uses the V3 client but is read-only and is not the active storefront/cart. There is no V2 compatibility adapter and POS has not been migrated to the V3 DTO. A V3 publication therefore cannot be assumed to feed the active Website/POS; an explicit compatibility or application cutover is required.
 - Security Advisor has 33 intentional RLS-enabled/no-policy informational notices and a warning for disabled leaked-password protection. Do not resolve the informational notices by adding broad table policies.
 
 ## Hard blockers to a working release
 
 1. **Operational database/API contract is missing.** The existing order and delivery Edge Function source references order, payment, delivery, rider tables and RPCs that are not present in Production. The source endpoints cannot operate correctly against the current database.
 2. **Catalog functions are not deployed.** `flame-chick-catalog` and the current Catalog V3-enabled Staff Admin function are not live. The currently deployed Staff Admin function is version 1, not the latest source.
-3. **Catalog is empty and unpublished.** The authoritative menu draft has not been imported to Production or validated/published.
-4. **Delivery pricing and branch delivery configuration are not set up.** No delivery areas/default fee tables exist; the confirmed contract requires server-side fee resolution and immutable order snapshots.
-5. **Storage and Realtime are not configured.** There are no media buckets or Realtime tables for the apps' live updates; polling must remain the fallback until the correct tables are approved and published.
-6. **Staff context and Auth need a live end-to-end check.** The source is aligned, but no new-user/existing-user browser sign-in, role isolation or invitation acceptance test has run against the current app deployment.
-7. **Preview release credentials/gates are missing.** The four Vercel projects have no deployments/domains yet; GitHub Environment secret/variables are not available to configure through the current connector.
-8. **The customer website security audit remains a hard pre-checkout gate.** It was explicitly deferred until immediately before database cutover and must now be completed before enabling customer ordering.
+3. **Active Website/POS schema cutover is missing.** The active Website loader and POS adapter require schema V2, while the publication contract is V3. The V3 preview is read-only and not wired to the active customer cart/order or POS flow. A reviewed V3 compatibility adapter or app migration is required before publication/cutover.
+4. **Catalog is empty and unpublished.** The authoritative menu draft has not been imported to Production or validated/published.
+5. **Delivery pricing and branch delivery configuration are not set up.** No delivery areas/default fee tables exist; the confirmed contract requires server-side fee resolution and immutable order snapshots.
+6. **Storage and Realtime are not configured.** There are no media buckets or Realtime tables for the apps' live updates; polling must remain the fallback until the correct tables are approved and published.
+7. **Staff context and Auth need a live end-to-end check.** The source is aligned, but no new-user/existing-user browser sign-in, role isolation or invitation acceptance test has run against the current app deployment.
+8. **Preview release credentials/gates are missing.** The four Vercel projects have no deployments/domains yet; GitHub Environment secret/variables are not available to configure through the current connector.
+9. **The customer website security audit remains a hard pre-checkout gate.** It was explicitly deferred until immediately before database cutover and must now be completed before enabling customer ordering.
 
 ## Safe next implementation sequence
 
