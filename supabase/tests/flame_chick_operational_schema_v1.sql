@@ -48,6 +48,26 @@ BEGIN
   IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
     AND table_name='rider_push_subscriptions' AND column_name IN('endpoint','p256dh','auth'))
   THEN RAISE EXCEPTION 'CLEARTEXT_PUSH_FIELDS_PRESENT'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM pg_constraint
+    WHERE conrelid='public.delivery_tasks'::regclass
+      AND conname='delivery_tasks_id_branch_restaurant_key' AND contype='u')
+  THEN RAISE EXCEPTION 'DELIVERY_TASK_BRANCH_RESTAURANT_COMPOSITE_KEY_MISSING'; END IF;
+  IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+    AND table_name='delivery_assignments' AND column_name='arrived_at')
+  THEN RAISE EXCEPTION 'RETIRED_DELIVERY_ARRIVAL_COLUMN_PRESENT'; END IF;
+  IF EXISTS(SELECT 1 FROM pg_constraint
+    WHERE conrelid='public.delivery_tasks'::regclass
+      AND conname='delivery_tasks_status_check'
+      AND pg_get_constraintdef(oid) ILIKE '%arrived_at_restaurant%')
+  THEN RAISE EXCEPTION 'RETIRED_DELIVERY_ARRIVAL_STATUS_PRESENT'; END IF;
+  IF NOT EXISTS(
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='delivery_assignments'
+      AND column_name='status'
+      AND position('accepted' IN column_default)>0
+      AND position('assigned' IN column_default)=0
+  )
+  THEN RAISE EXCEPTION 'DELIVERY_ASSIGNMENT_DEFAULT_NOT_ACCEPTED'; END IF;
 END;
 $check$;
 DO $fixtures$

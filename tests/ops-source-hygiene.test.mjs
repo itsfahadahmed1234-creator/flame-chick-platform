@@ -33,6 +33,21 @@ test("POS and Rider inline JavaScript parses", () => {
   }
 });
 
+test("Rider delivery sequence is Accept offer, Picked up, then Delivered", () => {
+  const html=source[1].html;
+  assert.match(html,/data-offer-action="accept"/);
+  assert.match(html,/data-action="picked_up"/);
+  assert.match(html,/if\(s==='out_for_delivery'\)return[^\n]*data-action="delivered"/);
+  assert.doesNotMatch(html,/arrived_at|arrived_at_restaurant|data-acceptance-deadline|pendingAcceptance|expiredAcceptanceRefreshes|acceptance-countdown/);
+});
+
+test("POS delivery dispatch uses the targeted offer state, not a second acceptance stage", () => {
+  const html=source[0].html;
+  assert.match(html,/task\.status==='offering'/);
+  assert.doesNotMatch(html,/deliveryAcceptanceTicker|pos-acceptance-deadline|Awaiting acceptance|reassignPending|pendingReassignment/);
+  assert.doesNotMatch(html,/arrived_at|arrived_at_restaurant/);
+});
+
 test("rider Realtime channel uses the Flame Chick namespace", () => {
   assert.match(source[1].html, /flame-chick-rider-ops-/);
 });

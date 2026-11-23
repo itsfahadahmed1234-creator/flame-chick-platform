@@ -1295,7 +1295,6 @@ let flameChickRealtimeRefreshRunning=false,flameChickRealtimeRefreshQueued=false
 let deliveryTasksByOrder=new Map();
 let dispatchRiders=[];
 let deliveryAssignInProgress=false;
-let deliveryAcceptanceTicker=null;
 let flameChickRealtimeClient=null,flameChickRealtimeChannel=null,flameChickRealtimeRefreshTimer=null,flameChickRealtimeRefreshDebounce=null;
 let flameChickRealtimeState="off";
 const FLAME_CHICK_REALTIME_EVENTS_PER_SECOND=4;
@@ -1430,19 +1429,6 @@ function riderNameFor(userId){
 function dispatchStatusLabel(status){
   return ({dispatch_pending:'Awaiting rider',offering:'Offering to riders',accepted:'Accepted by rider',out_for_delivery:'Out for delivery',delivered:'Delivered',failed:'Delivery issue',cancelled:'Cancelled'})[String(status||'')]||String(status||'Dispatch pending');
 }
-function ensureDeliveryAcceptanceTicker(){
-  if(deliveryAcceptanceTicker)return;
-  deliveryAcceptanceTicker=setInterval(()=>{
-    const nodes=[...document.querySelectorAll('[data-pos-acceptance-deadline]')];
-    nodes.forEach(el=>{
-      const deadline=Date.parse(el.dataset.posAcceptanceDeadline||'');
-      const left=Number.isFinite(deadline)?Math.max(0,Math.ceil((deadline-Date.now())/1000)):0;
-      el.textContent=left>0?left+'s left':'Time elapsed';
-      el.classList.toggle('expired',left===0);
-    });
-    if(!nodes.length){clearInterval(deliveryAcceptanceTicker);deliveryAcceptanceTicker=null;}
-  },500);
-}
 function renderDeliveryDispatchAction(order){
   const task=deliveryTasksByOrder.get(String(order.OrderID));
   if(!task)return '<span class="pill pending">Checking dispatch…</span>';
@@ -1467,22 +1453,12 @@ function renderDeliveryDispatchAction(order){
       const declined=latest&&latest.status==='reassigned'&&latest.is_current!==true
         ? `<small class="dispatch-last-offer">${esc(riderNameFor(latest.rider_user_id))} ${String(latest.end_reason||'').startsWith('No response within 60 seconds')?'did not respond · assignment expired':latest.accepted_at?'released the assignment before pickup':'declined the offer'}${latest.end_reason?' · '+esc(latest.end_reason):''}</small>`
         : '';
-      return `<div class="dispatch-pending-wrap">${task.status==='offering'?'<small class="dispatch-offer-note">Offers sent to all online, available riders · first acceptance wins</small>':''}<button class="btn primary dispatch-assign-btn" type="button" data-assign-rider="${esc(order.OrderID)}">${task.status==='offering'?'Manual override · Assign rider':'Assign rider'}</button>${declined}</div>`;
+      return `<div class="dispatch-pending-wrap">${task.status==='offering'?'<small class="dispatch-offer-note">Offer sent to the selected rider · waiting up to 60 seconds</small>':''}<button class="btn primary dispatch-assign-btn" type="button" data-assign-rider="${esc(order.OrderID)}">${task.status==='offering'?'Replace rider offer':'Assign rider'}</button>${declined}</div>`;
     }
     return '<span class="pill pending">Ready for rider dispatch</span>';
   }
   if(current){
     const name=riderNameFor(current.rider_user_id);
-    if(current.status==='assigned'&&!current.accepted_at){
-      const assignedAt=Date.parse(current.assigned_at||'');
-      const deadline=Number.isFinite(assignedAt)?new Date(assignedAt+60000).toISOString():'';
-      const reassignmentButton=['owner','admin','manager','cashier'].includes(role)
-        ? `<button class="btn primary dispatch-assign-btn" type="button" data-assign-rider="${esc(order.OrderID)}">Reassign rider</button>`
-        : '';
-      const html=`<div class="dispatch-pending-wrap"><span class="dispatch-rider-pill">${esc(name)} · Awaiting acceptance <b class="pos-acceptance-countdown" data-pos-acceptance-deadline="${esc(deadline)}">60s left</b></span>${reassignmentButton}</div>`;
-      setTimeout(ensureDeliveryAcceptanceTicker,0);
-      return html;
-    }
     return `<span class="dispatch-rider-pill">${esc(name)} · ${esc(dispatchStatusLabel(current.status))}</span>`;
   }
   return `<span class="pill pending">${esc(dispatchStatusLabel(task.status))}</span>`;
@@ -1513,12 +1489,9 @@ async function openRiderAssignment(orderId){
   const task=deliveryTasksByOrder.get(key);
   const order=inboxOrders.get(key);
   if(!task||!order){closeModal('assignRiderModal');showToast('Dispatch details are not loaded yet. Refresh and try again.');return;}
-  const taskAssignments=Array.isArray(task.delivery_assignments)?task.delivery_assignments:[];
-  const currentAssignment=taskAssignments.find(x=>x.is_current===true)||null;
-  const reassignPending=task.status==='assigned'&&currentAssignment?.status==='assigned'&&!currentAssignment.accepted_at;
-  if(!['dispatch_pending','offering'].includes(task.status)&&!reassignPending){closeModal('assignRiderModal');showToast('This delivery is no longer awaiting rider assignment.');return;}
-  $('assignRiderTitle').textContent=(reassignPending?'Reassign rider · ':'Assign rider · ')+(order.OrderNumber||'Flame Chick order');
-  $('assignRiderSubtitle').textContent=(reassignPending?'Current rider: '+riderNameFor(currentAssignment.rider_user_id)+' · choose a replacement':'Choose an online rider')+' · '+(order.CustomerName||'Customer')+' · '+(order.Area||'Delivery')+' · Rs. '+money(order.Total);
+  if(!['dispatch_pending','offering'].includes(task.status)){closeModal('assignRiderModal');showToast('This delivery is no longer awaiting rider assignment.');return;}
+  $('assignRiderTitle').textContent='Assign rider · '+(order.OrderNumber||'Flame Chick order');
+  $('assignRiderSubtitle').textContent='Choose an online rider · '+(order.CustomerName||'Customer')+' · '+(order.Area||'Delivery')+' · Rs. '+money(order.Total);
   const now=Date.now();
   const available=dispatchRiders.filter(r=>{
     const seen=Date.parse(r.last_seen_at||'');
@@ -1538,13 +1511,10 @@ async function assignRiderToOrder(orderId,riderUserId,button){
   deliveryAssignInProgress=true;
   if(button){button.disabled=true;button.setAttribute('aria-busy','true');}
   try{
-    const assignments=Array.isArray(task.delivery_assignments)?task.delivery_assignments:[];
-    const current=assignments.find(x=>x.is_current===true)||null;
-    const pendingReassignment=task.status==='assigned'&&current?.status==='assigned'&&!current.accepted_at;
     await flameChickDeliveryRequest('POST',null,{action:'assign',delivery_task_id:task.id,rider_user_id:riderUserId});
     closeModal('assignRiderModal');
     await loadInitialOnlineInbox();
-    showToast(pendingReassignment?'Delivery reassigned. The new rider has 60 seconds to accept.':'Rider assigned. They have 60 seconds to accept. The order stays Ready until pickup.');
+    showToast('Offer sent. The selected rider has 60 seconds to accept. The order stays Ready until pickup.');
   }catch(e){
     showToast(e?.message||'Rider assignment failed.');
     if(button){button.disabled=false;button.removeAttribute('aria-busy');}

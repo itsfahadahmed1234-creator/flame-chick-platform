@@ -616,6 +616,7 @@ CREATE TABLE public.delivery_tasks (
 
   CONSTRAINT delivery_tasks_pkey PRIMARY KEY(id),
   CONSTRAINT delivery_tasks_order_key UNIQUE(order_id),
+  CONSTRAINT delivery_tasks_id_branch_restaurant_key UNIQUE(id,branch_id,restaurant_id),
   CONSTRAINT delivery_tasks_id_order_branch_restaurant_key UNIQUE(id,order_id,branch_id,restaurant_id),
   CONSTRAINT delivery_tasks_order_fkey
     FOREIGN KEY(order_id,branch_id,restaurant_id)
@@ -708,7 +709,7 @@ CREATE TABLE public.delivery_assignments (
   delivery_task_id uuid NOT NULL,
   rider_user_id uuid NOT NULL,
   offer_id uuid NOT NULL,
-  status text NOT NULL DEFAULT 'assigned',
+  status text NOT NULL DEFAULT 'accepted',
   is_current boolean NOT NULL DEFAULT true,
   assigned_at timestamptz NOT NULL DEFAULT transaction_timestamp(),
   accepted_at timestamptz,
