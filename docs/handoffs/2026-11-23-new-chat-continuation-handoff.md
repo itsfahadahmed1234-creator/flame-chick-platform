@@ -2209,3 +2209,14 @@ The disposable behavioral workflow passed before the final migration filename wa
 
 
 - CI caught a source-edit omission before deployment: `parseStaffAdminOrigins` referenced the pinned preview list before its export was present. The failing Admin Static Checks run was inspected; failure was a module import error, not a runtime or permission issue. Added the missing explicit export. No Supabase function was deployed from the failing commit.
+
+
+## 2026-11-24 — Admin preview CORS fix deployed
+
+- Root cause confirmed from Production Supabase function logs: Admin preview `OPTIONS` preflights to Staff Admin returned HTTP 403 because only the canonical production Admin origin was always included in the exact-origin allowlist.
+- Updated `supabase/functions/flame-chick-staff-admin/origin-policy.mjs` to include only two explicitly pinned Admin preview origins (the immutable preview URL and its branch alias). No wildcard `*.vercel.app`, no public bypass, no changes to Auth/RLS/role checks, and the canonical production Admin origin remains allowed.
+- Regression tests now assert that both exact preview hosts receive CORS and unrelated Vercel hosts remain rejected.
+- GitHub Actions for commit `921660992fcebe67a910b3f7480edb91e28315c4`: Admin Static Checks **45426074111 PASSED**; Edge Function Static Checks **45426073813 PASSED**; Catalog Admin API QA **45426073950 PASSED**. Earlier failing commit `3cde294...` was not deployed; its import/export test failure was corrected before deployment.
+- Deployed Supabase Edge Function `flame-chick-staff-admin` successfully as **version 4**, still `verify_jwt=true`. Files deployed: `index.ts`, `origin-policy.mjs`, `catalog-actions.mjs`.
+- After deployment, no new preview request had yet appeared in Supabase logs at the time of this handoff update. Browser-level login is therefore **not yet confirmed fixed**. Next action: refresh `https://flame-chick-admin-production-fxdrq9od9-fahad-7455.vercel.app` (Ctrl+Shift+R), attempt login with the existing Admin credentials, then inspect logs for preview-origin `OPTIONS 200` followed by authenticated Staff Admin `GET 200`. If it still fails, capture the exact on-screen error and inspect the new log entries. Do not reset password or alter the account unless the app now returns an actual Auth credential error.
+- Production Admin alias `https://flamechicadmin.vercel.app` was not changed. No production user data, delivery settings, orders, or payments were modified.
