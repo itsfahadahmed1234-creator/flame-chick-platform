@@ -4747,3 +4747,17 @@ The disposable behavioral workflow passed before the final migration filename wa
 1. Open `https://flamechick.vercel.app/` in a browser and verify the embedded V3 menu/cards and Delivery/Pickup selection.
 2. Verify the browser network preflight and Order API `website_context`, then perform one clearly labelled test quote/order in a safe test flow and verify the resulting order reaches POS. If any request fails, fix that exact blocker before enabling actual customer traffic.
 3. Inspect Admin's named delivery-area management and Owner permissions, then complete the full manual rehearsal above.
+
+
+## 2026-11-24 — Verified POS status workflow and launch checkpoint
+
+- **Branch HEAD at checkpoint:** `da6d9c1b7b6e1df50d907c1287458e567a497174` before this documentation commit.
+- **Status RPC:** Production migration `20261124102922_flame_chick_order_status_commands_v1` is applied. Production object/ACL verification passed; RPC is postgres-owned SECURITY DEFINER with empty search_path and service_role-only EXECUTE. Production operational order/status-history counts remain zero.
+- **POS idempotency:** `89c950785bbf73ff5ae0a6a3870fba8da21337ce` added request UUID to each status mutation; `8f64002dd4ec31a2acaa76099cf64e706d4fefa7` added static coverage.
+- **CI:** POS/Rider Static Checks **45375639994** PASSED and full disposable Staff Admin Role Boundary QA **45375639906** PASSED on `8f64002dd4ec31a2acaa76099cf64e706d4fefa7`. The full run replayed the migration chain and executed the POS sync SQL test, which covers status RPC presence, Dine-in Accepted → Preparing → Ready → Served, served timestamp, request replay, Cashier cancel denial, and Manager cancel audit. It also passed staff ACL/role boundaries, delivery lifecycle/physical return, POS sync/payment idempotency, website order API/quota, and delivery concurrency checks.
+- This supersedes older notes saying full QA after UUID integration was pending. A diff from `8f64002...` to `da6d9c1...` shows no subsequent POS, status migration, Order API status handler or POS behavior-test changes; later changes were website files/workflow and handoff documentation.
+- Website Static Checks **45384177022** PASSED on `0a4394fe1533171cf9506cff980dad1e9fa28479`. Vercel Production deployment `dpl_J5y1tZeoBZfRAfxVkmjLTZ72jq6i` was recorded READY for that commit. Homepage V3 catalog/checkout is embedded below Menu; Delivery/Pickup are supported in source and Not Listed delivery fee is Rs. 150 server-side.
+- **Not yet restaurant-ready:** live browser checkout and order-to-POS verification, staff access, delivery area and rider setup, verified CORS/secrets, Realtime or polling confirmation, offline/reconnect and full manual Dine-in/Takeaway/Delivery/rider/return/payment/History rehearsal remain. User reported inability to enter Admin, POS and Rider; treat authentication/role routing as the immediate next blocker. Do not weaken role permissions to work around it.
+- Payment rule: Rider Delivered is not payment collected. Cashier must explicitly collect the full amount using COD, Card or Online/bank transfer before completion/History. GST remains deferred. No unlabelled test order or real restaurant operation.
+
+**Next:** diagnose existing staff sign-in/session/role routing for Admin, POS and Rider; then run controlled live browser checks and the full labelled synthetic restaurant rehearsal. Do not rebuild POS or apply unverified migrations.
