@@ -1824,3 +1824,14 @@ The disposable behavioral workflow passed before the final migration filename wa
 6. Preserve the payment rule: Rider Delivered is not payment collection; Cashier selects COD/Card/Online-bank transfer and confirms full collection before order completion/History.
 
 **No real customer orders, payments or delivery records were created by this status-RPC rollout.**
+
+
+## 2026-11-24 — POS status RPC idempotency payload integration fix (CI pending)
+
+- Read the currently deployed `flame-chick-order-api` version 1 source, not just the handoff. The handler authenticates the staff user through Supabase Auth and derives `actor_user_id` from the verified Auth response; it calls `flame_chick_update_order_status` through service-role PostgREST using `p_payload`.
+- Audited the POS `updateOnlineOrderStatus()` call site. It previously sent order ID/status/reason but omitted the optional RPC `request_id`, causing the SQL function to generate a fresh UUID server-side.
+- Corrected `apps/flame-chick-pos/index.html`: each status mutation now creates `requestId: crypto.randomUUID()` and includes `request_id: mutation.requestId` in the Order API request. No database schema or live data changed.
+- Added a source-hygiene test in `tests/ops-source-hygiene.test.mjs` asserting the status mutation creates and sends the request UUID.
+- Commits: POS source change `89c950785bbf73ff5ae0a6a3870fba8da21337ce`; test addition `8f64002dd4ec31a2acaa76099cf64e706d4fefa7`.
+- **CI for these two latest commits has not yet been inspected/confirmed.** The earlier static check `45372567729` and disposable behavior run `45372567275` passed on `716ae15863794f0a1a5cc893be43ffccb2110c93`, before the UUID integration fix and Production-generated migration filename alignment. Re-run/inspect the current-HEAD static and full disposable migration + POS behavioral workflows before declaring the current branch green.
+- The deployed Order API version 1 still uses wildcard CORS and required Edge Function secrets have not been securely verified/set; this small POS payload fix does not resolve those deployment blockers.
