@@ -849,6 +849,22 @@ async function buildStaffPosSyncPayload(
     return websiteError("POS_TABLE_REQUIRED","Choose a table before saving a Dine-in check.",400);
   }
 
+  let posPayment: Record<string,unknown>|null = null;
+  if (body.payment !== undefined && body.payment !== null) {
+    if (fulfillmentType === "delivery" || !isObject(body.payment)) {
+      return websiteError("POS_PAYMENT_FULFILLMENT_INVALID","Delivery payment must be collected by the Cashier after the Rider marks the order Delivered.",400);
+    }
+    const requestId = typeof body.payment.request_id === "string" ? body.payment.request_id.trim() : "";
+    const amount = body.payment.amount;
+    const method = typeof body.payment.payment_method === "string" ? body.payment.payment_method.trim().toLowerCase() : "";
+    if (!POS_ID_RE.test(requestId) || typeof amount !== "number" || !Number.isFinite(amount) ||
+        amount <= 0 || amount > total || Math.round(amount * 100) !== amount * 100 ||
+        !["cash","card","bank"].includes(method)) {
+      return websiteError("POS_PAYMENT_REQUEST_INVALID","The POS payment request must contain a unique UUID, valid amount and Cash, Card or Bank method.",400);
+    }
+    posPayment = {request_id:requestId,amount,payment_method:method};
+  }
+
   const canonical: Record<string,unknown> = {
     source:"pos",
     restaurant_id:context.restaurant_id,
@@ -877,7 +893,7 @@ async function buildStaffPosSyncPayload(
   };
   const requestHash = await sha256Hex(stableJson(canonical));
   if (!requestHash) return websiteError("POS_REQUEST_HASH_FAILED","The POS request could not be secured for safe retry.",503);
-  const payload = {...canonical,request_hash:requestHash};
+  const payload = {...canonical,request_hash:requestHash,...(posPayment ? {payment:posPayment} : {})};
   return {
     ok:true,
     payload,
