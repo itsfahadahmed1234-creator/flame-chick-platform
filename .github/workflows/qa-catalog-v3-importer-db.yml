@@ -6,6 +6,7 @@ on:
       - work/production-source-audit
     paths:
       - "scripts/qa-catalog-v3-importer-db.mjs"
+      - "supabase/tests/flame_chick_pos_order_sync_v1.sql"
       - "apps/flame-chick-admin/catalog-v3-importer.js"
       - "apps/flame-chick-admin/catalog-v3-admin.js"
       - "apps/flame-chick-website/js/catalog-v3.js"
@@ -109,6 +110,12 @@ jobs:
           expected="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' | wc -l | tr -d ' ')"
           applied="$(psql "${FLAME_CHICK_QA_DATABASE_URL}" -Atqc "select count(*) from supabase_migrations.schema_migrations")"
           test "${applied}" = "${expected}"
+
+      - name: Exercise POS sync, all fulfilments, walk-ins, revisions, table lock and payment replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "${FLAME_CHICK_QA_DATABASE_URL}" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_pos_order_sync_v1.sql
 
       - name: Import published menu through real authenticated catalog RPCs, compile, validate and resume
         run: node scripts/qa-catalog-v3-importer-db.mjs
