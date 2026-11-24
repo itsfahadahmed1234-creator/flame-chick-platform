@@ -1109,6 +1109,16 @@ html,body{background:var(--bg);overflow:hidden}
 .pos-deal-burger-slot{display:grid;gap:5px;min-width:0;color:#596575;font-size:11px;font-weight:800}
 .pos-deal-burger-slot select{width:100%;min-height:42px;padding:9px 11px;border:1px solid #d8dde4;border-radius:10px;background:#fff;color:#202832;font-weight:700}
 .pos-deal-burger-slot select:focus{outline:2px solid rgba(216,0,8,.18);border-color:#d80008}
+ .pos-deal-burger-picker{margin-top:2px;border:1px solid #e2e6eb;border-radius:11px;background:#fff;overflow:hidden}
+ .pos-deal-burger-picker>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:50px;padding:8px 11px;cursor:pointer;list-style:none}
+ .pos-deal-burger-picker>summary::-webkit-details-marker{display:none}
+ .pos-deal-burger-summary-copy{display:grid;gap:3px;min-width:0}
+ .pos-deal-burger-summary-copy strong{font-size:12px;color:#202832}
+ .pos-deal-burger-summary-copy small{max-width:270px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#707b89;font-size:10px}
+ .pos-deal-burger-edit{flex:0 0 auto;border-radius:8px;padding:6px 9px;background:#fff0f1;color:#b60008;font-size:11px;font-weight:900}
+ .pos-deal-burger-picker[open]>summary{border-bottom:1px solid #e9edf2;background:#fffafa}
+ .pos-deal-burger-picker .pos-deal-burger-selects{padding:10px}
+ @media(max-width:600px){.pos-deal-burger-selects{grid-template-columns:1fr}.pos-deal-burger-summary-copy small{max-width:55vw}}
 .fixed-deal-summary{display:flex;align-items:center;gap:10px;padding:8px 0;color:#2b3541;font-size:12px;font-weight:800}
 .fixed-deal-summary img,.fixed-deal-summary .deal-choice-placeholder{width:38px;height:38px;flex-basis:38px}
 </style>
@@ -3333,7 +3343,7 @@ function openPOSDeal(dealId){
       burgerSlots[group.id]=Array.from({length:Math.max(Number(group.maxUnits)||0,Number(group.minUnits)||0)},()=> '');
     }
   }
-  posDealChoice={deal,variants,variantId:variant?.id||'',groups,selections,burgerSlots};
+  posDealChoice={deal,variants,variantId:variant?.id||'',groups,selections,burgerSlots,expandedBurgerGroupId:''};
   $('choiceTitle').textContent=deal.title+' — Configure Deal';
   renderPOSDealChoice();openModal('choiceModal');
 }
@@ -3380,13 +3390,17 @@ function renderPOSDealChoice(){
       return '<section class="pos-option-group fixed-deal-group"><div class="pos-option-group-head"><span class="pos-option-group-title"><strong>'+esc(group.name||'Included items')+'</strong><small>Included · fixed quantity</small></span></div><div class="fixed-deal-summary">'+posDealOptionImage(option)+'<span>'+esc(option.productName||option.optionLabel||group.name)+'</span><strong>× '+count+'</strong></div></section>';
     }
     if(/burger/i.test(String(group.name||''))&&group.options.length>1){
-      const slots=Array.isArray(st.burgerSlots?.[group.id])?st.burgerSlots[group.id]:Array.from({length:Number(group.maxUnits)||Number(group.minUnits)||1},()=> '');
-      const slotCount=Math.max(Number(group.minUnits)||0,Number(group.maxUnits)||0);
+      const slots=Array.isArray(st.burgerSlots?.[group.id])?st.burgerSlots[group.id]:Array.from({length:Math.max(Number(group.maxUnits)||0,Number(group.minUnits)||0,1)},()=> '');
+      const slotCount=Math.max(Number(group.minUnits)||0,Number(group.maxUnits)||0,1);
+      const selectedNames=slots.map(id=>group.options.find(option=>String(option.id)===String(id))?.productName||'').filter(Boolean);
+      const detailsOpen=st.expandedBurgerGroupId===group.id?' open':'';
       const selects=Array.from({length:slotCount},(_,slot)=>{
         const current=String(slots[slot]||'');
         const options=group.options.map(option=>{
           const alreadyUsed=slots.some((id,index)=>index!==slot&&String(id||'')===String(option.id));
-          const disabled=!group.allowRepeatOption&&alreadyUsed;
+          const selectedCount=Number(selected[option.id])||0;
+          const cap=Math.min(Number(option.maxQuantity)||Number(group.maxUnitsPerOption)||Number(group.maxUnits)||1,Number(group.maxUnitsPerOption)||Number(group.maxUnits)||1);
+          const disabled=(!group.allowRepeatOption&&alreadyUsed)||(selectedCount>=cap&&current!==String(option.id));
           const price=option.pricingTreatment==='INCLUDED'?'Included'
             :option.pricingTreatment==='SURCHARGE'?'+ Rs. '+money((Number(option.surchargeMinor)||0)/100)
             :option.pricingTreatment==='STANDALONE'?'+ Rs. '+money((Number(option.standalonePriceMinor)||0)/100)
@@ -3395,7 +3409,9 @@ function renderPOSDealChoice(){
         }).join('');
         return '<label class="pos-deal-burger-slot"><span>Burger '+(slot+1)+(slot<Number(group.minUnits||0)?' · Required':' · Optional')+'</span><select data-pos-deal-burger-select="'+esc(group.id)+'" data-pos-deal-slot="'+slot+'"><option value="">Choose a burger</option>'+options+'</select></label>';
       }).join('');
-      return '<section class="pos-option-group pos-deal-burger-group"><div class="pos-option-group-head"><span class="pos-option-group-title"><strong>'+esc(group.name||'Choose burger')+'</strong><small>Choose '+group.minUnits+'–'+group.maxUnits+' from Chicken Burgers · '+units+' of '+group.maxUnits+' selected</small></span></div><div class="pos-deal-burger-selects">'+selects+'</div></section>';
+      const requiredLabel=group.minUnits===group.maxUnits?'Choose '+slotCount+' burgers':'Choose '+group.minUnits+'–'+group.maxUnits+' burgers';
+      const summaryText=selectedNames.length?selectedNames.length+'/'+slotCount+' selected · '+selectedNames.join(' + '):'No burgers selected yet';
+      return '<section class="pos-option-group pos-deal-burger-group"><details class="pos-deal-burger-picker" data-pos-deal-burger-picker="'+esc(group.id)+'"'+detailsOpen+'><summary><span class="pos-deal-burger-summary-copy"><strong>'+esc(requiredLabel)+'</strong><small>'+esc(summaryText)+'</small></span><span class="pos-deal-burger-edit">Edit</span></summary><div class="pos-deal-burger-selects">'+selects+'</div></details></section>';
     }
     const cards=group.options.map(option=>{
       const count=Number(selected[option.id])||0;
@@ -3416,8 +3432,11 @@ function renderPOSDealChoice(){
     '<div class="picker-bottom" style="margin-top:16px"><div><div style="font-size:11px;color:var(--muted)">Estimated deal price</div><strong>Rs. '+money(estimate||0)+'</strong></div><button type="button" class="btn primary" id="posDealAddBtn" data-pos-deal-add="true" '+(!valid?'disabled':'')+'>Add Deal</button></div>';
   $('choiceBody').querySelectorAll('[data-pos-deal-variant]').forEach(btn=>btn.onclick=()=>{
     const next=st.variants.find(v=>String(v.id)===String(btn.dataset.posDealVariant));if(!next)return;
-    st.variantId=next.id;st.groups=next.groups;st.selections={};
-    for(const group of st.groups)st.selections[group.id]=group.options.length===1&&group.minUnits>0?{[group.options[0].id]:group.minUnits}:{};
+    st.variantId=next.id;st.groups=next.groups;st.selections={};st.burgerSlots={};st.expandedBurgerGroupId='';
+    for(const group of st.groups){
+      st.selections[group.id]=group.options.length===1&&group.minUnits>0?{[group.options[0].id]:group.minUnits}:{};
+      if(/burger/i.test(String(group.name||''))&&group.options.length>1)st.burgerSlots[group.id]=Array.from({length:Math.max(Number(group.maxUnits)||0,Number(group.minUnits)||0,1)},()=> '');
+    }
     renderPOSDealChoice();
   });
   $('choiceBody').querySelectorAll('[data-pos-deal-pick],[data-pos-deal-remove]').forEach(btn=>btn.onclick=()=>{
@@ -3440,6 +3459,7 @@ function renderPOSDealChoice(){
     const next={};
     for(const id of slots.filter(Boolean))next[id]=(next[id]||0)+1;
     st.selections[groupId]=next;
+    st.expandedBurgerGroupId=groupId;
     renderPOSDealChoice();
   });
   const addDealButton=$('posDealAddBtn');
