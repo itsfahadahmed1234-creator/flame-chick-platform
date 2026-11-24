@@ -3460,6 +3460,10 @@ async function takePaymentAndCloseTable(){
   openLocalReceipt(receiptOrder,{editable:true});
 }
 async function saveLocalOrder(){
+  if(catalogSnapshot?.schemaVersion===3){
+    showToast('The published V3 menu is loaded. V3 staff order pricing and synchronization must be connected before placing orders; no legacy V2 order will be submitted.');
+    return;
+  }
   if(!cart.length){showToast('Add at least one item');return}
   const type=$('orderType').value;
   const subtotal=cart.reduce((a,x)=>a+(Number(x.price)||0)*(Number(x.quantity)||1),0);
