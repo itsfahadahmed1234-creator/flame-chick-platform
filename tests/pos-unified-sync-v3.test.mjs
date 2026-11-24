@@ -81,13 +81,30 @@ test('requires review rather than syncing a stale publication',()=>{
   const s=snapshot();
   assert.throws(()=>sync.buildSyncPayload(baseOrder({catalogVersion:99}),s,IDS.branch,{contract,dealView}),e=>e.code==='POS_CATALOG_STALE');
 });
-test('adds full payment as separate idempotent request; delivery remains payment-free unless explicitly requested',()=>{
+test('adds full payment as a separate idempotent request for Takeaway/Dine-in',()=>{
   const s=snapshot();
   const order=baseOrder({pendingPayment:{requestId:PAYMENT,amount:550,method:'cash'}});
   const payload=sync.buildSyncPayload(order,s,IDS.branch,{contract,dealView});
   assert.deepEqual(payload.payment,{request_id:PAYMENT,amount:550,payment_method:'cash'});
   assert.equal(sync.acknowledgementMatches(payload,{ok:true,local_order_id:ORDER,local_revision:1,order_id:'99000000-0000-4000-8000-000000000002'}),true);
   assert.equal(sync.acknowledgementMatches(payload,{ok:true,local_order_id:ORDER,local_revision:2,order_id:'99000000-0000-4000-8000-000000000002'}),false);
+});
+test('builds Delivery with a published area ID and never collects payment at Rider delivery time',()=>{
+  const s=snapshot();
+  const areaId='bb000000-0000-4000-8000-000000000001';
+  s.deliveryAreas=[{deliveryAreaId:areaId,nameEn:'Gulshan',deliveryFee:50,available:true}];
+  const order=baseOrder({
+    fulfillmentType:'Delivery',area:'Gulshan',deliveryAreaId:areaId,
+    address:'House 10, Gulshan, Karachi',deliveryInstructions:'Ring bell'
+  });
+  const payload=sync.buildSyncPayload(order,s,IDS.branch,{contract,dealView});
+  assert.equal(payload.fulfillment_type,'delivery');
+  assert.deepEqual(payload.delivery,{
+    selection_type:'listed_area',area_id:areaId,other_locality:null,
+    address:'House 10, Gulshan, Karachi',instructions:''
+  });
+  assert.equal(Object.hasOwn(payload,'payment'),false);
+  assert.throws(()=>sync.buildSyncPayload({...order,pendingPayment:{requestId:PAYMENT,amount:550,method:'cash'}},s,IDS.branch,{contract,dealView}),e=>e.code==='POS_PAYMENT_FULFILLMENT_INVALID');
 });
 test('lost-response retries are safe and acknowledgement must match identity plus revision',()=>{
   const s=snapshot();
