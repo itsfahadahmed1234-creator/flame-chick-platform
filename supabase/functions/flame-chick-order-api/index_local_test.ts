@@ -29,7 +29,7 @@ async function updateDeliveryFee(fee: number): Promise<void> {
       AND restaurant_id = '${fixture.createSnapshot().restaurantId}'::uuid
     RETURNING id`;
   const output = await new Deno.Command("psql", {
-    args: [databaseUrl, "--no-psqlrc", "--set=ON_ERROR_STOP=1", "--tuples-only", "--no-align", "--command", sql],
+    args: [databaseUrl, "--no-psqlrc", "--quiet", "--set=ON_ERROR_STOP=1", "--tuples-only", "--no-align", "--command", sql],
     stdout: "piped",
     stderr: "piped",
   }).output();
