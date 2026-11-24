@@ -297,7 +297,7 @@ BEGIN
      OR NOT pg_catalog.has_function_privilege('service_role',v_oid,'EXECUTE')
      OR pg_catalog.has_function_privilege('anon',v_oid,'EXECUTE')
      OR pg_catalog.has_function_privilege('authenticated',v_oid,'EXECUTE')
-     OR pg_catalog.has_function_privilege('PUBLIC',v_oid,'EXECUTE') THEN
+     OR pg_catalog.has_function_privilege('public',v_oid,'EXECUTE') THEN
     RAISE EXCEPTION 'FLAME_CHICK_ORDER_STATUS_RPC_SECURITY_INVALID';
   END IF;
 END
