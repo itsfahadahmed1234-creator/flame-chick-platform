@@ -15,6 +15,7 @@ on:
       - "supabase/migrations/20261121053647_flame_chick_staff_admin_commands.sql"
       - "supabase/migrations/20261121054852_flame_chick_staff_command_definer_isolation.sql"
       - "tests/admin-invitation-acceptance.test.mjs"
+      - "tests/admin-navigation-access.test.mjs"
       - "tests/catalog-v3-admin.test.mjs"
       - "tests/catalog-v3-importer.test.mjs"
       - "tests/edge-function-contract-hygiene.test.mjs"
@@ -46,7 +47,7 @@ jobs:
           node --check apps/flame-chick-admin/catalog-v3-admin.js
           node --check apps/flame-chick-admin/catalog-v3-importer.js
           node --check apps/flame-chick-admin/accept-invitation.js
-          node --test tests/admin-invitation-acceptance.test.mjs tests/catalog-v3-admin.test.mjs tests/catalog-v3-importer.test.mjs tests/edge-function-contract-hygiene.test.mjs tests/staff-admin-origin-policy.test.mjs tests/staff-admin-role-boundary.test.mjs
+          node --test tests/admin-invitation-acceptance.test.mjs tests/admin-navigation-access.test.mjs tests/catalog-v3-admin.test.mjs tests/catalog-v3-importer.test.mjs tests/edge-function-contract-hygiene.test.mjs tests/staff-admin-origin-policy.test.mjs tests/staff-admin-role-boundary.test.mjs
 
       - name: Verify static page assets and invitation wiring
         run: |

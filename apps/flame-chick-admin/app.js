@@ -103,7 +103,7 @@ async function bootstrap(){
  $("profileBadge").textContent=(u.email||"FC").slice(0,2).toUpperCase();
  showAuth(false);
  document.querySelectorAll(".nav-item[data-page]").forEach(button=>{
-  const allowed=["staff","catalog-v3"].includes(button.dataset.page);
+  const allowed=["staff","catalog-v3","delivery"].includes(button.dataset.page);
   button.disabled=!allowed;
   if(!allowed){button.title="This module will be enabled after its secure production API is completed.";button.setAttribute("aria-disabled","true");}
  });

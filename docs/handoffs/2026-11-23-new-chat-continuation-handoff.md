@@ -2227,3 +2227,12 @@ The disposable behavioral workflow passed before the final migration filename wa
 - Post-deploy Supabase function logs show Staff Admin endpoint `OPTIONS 200`, `GET 200`, and multiple `POST 200` requests at 2026-11-24 15:31:08Z–15:31:36Z, replacing the previously observed preview-origin `OPTIONS 403`. This independently corroborates successful browser-to-API access.
 - Existing Admin account was retained; no password reset, Auth account mutation, or role change occurred.
 - Next: have user open **Delivery areas** in Admin preview and inspect whether Main branch, Rs. 150 Not Listed fee and area list load from the secure branch configuration command. Do not save fees or add area rows until UI read is confirmed. If values fail to load, inspect browser console and function logs for `flame_chick_delivery_configuration_command` call result. Do not promote the preview or alter production Admin alias yet.
+
+
+## 2026-11-24 — Delivery areas tab role-gating correction
+
+- User entered Admin preview successfully but reported only Staff & Riders and Catalog V3 Draft available.
+- Root cause is in `apps/flame-chick-admin/app.js` bootstrap: after verifying Admin/Owner role, the UI hard-coded `allowed=["staff","catalog-v3"]` and disabled every other tab. This overrode the enabled Delivery button in `index.html` and hid the already implemented Delivery management screen from Admin/Owner.
+- Changed the Admin/Owner navigation allowlist to `["staff","catalog-v3","delivery"]`. Delivery calls the existing authenticated Admin/Owner-only `flame_chick_delivery_configuration_command` RPC via `loadDeliveryConfig`. No table grants, roles, RLS, or APIs were widened. Dashboard, Orders, Menu, Categories, Deals, Website Images and Website Settings remain disabled pending their secure APIs.
+- Added `tests/admin-navigation-access.test.mjs` and included it in Admin static CI. This explicitly checks Admin/Owner bootstrap and Delivery route wiring, and confirms the unfinished modules stay gated.
+- Source change is not deployed yet. Await exact CI pass, then create a fresh Admin preview deployment and reassign the already CORS-allowlisted branch preview alias. Do not change the canonical production Admin domain.
