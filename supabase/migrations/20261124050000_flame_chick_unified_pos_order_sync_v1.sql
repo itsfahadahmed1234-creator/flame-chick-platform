@@ -18,6 +18,12 @@ END $preflight$;
 -- A walk-in customer may omit a phone for dine-in or takeaway; delivery must provide one.
 ALTER TABLE public.orders
   ALTER COLUMN customer_phone DROP NOT NULL,
+  DROP CONSTRAINT orders_customer_phone_check,
+  ADD CONSTRAINT orders_customer_phone_check CHECK (
+    customer_phone IS NULL OR (
+      customer_phone=btrim(customer_phone) AND char_length(customer_phone) BETWEEN 3 AND 32
+    )
+  ),
   ADD COLUMN table_reference text,
   ADD COLUMN table_label_snapshot text,
   ADD COLUMN scheduled_for timestamptz,
@@ -71,7 +77,7 @@ BEGIN
   v_customer_name:=NULLIF(pg_catalog.btrim(p_payload->>'customer_name'),'');
   v_customer_phone:=NULLIF(pg_catalog.btrim(p_payload->>'customer_phone'),'');
   v_notes:=NULLIF(pg_catalog.btrim(p_payload->>'notes'),'');
-  v_payment_method:=pg_catalog.lower(pg_catalog.btrim(COALESCE(p_payload->>'payment_method','')));
+  v_payment_method:=NULLIF(pg_catalog.lower(pg_catalog.btrim(COALESCE(p_payload->>'payment_method',''))),'');
   v_payment_method:=CASE v_payment_method
     WHEN 'bank_transfer' THEN 'bank'
     WHEN 'online' THEN 'other'
@@ -89,7 +95,7 @@ BEGIN
      OR v_revision IS NULL OR v_revision<1 OR v_fulfillment NOT IN ('delivery','pickup','dine_in')
      OR v_customer_name IS NULL OR pg_catalog.char_length(v_customer_name)>160
      OR (v_customer_phone IS NOT NULL AND pg_catalog.char_length(v_customer_phone) NOT BETWEEN 3 AND 32)
-     OR v_payment_method NOT IN ('cash','card','bank','wallet','other','bank_transfer','online','cod')
+     OR (v_payment_method IS NOT NULL AND v_payment_method NOT IN ('cash','card','bank','wallet','other'))
      OR (v_notes IS NOT NULL AND pg_catalog.char_length(v_notes)>1000)
      OR (v_kitchen_timing IS NOT NULL AND v_kitchen_timing NOT IN ('now','schedule'))
      OR (v_fulfillment='dine_in' AND v_table_reference IS NULL AND v_kitchen_timing IS DISTINCT FROM 'schedule')
