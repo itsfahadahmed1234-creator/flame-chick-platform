@@ -4171,3 +4171,35 @@ Production remains unchanged by this source-only work. The live migration ledger
 
 ## Safety
 No Production DB changes, test orders, customer records, function deployment, Vercel deployment or Realtime changes were made in this adapter step. No GST/tax changes. Free plan only. Keep the existing POS UI and IndexedDB offline-first design.
+
+
+# 2026-11-24 — Cashier delivery-payment popup narrowed to requested methods
+
+## User-confirmed workflow
+After the Rider marks a Delivery order Delivered, the Cashier/Manager/Admin/Owner opens **Collect Payment**. A popup requires one method:
+- **COD** → database payment method `cash`
+- **Card** → `card`
+- **Online/bank transfer** → `bank`
+
+The cashier confirms the method only after receiving the **entire outstanding balance**. There is no editable partial amount and no Wallet/Other choice in this popup. On successful server confirmation of zero balance, the order must be `completed`, disappear from active Delivery orders, and appear in Order History. Rider Delivered remains delivery-only; it never collects payment or completes the order.
+
+## Source changes
+- Added `apps/flame-chick-pos/payment-collection.js`: strict three-method mapping and UUID/full-balance request validation.
+- Updated `apps/flame-chick-pos/index.html`: removed editable payment amount and extra payment choices from the delivery collection popup; changed action label to **Confirm method & collect payment**; it uses the current authoritative server balance and the same idempotent request UUID on uncertain retries; it refuses a success response unless the server confirms `completed=true` and `balance_due=0`; after success it refreshes active orders and Order History.
+- Added `tests/pos-payment-collection.test.mjs` for exact method options, database mapping, full-balance payload and invalid request rejection.
+- Updated `tests/ops-source-hygiene.test.mjs` for the new collection UI contract.
+- Updated `.github/workflows/ci-ops-static.yml` to run the new test.
+
+## Existing backend reused, not duplicated
+The existing source-only migration `20261124033426_flame_chick_payment_collection_v1.sql` and Order API already implement a service-role-only, security-definer, row-locked, idempotent payment transaction. It checks branch-scoped staff roles (Admin/Owner/Manager/Cashier), prevents over-collection, records the ledger and audit row, and completes the order only when balance reaches zero. That migration is not applied to Production. Do not add another payment RPC or duplicate ledger logic.
+
+The existing backend also allows partial payments for other potential workflows; this requested Delivery popup now always sends the full current outstanding balance. No card gateway, bank API verification, wallet, or online gateway integration is implied by the label Online/bank transfer: it is a cashier-recorded method after receipt/verification outside this app.
+
+## CI / current status
+- An initial POS static workflow failed because its old source-hygiene test explicitly required the old editable partial amount and five-method popup. The assertions were updated to the new requirement.
+- Latest run for the updated source-hygiene assertions: `45339760906` was queued at checkpoint time; poll it and inspect any failure logs before calling the tests passed.
+- Admin static checks passed on earlier commits. POS preview deployment remains skipped by the configured fail-closed readiness gate.
+- No Production database changes, function deployments, Vercel deployments, fake customers/orders, or Realtime changes were made.
+
+## Still outstanding
+The POS is **not yet wired to the V3 catalog adapter**; the existing page still has the legacy V2 catalog dependency. Continue the V3-only POS integration before claiming the POS is ready. Then implement and test the authenticated staff POS sync API, unified IndexedDB outbox for Dine-in/Takeaway/Delivery, real disposable local Supabase integration, offline/reconnect/revision/idempotency/concurrency tests, board/history correctness and payment migration validation. Do not apply any migration or deploy until all relevant disposable tests pass. Keep Production as the target system being built; it currently has no live customer/order operation. No GST changes; Free plan only.
