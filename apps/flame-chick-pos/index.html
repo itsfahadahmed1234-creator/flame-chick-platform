@@ -1103,6 +1103,78 @@ html,body{background:var(--bg);overflow:hidden}
   .brand .brand-subtitle{display:none}
 }
 </style>
+
+<style id="flame-chick-pos-visual-refinement">
+/* Flame Chick POS visual refinement — consistent catalog cards and visible brand */
+.brand-logo{
+  display:block;width:203px;height:38px;max-width:32vw;object-fit:contain;flex:0 0 auto;
+  filter:brightness(0) saturate(100%) invert(10%) sepia(99%) saturate(6420%) hue-rotate(353deg) brightness(91%) contrast(122%);
+}
+.pos-menu #menuGrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));align-items:stretch;gap:14px}
+.pos-menu #menuGrid .cat{
+  grid-column:1/-1;margin:16px 0 2px;padding:10px 13px;border-radius:10px;
+  background:#202a35;color:#fff;font-size:13px;line-height:1.25;letter-spacing:.01em;
+}
+.pos-menu #menuGrid .product-card{
+  min-width:0;min-height:202px;padding:15px;display:flex;flex-direction:column;align-items:stretch;
+  justify-content:space-between;gap:13px;border:1px solid #e3d9d1;border-radius:15px;
+  background:linear-gradient(180deg,#fff 0%,#fffdfa 100%);box-shadow:0 2px 8px rgba(42,31,22,.045);
+}
+.pos-menu #menuGrid .product-card:hover{
+  border-color:#d8b7aa;box-shadow:0 8px 18px rgba(42,31,22,.085);transform:translateY(-1px);
+}
+.pos-menu #menuGrid .product-card-main{
+  display:flex;align-items:flex-start;gap:13px;flex:1 1 auto;min-width:0;min-height:96px;
+}
+.pos-menu #menuGrid .item-thumb{
+  width:72px;height:72px;flex:0 0 72px;border-radius:13px;border:1px solid #efe2d8;
+  background:linear-gradient(145deg,#fff6ef,#f4e8df);box-shadow:inset 0 1px 0 rgba(255,255,255,.9);
+}
+.pos-menu #menuGrid .item-thumb img{object-fit:cover}
+.pos-menu #menuGrid .product-card-copy{min-width:0;flex:1 1 auto;padding-top:2px}
+.pos-menu #menuGrid .product-card-copy h3{
+  margin:0 0 6px;color:#1c2631;font-size:15px;font-weight:850;line-height:1.27;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;
+}
+.pos-menu #menuGrid .product-card-copy p{
+  margin:0;min-height:0;color:#687484;font-size:12px;line-height:1.45;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+}
+.pos-menu #menuGrid .product-card>.row,.pos-menu #menuGrid .product-card-footer{
+  display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:11px;min-width:0;
+  margin-top:auto;padding-top:12px;border-top:1px solid #eee6df;
+}
+.pos-menu #menuGrid .product-card .price{
+  color:#1d2935;font-size:15px;font-weight:900;line-height:1.2;white-space:nowrap;
+}
+.pos-menu #menuGrid .product-card .pizza-from{color:#1d2935;font-size:13px;white-space:nowrap}
+.pos-menu #menuGrid .product-card .add{
+  width:100%;max-width:160px;min-width:0;min-height:40px;padding:9px 12px;border:1px solid #c90008;
+  border-radius:10px;background:#d80008;color:#fff;font-size:12px;font-weight:900;line-height:1.25;
+  text-align:center;white-space:normal;overflow-wrap:anywhere;box-shadow:0 3px 8px rgba(216,0,8,.16);
+}
+.pos-menu #menuGrid .product-card .add:hover:not(:disabled){background:#b90007;transform:translateY(-1px)}
+.pos-menu #menuGrid .product-card-footer.is-unavailable{grid-template-columns:auto minmax(0,1fr)}
+.pos-menu #menuGrid .deal-status{
+  display:flex;align-items:center;justify-content:center;width:100%;max-width:210px;min-width:0;min-height:38px;
+  padding:7px 10px;border:1px solid #efc7c1;border-radius:10px;background:#fff3f1;color:#a83229;
+  font-size:10px;font-weight:850;line-height:1.3;text-align:center;white-space:normal;overflow-wrap:anywhere;
+}
+.order-type-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.order-type-row .type-btn{min-width:0;min-height:42px;padding:9px 7px;font-size:12px;white-space:nowrap}
+.order-type-row .type-btn.active{background:#d80008;border-color:#d80008;color:#fff;box-shadow:0 3px 8px rgba(216,0,8,.16)}
+@media(max-width:700px){
+  .brand-logo{width:min(172px,43vw);height:auto;max-height:34px}
+  .pos-menu #menuGrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,245px),1fr));gap:11px}
+  .pos-menu #menuGrid .product-card{min-height:184px;padding:12px}
+  .pos-menu #menuGrid .item-thumb{width:62px;height:62px;flex-basis:62px}
+  .pos-menu #menuGrid .product-card-main{gap:10px}
+  .pos-menu #menuGrid .product-card-copy h3{font-size:14px}
+  .pos-menu #menuGrid .product-card .price{font-size:14px}
+  .order-type-row .type-btn{padding:8px 4px;font-size:11px}
+}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -1179,7 +1251,7 @@ html,body{background:var(--bg);overflow:hidden}
     <section class="order-section"><div class="section-label">Order type</div><div class="order-type-row" id="orderTypeButtons">
       <button type="button" class="type-btn active" data-type="Delivery">Delivery</button>
       <button type="button" class="type-btn" data-type="Takeaway">Takeaway</button>
-      <button type="button" class="type-btn" data-type="Dine-in" hidden>Dine-in</button>
+      <button type="button" class="type-btn" data-type="Dine-in">Dine-in</button>
     </div><select id="orderType" hidden><option selected>Delivery</option><option>Takeaway</option><option>Dine-in</option></select></section>
     <section class="order-section" id="dineTableSection" style="display:none"><div class="section-label">Table</div><div class="dine-table-bar"><button id="selectTableBtn" class="btn table-select-btn" type="button">Select table</button><span id="selectedTableBadge" class="table-badge">No table</span></div></section>
     <section class="order-section" id="preorderSection" style="display:none"><div class="section-label">Dine-in Mode</div><div class="preorder-mode-row" id="preorderModeButtons"><button type="button" class="preorder-mode-btn active" data-preorder="immediate">Immediate</button><button type="button" class="preorder-mode-btn" data-preorder="preorder">Pre-Order</button></div>
@@ -2366,7 +2438,7 @@ function openOrderDetails(orderId){
 async function guardedOrderAction(buttonId,handler){if(orderActionInProgress)return;orderActionInProgress=true;const btn=$(buttonId);const original=btn?.textContent||'';if(btn){btn.disabled=true;btn.setAttribute('aria-busy','true')}try{return await handler()}catch(e){console.error('order action failed',e);showToast(e?.message||'Order action failed')}finally{if(btn){btn.disabled=false;btn.removeAttribute('aria-busy');if(buttonId==='placeBtn')btn.textContent=original||'PLACE ORDER';}orderActionInProgress=false}}
 
 function setupCashierControls(){
-  const initialType=$('orderType')?.value||'Dine-in';
+  const initialType=$('orderType')?.value||'Delivery';
   $('orderTypeButtons')?.querySelectorAll('.type-btn').forEach(b=>b.classList.toggle('active',b.dataset.type===initialType));
   const orderTypes=$('orderTypeButtons');
   orderTypes?.addEventListener('click',e=>{
@@ -2584,8 +2656,8 @@ async function checkScheduledOrders(){
   }catch(e){console.debug('scheduled order check',e.message)}
 }
 async function init(){
-  $('orderType').value='Dine-in';
-  $('orderTypeButtons')?.querySelectorAll('.type-btn').forEach(b=>b.classList.toggle('active',b.dataset.type==='Dine-in'));
+  $('orderType').value='Delivery';
+  $('orderTypeButtons')?.querySelectorAll('.type-btn').forEach(b=>b.classList.toggle('active',b.dataset.type==='Delivery'));
   setupCashierControls();
   bindPreorderControls();
   updateNetworkStatus();
@@ -2864,10 +2936,16 @@ function renderDealCard(deal){
     if(/^[0-9a-f-]{36}\//i.test(imagePath.slice(6)))src=FLAME_CHICK_SUPABASE_URL+'/storage/v1/object/public/flame-chick-media/'+imagePath.split('/').map(encodeURIComponent).join('/');
     else src='https://adkrxfnawdiljhjaavnj.supabase.co/storage/v1/object/public/flame-chick-media/'+imagePath.split('/').map(encodeURIComponent).join('/');
   }
-  const art=src?'<div class="item-thumb"><img src="'+esc(src)+'" alt="'+esc(deal.Title||'Deal')+'" loading="lazy" decoding="async" onerror="this.parentElement.classList.add(String.fromCharCode(110,111,45,112,104,111,116,111));this.remove()"></div>':'<div class="item-thumb no-photo"><span>🎁</span></div>';
+  const title=String(deal.Title||'Deal');
+  const description=String(deal.Description||'').trim();
+  const art=src?'<div class="item-thumb"><img src="'+esc(src)+'" alt="'+esc(title)+'" loading="lazy" decoding="async" onerror="this.parentElement.classList.add(String.fromCharCode(110,111,45,112,104,111,116,111));this.remove()"></div>':'<div class="item-thumb no-photo"><span>🎁</span></div>';
   const orderable=deal.Available===true&&deal.available===true;
-  const status=orderable?'Choose the included items for this published deal':'Currently outside deal hours or unavailable at this branch';
-  return '<article class="item product-card '+(orderable?'':'deal-unavailable')+'"><div class="product-card-main">'+art+'<div class="product-card-copy"><h3>'+esc(deal.Title||'Deal')+'</h3><p>'+esc(deal.Description||status)+'</p></div></div><div class="row"><span class="price">'+(Number.isFinite(Number(deal.BundlePrice))?'Rs. '+money(deal.BundlePrice):'Price unavailable')+'</span><button class="add" type="button" data-pos-deal="'+esc(deal.DealID)+'" '+(orderable?'':'disabled title="'+esc(status)+'"')+'>'+(orderable?'Choose Deal':esc(status))+'</button></div></article>';
+  const status='Currently outside deal hours or unavailable at this branch';
+  const action=orderable
+    ?'<button class="add" type="button" data-pos-deal="'+esc(deal.DealID)+'">Choose Deal</button>'
+    :'<span class="deal-status" role="status" title="'+esc(status)+'">Unavailable now</span>';
+  const price=Number.isFinite(Number(deal.BundlePrice))?'Rs. '+money(deal.BundlePrice):'Price unavailable';
+  return '<article class="item product-card deal-card '+(orderable?'':'deal-unavailable')+'"><div class="product-card-main">'+art+'<div class="product-card-copy"><h3>'+esc(title)+'</h3>'+(description?'<p>'+esc(description)+'</p>':'')+'</div></div><div class="product-card-footer '+(orderable?'':'is-unavailable')+'"><span class="price">'+price+'</span>'+action+'</div></article>';
 }
 function setupCategoryObserver(){if(window._categoryObserver){window._categoryObserver.disconnect();window._categoryObserver=null;}}
 function groupPizzas(rows){
