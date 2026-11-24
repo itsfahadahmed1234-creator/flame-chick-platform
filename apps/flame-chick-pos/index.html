@@ -1110,7 +1110,7 @@ html,body{background:var(--bg);overflow:hidden}
   display:block;width:203px;height:38px;max-width:32vw;object-fit:contain;flex:0 0 auto;
   filter:brightness(0) saturate(100%) invert(10%) sepia(99%) saturate(6420%) hue-rotate(353deg) brightness(91%) contrast(122%);
 }
-.pos-menu #menuGrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));align-items:stretch;gap:14px}
+.pos-menu #menuGrid{grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch;gap:14px}
 .pos-menu #menuGrid .cat{
   grid-column:1/-1;margin:16px 0 2px;padding:10px 13px;border-radius:10px;
   background:#202a35;color:#fff;font-size:13px;line-height:1.25;letter-spacing:.01em;
@@ -1141,7 +1141,7 @@ html,body{background:var(--bg);overflow:hidden}
   display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
 }
 .pos-menu #menuGrid .product-card>.row,.pos-menu #menuGrid .product-card-footer{
-  display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:11px;min-width:0;
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:11px;min-width:0;
   margin-top:auto;padding-top:12px;border-top:1px solid #eee6df;
 }
 .pos-menu #menuGrid .product-card .price{
@@ -1149,7 +1149,7 @@ html,body{background:var(--bg);overflow:hidden}
 }
 .pos-menu #menuGrid .product-card .pizza-from{color:#1d2935;font-size:13px;white-space:nowrap}
 .pos-menu #menuGrid .product-card .add{
-  width:100%;max-width:160px;min-width:0;min-height:40px;padding:9px 12px;border:1px solid #c90008;
+  width:100%;max-width:160px;min-width:0;min-height:40px;justify-self:end;padding:9px 12px;border:1px solid #c90008;
   border-radius:10px;background:#d80008;color:#fff;font-size:12px;font-weight:900;line-height:1.25;
   text-align:center;white-space:normal;overflow-wrap:anywhere;box-shadow:0 3px 8px rgba(216,0,8,.16);
 }
@@ -1165,12 +1165,14 @@ html,body{background:var(--bg);overflow:hidden}
 .order-type-row .type-btn.active{background:#d80008;border-color:#d80008;color:#fff;box-shadow:0 3px 8px rgba(216,0,8,.16)}
 @media(max-width:700px){
   .brand-logo{width:min(172px,43vw);height:auto;max-height:34px}
-  .pos-menu #menuGrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,245px),1fr));gap:11px}
+  .pos-menu #menuGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
   .pos-menu #menuGrid .product-card{min-height:184px;padding:12px}
   .pos-menu #menuGrid .item-thumb{width:62px;height:62px;flex-basis:62px}
   .pos-menu #menuGrid .product-card-main{gap:10px}
   .pos-menu #menuGrid .product-card-copy h3{font-size:14px}
   .pos-menu #menuGrid .product-card .price{font-size:14px}
+  .pos-menu #menuGrid .product-card>.row,.pos-menu #menuGrid .product-card-footer{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px}
+  .pos-menu #menuGrid .product-card .add{max-width:none}
   .order-type-row .type-btn{padding:8px 4px;font-size:11px}
 }
 </style>
@@ -2787,6 +2789,9 @@ async function ensureDeliveryAreas(){
   if(saved?.value)posDeliveryConfig=saved.value;
   if(navigator.onLine&&flameChickStaffSession?.access_token){
     try{await refreshDeliveryAreas();}catch(error){console.warn('Branch delivery configuration refresh failed; cached settings remain available.',error);}
+  }
+  if(!deliveryAreas.length&&getDefaultDeliveryFee()!==null){
+    const area=$('area');if(area)area.value='Not Listed';
   }
 }
 

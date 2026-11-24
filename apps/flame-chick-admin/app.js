@@ -122,10 +122,12 @@ async function loadAll(){
  db("deals?restaurant_id=eq."+id+"&select=id,legacy_id,category_id,title,title_ur,description_en,description_ur,bundle_price,featured,sort_order,is_active,is_available,image_path,image_previous_path,metadata&order=sort_order.asc"),
  db("deal_components?select=id,deal_id,legacy_id,component_type,ref_type,product_id,product_variant_id,pool_subcategory_id,size_key,sort_order,quantity,price_delta,display_name,volume_key,description_phrase,description_phrase_ur,metadata&order=sort_order.asc"),
  db("drink_options?restaurant_id=eq."+id+"&select=id,legacy_id,product_variant_id,display_name,display_name_ur,volume_key,volume_ml,is_active,sort_order&order=sort_order.asc"),
- db("delivery_areas?restaurant_id=eq."+id+"&branch_id=eq."+b+"&select=id,legacy_id,name,delivery_fee,sort_order,is_active&order=sort_order.asc"),
+ Promise.resolve([]),
  db("restaurant_settings?restaurant_id=eq."+id+"&select=id,setting_key,value_json,is_public,description&order=setting_key.asc")
  ]);
- [S.orders,S.products,S.variants,S.categories,S.subcategories,S.deals,S.dealComponents,S.drinkOptions,S.areas,S.settings]=out;renderAll();
+ [S.orders,S.products,S.variants,S.categories,S.subcategories,S.deals,S.dealComponents,S.drinkOptions,S.areas,S.settings]=out;
+ await loadDeliveryConfig();
+ renderAll();
 }
 function renderAll(){renderOrders();renderProducts();renderCategories();renderDeals();renderAreas();renderSettings();loadDashboard().catch(()=>{});}
 
@@ -244,7 +246,7 @@ async function saveStaffForm(e){
  finally{btn.disabled=false;btn.textContent=$("staffDialog").dataset.mode==="scope"?"Add access":"Send invitation";}
 }
 
-function nav(p){document.querySelectorAll(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===p));document.querySelectorAll(".page").forEach(x=>x.hidden=x.id!=="page-"+p);$("pageTitle").textContent=({dashboard:"Dashboard",orders:"Orders",menu:"Menu & products",categories:"Categories",deals:"Deals & offers",delivery:"Delivery areas",staff:"Staff & riders","catalog-v3":"Catalog V3 draft",media:"Website images",settings:"Website settings"})[p]||"Dashboard";$("crumb").textContent=p.toUpperCase();if(p==="staff")loadStaff().catch(e=>toast(e.message,true));if(p==="catalog-v3")openCatalogV3().catch(e=>toast(e.message,true));if(p==="media")renderSiteMedia();if(p==="dashboard")loadDashboard().catch(()=>{});}
+function nav(p){document.querySelectorAll(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===p));document.querySelectorAll(".page").forEach(x=>x.hidden=x.id!=="page-"+p);$("pageTitle").textContent=({dashboard:"Dashboard",orders:"Orders",menu:"Menu & products",categories:"Categories",deals:"Deals & offers",delivery:"Delivery areas",staff:"Staff & riders","catalog-v3":"Catalog V3 draft",media:"Website images",settings:"Website settings"})[p]||"Dashboard";$("crumb").textContent=p.toUpperCase();if(p==="staff")loadStaff().catch(e=>toast(e.message,true));if(p==="catalog-v3")openCatalogV3().catch(e=>toast(e.message,true));if(p==="media")renderSiteMedia();if(p==="delivery")loadDeliveryConfig().catch(e=>toast(e.message,true));if(p==="dashboard")loadDashboard().catch(()=>{});}
 function renderDashboard(){
  let today=parts(new Date()),n=S.range==="today"?1:Number(S.range),start=parts(new Date(Date.now()-(n-1)*86400000));
  let os=S.orders.filter(o=>parts(new Date(o.created_at||o.placed_at))>=start),valid=os.filter(o=>!["cancelled","rejected"].includes(o.status));
@@ -378,37 +380,33 @@ function renderDeals(){
  $("dealsList").querySelectorAll("[data-delete-deal]").forEach(b=>b.onclick=()=>{const d=S.deals.find(x=>x.id===b.dataset.deleteDeal);if(d)namedDelete("deal",d.title,()=>deleteDealSafely(d),()=>db("deals?id=eq."+d.id,{method:"PATCH",body:{is_active:false,is_available:false},prefer:"return=minimal"})).catch(e=>toast(e.message,true));});
 }
 
+async function deliveryConfigCommand(action,payload){
+ const result=await db("rpc/flame_chick_delivery_configuration_command",{method:"POST",body:{p_action:action,p_payload:payload}});
+ if(!result||result.ok!==true)throw Error("Delivery configuration could not be saved.");
+ return result;
+}
+async function loadDeliveryConfig(){
+ const result=await deliveryConfigCommand("list",{branch_id:S.branch.id});
+ S.areas=Array.isArray(result.areas)?result.areas:[];
+ S.deliveryDefaultFee=result.not_listed_delivery_fee==null?null:Number(result.not_listed_delivery_fee);
+ renderAreas();
+}
 function renderDefaultDeliveryFee(){
  const input=$("defaultDeliveryFeeInput"),status=$("defaultDeliveryFeeStatus");
  if(!input)return;
- const row=setting("DefaultDeliveryFee"),value=row?row.value_json:null;
- input.value=value===null||value===undefined||value===""?"":String(value);
- if(status)status.textContent=input.value===""?"Not configured. Not Listed delivery orders will be blocked until a fee is saved.":"Current default fee for Not Listed: "+cash(Number(value));
+ input.value=S.deliveryDefaultFee==null?"":String(S.deliveryDefaultFee);
+ if(status)status.textContent=S.deliveryDefaultFee==null?"Not configured. Set a fee before taking Not Listed delivery orders.":"Current Not Listed default fee: "+cash(S.deliveryDefaultFee);
 }
 async function saveDefaultDeliveryFee(){
- const input=$("defaultDeliveryFeeInput"),button=$("saveDefaultDeliveryFeeButton");
- if(!input)return;
- const raw=input.value.trim();
- let value=null;
- if(raw!==""){value=Number(raw);if(!Number.isFinite(value)||value<0)throw Error("Enter a valid non-negative default delivery fee, or leave it blank to keep it unset.");}
+ const input=$("defaultDeliveryFeeInput"),button=$("saveDefaultDeliveryFeeButton"),value=Number(input.value);
+ if(input.value.trim()===""||!Number.isFinite(value)||value<0)throw Error("Enter a valid non-negative default delivery fee.");
  if(button){button.disabled=true;button.textContent="Saving…";}
- try{
-  const row=setting("DefaultDeliveryFee");
-  const payload={value_json:value,is_public:true,description:"Default delivery fee used only when the customer selects Not Listed.",updated_by:S.user.id,updated_at:new Date().toISOString()};
-  if(row){
-   await db("restaurant_settings?id=eq."+row.id,{method:"PATCH",body:payload,prefer:"return=minimal"});
-  }else{
-   await db("restaurant_settings",{method:"POST",body:Object.assign({},payload,{restaurant_id:S.restaurant.id,branch_id:null,setting_key:"DefaultDeliveryFee"}),prefer:"return=minimal"});
-  }
-  await loadAll();
-  toast(value===null?"Default fee left unset. Not Listed delivery remains unavailable.":"Default delivery fee saved.");
- }finally{if(button){button.disabled=false;button.textContent="Save default fee";}}
+ try{await deliveryConfigCommand("default_fee_set",{branch_id:S.branch.id,delivery_fee:value});await loadDeliveryConfig();toast("Not Listed default delivery fee saved.");}
+ finally{if(button){button.disabled=false;button.textContent="Save default fee";}}
 }
-
 function renderAreas(){
- $("areasList").innerHTML=S.areas.map(a=>'<div class="area-row"><div class="deal-mark">⌁</div><div class="area-copy"><b>'+esc(a.name)+'</b><small>'+esc(a.legacy_id||"")+' · Order '+a.sort_order+'</small></div><div class="area-fee">'+cash(a.delivery_fee)+'</div><span class="state-text '+(a.is_active?"good":"bad")+'">'+(a.is_active?"Active":"Paused")+'</span><button class="action-link" data-edit-area="'+a.id+'">Edit</button>'+(canDelete()?'<button class="action-link danger-link" data-delete-area="'+a.id+'">Delete</button>':'')+'</div>').join("")||'<div class="surface empty-state">No delivery areas configured.</div>';
+ $("areasList").innerHTML=S.areas.map(a=>'<div class="area-row"><div class="deal-mark">⌁</div><div class="area-copy"><b>'+esc(a.name)+'</b><small>Order '+a.sort_order+'</small></div><div class="area-fee">'+cash(a.delivery_fee)+'</div><span class="state-text '+(a.is_active?"good":"bad")+'">'+(a.is_active?"Active":"Paused")+'</span><button class="action-link" data-edit-area="'+a.id+'">Edit</button></div>').join("")||'<div class="surface empty-state">No delivery areas configured. Customers will use Not Listed and the default fee until areas are added.</div>';
  $("areasList").querySelectorAll("[data-edit-area]").forEach(b=>b.onclick=()=>editArea(b.dataset.editArea));
- $("areasList").querySelectorAll("[data-delete-area]").forEach(b=>b.onclick=()=>{const a=S.areas.find(x=>x.id===b.dataset.deleteArea);if(a)namedDelete("delivery area",a.name,()=>deleteAreaSafely(a),()=>activeArchive("delivery_areas",a.id)).catch(e=>toast(e.message,true));});
  renderDefaultDeliveryFee();
 }
 
@@ -756,8 +754,13 @@ function editDeal(id){
 }
 
 function editArea(id){
- let a=S.areas.find(x=>x.id===id),html='<div class="form-grid"><label>Area name<input name="name" required value="'+esc(a?a.name:"")+'"></label><label>Delivery fee (PKR)<input name="fee" type="number" min="0" required value="'+(a?a.delivery_fee:0)+'"></label><label>Sort order<input name="sort" type="number" value="'+(a?a.sort_order:0)+'"></label><label class="check-row"><input type="checkbox" name="active" '+(!a||a.is_active?"checked":"")+'> Accept deliveries here</label></div>';
- openEditor(a?"Edit delivery area":"Add delivery area","DELIVERY COVERAGE",html,async fd=>{let b={name:String(fd.get("name")||"").trim(),delivery_fee:Number(fd.get("fee")),sort_order:Number(fd.get("sort")||0),is_active:fd.has("active")};if(!b.name||!Number.isFinite(b.delivery_fee)||b.delivery_fee<0)throw Error("Enter a valid area name and fee.");if(a)await db("delivery_areas?id=eq."+id,{method:"PATCH",body:b,prefer:"return=minimal"});else await db("delivery_areas",{method:"POST",body:Object.assign({},b,{restaurant_id:S.restaurant.id,branch_id:S.branch.id}),prefer:"return=minimal"});});
+ const area=S.areas.find(x=>x.id===id);
+ const html='<div class="form-grid"><label>Area name<input name="name" required maxlength="120" value="'+esc(area?area.name:"")+'"></label><label>Urdu name<input name="name_ur" dir="rtl" value="'+esc(area?area.name_ur||"": "")+'"></label><label>Delivery fee (PKR)<input name="fee" type="number" min="0" step="0.01" required value="'+(area?area.delivery_fee:0)+'"></label><label>Sort order<input name="sort" type="number" min="0" value="'+(area?area.sort_order:0)+'"></label><label class="check-row"><input type="checkbox" name="active" '+(!area||area.is_active?"checked":"")+'> Accept deliveries here</label></div>';
+ openEditor(area?"Edit delivery area":"Add delivery area","DELIVERY COVERAGE",html,async fd=>{
+  const payload={branch_id:S.branch.id,area_id:area?area.id:null,name:String(fd.get("name")||"").trim(),name_ur:String(fd.get("name_ur")||"").trim()||null,delivery_fee:Number(fd.get("fee")),sort_order:Number(fd.get("sort")||0),is_active:fd.has("active")};
+  if(!payload.name||!Number.isFinite(payload.delivery_fee)||payload.delivery_fee<0)throw Error("Enter a valid area name and fee.");
+  await deliveryConfigCommand("area_upsert",payload);
+ }); 
 }
 async function saveSettings(e){
  e.preventDefault();let pairs=[["restaurant_name","settingRestaurantName"],["wa_phone_display","settingPhoneDisplay"],["wa_phone","settingPhone"],["address","settingAddress"],["footer_text_en","settingFooter"]];
