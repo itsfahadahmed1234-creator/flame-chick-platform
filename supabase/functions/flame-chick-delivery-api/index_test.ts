@@ -1,11 +1,10 @@
-import { handleDeliveryApiRequest } from "./index.ts";
-
 Deno.test("internal push hook fails closed while Rider Web Push is disabled", async () => {
   const previousUrl = Deno.env.get("SUPABASE_URL");
   const previousKeys = Deno.env.get("SUPABASE_SECRET_KEYS");
   Deno.env.set("SUPABASE_URL", "https://example.supabase.co");
   Deno.env.set("SUPABASE_SECRET_KEYS", JSON.stringify({ default: "server-only-test-secret" }));
   try {
+    const { handleDeliveryApiRequest } = await import("./index.ts");
     const response = await handleDeliveryApiRequest(new Request("https://edge.example/delivery", {
       method: "POST",
       headers: { "x-flame-chick-push-hook": "test-hook-token", "content-type": "application/json" },
