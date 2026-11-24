@@ -1510,3 +1510,14 @@ User priorities/constraints unchanged: Flame Chick Production is the system bein
 - Corrected both test strings passed to `to_jsonb` by casting them explicitly to `text`. No production constraints or database authorization were changed.
 - Run 67 on commit `c2baa612ee9d1b3074291be132866402faee3e72`: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45348420225. It passed source-check setup and was starting the disposable local stack at handoff update time. Check the behavioral SQL step result; do not claim it passed until verified.
 - Production remains untouched. No migrations deployed, Edge Function deployed, Vercel deployment, customer rows or order rows created.
+
+
+## POS same-revision payload fingerprint regression — 2026-11-24
+
+The unified POS sync behavioral workflow previously failed exactly one assertion: `POS_SAME_REVISION_CHANGED_PAYLOAD_NOT_REJECTED`. Root cause in the test fixture: it changed the order notes but reused the original `request_hash`, which represents an identical retry from the RPC's perspective. The trusted `flame-chick-order-api` recomputes SHA-256 over the canonical server-priced POS payload; a changed note/content therefore produces a different hash before the service-role-only sync RPC is called. The SQL behavioral test now models that contract by assigning a distinct fingerprint for changed content at the same revision, then asserting `POS_ORDER_REVISION_CONFLICT`. It also retains the exact-payload/exact-hash replay assertion and later-revision update assertion.
+
+Added authenticated Edge Function regression coverage: identical POS request payloads must yield stable hashes; changed payload content at the same local order ID/revision must yield a different canonical hash. Changes committed on `work/production-source-audit`:
+- SQL behavioral test commit: `973238aa675cf4a68288d12176d462a654d7af78`
+- Edge Function regression test commit: `26e7b1b48ffb269d4aa1f4a0510f1d99d4349b01`
+
+These commits update test coverage only; no migration, Production data, Edge Function deployment, Vercel deployment, Realtime configuration or secrets were changed. Wait for the newly triggered disposable-local-Supabase workflow and inspect the exact failed job/step/log if it fails again. Do not infer that SQL/edge tests passed merely from commits. The unified POS sync workflow must pass before moving to the agreed application/API/Edge Function/Realtime deployment phase. After infrastructure deployment, conduct the complete manual test-order rehearsal with test accounts before real restaurant go-live. Flame Chick has no live restaurant operation or existing production customer/order records; this is a new system being built.
