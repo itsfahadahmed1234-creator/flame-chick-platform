@@ -4,6 +4,8 @@ import {
   isAllowedRequestOrigin,
   isSafeInviteRedirect,
   parseAllowedOrigins,
+  parseStaffAdminOrigins,
+  PRODUCTION_STAFF_ADMIN_ORIGIN,
   staffCorsHeaders
 } from "../supabase/functions/flame-chick-staff-admin/origin-policy.mjs";
 
@@ -63,8 +65,22 @@ test("the production Edge Function imports and enforces the tested origin policy
   const source = readFileSync("supabase/functions/flame-chick-staff-admin/index.ts", "utf8");
   assert.match(source, /isAllowedRequestOrigin/);
   assert.match(source, /isSafeInviteRedirect/);
-  assert.match(source, /parseAllowedOrigins/);
+  assert.match(source, /parseStaffAdminOrigins/);
   assert.match(source, /if\(!isAllowedRequestOrigin\(origin,ORIGINS\)\)/);
+});
+
+test("production Admin origin remains allowed when the optional environment allowlist is unset", () => {
+  const configured = parseStaffAdminOrigins("");
+  assert.deepEqual([...configured], [PRODUCTION_STAFF_ADMIN_ORIGIN]);
+  assert.equal(isAllowedRequestOrigin(PRODUCTION_STAFF_ADMIN_ORIGIN, configured), true);
+  assert.equal(staffCorsHeaders(PRODUCTION_STAFF_ADMIN_ORIGIN, configured)["Access-Control-Allow-Origin"], PRODUCTION_STAFF_ADMIN_ORIGIN);
+});
+
+test("production Admin origin is merged with explicitly configured exact origins", () => {
+  const configured = parseStaffAdminOrigins("https://localhost.example.test");
+  assert.equal(configured.has(PRODUCTION_STAFF_ADMIN_ORIGIN), true);
+  assert.equal(configured.has("https://localhost.example.test"), true);
+  assert.throws(() => parseStaffAdminOrigins("*"));
 });
 
 const productionAdminOrigin = "https://flamechicadmin.vercel.app";
