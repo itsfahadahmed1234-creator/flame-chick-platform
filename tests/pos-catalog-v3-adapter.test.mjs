@@ -35,6 +35,16 @@ function adapt(snapshot = createSnapshot(), options = {}) {
   return adapter.adapt(snapshot, { contract, dealView, ...options });
 }
 
+test('POS renders the V3 deal projection rather than raw snapshot deal rows', () => {
+  const html = readFileSync('apps/flame-chick-pos/index.html', 'utf8');
+  assert.match(html, /let catalogSnapshot=null,posDeals=\[\];/);
+  assert.match(html, /posDeals=adaptFlameChickCatalog\(saved\)\.deals\|\|\[\]/);
+  assert.match(html, /posDeals=adapted\.deals\|\|\[\]/);
+  assert.match(html, /\(posDeals\|\|\[\]\)\.filter\(d=>d\.Active===true/);
+  assert.doesNotMatch(html, /catalogSnapshot\?\.deals/,
+    'Raw V3 snapshot deal rows do not have the legacy POS display projection fields.');
+});
+
 test('projects published V3 products and category IDs without legacy IDs', () => {
   const result = adapt();
   assert.equal(result.ok, true, JSON.stringify(result));
