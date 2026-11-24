@@ -20,6 +20,7 @@ DO $fixtures$
 DECLARE
   r uuid:=gen_random_uuid();
   b uuid:=gen_random_uuid();
+  admin uuid:='d1111111-1111-4111-8111-111111111110';
   cashier uuid:='d1111111-1111-4111-8111-111111111111';
   rider uuid:='d1111111-1111-4111-8111-111111111112';
   category uuid:=gen_random_uuid();
@@ -30,7 +31,7 @@ DECLARE
   now_at timestamptz:=clock_timestamp();
 BEGIN
   IF EXISTS(SELECT 1 FROM public.restaurants WHERE slug='qa-pos-sync-flame-chick')
-     OR EXISTS(SELECT 1 FROM auth.users WHERE id IN(cashier,rider)) THEN
+     OR EXISTS(SELECT 1 FROM auth.users WHERE id IN(admin,cashier,rider)) THEN
     RAISE EXCEPTION 'POS_SYNC_TEST_FIXTURE_CONFLICT';
   END IF;
 
@@ -43,18 +44,23 @@ BEGIN
     id,aud,role,email,encrypted_password,email_confirmed_at,
     raw_app_meta_data,raw_user_meta_data,created_at,updated_at,is_sso_user,is_anonymous
   ) VALUES
+    (admin,'authenticated','authenticated','qa-pos-admin@example.invalid','',now_at,
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,now_at,now_at,false,false),
     (cashier,'authenticated','authenticated','qa-pos-cashier@example.invalid','',now_at,
       '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,now_at,now_at,false,false),
     (rider,'authenticated','authenticated','qa-pos-rider@example.invalid','',now_at,
       '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,now_at,now_at,false,false);
 
   INSERT INTO public.user_profiles(user_id,display_name,is_active)
-  VALUES(cashier,'QA POS Cashier',true),(rider,'QA POS Rider',true);
+  VALUES(admin,'QA POS Admin',true),(cashier,'QA POS Cashier',true),(rider,'QA POS Rider',true);
+  INSERT INTO public.user_roles(
+    restaurant_id,user_id,role_key,branch_id,is_active,assigned_by,reason,request_id,assignment_method
+  ) VALUES(r,admin,'admin',NULL,true,admin,'Disposable POS bootstrap QA',gen_random_uuid(),'initial_bootstrap');
   INSERT INTO public.user_roles(
     restaurant_id,user_id,role_key,branch_id,is_active,assigned_by,reason,request_id
   ) VALUES
-    (r,cashier,'cashier',b,true,cashier,'Disposable POS sync QA',gen_random_uuid()),
-    (r,rider,'rider',b,true,cashier,'Disposable POS sync QA',gen_random_uuid());
+    (r,cashier,'cashier',b,true,admin,'Disposable POS sync QA',gen_random_uuid()),
+    (r,rider,'rider',b,true,admin,'Disposable POS sync QA',gen_random_uuid());
 
   INSERT INTO public.categories(id,restaurant_id,category_kind,name_en,is_active)
   VALUES(category,r,'menu','QA POS Menu',true);
@@ -287,7 +293,7 @@ ROLLBACK;
 DO $cleanup$
 BEGIN
   IF EXISTS(SELECT 1 FROM public.restaurants WHERE slug='qa-pos-sync-flame-chick')
-     OR EXISTS(SELECT 1 FROM auth.users WHERE email IN('qa-pos-cashier@example.invalid','qa-pos-rider@example.invalid')) THEN
+     OR EXISTS(SELECT 1 FROM auth.users WHERE email IN('qa-pos-admin@example.invalid','qa-pos-cashier@example.invalid','qa-pos-rider@example.invalid')) THEN
     RAISE EXCEPTION 'POS_SYNC_TEST_FIXTURES_NOT_ROLLED_BACK';
   END IF;
 END;
