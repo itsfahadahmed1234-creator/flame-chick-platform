@@ -1438,6 +1438,68 @@ async function flameChickDeliveryRequest(method,query,body){
   if(!r.ok||data.ok===false)throw new Error(data?.error?.message||'Flame Chick delivery request failed.');
   return data;
 }
+function scheduleFlameChickRealtimeRefresh(){
+  if(flameChickRealtimeRefreshDebounce)clearTimeout(flameChickRealtimeRefreshDebounce);
+  flameChickRealtimeRefreshDebounce=setTimeout(async()=>{
+    flameChickRealtimeRefreshDebounce=null;
+    if(!navigator.onLine||!flameChickStaffSession?.access_token||flameChickRealtimeRefreshRunning)return;
+    flameChickRealtimeRefreshRunning=true;
+    try{await loadInitialOnlineInbox();await loadDeliveryDispatch();}
+    catch(error){console.warn('POS live refresh failed; manual refresh remains available.',error);}
+    finally{flameChickRealtimeRefreshRunning=false;}
+  },350);
+}
+function startFlameChickRealtimeFallback(){
+  flameChickRealtimeState='polling';
+  if($('inboxLiveText'))$('inboxLiveText').textContent='Connected · automatic refresh fallback';
+  if(flameChickRealtimeRefreshTimer)clearInterval(flameChickRealtimeRefreshTimer);
+  flameChickRealtimeRefreshTimer=setInterval(()=>{
+    if(navigator.onLine&&flameChickStaffSession?.access_token)scheduleFlameChickRealtimeRefresh();
+  },30000);
+}
+async function stopFlameChickRealtime(){
+  if(flameChickRealtimeRefreshTimer){clearInterval(flameChickRealtimeRefreshTimer);flameChickRealtimeRefreshTimer=null;}
+  if(flameChickRealtimeRefreshDebounce){clearTimeout(flameChickRealtimeRefreshDebounce);flameChickRealtimeRefreshDebounce=null;}
+  try{if(flameChickRealtimeClient&&flameChickRealtimeChannel)await flameChickRealtimeClient.removeChannel(flameChickRealtimeChannel);}catch(error){console.debug('POS Realtime channel cleanup',error?.message||error);}
+  flameChickRealtimeChannel=null;flameChickRealtimeClient=null;flameChickRealtimeState='off';
+}
+async function startFlameChickRealtime(){
+  await stopFlameChickRealtime();
+  if(!flameChickStaffSession?.access_token||!flameChickStaffProfile?.branch_id){flameChickRealtimeState='off';return false;}
+  const branch=String(flameChickStaffProfile.branch_id);
+  const baseUrl=FLAME_CHICK_AUTH_URL.replace(/\/auth\/v1\/?$/,'');
+  const sdk=window.supabase;
+  if(!sdk?.createClient){startFlameChickRealtimeFallback();return false;}
+  try{
+    const client=sdk.createClient(baseUrl,FLAME_CHICK_PUBLISHABLE_KEY,{
+      auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
+      realtime:{params:{eventsPerSecond:FLAME_CHICK_REALTIME_EVENTS_PER_SECOND}}
+    });
+    flameChickRealtimeClient=client;
+    await client.realtime.setAuth(flameChickStaffSession.access_token);
+    const channel=client.channel('fc:branch:'+branch+':pos',{config:{private:true}});
+    channel.on('broadcast',{event:'orders_changed'},scheduleFlameChickRealtimeRefresh);
+    channel.on('broadcast',{event:'delivery_changed'},scheduleFlameChickRealtimeRefresh);
+    flameChickRealtimeChannel=channel;
+    channel.subscribe(status=>{
+      if(status==='SUBSCRIBED'){
+        flameChickRealtimeState='connected';
+        if($('inboxLiveText'))$('inboxLiveText').textContent='Realtime connected';
+        if(flameChickRealtimeRefreshTimer)clearInterval(flameChickRealtimeRefreshTimer);
+        // A slower fallback still reconciles a missed Broadcast after reconnects.
+        flameChickRealtimeRefreshTimer=setInterval(()=>{
+          if(navigator.onLine&&flameChickStaffSession?.access_token)scheduleFlameChickRealtimeRefresh();
+        },120000);
+      }else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)){
+        startFlameChickRealtimeFallback();
+      }
+    });
+    return true;
+  }catch(error){
+    console.warn('POS private Realtime is unavailable; enabling safe polling fallback.',error?.message||error);
+    startFlameChickRealtimeFallback();return false;
+  }
+}
 async function loadDeliveryDispatch(){
   const role=String(flameChickStaffProfile?.role||'').toLowerCase();
   if(!['owner','admin','manager','cashier'].includes(role)||!flameChickStaffProfile?.branch_id){
