@@ -159,7 +159,7 @@ BEGIN
     RAISE EXCEPTION 'POS_DINE_IN_IDEMPOTENT_REPLAY_FAILED: %',result;
   END IF;
 
-  changed:=jsonb_set(payload,'{notes}',to_jsonb('changed at same revision'),true);
+  changed:=jsonb_set(payload,'{notes}',to_jsonb('changed at same revision'::text),true);
   result:=public.flame_chick_sync_pos_order(changed);
   IF result->>'ok'<>'false' OR result#>>'{error,code}'<>'POS_ORDER_REVISION_CONFLICT' THEN
     RAISE EXCEPTION 'POS_SAME_REVISION_CHANGED_PAYLOAD_NOT_REJECTED: %',result;
@@ -167,7 +167,7 @@ BEGIN
 
   changed:=jsonb_set(
     jsonb_set(payload,'{local_revision}',to_jsonb(2),true),
-    '{notes}',to_jsonb('valid later revision'),true
+    '{notes}',to_jsonb('valid later revision'::text),true
   );
   changed:=jsonb_set(changed,'{request_hash}',to_jsonb(repeat('2',64)),true);
   result:=public.flame_chick_sync_pos_order(changed);
