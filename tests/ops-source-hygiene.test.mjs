@@ -109,6 +109,15 @@ test("POS keeps Rider-delivered orders active until Cashier payment collection",
   assert.doesNotMatch(html,/status==='Delivered'[^\\n]*data-order-status="Completed"/);
 });
 
+test("POS status commands include a per-mutation idempotency UUID",()=>{
+  const html=source[0].html;
+  const start=html.indexOf("async function updateOnlineOrderStatus(orderId,status)");
+  const end=html.indexOf("async function ",start+30);
+  const mutation=html.slice(start,end);
+  assert.match(mutation,/requestId:crypto\.randomUUID\(\)/);
+  assert.match(mutation,/order_id:key,to_status:toStatus,reason,request_id:mutation\.requestId/);
+});
+
 test("POS distinguishes Dine-in Served from Takeaway Collected",()=>{
   const html=source[0].html;
   assert.match(html,/data-order-status="Served"/);
