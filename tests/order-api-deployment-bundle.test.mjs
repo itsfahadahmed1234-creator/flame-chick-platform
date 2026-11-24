@@ -17,8 +17,8 @@ test('Order API deployment bundle is byte-for-byte aligned with canonical shared
 
 test('Order API uses only self-contained local imports for deployment',()=>{
   const source=readFileSync('supabase/functions/flame-chick-order-api/index.ts','utf8');
-  assert.match(source,/from "\.\/catalog-v3\.js"/);
-  assert.match(source,/from "\.\/catalog-v3-deal-view\.js"/);
+  assert.match(source,/import "\.\/catalog-v3\.js"/);
+  assert.match(source,/import "\.\/catalog-v3-deal-view\.js"/);
   assert.match(source,/from "\.\/flame-chick-order-pricing\.mjs"/);
   assert.match(source,/from "\.\/website-order-quote-token\.mjs"/);
   assert.doesNotMatch(source,/\.\.\/_shared|\.\.\.\/apps\/flame-chick-website/);
