@@ -1489,3 +1489,14 @@ User priorities/constraints unchanged: Flame Chick Production is the system bein
 - Run 65, URL https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45347377217, was triggered on commit `22b783518f8efbc9899ad019cd0305502e8fb5b0`. At handoff update time it had passed source checks and was starting disposable Supabase; behavioral SQL result is pending and must be inspected.
 - Run 63's earlier self-assignment fixture error and run 64's slug mismatch are test fixture defects, not evidence of the POS sync RPC passing. Do not claim behavioral integration passed until run 65 or a later corrected run passes the SQL step.
 - Production project was not changed. No migrations deployed and no operational records created there.
+
+
+# 2026-11-24 — POS sync SQL run 65 diagnosis and generated-column correction
+
+- Run 65 passed complete disposable migration replay and staff-role fixture checks, then the first Dine-in order insert exposed the next genuine migration defect:
+  `cannot insert a non-DEFAULT value into column "balance_due"`; `balance_due` is generated as `greatest(total-paid_amount,0)`.
+- Corrected candidate migration `20261124050000_flame_chick_unified_pos_order_sync_v1.sql`: removed `balance_due` from the initial INSERT, removed explicit assignments from the revision UPDATE and payment UPDATE. The database-generated column is now the only source of balance.
+- Candidate migration remains unapplied to the hosted Flame Chick project. This change is source-only pending disposable verification.
+- Run 66 has been triggered on commit `a4741f838de027d20b82e50f8a79f86e068e5b77`: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45347935015. At checkpoint time it was in progress. Inspect the full migration replay and behavioral SQL logs; do not report success until the SQL step passes.
+- Run 65's full migration replay passed; behavioral SQL failed at the first order insert, so no downstream Dine-in/Takeaway/Delivery or payment assertions ran.
+- No changes to hosted database, auth users, customer/order data, Edge Function deployment, or website deployment.
