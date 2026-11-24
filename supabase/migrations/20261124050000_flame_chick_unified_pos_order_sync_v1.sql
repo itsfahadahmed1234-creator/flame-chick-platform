@@ -244,42 +244,44 @@ BEGIN
     RETURNING id INTO v_order_id;
   END IF;
 
-  FOR v_item IN SELECT value FROM pg_catalog.jsonb_array_elements(v_items) WITH ORDINALITY AS e(value,ordinality) ORDER BY ordinality LOOP
-    v_ordinal:=v_ordinal+1; v_quantity:=(v_item->>'quantity')::integer;
-    INSERT INTO public.order_items(restaurant_id,branch_id,order_id,line_number,line_kind,product_id,product_variant_id,deal_id,quantity,
-      product_name_snapshot,variant_label_snapshot,deal_title_snapshot,unit_price_snapshot,discount_amount,line_total,item_notes,item_snapshot,catalog_publication_id)
-    VALUES(v_restaurant_id,v_branch_id,v_order_id,v_ordinal,v_item->>'line_kind',NULLIF(v_item->>'product_id','')::uuid,
-      NULLIF(v_item->>'product_variant_id','')::uuid,NULLIF(v_item->>'deal_id','')::uuid,v_quantity,
-      NULLIF(v_item->>'product_name_snapshot',''),NULLIF(v_item->>'variant_label_snapshot',''),NULLIF(v_item->>'deal_title_snapshot',''),
-      (v_item->>'unit_price_snapshot')::numeric,0,(v_item->>'line_total')::numeric,NULLIF(v_item->>'item_notes',''),v_item->'item_snapshot',
-      NULLIF(p_payload->>'catalog_publication_id','')::uuid) RETURNING id INTO v_item_id;
-    FOR v_modifier IN SELECT value FROM pg_catalog.jsonb_array_elements(v_item->'modifiers') LOOP
-      INSERT INTO public.order_item_modifiers(restaurant_id,branch_id,order_id,order_item_id,order_item_component_id,modifier_group_id,modifier_id,
-        quantity,modifier_group_name_snapshot,modifier_name_snapshot,unit_price_snapshot,total_price_snapshot,modifier_snapshot)
-      VALUES(v_restaurant_id,v_branch_id,v_order_id,v_item_id,NULL,NULLIF(v_modifier->>'modifier_group_id','')::uuid,
-        NULLIF(v_modifier->>'modifier_id','')::uuid,(v_modifier->>'quantity')::integer,
-        NULLIF(v_modifier->>'modifier_group_name_snapshot',''),COALESCE(NULLIF(v_modifier->>'modifier_name_snapshot',''),'Modifier'),
-        (v_modifier->>'unit_price_snapshot')::numeric,(v_modifier->>'total_price_snapshot')::numeric,COALESCE(v_modifier->'modifier_snapshot','{}'::jsonb));
-    END LOOP;
-    FOR v_component IN SELECT value FROM pg_catalog.jsonb_array_elements(v_item->'components') LOOP
-      INSERT INTO public.order_item_components(restaurant_id,branch_id,order_id,order_item_id,deal_component_id,component_type,selected_product_id,
-        selected_variant_id,selected_drink_option_id,quantity,name_snapshot,variant_snapshot,volume_snapshot,unit_price_snapshot,component_snapshot)
-      VALUES(v_restaurant_id,v_branch_id,v_order_id,v_item_id,NULLIF(v_component->>'deal_component_id','')::uuid,v_component->>'component_type',
-        NULLIF(v_component->>'selected_product_id','')::uuid,NULLIF(v_component->>'selected_variant_id','')::uuid,
-        NULLIF(v_component->>'selected_drink_option_id','')::uuid,LEAST((v_component->>'quantity')::integer*v_quantity,99),
-        v_component->>'name_snapshot',NULLIF(v_component->>'variant_snapshot',''),NULLIF(v_component->>'volume_snapshot',''),
-        (v_component->>'unit_price_snapshot')::numeric,COALESCE(v_component->'component_snapshot','{}'::jsonb)) RETURNING id INTO v_component_id;
-      FOR v_component_modifier IN SELECT value FROM pg_catalog.jsonb_array_elements(v_component->'modifiers') LOOP
+  IF v_updated OR v_existing.id IS NULL THEN
+    FOR v_item IN SELECT value FROM pg_catalog.jsonb_array_elements(v_items) WITH ORDINALITY AS e(value,ordinality) ORDER BY ordinality LOOP
+      v_ordinal:=v_ordinal+1; v_quantity:=(v_item->>'quantity')::integer;
+      INSERT INTO public.order_items(restaurant_id,branch_id,order_id,line_number,line_kind,product_id,product_variant_id,deal_id,quantity,
+        product_name_snapshot,variant_label_snapshot,deal_title_snapshot,unit_price_snapshot,discount_amount,line_total,item_notes,item_snapshot,catalog_publication_id)
+      VALUES(v_restaurant_id,v_branch_id,v_order_id,v_ordinal,v_item->>'line_kind',NULLIF(v_item->>'product_id','')::uuid,
+        NULLIF(v_item->>'product_variant_id','')::uuid,NULLIF(v_item->>'deal_id','')::uuid,v_quantity,
+        NULLIF(v_item->>'product_name_snapshot',''),NULLIF(v_item->>'variant_label_snapshot',''),NULLIF(v_item->>'deal_title_snapshot',''),
+        (v_item->>'unit_price_snapshot')::numeric,0,(v_item->>'line_total')::numeric,NULLIF(v_item->>'item_notes',''),v_item->'item_snapshot',
+        NULLIF(p_payload->>'catalog_publication_id','')::uuid) RETURNING id INTO v_item_id;
+      FOR v_modifier IN SELECT value FROM pg_catalog.jsonb_array_elements(v_item->'modifiers') LOOP
         INSERT INTO public.order_item_modifiers(restaurant_id,branch_id,order_id,order_item_id,order_item_component_id,modifier_group_id,modifier_id,
           quantity,modifier_group_name_snapshot,modifier_name_snapshot,unit_price_snapshot,total_price_snapshot,modifier_snapshot)
-        VALUES(v_restaurant_id,v_branch_id,v_order_id,v_item_id,v_component_id,NULLIF(v_component_modifier->>'modifier_group_id','')::uuid,
-          NULLIF(v_component_modifier->>'modifier_id','')::uuid,LEAST((v_component_modifier->>'quantity')::integer*v_quantity,99),
-          NULLIF(v_component_modifier->>'modifier_group_name_snapshot',''),COALESCE(NULLIF(v_component_modifier->>'modifier_name_snapshot',''),'Modifier'),
-          (v_component_modifier->>'unit_price_snapshot')::numeric,(v_component_modifier->>'unit_price_snapshot')::numeric*LEAST((v_component_modifier->>'quantity')::integer*v_quantity,99),
-          COALESCE(v_component_modifier->'modifier_snapshot','{}'::jsonb));
+        VALUES(v_restaurant_id,v_branch_id,v_order_id,v_item_id,NULL,NULLIF(v_modifier->>'modifier_group_id','')::uuid,
+          NULLIF(v_modifier->>'modifier_id','')::uuid,(v_modifier->>'quantity')::integer,
+          NULLIF(v_modifier->>'modifier_group_name_snapshot',''),COALESCE(NULLIF(v_modifier->>'modifier_name_snapshot',''),'Modifier'),
+          (v_modifier->>'unit_price_snapshot')::numeric,(v_modifier->>'total_price_snapshot')::numeric,COALESCE(v_modifier->'modifier_snapshot','{}'::jsonb));
+      END LOOP;
+      FOR v_component IN SELECT value FROM pg_catalog.jsonb_array_elements(v_item->'components') LOOP
+        INSERT INTO public.order_item_components(restaurant_id,branch_id,order_id,order_item_id,deal_component_id,component_type,selected_product_id,
+          selected_variant_id,selected_drink_option_id,quantity,name_snapshot,variant_snapshot,volume_snapshot,unit_price_snapshot,component_snapshot)
+        VALUES(v_restaurant_id,v_branch_id,v_order_id,v_item_id,NULLIF(v_component->>'deal_component_id','')::uuid,v_component->>'component_type',
+          NULLIF(v_component->>'selected_product_id','')::uuid,NULLIF(v_component->>'selected_variant_id','')::uuid,
+          NULLIF(v_component->>'selected_drink_option_id','')::uuid,LEAST((v_component->>'quantity')::integer*v_quantity,99),
+          v_component->>'name_snapshot',NULLIF(v_component->>'variant_snapshot',''),NULLIF(v_component->>'volume_snapshot',''),
+          (v_component->>'unit_price_snapshot')::numeric,COALESCE(v_component->'component_snapshot','{}'::jsonb)) RETURNING id INTO v_component_id;
+        FOR v_component_modifier IN SELECT value FROM pg_catalog.jsonb_array_elements(v_component->'modifiers') LOOP
+          INSERT INTO public.order_item_modifiers(restaurant_id,branch_id,order_id,order_item_id,order_item_component_id,modifier_group_id,modifier_id,
+            quantity,modifier_group_name_snapshot,modifier_name_snapshot,unit_price_snapshot,total_price_snapshot,modifier_snapshot)
+          VALUES(v_restaurant_id,v_branch_id,v_order_id,v_item_id,v_component_id,NULLIF(v_component_modifier->>'modifier_group_id','')::uuid,
+            NULLIF(v_component_modifier->>'modifier_id','')::uuid,LEAST((v_component_modifier->>'quantity')::integer*v_quantity,99),
+            NULLIF(v_component_modifier->>'modifier_group_name_snapshot',''),COALESCE(NULLIF(v_component_modifier->>'modifier_name_snapshot',''),'Modifier'),
+            (v_component_modifier->>'unit_price_snapshot')::numeric,(v_component_modifier->>'unit_price_snapshot')::numeric*LEAST((v_component_modifier->>'quantity')::integer*v_quantity,99),
+            COALESCE(v_component_modifier->'modifier_snapshot','{}'::jsonb));
+        END LOOP;
       END LOOP;
     END LOOP;
-  END LOOP;
+  END IF;
 
   IF v_fulfillment='delivery' THEN
     INSERT INTO public.delivery_tasks(restaurant_id,branch_id,order_id,status,recipient_name_snapshot,recipient_phone_snapshot,
