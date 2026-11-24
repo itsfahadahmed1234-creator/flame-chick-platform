@@ -744,7 +744,7 @@ async function buildStaffPosSyncPayload(
   if (!customerName || customerName.length > 160 ||
       (customerPhone && (customerPhone.length < 3 || customerPhone.length > 32)) ||
       (fulfillmentType === "delivery" && customerPhone.length < 3) ||
-      (customerEmail && (customerEmail.length > 254 || !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(customerEmail)))) {
+      (customerEmail && (customerEmail.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(customerEmail)))) {
     return websiteError("CUSTOMER_DETAILS_INVALID","Enter a valid customer name and phone number; Delivery requires a phone number.",400);
   }
 
