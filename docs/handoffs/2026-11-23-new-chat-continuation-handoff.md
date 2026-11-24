@@ -2301,3 +2301,24 @@ The disposable behavioral workflow passed before the final migration filename wa
 - GST/tax remains explicitly deferred. Do not add tax columns or tax calculation logic.
 - No Production schema, migration, catalog publication, Storage, auth account, role, order, payment, delivery fee or deployment alias was changed in this audit.
 - Deployment in the restaurant within the requested one-hour window cannot responsibly be certified from the current evidence: the code/deployments are substantially present, but the browser checkout-to-POS test, Rider provisioning and full manual operational rehearsal remain open. Keep the system in controlled test mode until those gates pass and the operator approves live use.
+
+
+## 2026-11-24 — POS deal Add action and live delivery-fee display fix (source + CI verified; deployment blocked)
+
+- User reported that the POS Deals “Add” action did not add deals to the cart and that the delivery fee/total still displayed “Not configured” even though delivery areas had been completed.
+- Inspected the current POS source and connected browser. The POS was still rendering the Area / Mohalla as a free-text input, even though the authenticated `pos_delivery_context` endpoint and both backing Production reads returned HTTP 200. The Production rows are intact: Main branch, active Comsats University area at **Rs. 0**, and Not Listed / Other default at **Rs. 100**. User's intentional zero test fee remains unchanged.
+- Updated `apps/flame-chick-pos/index.html`:
+  - Replaced the free-text area input with a real select populated from the authenticated branch delivery configuration.
+  - Shows the saved fee beside each area; explicitly includes the zero-fee Comsats row and the configured Not Listed / Other default.
+  - Preserves the current area only when it still exists in the refreshed branch configuration; rejects stale cached configuration from a different branch.
+  - Refreshes options after staff sign-in and on startup, and recalculates subtotal/delivery/total immediately on area selection.
+  - Replaces the ambiguous “Not configured” placeholder with “Choose area” before selection or “Fee unavailable” for a stale/invalid selection. Takeaway and Dine-in show Rs. 0 delivery and subtotal-based total.
+  - Delivery order validation and authoritative server-side fee calculation remain in place; the client still does not submit its own delivery fee as pricing authority.
+  - Strengthened the Add Deal button's direct click handler, prevents default/bubbling, validates the deal price and selected component group quantities before cart insertion, and shows an explicit toast on errors rather than silently failing. Existing V3 deal IDs and cart/sync payload contract are retained.
+- Added regression coverage in `tests/ops-source-hygiene.test.mjs` for fee-labelled branch options, zero/default fee handling, branch-cache mismatch, immediate recalculation and direct Add Deal action/error handling.
+- Exact commits: POS source `75169652e6eb0b98623e85894f99cf5fe8dd8ab9`; tests `52e769a34c02ab00936771564bcb09bee7b4fe8d`.
+- GitHub Actions POS and Rider Static Checks run **45435483767 PASSED** on exact test commit `52e769a34c02ab00936771564bcb09bee7b4fe8d`; job `static-checks` completed successfully, including the new regression tests and inline JavaScript parse. The earlier source-only run `45435438400` also passed.
+- The automatic POS preview deploy workflow `45435438209` was skipped because its repository gate `FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED` is not true. A direct Vercel preview deployment request against the known POS project was rejected with **403 Forbidden / not authorized**. No deployment was made and no alias was changed. Do not claim the fix is live yet.
+- Next action: deploy this exact verified branch commit `52e769a34c02ab00936771564bcb09bee7b4fe8d` to the existing POS Vercel project as a **preview only**, using an authorized Vercel CLI/session or by having the repository's preview deployment gate explicitly enabled by an authorized project owner. Do not promote production or change `flamechicpos.vercel.app` until the preview browser test passes.
+- After preview deployment, sign in to POS, select Deals, open Flame Duo (or another currently available deal), verify selectable options and Add Deal inserts the correct deal/price/components into cart, then verify delivery selector shows Comsats University — Rs. 0 and Not Listed / Other — Rs. 100. Select each option and verify total = subtotal + the selected fee. Test Takeaway/Dine-in show zero delivery. No Production order is required for these UI calculations; do not submit a live order just to verify the display.
+- No Production migration, schema, delivery area, fee, order, payment, user, role, catalog publication or deployment alias was changed by this work.
