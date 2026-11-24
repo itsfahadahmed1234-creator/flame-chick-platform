@@ -1,5 +1,5 @@
 // Flame Chick Staff Admin API — Batch 4.
-import { isAllowedRequestOrigin, isSafeInviteRedirect, parseAllowedOrigins, staffCorsHeaders } from "./origin-policy.mjs";
+import { isAllowedRequestOrigin, isSafeInviteRedirect, parseStaffAdminOrigins, staffCorsHeaders } from "./origin-policy.mjs";
 import { buildCatalogRpcCall } from "./catalog-actions.mjs";
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").replace(/\/+$/,"");
 function readKey(jsonName:string,fallback:string[]):string{
@@ -12,7 +12,7 @@ const REDIRECT=(Deno.env.get("FLAME_CHICK_STAFF_INVITE_REDIRECT_URL")??"").trim(
 let ORIGINS: Set<string> = new Set();
 let ORIGIN_CONFIG_VALID = false;
 try {
- ORIGINS = parseAllowedOrigins(Deno.env.get("FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS") ?? "");
+ ORIGINS = parseStaffAdminOrigins(Deno.env.get("FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS") ?? "");
  ORIGIN_CONFIG_VALID = true;
 } catch {
  // Fail closed without logging the environment value.
