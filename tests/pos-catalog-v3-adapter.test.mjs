@@ -68,7 +68,9 @@ test('marks deals unavailable when schedule, branch or a required component is u
   });
   const result = adapt(snapshot);
   assert.equal(result.ok, true, JSON.stringify(result));
-  assert.deepEqual(result.deals, []);
+  assert.equal(result.deals.length, 1);
+  assert.equal(result.deals[0].Available, false);
+  assert.equal(result.deals[0].BranchAvailable, false);
 });
 
 test('requires explicit branch selection when the published catalog has multiple branches', () => {
