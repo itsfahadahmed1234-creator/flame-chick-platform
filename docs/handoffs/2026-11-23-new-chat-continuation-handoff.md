@@ -1391,3 +1391,40 @@ The existing backend also allows partial payments for other potential workflows;
 
 ## Still outstanding
 The POS is **not yet wired to the V3 catalog adapter**; the existing page still has the legacy V2 catalog dependency. Continue the V3-only POS integration before claiming the POS is ready. Then implement and test the authenticated staff POS sync API, unified IndexedDB outbox for Dine-in/Takeaway/Delivery, real disposable local Supabase integration, offline/reconnect/revision/idempotency/concurrency tests, board/history correctness and payment migration validation. Do not apply any migration or deploy until all relevant disposable tests pass. Keep Production as the target system being built; it currently has no live customer/order operation. No GST changes; Free plan only.
+
+
+# 2026-11-24 — POS published V3 catalog cutover (menu read path only; order path intentionally gated)
+
+## Completed source integration
+- POS now loads the shared website V3 catalog contract, V3 deal view, and `catalog-v3-adapter.js` before its main application code.
+- Health responses are validated with `FlameChickCatalogV3.validateHealth`; catalog download must match V3 schema, publication ID and version hash.
+- IndexedDB menu cache records schemaVersion 3 and the publication/version metadata.
+- Existing V2 catalog cache is discarded from the menu/catalog stores at startup. Orders, tables and queue stores are not deleted by this cache reset.
+- POS menu projection uses V3 category/product/variant IDs, published prices, branch product/variant availability, subcategories and database timestamp.
+- Product modifier groups now come from the shared V3 `buildProductModifierGroups` logic for the selected product variant, with resolved V3 minor-unit prices. No V2 modifier tables or legacy IDs are used in this read path.
+- Unavailable/scheduled/branch-unavailable deals remain visible in the menu as disabled entries; the POS no longer silently hides them.
+
+## Fail-closed safety gates (important)
+The current Order API `action=create` for staff still calls the older `flame_chick_create_order` RPC and does not invoke the V3 server-side quote/pricing path. The current local cart and delivery create payload are also still legacy-shaped. The old deal picker still expects V2 `dealComponents` and cannot correctly represent V3 deal variants/component groups.
+
+Therefore:
+- `saveLocalOrder()` now refuses order submission when the V3 catalog is loaded, with an explicit message that V3 staff pricing/sync must be connected first. This prevents V3 IDs being sent into legacy order RPCs or creating wrongly priced/structured records.
+- V3 deal buttons remain disabled until the V3 deal variant/component selection and server payload are implemented.
+- The menu can be read from the published V3 snapshot, but POS checkout is **not yet operational**. Do not remove these gates or call the POS complete until the next phase is finished.
+
+## CI
+- `tests/pos-catalog-v3-adapter.test.mjs` now runs in the POS static workflow.
+- `tests/ops-source-hygiene.test.mjs` includes V3-only loader/cache, unavailable-deal display, V3 order fail-closed and V3 deal fail-closed assertions.
+- Run `45340945412` passed on commit `8df0ef51e5b175e09aa34fe1933caaae49127bd7`, before the final order/deal gates were added. A new run for the latest commits must be checked; do not reuse the earlier pass as proof of the final tree.
+- Older failed runs during test migration are historical; current verification is the latest workflow run for the final head SHA.
+
+## Next exact implementation work
+1. Implement a trusted staff V3 quote endpoint/action that resolves the authenticated staff identity, branch and fulfilment from trusted session context. Call shared `calculateWebsiteOrder` with `staffPos:true` only server-side. Never trust browser prices, branch IDs, totals, or `staffPos`.
+2. Add a staff-only V3 order create transaction/RPC using the canonical priced result and idempotency key; preserve cashier actor, source, branch, POS device/register metadata and audit fields. Review the existing order tables/RPC and migration dependencies before drafting any migration.
+3. Implement V3 product cart payloads (`kind: product`, `product_id`, `product_variant_id`, modifier group IDs and modifier IDs) and V3 deal selector/cart payloads (`kind: deal`, `deal_id`, `deal_variant_id`, exact component group/option/product/variant IDs and nested modifiers). Validate selections through shared V3 validators and let server pricing calculate totals.
+4. Connect Dine-in, Takeaway and Delivery to one durable IndexedDB outbox with local UUID, stable idempotency key, revisions, server acknowledgement, retry and lost-response reconciliation. Current legacy `syncPending` short-circuits to Delivery sync; Dine-in and Takeaway are not yet on unified server sync.
+5. Load delivery areas/fees from trusted branch delivery configuration (not the V3 catalog arrays, which the V3 contract explicitly requires empty). Do not infer a zero/default fee.
+6. Add disposable local Supabase migration/integration tests for all fulfilments, pricing/modifiers/deals, payment collection, offline reconnect, duplicate retries, two-terminal table concurrency, revisions and history.
+7. Only after tests pass, review/deploy migrations and function changes deliberately. No Production migrations, test orders, fake customer records, Edge Function deployments, Realtime changes or Vercel deployments have been made in this stage.
+
+User priorities/constraints unchanged: Flame Chick Production is the system being built and has no live customer/order production data; no GST/tax implementation; Free plan only; no rebuild of existing POS UI; no unverified migrations.
