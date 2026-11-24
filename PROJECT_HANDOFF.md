@@ -4693,3 +4693,11 @@ The disposable behavioral workflow passed before the final migration filename wa
 - After the first Production website deployment, a final source review found that the homepage's dormant legacy Add/Cart action still routed to `order-online-v3.html`. Changed every legacy homepage action redirect to `menu.html`, relabelled the header control as Menu, and changed the bottom bar text to Browse the published menu. This ensures old embedded controls cannot lead customers to the unconfigured checkout route.
 - Commit: `2c48be760af08d7242790eb7f5967109c1fb47a5`.
 - Website static workflow **45377334847** and preview deploy workflow **45377334883** were triggered on this commit; at handoff update time CI is still running and preview workflow guard may skip it. The previous Production deployment `dpl_GCFHz8afyKw4d7z95ofwBZJoQZ2B` is READY on prior commit `5653713cd6a41f6efe3954691a41f9c573d721ac`. After current static workflow succeeds, create a fresh Vercel Production deployment for commit `2c48be760af08d7242790eb7f5967109c1fb47a5` so these final navigation corrections are live.
+
+
+### Final public homepage navigation deployment — READY
+- Current homepage final correction commit `2c48be760af08d7242790eb7f5967109c1fb47a5` passed Website Static Checks workflow **45377334847** (all syntax, core catalog regression, preview regression and inline-script steps successful).
+- A fresh Vercel **Production** deployment was created from that exact commit and reached **READY**: `dpl_YJbH18Kd2MH9nkTb6rbfQVKYoK78`.
+- Vercel confirms the custom domain alias `flamechick.vercel.app` is assigned to this newest deployment. Public menu remains `https://flamechick.vercel.app/menu.html`.
+- This latest release includes the final change routing all homepage legacy Add/Cart controls to the read-only V3 menu and labels the header control as Menu.
+- The deployment is published. Runtime browser-level menu rendering smoke test remains the outstanding website verification; static tests and Vercel READY/alias are not a substitute for that visual/network test.
