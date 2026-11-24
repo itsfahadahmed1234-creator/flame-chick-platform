@@ -1412,6 +1412,7 @@ async function flameChickStaffSignIn(event){
     flameChickStaffProfile={...role,email:user.email};
     if($('staffGatePassword'))$('staffGatePassword').value='';if($('staffPassword'))$('staffPassword').value='';
     hideStaffLoginGate();closeModal('staffAuthModal');$('staffLoginBtn').textContent='Sign out · '+role.role;
+    await ensureDeliveryAreas();
     await startFlameChickRealtime();await loadInitialOnlineInbox();await syncPending();showToast('Signed in to Flame Chick as '+role.role);
   }catch(e){if(error)error.textContent=e.message||'Sign in failed.';showStaffLoginGate(e.message||'Sign in failed.');}
   finally{if(btn){btn.disabled=false;btn.textContent='Sign in';}}
@@ -3581,7 +3582,13 @@ async function saveLocalOrder(){
   const type=$('orderType').value;
   const subtotal=cart.reduce((a,x)=>a+(Number(x.price)||0)*(Number(x.quantity)||1),0);
   const deliveryFee=type==='Delivery'?getDeliveryFeeForArea($('area').value):0;
+  const deliveryAreaText=normalizeLookupText($('area').value);
+  const isNotListedDelivery=['not listed','not listed / other'].includes(deliveryAreaText);
+  const deliveryLocality=String($('deliveryLocality')?.value||'').trim();
+  const deliveryAreaId=type==='Delivery'&&!isNotListedDelivery?getDeliveryAreaId($('area').value):'';
   if(type==='Delivery'&&deliveryFee===null){showToast('Choose a listed area or Not Listed. The default fee for Not Listed must be configured in Admin.');$('area').focus();return;}
+  if(type==='Delivery'&&isNotListedDelivery&&!deliveryLocality){showToast('Enter the locality for this Not Listed delivery.');$('deliveryLocality').focus();return;}
+  if(type==='Delivery'&&!isNotListedDelivery&&!deliveryAreaId){showToast('Choose a listed delivery area from the Production branch settings.');$('area').focus();return;}
   const customerName=$('customerName').value.trim();
   const phone=$('phone').value.trim();
   if(!customerName){showToast('Customer name is required');$('customerName').focus();return;}
@@ -3650,6 +3657,10 @@ async function saveLocalOrder(){
       status:'Pending',notes:$('notes').value.trim(),tableNumber:'',items:cart.map(x=>({...x})),
       syncStatus:'pending',syncAttempts:0,checkoutPending:true
     });
+  }
+  if(type==='Delivery'){
+    order.deliveryAreaId=deliveryAreaId||null;
+    order.deliveryLocality=isNotListedDelivery?deliveryLocality:'';
   }
   window.editingLocalOrderId=order.localOrderId;
   await put(STORES.orders,order);
@@ -4513,7 +4524,7 @@ function bindStaticControls(){
 }
 
 // Cashier-friendly keyboard navigation: Enter moves to the next relevant field.
-const orderFieldIds=['orderType','customerName','phone','address','area','paymentMethod','notes'];
+const orderFieldIds=['orderType','customerName','phone','address','area','deliveryLocality','paymentMethod','notes'];
 function focusNextOrderField(currentId){
   const idx=orderFieldIds.indexOf(currentId);
   if(idx<0)return;
@@ -4523,6 +4534,10 @@ function focusNextOrderField(currentId){
     if(next){next.focus();if(typeof next.select==='function' && next.tagName==='INPUT')next.select();}
   }
 }
+$('area')?.addEventListener('input',()=>{
+  const value=normalizeLookupText($('area').value);
+  $('deliveryLocalityField').style.display=['not listed','not listed / other'].includes(value)&&$('orderType').value==='Delivery'?'grid':'none';
+});
 orderFieldIds.forEach(id=>{
   const el=$(id);
   if(!el)return;
