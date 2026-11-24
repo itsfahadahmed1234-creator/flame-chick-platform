@@ -2159,3 +2159,11 @@ The disposable behavioral workflow passed before the final migration filename wa
 - Latest known POS baseline remains commit `72f2977adf0d3b64d8a3e67edc2761ab4da39e9e`, CI `45407482554` passed; latest POS deployment at that baseline is READY. New source edits above are not deployed.
 
 **Next:** retrieve exact SQL from remote migration ledger and mirror to source; add disposable SQL/role-boundary tests for Admin/Owner allowed and Manager/Cashier/Rider/anon denied, plus fee/area validation; run Admin/POS static checks. Only then proceed with deploy preview and verify canonical Admin/POS pages. Do not publish catalog burger changes until the deal selection payload passes the existing order-pricing/checkout contract.
+
+
+### CI correction after delivery/POS source commit
+- GitHub Actions POS/Rider Static Checks **45421158015 FAILED** on commit `b41ccd7b60e06624ce4cb38c56105d8ca2ab1e4d`. Exact failure: stale visual regression assertion expected the old `auto-fill/minmax(280px)` grid; the new three-column desktop grid intentionally changes this. 46/47 tests passed; no runtime/functional test failed.
+- Admin Static Checks **45421158036 PASSED** on `b41ccd7...`.
+- Staff Admin Role Boundary QA **45421157997 PASSED** on `b41ccd7...`, including full disposable migration replay and Admin/Owner vs operational-role boundaries, but this run predates the newly reconciled migration file commit `6bf4dfdc8d0696b68bc03f0bf4133af0b168a452`; therefore it does not validate that new source migration yet.
+- Updated the POS visual test to assert three desktop columns, two mobile columns and right-aligned action button. This test fix is queued for a new CI run against the migration-reconciled branch head.
+- No Vercel deployment was triggered (preview workflows skipped); do not deploy until the exact latest POS/Admin checks and full role-boundary QA pass.

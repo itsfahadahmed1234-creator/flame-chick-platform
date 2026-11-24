@@ -148,7 +148,9 @@ test('POS deal cards keep unavailable status separate from the price and action'
 test('POS visual refinement styles product cards consistently and colours the brand mark red', () => {
   const html = readFileSync('apps/flame-chick-pos/index.html', 'utf8');
   assert.match(html, /id="flame-chick-pos-visual-refinement"/);
-  assert.match(html, /\.pos-menu #menuGrid\{grid-template-columns:repeat\(auto-fill,minmax\(min\(100%,280px\),1fr\)\)/);
+  assert.match(html, /\.pos-menu #menuGrid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(html, /\.pos-menu #menuGrid \.product-card \.add\{[\s\S]*?justify-self:end/);
+  assert.match(html, /\.pos-menu #menuGrid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(html, /\.pos-menu #menuGrid \.product-card\{[\s\S]*?min-height:202px/);
   assert.match(html, /\.brand-logo\{[\s\S]*?filter:brightness\(0\) saturate\(100%\)/);
 });
