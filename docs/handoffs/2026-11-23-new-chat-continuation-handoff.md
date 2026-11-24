@@ -1524,3 +1524,26 @@ These commits update test coverage only; no migration, Production data, Edge Fun
 
 
 Follow-up CI correction: the first Edge Function test run after adding the new regression coverage failed TypeScript control-flow analysis (TS2367), because Deno inferred the array length as a literal after a prior length assertion. The test now reads the count through `Array.from(posSyncPayloads).length` to avoid stale narrowing. Fix commit: `4ee773b75541f5d59b48eceb4fb58018072f901c`. Recheck the latest Edge Function workflow and unified POS behavioral SQL workflow before declaring this fix verified.
+
+
+## Latest workflow verification — 2026-11-24 (after POS revision-fingerprint fix)
+
+Latest relevant workflow results inspected directly, including job steps (not just run badges):
+
+| Area | Latest successful run | Result |
+|---|---:|---|
+| Unified POS sync + V3 catalog import against disposable local Supabase | [#68 / 45349845108](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45349845108) | PASS — full migration replay, POS behavioral SQL (Dine-in/Takeaway/Delivery, walk-ins, exact retry, changed same-revision payload rejection, later revision, table lock, payment replay), catalog import/compile/validate/resume, disposable stack stopped |
+| Edge Function TypeScript + API integration/static contracts | [#96 / 45349936949](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45349936949) | PASS — TypeScript check, actual Website Order API synthetic route tests, RPC/catalog/pricing/key contracts |
+| Admin static checks | [#144 / 45349936893](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45349936893) | PASS |
+| Staff Admin role boundary QA | [#103 / 45347935003](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45347935003) | PASS — role authorization and disposable SQL tests |
+| Catalog publication validation fixes | [#89 / 45347934967](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45347934967) | PASS |
+| POS/Rider static checks | [#56 / 45341289623](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45341289623) | PASS |
+
+The two immediately preceding failed attempts are historical and superseded:
+- SQL workflow #67 failed because its test changed `notes` while reusing the same request hash. Corrected SQL behavioral fixture in #68 now supplies a distinct canonical fingerprint for changed same-revision content and the full workflow passed.
+- Edge Function workflow #95 failed TypeScript check TS2367 because TypeScript narrowed a test array length to literal 2 before a later comparison with 3. The test assertion was changed to use `Array.from(posSyncPayloads).length`; Edge Function workflow #96 then passed all steps.
+- Older failed runs #63–#67, #87–#95 and other earlier attempts are historical records from superseded commits. Do not mistake them for current branch failures; GitHub retains their audit history.
+
+**Current verification checkpoint:** all relevant latest workflows inspected above are green. No remaining failed current run identified. No application or SQL behavior changes were needed after the green results; the follow-up was test-only. Do not claim production deployment or real-world manual rehearsal has occurred.
+
+**Deployment gate remains:** after this successful unified behavioral SQL workflow, proceed to the planned infrastructure deployment of the apps, APIs, Supabase Edge Functions, Realtime and required integrations. This is deployment of the new system, not permission to start real restaurant operations. Before a restaurant go-live, conduct the complete manual rehearsal using test accounts and explicitly identified test orders: all three fulfilment types; online ordering and POS where applicable; IndexedDB offline queue and automatic reconnect sync; rider accept/pickup/delivered; Cashier collect-payment popup and COD/Card/Online-bank-transfer method; payment collection then completion/history; staff role boundaries; duplicate requests, network loss/retry, and failure recovery. Verify records and clean up test data. Only after the rehearsal passes may real restaurant operations begin. Flame Chick is being built from scratch; do not imply there are pre-existing production customers or orders.
