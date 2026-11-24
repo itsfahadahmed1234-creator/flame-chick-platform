@@ -116,7 +116,7 @@ test("checkout uses server quote tokens, idempotency and safe uncertain-response
 
 test("cart badge, delivery and pickup controls are wired to the V3 order experience", () => {
   assert.match(html, /id="badge"/);
-  assert.match(order, /if \('badge'\)/);
+  assert.match(order, /if \(\$\('badge'\)\)/);
   assert.match(html, /id="branch-selector"/);
   assert.match(html, /id="delivery-area"/);
   assert.match(html, /id="request-quote"/);
