@@ -163,6 +163,45 @@ BEGIN
   END IF;
   v_dine_order_id:=(result->>'order_id')::uuid;
 
+  -- Exact retry replays the same server order; changed facts at the same
+  -- revision are rejected. A later revision updates that still-new order.
+  result:=public.flame_chick_sync_pos_order(payload);
+  IF result->>'ok'<>'true' OR result->>'already_processed'<>'true'
+     OR (result->>'order_id')::uuid<>v_dine_order_id
+     OR (SELECT count(*) FROM public.orders WHERE local_order_id=dine_local::text)<>1 THEN
+    RAISE EXCEPTION 'POS_DINE_IN_IDEMPOTENT_REPLAY_FAILED: %',result;
+  END IF;
+
+  changed:=jsonb_set(payload,'{notes}',to_jsonb('changed at same revision'::text),true);
+  -- The trusted Order API hashes its canonical payload. A changed payload at the
+  -- same revision therefore arrives with a different server-computed fingerprint.
+  changed:=jsonb_set(changed,'{request_hash}',to_jsonb(repeat('6',64)),true);
+  IF changed->>'request_hash'=payload->>'request_hash' THEN
+    RAISE EXCEPTION 'POS_TEST_CHANGED_PAYLOAD_HASH_DID_NOT_CHANGE';
+  END IF;
+  result:=public.flame_chick_sync_pos_order(changed);
+  IF result->>'ok'<>'false' OR result#>>'{error,code}'<>'POS_ORDER_REVISION_CONFLICT' THEN
+    RAISE EXCEPTION 'POS_SAME_REVISION_CHANGED_PAYLOAD_NOT_REJECTED: %',result;
+  END IF;
+
+  changed:=jsonb_set(
+    jsonb_set(payload,'{local_revision}',to_jsonb(2),true),
+    '{notes}',to_jsonb('valid later revision'::text),true
+  );
+  changed:=jsonb_set(changed,'{request_hash}',to_jsonb(repeat('2',64)),true);
+  result:=public.flame_chick_sync_pos_order(changed);
+  IF result->>'ok'<>'true' OR (result->>'local_revision')::bigint<>2
+     OR (SELECT notes FROM public.orders WHERE id=v_dine_order_id)<>'valid later revision'
+     OR (SELECT count(*) FROM public.order_items WHERE order_id=v_dine_order_id)<>1 THEN
+    RAISE EXCEPTION 'POS_DINE_IN_REVISION_UPDATE_FAILED: %',result;
+  END IF;
+
+  result:=public.flame_chick_sync_pos_order(payload);
+  IF result->>'ok'<>'true' OR result->>'stale_revision'<>'true'
+     OR (result->>'local_revision')::bigint<>2 THEN
+    RAISE EXCEPTION 'POS_STALE_OFFLINE_REVISION_NOT_IGNORED: %',result;
+  END IF;
+
   -- Cashier advances Dine-in through kitchen and marks it Served.
   status_payload:=jsonb_build_object('order_id',v_dine_order_id,'actor_user_id',cashier,'request_id',status_request,'to_status','accepted');
   result:=public.flame_chick_update_order_status(status_payload);
@@ -211,45 +250,6 @@ BEGIN
      OR (SELECT cancellation_reason FROM public.orders WHERE id=cancel_order_id)<>'Customer changed mind'
      OR NOT EXISTS(SELECT 1 FROM public.order_status_history WHERE order_id=cancel_order_id AND to_status='cancelled') THEN
     RAISE EXCEPTION 'POS_MANAGER_CANCEL_AUDIT_FAILED: %',result;
-  END IF;
-
-  -- Exact retry replays the same server order; changed facts at the same
-  -- revision are rejected. A later revision updates that still-new order.
-  result:=public.flame_chick_sync_pos_order(payload);
-  IF result->>'ok'<>'true' OR result->>'already_processed'<>'true'
-     OR (result->>'order_id')::uuid<>v_dine_order_id
-     OR (SELECT count(*) FROM public.orders WHERE local_order_id=dine_local::text)<>1 THEN
-    RAISE EXCEPTION 'POS_DINE_IN_IDEMPOTENT_REPLAY_FAILED: %',result;
-  END IF;
-
-  changed:=jsonb_set(payload,'{notes}',to_jsonb('changed at same revision'::text),true);
-  -- The trusted Order API hashes its canonical payload. A changed payload at the
-  -- same revision therefore arrives with a different server-computed fingerprint.
-  changed:=jsonb_set(changed,'{request_hash}',to_jsonb(repeat('6',64)),true);
-  IF changed->>'request_hash'=payload->>'request_hash' THEN
-    RAISE EXCEPTION 'POS_TEST_CHANGED_PAYLOAD_HASH_DID_NOT_CHANGE';
-  END IF;
-  result:=public.flame_chick_sync_pos_order(changed);
-  IF result->>'ok'<>'false' OR result#>>'{error,code}'<>'POS_ORDER_REVISION_CONFLICT' THEN
-    RAISE EXCEPTION 'POS_SAME_REVISION_CHANGED_PAYLOAD_NOT_REJECTED: %',result;
-  END IF;
-
-  changed:=jsonb_set(
-    jsonb_set(payload,'{local_revision}',to_jsonb(2),true),
-    '{notes}',to_jsonb('valid later revision'::text),true
-  );
-  changed:=jsonb_set(changed,'{request_hash}',to_jsonb(repeat('2',64)),true);
-  result:=public.flame_chick_sync_pos_order(changed);
-  IF result->>'ok'<>'true' OR (result->>'local_revision')::bigint<>2
-     OR (SELECT notes FROM public.orders WHERE id=v_dine_order_id)<>'valid later revision'
-     OR (SELECT count(*) FROM public.order_items WHERE order_id=v_dine_order_id)<>1 THEN
-    RAISE EXCEPTION 'POS_DINE_IN_REVISION_UPDATE_FAILED: %',result;
-  END IF;
-
-  result:=public.flame_chick_sync_pos_order(payload);
-  IF result->>'ok'<>'true' OR result->>'stale_revision'<>'true'
-     OR (result->>'local_revision')::bigint<>2 THEN
-    RAISE EXCEPTION 'POS_STALE_OFFLINE_REVISION_NOT_IGNORED: %',result;
   END IF;
 
   -- A second terminal cannot create another active check for the same table.
