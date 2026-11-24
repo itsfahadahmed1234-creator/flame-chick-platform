@@ -606,7 +606,6 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="js/config.js"></script>
-<script src="js/catalog.js"></script>
 <script>
 /* Flame Chick core: menu data, money, totals, order message, validation. No DOM in here. */
 var FCCore = (function () {
@@ -1530,7 +1529,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
   $('#phoneDrawer').textContent = CONFIG.phoneDisplay;
   applyMode();
   renderCart();
-  // Do not load the legacy V2 menu API; the public V3 catalog is served by menu.html.
+  // V3 catalog and checkout are loaded below the homepage Menu heading.
   spy();
 })();
 
