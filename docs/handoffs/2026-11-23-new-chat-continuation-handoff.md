@@ -1173,3 +1173,34 @@ Source-only edits on work/production-source-audit:
 - No Production SQL or deployment was performed.
 
 Verification caveat: source files were re-read after changes, but GitHub reported no workflow runs for the Rider/POS/API commits. The simplified flow is therefore source-updated but not yet CI-verified or runtime-verified. Before deployment, run syntax/contract tests and disposable local migration replay, then test accept, pickup, delivery, reject/expiry, failure/physical return and role isolation against local Supabase.
+
+
+# USER-APPROVED PRIORITY — ALL POS ORDER TYPES MUST SYNC TO DATABASE
+**Confirmed:** 2026-11-24 (user clarification)
+
+The highest-priority POS data requirement is that **every POS order type is persisted in the central Production database**: Dine-in, Takeaway, and Delivery. IndexedDB is the local-first working store and durable offline outbox, not a permanent destination for Dine-in/Takeaway orders.
+
+Required behavior:
+- Save every order locally first so the cashier can continue even with no internet.
+- When online, automatically synchronize pending POS orders to Supabase. On an offline-to-online transition, resume automatically; no manual retry should be required.
+- Keep unsynced order writes and payment/status mutations in a durable local outbox until the server confirms them.
+- Use the stable local order ID as the idempotency identity. A timeout/lost response must be reconciled before retry; the same local order must never create a duplicate cloud order.
+- Dine-in open checks must sync on first save and subsequent edits must update the same cloud order, not create a new order. Preserve table identity/name and any preorder scheduling data in the database (the current Production orders schema does not yet have table/scheduled fields; design an additive migration if needed).
+- Takeaway maps to database fulfillment type `pickup`; preserve the POS-facing label `Takeaway` in the client/UI projection.
+- Delivery must still enter the shared Online Orders workflow as a POS-source delivery order and create its delivery task. It must use the same durable sync/retry/idempotency guarantees as the other POS types.
+- Do not let local payment method selection or a rider's Delivered status imply server-side payment collection. Actual collections must be represented by payment records. If a payment is taken while offline, queue the payment command durably and replay it idempotently after reconnection; only then mark the server order paid/completed and move it to history.
+- Website order throttles apply to website traffic only, never POS sync.
+- Keep catalog pricing validation and authoritative totals server-side; do not trust client totals or client-supplied branch/restaurant IDs.
+- Preserve existing POS manual order-entry UX, table workflow, receipt confirmation, delivery board, staff role rules, and rider lifecycle. Do not rebuild the POS.
+
+## Current implementation gap confirmed by source audit
+- With `FLAME_CHICK_ORDER_API_READY=true`, `syncPending()` immediately delegates to `syncPendingPosDeliveryOrders()`.
+- That specialized function intentionally filters to POS Delivery and explicitly leaves Takeaway/Dine-in local.
+- Takeaway receipt finalization currently marks local status Completed/Paid and queues a generic local record, but the Supabase-ready sync path does not upload it.
+- Dine-in open checks are locally queued and trigger sync, but the Supabase-ready sync path excludes them.
+- Delivery has a separate immediate submission path; unify all three under a durable order outbox while preserving delivery's shared Online Orders board placement.
+- Production already has `orders.local_order_id` and a unique idempotency constraint on (restaurant_id, branch_id, source, idempotency_key). Existing order item, deal-component, modifier, payment and status-history tables should be reused.
+- Production `orders.fulfillment_type` supports `delivery`, `pickup`, `dine_in`; `orders.status` does not support local-only labels such as `Open` or `Scheduled`. Add an explicit safe mapping and persist table/scheduling data via a reviewed additive schema change if required.
+
+## Next implementation stage
+Design and implement a single authenticated POS sync contract and service-role-only transactional RPC for create/update of Dine-in, Takeaway and Delivery orders; persist order line snapshots/components/modifiers and table/schedule data; queue offline payment/status operations separately with idempotency; then update POS sync/reconnect handling and tests. Test all three order types online and offline, edit/replay, lost-response reconciliation, payment replay, duplicate/concurrent retries, and ensure no rider-delivered order is treated as paid. Keep Production schema/functions/deployments unchanged until the source migration and full disposable QA are reviewed and separately approved. Manual backups remain a prerequisite before accepting real customer orders.
