@@ -1547,3 +1547,61 @@ The two immediately preceding failed attempts are historical and superseded:
 **Current verification checkpoint:** all relevant latest workflows inspected above are green. No remaining failed current run identified. No application or SQL behavior changes were needed after the green results; the follow-up was test-only. Do not claim production deployment or real-world manual rehearsal has occurred.
 
 **Deployment gate remains:** after this successful unified behavioral SQL workflow, proceed to the planned infrastructure deployment of the apps, APIs, Supabase Edge Functions, Realtime and required integrations. This is deployment of the new system, not permission to start real restaurant operations. Before a restaurant go-live, conduct the complete manual rehearsal using test accounts and explicitly identified test orders: all three fulfilment types; online ordering and POS where applicable; IndexedDB offline queue and automatic reconnect sync; rider accept/pickup/delivered; Cashier collect-payment popup and COD/Card/Online-bank-transfer method; payment collection then completion/history; staff role boundaries; duplicate requests, network loss/retry, and failure recovery. Verify records and clean up test data. Only after the rehearsal passes may real restaurant operations begin. Flame Chick is being built from scratch; do not imply there are pre-existing production customers or orders.
+
+
+## 2026-11-24 — First application deployment wave (protected Vercel previews)
+
+User authorized starting deployment and requested the customer website hostname `flamechick.vercel.app`.
+
+### Canonical website hostname
+- Verified Vercel domain `flamechick.vercel.app` is already attached to the intended new Website project `flame-chick-website-production` and verified by Vercel. No registration or DNS change was needed.
+- Corrected `docs/operations/admin-auth-deployment-configuration.md` from the old misspelling `flamechic.vercel.app` to `flamechick.vercel.app` (commit recorded separately).
+- Do not move the custom hostname to a new preview deployment. It remains the intended customer website hostname; final production alias/cutover must wait for backend + manual test-order rehearsal and explicit go-live authorization.
+
+### Vercel project inventory
+All four existing projects belong to team `team_Rpf9jeGg9r3cmMguFXHtziqz` (Hobby plan) and link to `itsfahadahmed1234-creator/flame-chick-platform`. Existing project domains are verified:
+- Website: `flamechick.vercel.app` (canonical customer hostname) and generated project alias.
+- POS: `flamechickpos.vercel.app`.
+- Admin: `flamechickadmin.vercel.app`.
+- Rider: `flamechickrider.vercel.app`.
+
+### Preview deployment results
+The first API-created POS deployment was canceled because the project-level Ignored Build Step ran `exit 0`; this was a project build setting, not an application compile failure. Cleared the ignored-build-step command (set to null) for all four intended app projects and verified the project updates. Set the correct app root directories:
+- `apps/flame-chick-website`
+- `apps/flame-chick-pos`
+- `apps/flame-chick-admin`
+- `apps/flame-chick-rider`
+
+Created isolated preview deployments from branch `work/production-source-audit`, commit `30d960c623d66e8a49a37c8180d5bb57f3919ab6`. These are **preview target=null**, not Production targets; no production alias/domain was assigned:
+- Website: READY — https://flame-chick-website-production-7r06lrwbu-fahad-7455.vercel.app (deployment `dpl_HZ1Bz1qdww9jqSTiovkwRfLZLqU8`)
+- POS: READY — https://flame-chick-pos-production-h5shek378-fahad-7455.vercel.app (deployment `dpl_2sjv8qVthWH1TaWJvXrrccnd4Vjj`)
+- Admin: READY — https://flame-chick-admin-production-hol0gu7i4-fahad-7455.vercel.app (deployment `dpl_48CK9TiY468Tyvhc6zzMmxbDFWcd`)
+- Rider: READY — https://flame-chick-rider-production-cn2l2gex4-fahad-7455.vercel.app (deployment `dpl_AoAJvNZQLsBamhBGNWEspcvv3hRU`)
+
+Each build log shows Git clone, `vercel build`, output deployment completed. This is a successful static-app preview wave, **not** proof that live backend functions or full workflows work.
+
+### Hosting blocker diagnosed
+Earlier Git-linked project deployments were `BLOCKED` with Vercel's team-configuration troubleshooting link. The Hobby team has one OWNER (`itsfahadahmed1234-creator`), while the historical `main` commit author was `befahad1234-cmyk`. Do not transfer repository ownership, alter billing plan, or disable protection as an automatic workaround. API-created preview deployments from the explicitly selected repo/branch/commit are READY. Team remains on Hobby; no plan upgrade was performed.
+
+### Supabase/backend status verified
+Project `adkrxfnawdiljhjaavnj` remains ACTIVE_HEALTHY in Mumbai, Free plan. Migration history currently ends at `20261124033433`; the candidate unified POS sync migration `20261124050000` is not present in the hosted migration history. Read-only counts: 1 restaurant, 1 branch, 0 orders, 0 order_items, 0 payments, 0 delivery_tasks, and 0 tables in `supabase_realtime`. No test customer/order data was added. One Edge Function is currently deployed: `flame-chick-staff-admin` version 1. Catalog, order API and delivery API are not deployed yet.
+
+### Deployment must pause at backend configuration gate
+- Vercel Production env lists are empty for all four app projects.
+- Required Supabase Edge Function secrets are not yet configured/verified through the available connector; do not attempt to deploy functions that fail closed without service secret, branch ID, HMAC quote secret/phone secret, staff allowed-origin and invite redirect configuration.
+- Supabase Auth Site URL/redirect allowlist and Edge Function secrets must be configured for `https://flamechickadmin.vercel.app` and `https://flamechickadmin.vercel.app/accept-invitation.html`.
+- Website config still contains an owner/contact phone destination and public catalog media base; do not treat a ready static preview as customer ordering being ready. Verify source config and menu media before enabling checkout.
+- No operational Realtime tables are currently in `supabase_realtime`. Architecture requires private authorized Broadcast; POS currently has broad legacy Postgres Changes subscriptions and Rider user-filtered Postgres Changes. Do not simply publish operational tables or enable broad subscriptions. Implement authorized server-side Broadcast + channel policies first.
+- No Production schema migration was applied by this deployment wave; no Edge Function was deployed/replaced; no Auth settings/secrets were changed; no Realtime publication/policies were changed; no Vercel production deploy or alias cutover was performed.
+
+### Next steps
+1. Finish and review the hosted candidate operational/POS sync migration chain only after checking exact diffs against the successful disposable run; apply via a controlled release step.
+2. Configure the server-only Supabase Edge Function secrets securely without exposing values in chat, source, Vercel client variables or GitHub.
+3. Deploy and smoke-test catalog, order, delivery and staff-admin Edge Functions with correct JWT modes and exact CORS/origin allowlists.
+4. Implement authorized private Realtime Broadcast, channel policies, app subscriptions and polling fallback; test branch/own-rider isolation.
+5. Configure Vercel production environment variables only with public values required by each app; verify the apps use only publishable keys client-side.
+6. Validate the preview deployments in browser and run API integration tests. Do not attach customer-facing production domain to preview.
+7. Run the full manual test-order rehearsal (Dine-in, Takeaway, Delivery; offline IndexedDB and automatic reconnect; rider delivery; cashier COD/Card/Online-bank transfer payment collection; completed/history; role isolation; retries/failure recovery).
+8. Only after manual rehearsal passes and explicit go-live approval, create a production-target deployment from a reviewed release commit and assign `https://flamechick.vercel.app` to that tested Website deployment.
+
+Remember: Flame Chick is a new system under construction. Existing restaurant/branch foundation rows are present, but there are no customer/order/payment/delivery operational records. Deployment of static preview apps is not real-restaurant launch.
