@@ -1,3 +1,30 @@
+# PRODUCTION OPERATIONAL MIGRATIONS — APPLIED
+**Updated:** 2026-11-24 08:35 PKT
+**Production project:** adkrxfnawdiljhjaavnj (Flame Chick Production, ap-south-1, Free)
+**Repository:** itsfahadahmed1234-creator/flame-chick-platform
+**Branch:** work/production-source-audit
+
+The user clarified that Flame Chick has no live operational system or order records and explicitly approved applying the seven operational migrations without manual backups at this pre-launch stage. The live DB was checked immediately before apply: 0 orders, 0 order items, 0 payments, 0 delivery tasks, 0 delivery offers, 0 rider profiles. Existing catalog/setup records were present and preserved: 1 restaurant, 1 branch, 25 products, 28 variants, 6 deals, 1 Auth user. Do not describe the whole database as empty.
+
+All seven migrations were successfully applied to Production, sequentially, through Supabase MCP `apply_migration`. The tool assigned authoritative migration versions; the source filenames on this work branch were then renamed to match those exact remote versions. No remote migration ledger rows were manually edited. Final applied versions:
+1. `20261124033406_flame_chick_operational_schema_v1`
+2. `20261124033413_flame_chick_staff_role_projection_rpc_v1`
+3. `20261124033417_flame_chick_delivery_offer_identity_guard_v1`
+4. `20261124033422_flame_chick_delivery_commands_v1`
+5. `20261124033426_flame_chick_payment_collection_v1`
+6. `20261124033430_flame_chick_website_order_create_v1`
+7. `20261124033433_flame_chick_website_order_idempotency_lookup_v1`
+
+Production now has 33 migrations (26 previous + 7 operational). Post-apply checks verified operational tables exist with RLS enabled; all order/payment/delivery tables have 0 rows; catalog counts remain unchanged. Verified privileged RPCs are owned by postgres, SECURITY DEFINER, configured with empty search_path, executable by service_role, and not executable by anon/authenticated. Existing catalog and staff records remain intact. Security advisor still reports the pre-existing RLS-enabled/no-policy INFO lint class (51 findings) and Auth leaked-password-protection WARN; compare/resolve these in a separate security remediation task, do not claim zero lints.
+
+Manual backups were explicitly deferred by the user until before real customer orders are accepted. Before accepting real orders, introduce and verify Free-plan manual schema/data/roles exports and restore procedure. No orders are currently live, so no business transactions were affected.
+
+Still not done / not authorized by this migration approval: setting Edge Function secrets; deploying or changing Edge Functions; Rider Push implementation (ciphertext schema mismatch remains); enabling Realtime; configuring delivery areas / Not Listed fee; V3 storefront cart/checkout; enabling branch website order flags; catalog publication changes; Vercel deployment. Website ordering remains disabled. GST remains deferred. Rider Delivered still does not mean payment collected; Cashier must collect the full payment before completion/history.
+
+**Important:** The source migration files were renamed to the generated Production version IDs. Do not restore the previous 20261123 filenames or apply them again. Run local full migration replay after this filename alignment before the next code release. Current GitHub update commits include the migration file renames; latest commit will be verified separately.
+
+---
+
 # Flame Chick Production migration reconciliation — read-only
 
 **Date:** 2026-11-24  
