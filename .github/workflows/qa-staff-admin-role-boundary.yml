@@ -143,7 +143,7 @@ jobs:
           )"
           psql "$db" --set ON_ERROR_STOP=1 --set snapshot_b64="$snapshot_b64" --file supabase/tests/flame_chick_website_order_route_setup.sql
 
-          supabase status --env --output-format text > "$RUNNER_TEMP/flame-chick-local-supabase.env"
+          supabase status -o env > "$RUNNER_TEMP/flame-chick-local-supabase.env"
           set -a
           . "$RUNNER_TEMP/flame-chick-local-supabase.env"
           set +a
