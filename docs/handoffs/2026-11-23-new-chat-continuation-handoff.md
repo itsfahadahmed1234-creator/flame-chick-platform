@@ -2105,3 +2105,44 @@ The disposable behavioral workflow passed before the final migration filename wa
 - Staff Admin Role Boundary QA run **45404679684** was still IN PROGRESS at the last check (on parent source commit `560a30a...`). Must retrieve final status; do not claim full QA/rehearsal complete.
 - User-facing confirmation still required: hard-refresh `https://flamechicpos.vercel.app`, open Menu, verify Deals category and six published deal cards appear, then open at least one deal and verify component choices/configurator work. Do not place an order as part of this check.
 - No Production DB/schema/migration/catalog publication changes were made for the deals fix. The six deals were already present in the immutable published snapshot. GST remains deferred.
+
+
+## 2026-11-24 — POS visual refinement and order-type startup correction
+
+### User-requested changes
+- User shared a live POS screenshot and requested: improve product/deal card typography and alignment; make Flame Chick wordmark/logo clearly red; show Delivery, Takeaway and Dine-in controls in that order; make Delivery the default when POS opens; show Delivery-specific fields first; show Table and Dine-in Mode/scheduling fields only after Dine-in is selected.
+- Do not rebuild POS, change catalog content, create database migrations, add tax/GST fields, or create test orders.
+
+### Source diagnosis and implementation
+- The Dine-in order button was explicitly hidden in the markup (hidden attribute), even though it remained in the backing select and the JavaScript supported it. The POS init() function also overrode the HTML's Delivery default by setting the order type to Dine-in at startup. This caused the selector/fields to disagree.
+- Removed the hidden attribute from the Dine-in button. Visible order selector order is Delivery → Takeaway → Dine-in.
+- Updated the POS init() startup selection and setupCashierControls() initial fallback to Delivery. Existing Dine-in table selection/reopen routines intentionally still set Dine-in when an existing table/check is opened; those paths were preserved.
+- Delivery-specific address/area/Not Listed locality controls remain governed by the existing updateOrderFieldsByType() function and now show at startup. Dine-in table and scheduling/mode controls remain conditional on Dine-in selection.
+- Added targeted POS card styling: balanced grid/card dimensions, consistent image thumbnails, clearer product title/description typography, separated price/action footer, aligned action buttons, improved spacing and subtle hover treatment. Product/deal IDs, prices, configurator data and add-to-order handlers are unchanged.
+- Changed long disabled deal action text (which overlapped deal prices/cards in the user's screenshot) to a compact Unavailable now status label with the full reason retained as a title/tooltip. Available deals retain Choose Deal.
+- Applied a red color filter to the existing official brand SVG image in POS CSS; no logo asset was replaced.
+- No database, RPC, Edge Function, order or catalog data changes. No migration applied and no test order created.
+
+### Commits and CI
+- UI commit: c35073a7b356130c77646fb0a310a0c41ee7747d — UI implementation.
+- Test commits added and refined regression assertions. Final branch HEAD at this update: 72f2977adf0d3b64d8a3e67edc2761ab4da39e9e.
+- POS/Rider Static Checks 45407482554 PASSED on exact final HEAD 72f2977..., including POS source parsing, current catalog/deal regression coverage, and new tests for Delivery startup, all three visible order types, compact unavailable-deal status and red wordmark/card styling.
+- Several earlier workflow attempts failed only due overly broad/incorrect new test matchers. They were inspected from job logs and fixed. The final run above is the passing run for the exact current HEAD; do not cite earlier failures as current status.
+
+### Vercel deployment
+- Existing POS project preserved: flame-chick-pos-production, project ID prj_gh1UnkZKnFnehWEs5eYhiXa40Xj5, team ID team_Rpf9jeGg9r3cmMguFXHtziqz.
+- Existing POS project root remains apps/flame-chick-pos; no new project created.
+- Fresh Vercel deployment dpl_9qb42tx35mD3qcb57c4B7zAMhVur READY, from branch work/production-source-audit, exact commit 72f2977...; build events confirm source cloned from that branch/commit and deployment completed.
+- Canonical POS alias flamechicpos.vercel.app was assigned to the new READY deployment, replacing prior deployment dpl_Gj67JUEpNrUSuvKkG8DUyHV4r5HA. Vercel alias lookup confirms flamechicpos.vercel.app appears on deployment dpl_9qb42tx35mD3qcb57c4B7zAMhVur.
+- Deployment's immutable URL: https://flame-chick-pos-production-4ocw3vdeg-fahad-7455.vercel.app.
+
+### Remaining live verification
+- User must hard-refresh https://flamechicpos.vercel.app (Ctrl+Shift+R), sign in with existing Admin credentials if requested, and confirm:
+  1. Flame Chick logo/wordmark is visible red.
+  2. Product and deal cards have readable text, aligned images/prices/actions and no overlap.
+  3. Deal cards show compact unavailable status rather than long overlapping button copy.
+  4. Order type selector visibly shows Delivery, Takeaway, Dine-in in that order; Delivery is active after a new POS open/refresh.
+  5. Delivery starts with address and area fields; Takeaway hides Delivery-only inputs; Dine-in shows Table and Dine-in Mode/scheduling fields.
+  6. Selecting Dine-in, selecting a table, and reopening an existing table/check still works.
+- The source and workflow checks pass and Vercel is READY, but the post-deploy visual/interaction check is not yet confirmed by the user. Do not claim the full POS workflow or restaurant rehearsal is complete.
+- Continue with POS screen feedback. If the layout is visually right, proceed to the pending live order-type and deal-configurator checks. Keep Production database/schema untouched and GST deferred.
