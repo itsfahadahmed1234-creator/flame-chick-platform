@@ -194,3 +194,26 @@ The connector can then independently re-check the ledger, objects, grants/RLS an
 
 ---
 
+
+
+---
+
+## Supabase CLI v3 — exact one-at-a-time migration procedure (approved rollout)
+
+This section supersedes generic `db push` alternatives elsewhere in older notes. Current Supabase CLI v3 is local by default for database commands, so specify the Production target explicitly every time. Official docs:
+- [CLI migration up](https://supabase.com/docs/reference/cli/supabase-migration-up)
+- [CLI db dump](https://supabase.com/docs/reference/cli/supabase-db-remote)
+- [CLI v3 migration guide](https://supabase.com/docs/guides/local-development/cli/migrating-to-v3)
+
+Use `supabase migration up --remote=adkrxfnawdiljhjaavnj --yes`, not `apply_migration` and not direct SQL/manual migration-ledger edits. For each run, keep only the *next* pending migration file in `supabase/migrations`; temporarily move the later pending files outside that directory, run one migration, verify the exact version/name with `supabase migration list --remote=adkrxfnawdiljhjaavnj` and a read-only query, then restore the moved files before proceeding. Use a cleanup/finally block so no source migration file can be left outside its original location. Do not add `--include-all` unless a separate reconciliation proves it is necessary. Do not use `db push` for this controlled sequence because it can also include roles, seed inputs and other push inputs.
+
+CLI v3 unattended/agent runs require `--yes` for hosted migrations; that flag is appropriate here because the user approved this exact seven-migration rollout. Never use `--yes` for any additional Production action outside that approval. CLI v3 database queries must use the SQL as a positional argument and `--read-only`, e.g.:
+```powershell
+supabase migration list --remote=adkrxfnawdiljhjaavnj
+supabase migration up --remote=adkrxfnawdiljhjaavnj --yes
+supabase db query "select version,name from supabase_migrations.schema_migrations where version = '20261123160000';" --remote=adkrxfnawdiljhjaavnj --read-only
+```
+Repeat the final two commands with the exact next migration version only after the previous migration's object, ACL/RLS and smoke checks pass. The one-at-a-time method requires backing up and validating exports first. The active session still has no local shell/CLI execution, so none of these commands has been run.
+
+---
+
