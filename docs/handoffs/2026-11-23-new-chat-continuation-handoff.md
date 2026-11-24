@@ -2095,3 +2095,13 @@ The disposable behavioral workflow passed before the final migration filename wa
 - Important: previous POS Vercel project root is configured as `apps/flame-chick-pos`. Preserve this root setting and the local V3 runtime bundles.
 
 **Exact next action:** check GitHub Actions run 45404679429. Only after success deploy current HEAD to POS and validate Flame Hour / Flame Duo / Flame Feast / Mini Flame / Little Crunch deal cards plus at least one deal configurator. Keep database untouched.
+
+
+### 2026-11-24 follow-up — POS deal projection fix passed and deployed
+- POS/Rider Static Checks **45404684277 PASSED** on latest commit `b4dd721d2f4f5a1cae27514e5b681194641dd5a5`, including the new test that POS uses the V3 adapter's projected deal rows rather than raw snapshot deals.
+- Admin Static Checks **45404679927 PASSED** on commit `560a30a...` (shared source state before the final test-only commit).
+- Fresh POS Vercel deployment **`dpl_Gj67JUEpNrUSuvKkG8DUyHV4r5HA` READY**, built from latest commit `b4dd721...` on `work/production-source-audit`. POS Vercel root directory setting remains `apps/flame-chick-pos`.
+- Canonical alias `flamechicpos.vercel.app` was assigned to this new READY deployment. Alias lookup confirms `deploymentId=dpl_Gj67JUEpNrUSuvKkG8DUyHV4r5HA`.
+- Staff Admin Role Boundary QA run **45404679684** was still IN PROGRESS at the last check (on parent source commit `560a30a...`). Must retrieve final status; do not claim full QA/rehearsal complete.
+- User-facing confirmation still required: hard-refresh `https://flamechicpos.vercel.app`, open Menu, verify Deals category and six published deal cards appear, then open at least one deal and verify component choices/configurator work. Do not place an order as part of this check.
+- No Production DB/schema/migration/catalog publication changes were made for the deals fix. The six deals were already present in the immutable published snapshot. GST remains deferred.
