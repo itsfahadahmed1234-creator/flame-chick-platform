@@ -4312,3 +4312,13 @@ User priorities/constraints unchanged: Flame Chick Production is the system bein
 - Run 66 has been triggered on commit `a4741f838de027d20b82e50f8a79f86e068e5b77`: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45347935015. At checkpoint time it was in progress. Inspect the full migration replay and behavioral SQL logs; do not report success until the SQL step passes.
 - Run 65's full migration replay passed; behavioral SQL failed at the first order insert, so no downstream Dine-in/Takeaway/Delivery or payment assertions ran.
 - No changes to hosted database, auth users, customer/order data, Edge Function deployment, or website deployment.
+
+
+# 2026-11-24 — Run 66 had one failed step; run 67 cast correction
+
+- Clarification: run 66 did **not** have multiple failures. Its migration replay, Edge Function static checks, catalog publication validation, and staff role-boundary workflow all passed. Exactly one step failed: `Exercise POS sync, all fulfilments, walk-ins, revisions, table lock and payment replay`.
+- Exact test error: `could not determine polymorphic type because input has type unknown`, at test-only call `jsonb_set(payload,'{notes}',to_jsonb('changed at same revision'),true)`.
+- This failure is in a SQL test literal, not a failure of migration replay. The candidate migration itself applied successfully to the disposable local database.
+- Corrected both test strings passed to `to_jsonb` by casting them explicitly to `text`. No production constraints or database authorization were changed.
+- Run 67 on commit `c2baa612ee9d1b3074291be132866402faee3e72`: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45348420225. It passed source-check setup and was starting the disposable local stack at handoff update time. Check the behavioral SQL step result; do not claim it passed until verified.
+- Production remains untouched. No migrations deployed, Edge Function deployed, Vercel deployment, customer rows or order rows created.
