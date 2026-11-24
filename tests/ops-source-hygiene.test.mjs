@@ -238,3 +238,27 @@ test("POS saves server payment collection only after cashier confirms a non-deli
   assert.match(html,/await put\(STORES\.queue,current\)/);
 });
 
+
+
+test("POS renders live branch delivery areas as fee-labelled options and recalculates totals",()=>{
+  const html=source[0].html;
+  assert.match(html,/<select id="area"/);
+  assert.match(html,/function renderDeliveryAreaOptions\(\)/);
+  assert.match(html,/option\.textContent=deliveryAreaDisplayName\(name\)\+' — Rs\. '\+money\(fee\)/);
+  assert.match(html,/option\.value='Not Listed \/ Other'/);
+  assert.match(html,/\$\('area'\)\?\.addEventListener\('change'/);
+  assert.match(html,/posDeliveryConfig\?\.branchId/);
+  assert.match(html,/feeFallback=selectedArea\?'Fee unavailable':'Choose area'/);
+  assert.doesNotMatch(html,/\$\('deliveryFee'\)\.textContent=feeKnown\?'Rs\. '\+money\(fee\):'Not configured'/);
+});
+
+test("POS deal Add Deal action is directly bound, validates price and reports failures",()=>{
+  const html=source[0].html;
+  assert.match(html,/data-pos-deal-add="true"/);
+  assert.match(html,/const addDealButton=\$\('posDealAddBtn'\)/);
+  assert.match(html,/addDealButton\.onclick=event=>/);
+  assert.match(html,/event\.preventDefault\(\);event\.stopPropagation\(\);/);
+  assert.match(html,/if\(!Number\.isFinite\(price\)\|\|price<0\)throw new Error/);
+  assert.match(html,/showToast\(error\?\.message\|\|'The deal could not be added/);
+  assert.match(html,/cart\.push\(\{key,itemId:st\.deal\.id,dealId:st\.deal\.id,dealVariantId:variant\.id,itemName:st\.deal\.title,quantity:1,price,type:'deal'/);
+});
