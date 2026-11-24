@@ -2248,3 +2248,15 @@ The disposable behavioral workflow passed before the final migration filename wa
 - This is a preview deployment (`target=null)); canonical production Admin alias `https://flamechickadmin.vercel.app` was not promoted or changed.
 - User should open the branch preview alias and hard-refresh (Ctrl+Shift+R). Expected Admin/Owner tabs: Staff & Riders, Catalog V3 Draft, Delivery Areas. Confirm the Delivery Areas tab appears and loads configuration before any settings are saved.
 - Delivery Areas access is UI-enabled only for verified Admin/Owner sessions and continues to call the existing authenticated Staff Admin command. Other unfinished tabs remain disabled. No DB migration, fee change, delivery-area insert, or production data change was made.
+
+
+## 2026-11-24 — User confirmed Admin delivery settings saved successfully
+
+- User reports they can access Admin preview, save the default delivery fee, and add a delivery-area row for testing; screenshot unavailable due upload limit. Direct read-only Supabase Production inspection independently confirms the saves succeeded.
+- Main branch delivery configuration now reads:
+  - Not Listed / Other branch default fee: **Rs. 100**.
+  - Active test delivery area: **Comsats University**, fee **Rs. 0**.
+  - Area creation and setting updates were attributed to the existing authenticated Admin account through `created_by` / `updated_by`.
+- The Order API source was inspected: it selects active named areas and reads each area's `delivery_fee`; `not_listed` selection uses `branch_delivery_settings.not_listed_delivery_fee`. Therefore the current intended quote values are Comsats University = Rs. 0 and Not Listed / Other = Rs. 100 (plus the order subtotal). No test order was created and no quote endpoint was invoked on a customer order.
+- **Operational warning:** Comsats University is currently active with a zero fee. Any delivery order selecting this area will be charged no delivery fee until Admin edits/pauses the area. This may be intentional for testing; do not modify without user confirmation.
+- No screenshot needed; text confirmation and direct DB read are enough. No further changes performed. Next: user should confirm whether Rs. 0 on the test area is intentional or whether it should be changed/paused before accepting real orders. If they wish to test calculation safely, use the read-only configuration values first and do not create a live order until the test area fee is deliberate. Both handoffs include this exact state.
