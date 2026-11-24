@@ -33,7 +33,6 @@
 .offer-actions{display:flex;gap:8px;margin-top:14px}
 .offer-actions .btn{flex:1;min-height:48px}
 .offer-card .muted{margin:8px 0 0}
-#enableNotificationsBtn{border-color:#b9deca;color:var(--brand)}
 body{padding-bottom:env(safe-area-inset-bottom)}
 .top{padding-top:env(safe-area-inset-top)}
 @media(max-width:640px){
@@ -185,7 +184,6 @@ body.rider-active .toast{bottom:calc(10px + env(safe-area-inset-bottom));font-si
     <div class="rider-title-row">
       <h1 id="helloName">Deliveries</h1>
       <div class="rider-tools">
-        <button class="btn utility-btn" id="enableNotificationsBtn" type="button">Alerts</button>
         <button class="btn utility-btn" id="refreshBtn" type="button">Refresh</button>
       </div>
     </div>
@@ -588,46 +586,6 @@ async function respondToOffer(offerId,action,button){
     await loadJobs(false);
   }
 }
-function urlBase64ToUint8Array(value){
-  const padding='='.repeat((4-value.length%4)%4);
-  const base64=(value+padding).replace(/-/g,'+').replace(/_/g,'/');
-  const raw=atob(base64),output=new Uint8Array(raw.length);
-  for(let i=0;i<raw.length;i++)output[i]=raw.charCodeAt(i);
-  return output;
-}
-async function enableRiderNotifications(){
-  const button=$('enableNotificationsBtn');
-  if(!('serviceWorker'in navigator)||!('PushManager'in window)||!('Notification'in window)){
-    toast('This browser does not support app notifications. Keep the Rider app open and use Refresh jobs.');
-    return;
-  }
-  if(!riderAppInstalled()&&/iphone|ipad|ipod/i.test(navigator.userAgent||'')){
-    alert('On iPhone, first install Flame Chick Rider: Safari Share → Add to Home Screen. Then open the installed app and enable notifications.');
-    return;
-  }
-  if(Notification.permission==='denied'){
-    alert('Notifications are blocked for Flame Chick Rider. Enable them in your browser or device settings.');
-    return;
-  }
-  button.disabled=true;
-  try{
-    const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
-    if(permission!=='granted'){toast('Notification permission was not granted.');return;}
-    const cfg=await deliveryRequest('GET',{view:'push-config'});
-    if(!cfg.vapid_public_key)throw new Error('Notifications are not configured yet.');
-    const registration=await navigator.serviceWorker.ready;
-    const existing=await registration.pushManager.getSubscription();
-    const subscription=existing||await registration.pushManager.subscribe({
-      userVisibleOnly:true,
-      applicationServerKey:urlBase64ToUint8Array(cfg.vapid_public_key)
-    });
-    await deliveryRequest('POST',null,{action:'push_subscribe',subscription:subscription.toJSON(),user_agent:navigator.userAgent});
-    button.textContent='Alerts on';
-    toast('Delivery notifications are enabled on this device.');
-  }catch(error){toast(error.message||'Could not enable notifications.');}
-  finally{button.disabled=false;}
-}
-
 function showApp(){ document.body.classList.add('rider-active');$('loginView').classList.add('hidden');$('passwordView').classList.add('hidden');$('appView').classList.remove('hidden');$('signOutBtn').classList.remove('hidden'); }
 function showLogin(message=''){ document.body.classList.remove('rider-active');$('appView').classList.add('hidden');$('passwordView').classList.add('hidden');$('loginView').classList.remove('hidden');$('signOutBtn').classList.add('hidden');$('loginError').textContent=message; }
 function showPasswordSetup(type,next){
@@ -769,7 +727,6 @@ $('availabilityBtn').addEventListener('click',async()=>{
   }finally{renderRiderAvailability();}
 });
 $('refreshBtn').addEventListener('click',()=>loadJobs(true));
-$('enableNotificationsBtn').addEventListener('click',enableRiderNotifications);
 $('offerList').addEventListener('click',e=>{
   const button=e.target.closest('[data-offer-action]');
   const card=button?.closest('[data-offer-id]');
