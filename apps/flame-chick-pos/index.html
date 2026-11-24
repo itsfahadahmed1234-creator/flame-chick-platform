@@ -1307,7 +1307,7 @@ let lastAddedCartKey='';
 const FLAME_CHICK_CATALOG_API='https://adkrxfnawdiljhjaavnj.supabase.co/functions/v1/flame-chick-catalog';
 const FLAME_CHICK_PUBLISHABLE_KEY='sb_publishable_89MQIj_drF15IrF05ZLt0w_txUjPMxy';
 const FLAME_CHICK_ORDER_API_READY=true;
-let catalogSnapshot=null;
+let catalogSnapshot=null,posDeals=[];
 let pizzaCategoryIds=new Set();
 let posPizzaChoice=null;
 let posModifierChoice=null;
@@ -2630,10 +2630,11 @@ async function loadLocal(){
     // Never let an old V2 cache appear as the current Production menu.
     await Promise.all([clearStore(STORES.menu),clearStore(STORES.categories),clearStore(STORES.deliveryAreas),clearStore(STORES.catalog)]);
     await del(STORES.settings,'menuVersion');
-    menu=[];categories=[];deliveryAreas=[];catalogSnapshot=null;menuVersion='';pizzaCategoryIds=new Set();
+    menu=[];categories=[];deliveryAreas=[];catalogSnapshot=null;posDeals=[];menuVersion='';pizzaCategoryIds=new Set();
     return;
   }
   catalogSnapshot=saved;
+  try{posDeals=adaptFlameChickCatalog(saved).deals||[];}catch(error){posDeals=[];console.warn('Published deal projection unavailable from local catalog cache.',error);}
   menu=await all(STORES.menu);categories=await all(STORES.categories);deliveryAreas=await all(STORES.deliveryAreas);
   const setting=await get(STORES.settings,'menuVersion');menuVersion=String(setting?.value||'');
   pizzaCategoryIds=new Set(categories.filter(c=>/pizza/i.test(c.Name||'')).map(c=>String(c.ID)));
@@ -2745,7 +2746,7 @@ async function refreshMenu(force=false){
   await put(STORES.catalog,{key:'snapshot',versionId:snapshot.versionId,schemaVersion:3,value:snapshot,savedAt:new Date().toISOString(),publicationId:snapshot.publicationId,publicationNumber:snapshot.publicationNumber});
   await put(STORES.settings,{key:'menuVersion',value:snapshot.versionId,updatedAt:new Date().toISOString()});
   menu=adapted.menu;categories=adapted.categories;deliveryAreas=adapted.deliveryAreas;
-  catalogSnapshot=snapshot;pizzaCategoryIds=adapted.pizzaCategoryIds;menuVersion=snapshot.versionId;
+  catalogSnapshot=snapshot;posDeals=adapted.deals||[];pizzaCategoryIds=adapted.pizzaCategoryIds;menuVersion=snapshot.versionId;
   $('notice').textContent='Published V3 Flame Chick menu cached locally · '+menu.length+' sellable variants · publication '+snapshot.publicationNumber;
   $('notice').className='notice ok';
   render();showToast('Published V3 Flame Chick menu updated');
@@ -2772,7 +2773,7 @@ async function ensureMenu(){
 function updateNetworkStatus(){const on=navigator.onLine;$('statusDot').className='dot '+(on?'online':'offline');$('statusText').textContent=on?'Online':'Offline';}
 
 function isPizzaCategoryId(id){return pizzaCategoryIds.has(String(id));}
-function groupedMenu(){const cats=[...categories].sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0));if(!cats.length)return [{id:'all',name:'Menu',rows:[...menu]}];return cats.map(c=>({id:c.ID,name:c.Name,rows:menu.filter(x=>String(x.CategoryID)===String(c.ID)).sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0))})).filter(g=>g.rows.length||(catalogSnapshot?.deals||[]).some(d=>d.Active===true&&String(d.CategoryID)===String(g.id)))}
+function groupedMenu(){const cats=[...categories].sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0));if(!cats.length)return [{id:'all',name:'Menu',rows:[...menu]}];return cats.map(c=>({id:c.ID,name:c.Name,rows:menu.filter(x=>String(x.CategoryID)===String(c.ID)).sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0))})).filter(g=>g.rows.length||(posDeals||[]).some(d=>d.Active===true&&String(d.CategoryID)===String(g.id)))}
 function render(){
   renderCategoryBar();
   renderSubcategoryBar();
@@ -2783,7 +2784,7 @@ function render(){
 function menuCategoryItemCount(group){
   const rows=(group.rows||[]).filter(row=>row.Available!==false&&String(row.Available).toLowerCase()!=='false');
   const productCount=isPizzaCategoryId(group.id)?groupPizzas(rows).length:new Set(rows.map(row=>String(row.ProductID||row.ID))).size;
-  const dealCount=(catalogSnapshot?.deals||[]).filter(d=>d.Active===true&&String(d.CategoryID)===String(group.id)).length;
+  const dealCount=(posDeals||[]).filter(d=>d.Active===true&&String(d.CategoryID)===String(group.id)).length;
   return productCount+dealCount;
 }
 function activeSubcategories(categoryId){
@@ -2890,7 +2891,7 @@ function renderMenu(){
   for(const g of visibleGroups){
     let rows=g.rows.filter(row=>row.Available!==false&&String(row.Available).toLowerCase()!=='false');
     if(selectedSubcategoryId&&String(g.id)===selected)rows=rows.filter(row=>String(row.SubcategoryID||'')===String(selectedSubcategoryId));
-    const dealRows=(catalogSnapshot?.deals||[]).filter(d=>d.Active===true&&String(d.CategoryID)===String(g.id)).sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0));
+    const dealRows=(posDeals||[]).filter(d=>d.Active===true&&String(d.CategoryID)===String(g.id)).sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0));
     const pizzaGroups=isPizzaCategoryId(g.id)?groupPizzas(rows):[];
     const productCount=isPizzaCategoryId(g.id)?pizzaGroups.length:new Set(rows.map(r=>String(r.ProductID||r.ID))).size;
     const itemCount=productCount+dealRows.length;
