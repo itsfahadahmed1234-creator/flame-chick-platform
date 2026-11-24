@@ -262,3 +262,22 @@ test("POS deal Add Deal action is directly bound, validates price and reports fa
   assert.match(html,/showToast\(error\?\.message\|\|'The deal could not be added/);
   assert.match(html,/cart\.push\(\{key,itemId:st\.deal\.id,dealId:st\.deal\.id,dealVariantId:variant\.id,itemName:st\.deal\.title,quantity:1,price,type:'deal'/);
 });
+
+test("POS deal cart uses the declared contents array and never references an undefined content variable",()=>{
+  const html=source[0].html;
+  assert.match(html,/const contents=componentGroups\.flatMap/);
+  assert.match(html,/type:'deal',contents,componentGroups/);
+  assert.doesNotMatch(html,/const content=componentGroups\.flatMap/);
+});
+
+test("POS renders required Burger component slots as selectable dropdowns and preserves exact V3 option IDs",()=>{
+  const html=source[0].html;
+  assert.match(html,/burgerSlots=\{\}/);
+  assert.match(html,/if\(\/burger\/i\.test\(String\(group\.name\|\|''\)\)&&group\.options\.length>1\)/);
+  assert.match(html,/data-pos-deal-burger-select/);
+  assert.match(html,/data-pos-deal-slot/);
+  assert.match(html,/st\.selections\[groupId\]=next/);
+  assert.match(html,/componentOptionId:option\.id/);
+  assert.match(html,/productVariantId:option\.productVariantId/);
+  assert.match(html,/group\.allowRepeatOption/);
+});
