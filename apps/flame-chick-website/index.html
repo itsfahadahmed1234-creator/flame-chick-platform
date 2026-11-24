@@ -332,8 +332,8 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
         <a href="#how" data-act="go" data-target="#how">How to order</a>
         <a href="menu.html" class="nav-order-online">View Menu</a>
       </nav>
-      <button class="btn btn-cart" id="headCart" type="button" data-act="open-cart" aria-label="Open your order">
-        <svg class="ic" aria-hidden="true"><use href="#i-bag"/></svg><span>Order</span><b class="badge" id="badge">0</b>
+      <button class="btn btn-cart" id="headCart" type="button" data-act="open-cart" aria-label="Browse the published menu">
+        <svg class="ic" aria-hidden="true"><use href="#i-bag"/></svg><span>Menu</span><b class="badge" id="badge">0</b>
       </button>
     </div>
   </header>
@@ -455,7 +455,7 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
 
 <div class="cartbar" id="cartbar">
   <button type="button" id="cartbarBtn" data-act="open-cart" aria-label="Open your order">
-    <span id="cbCount">0 items</span><b id="cbTotal">Rs 0</b>
+    <span>Browse the published menu</span>
   </button>
 </div>
 
@@ -1267,7 +1267,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
     e.preventDefault();
     // Legacy V2 cart payloads are no longer accepted by the order API. Move
     // any old/dormant form submit to the V3 validated ordering page.
-    window.location.assign('order-online-v3.html');
+    window.location.assign('menu.html');
     return;
     if (orderSending) return;
 
