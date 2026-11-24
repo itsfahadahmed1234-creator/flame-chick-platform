@@ -47,6 +47,17 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const method = (init?.method || "GET").toUpperCase();
   const pathName = url.pathname;
 
+  if (pathName.endsWith("/auth/v1/user") && method === "GET") {
+    const authorization = new Headers(init?.headers).get("authorization");
+    return authorization === "Bearer synthetic-staff-token"
+      ? json({id:"aa000000-0000-4000-8000-000000000001"})
+      : json({message:"Unauthorized"},401);
+  }
+  if (pathName.endsWith("/rpc/flame_chick_get_staff_role_rows") && method === "POST") {
+    return json([{
+      restaurant_id:restaurantId,role_key:"cashier",branch_id:branchId,is_active:true
+    }]);
+  }
   if (pathName.endsWith("/rpc/flame_chick_catalog_public_read") && method === "POST") {
     return json({
       published: true, snapshot, publicationId, publicationNumber, schemaVersion: 3,
@@ -70,6 +81,23 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     return json([{ not_listed_delivery_fee: null }]);
   }
 
+  if (pathName.endsWith("/rpc/flame_chick_sync_pos_order") && method === "POST") {
+    const payload = JSON.parse(String(init?.body || "{}")).p_payload;
+    if (payload.source !== "pos" || payload.actor_user_id !== "aa000000-0000-4000-8000-000000000001" ||
+        payload.branch_id !== branchId || payload.fulfillment_type !== "pickup" ||
+        payload.payment_method_summary !== null || payload.total !== payload.subtotal ||
+        !/^[0-9a-f]{64}$/.test(String(payload.request_hash))) {
+      return json({message:"POS canonical payload invalid"},400);
+    }
+    commitCount += 1;
+    return json({
+      ok:true,already_processed:false,order_id:"99000000-0000-4000-8000-000000000099",
+      order_number:"FC-261124-0099",local_order_id:payload.local_order_id,
+      local_revision:payload.local_revision,status:"new",payment_status:"unpaid",
+      fulfillment_type:"pickup",subtotal:payload.subtotal,delivery_fee:0,total:payload.total,
+      paid_amount:0,balance_due:payload.total,currency_code:"PKR",created_at:databaseNow
+    });
+  }
   if (pathName.endsWith("/rpc/flame_chick_get_website_order_by_idempotency") && method === "POST") {
     const payload = JSON.parse(String(init?.body || "{}")).p_payload;
     const key = payload.branch_id + ":" + payload.idempotency_key;
@@ -188,5 +216,42 @@ Deno.test("actual Website Order API issues, validates and replays signed quotes"
     console.log("Website Order API route integration: quote, stale-fee/tamper/expiry rejection, commit and idempotent replay passed.");
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+Deno.test("authenticated POS sync prices from V3 and derives actor and branch from staff context", async () => {
+  try {
+    const localOrderId = "bb000000-0000-4000-8000-000000000001";
+    const body = {
+      action:"sync_pos_order",
+      local_order_id:localOrderId,
+      local_revision:1,
+      publication_id:publicationId,
+      version_id:"sha256:"+snapshotSha256,
+      fulfillment_type:"pickup",
+      customer:{name:"Walk-in Customer",phone:""},
+      items:[{
+        kind:"product",productId,productVariantId:variantId,quantity:1,modifiers:[],
+        price:0.01,line_total:0.01
+      }],
+      subtotal:0.01,total:0.01,branch_id:"aa000000-0000-4000-8000-000000000099",
+      actor_user_id:"aa000000-0000-4000-8000-000000000098"
+    };
+    const request = new Request("https://flame-chick-disposable.supabase.co/functions/v1/flame-chick-order-api",{
+      method:"POST",
+      headers:{...headers,authorization:"Bearer synthetic-staff-token"},
+      body:JSON.stringify(body)
+    });
+    const result = await handleOrderApiRequest(request);
+    const responseBody = await result.json() as Record<string,any>;
+    if (result.status!==201 || responseBody.ok!==true ||
+        responseBody.order_id!=="99000000-0000-4000-8000-000000000099" ||
+        responseBody.presentation.subtotal!==Number(standaloneVariant.price) ||
+        responseBody.total!==Number(standaloneVariant.price)) {
+      throw new Error("Authenticated V3 POS sync failed or trusted browser totals: "+JSON.stringify({status:result.status,body:responseBody}));
+    }
+    console.log("Authenticated POS sync: staff auth, server branch, V3 price and unpaid order state passed.");
+  } finally {
+    globalThis.fetch=originalFetch;
   }
 });
