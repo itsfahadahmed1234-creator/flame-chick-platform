@@ -1664,3 +1664,56 @@ Security advisor now reports 51 informational `rls_enabled_no_policy` notices ac
 - Catalog publication #2 is V3 and present; branch ordering is disabled intentionally; only one active Admin role exists; there are no active Rider profiles. Do not enable website checkout or attempt live Rider workflow before branch/menu/role configuration.
 - Realtime authorization baseline: `realtime.messages` exists with RLS enabled; zero policies and zero publication tables. No operational Broadcast implementation has been applied. Do not add broad policies or raw Postgres Changes publication.
 - Required secrets cannot be safely inspected/set with the available Supabase connector. Do not deploy functions that depend on unverified secrets or echo secret values. Need secure dashboard/CLI secret configuration and exact environment names from source.
+
+
+## 2026-11-24 — Production API rollout and POS integration audit (continued)
+
+### Hosted database and functions
+- Unified POS sync migration applied as `20261124082809_flame_chick_unified_pos_order_sync_v1`; see prior entry. The earlier duplicate candidate file `20261124050000_...` has been deleted from the current branch. It appeared in one earlier workflow run for commit `bb2bd26...` because that run was created before the deletion commit; it is not present at current branch HEAD.
+- Catalog Edge Function deployed ACTIVE version 1 with its `publication-read-contract.mjs` dependency, `verify_jwt=false` for public read-only catalog.
+- Staff Admin Edge Function redeployed ACTIVE version 2 with all three source files: `index.ts`, `origin-policy.mjs`, `catalog-actions.mjs`; `verify_jwt=true`.
+- Order API and Delivery API are still not deployed. Their current sources use wildcard CORS. Before deployment, replace wildcard CORS with exact origin allowlists (website canonical origin, POS/Admin/Rider production origins, and only explicitly authorized preview origins) while preserving JWT + database role checks. Catalog is read-only and may retain public wildcard CORS.
+- Order API needs `FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET` and `FLAME_CHICK_ORDER_PHONE_HMAC_SECRET` for website quote/rate-limit features. Do not enable website checkout until these secrets and branch config are set. POS sync route uses `action=sync_pos_order` and server-derived Auth actor/branch.
+- Supabase connector available here cannot set or safely verify Edge Function secrets. Do not guess secret values, echo them, put them in source/Vercel public variables, or deploy website checkout as ready without configuration.
+
+### Latest CI results
+Current branch head at this point: `6eb1e3954cd78bd7946a049fa8eeb312476708cb`.
+- Edge Function static checks: PASS, run `45356673455`.
+- Catalog publication validation QA: PASS, run `45356673371`.
+- Catalog V3 importer/local database QA: PASS, run `45356673366`.
+- Staff Admin role-boundary QA: run `45356673505`; all substantive steps passed (full migration replay, ACL/RLS, Admin/Owner/Manager/Cashier/Rider authorization, delivery lifecycle, website API idempotency/rate quotas, Rider Web Push fail-closed, actual Website Order API integration, simultaneous rider accept/decline/expiry race). At last poll, only disposable Supabase teardown/cleanup was still in progress. Recheck final run conclusion before proceeding.
+- Earlier failures for commit `bb2bd26...` were caused by both old and replacement POS sync migration files being present simultaneously; the replacement's preflight correctly detected the RPC created by the old file. The current branch deletes the old file, and all three latest database/edge static workflows on `6eb1e395...` pass. Do not report the old-commit failures as current HEAD failures.
+
+### Critical POS source audit — unified sync is not yet wired
+Inspected `apps/flame-chick-pos/index.html`, `catalog-v3-adapter.js`, `payment-collection.js`, the current Order API, and `flame-chick-order-pricing.mjs`.
+- POS already fetches and caches the published V3 catalog via Catalog API and `FlameChickPosCatalogV3.adapt`; old V2 cache is explicitly discarded. Product variants use V3 UUID IDs.
+- However, `saveLocalOrder()` currently contains a guard that blocks placing orders whenever a V3 snapshot is loaded: “V3 staff order pricing and synchronization must be connected before placing orders; no legacy V2 order will be submitted.”
+- Existing `syncPending()` returns early to `syncPendingPosDeliveryOrders()`; this only handles Delivery. Dine-in and Takeaway remain local-only. The legacy generic Apps Script sync branch is unreachable when `FLAME_CHICK_ORDER_API_READY=true`.
+- Current POS Delivery submission still uses old `action:'create'` and a LOCAL-prefixed ID; the new Production API requires `action:'sync_pos_order'`, UUID `local_order_id`, positive `local_revision`, and V3 catalog publication/version IDs. Current POS local IDs are `LOCAL-...`, which fail the API UUID contract.
+- Current V3 deal cards are intentionally disabled (`renderDealCard` sets `orderable=false`), and `openPOSDeal()` reads the legacy `catalogSnapshot.dealComponents` shape. The current published V3 snapshot has 25 products, 28 variants, 6 deals, 6 deal variants, 18 component groups, 0 modifier groups, 0 delivery areas. Deal selection must be updated to V3 component-group/option IDs before deal orders can sync.
+- Product sync payload must use API contract fields `product_id`, `product_variant_id`, `modifiers:[{modifier_group_id,modifier_ids:[]}]`; deal sync uses `deal_id`, `deal_variant_id`, and `component_groups:[{component_group_id,components:[{component_option_id,product_id,product_variant_id,quantity}]}]`. Server recomputes prices from the immutable V3 publication; never trust POS prices.
+- Dine-in maps to `dine_in`, Takeaway to `pickup`, Delivery to `delivery`. Dine-in additionally needs table reference/label and optional schedule fields.
+- New local orders must use stable UUIDs and monotonic `local_revision`. Existing LOCAL-prefixed offline rows must be migrated in IndexedDB without loss (retain legacy ID for traceability), before they can be submitted. Keep the local order and queue until server confirms matching UUID + revision. Retry/lost-response reconciliation must use the new API/server local-order lookup, not the old Apps Script `syncCheck` or fingerprint fallback.
+- Delivery creation must use the same unified `sync_pos_order` path as Dine-in/Takeaway. Rider delivery state remains in Delivery API; after Rider marks Delivered, cashier's existing popup (COD/Card/Online-bank transfer) calls `collect_payment`; order completes and moves to history only after server confirms zero balance. Do not collect delivery payment at Rider Delivered event.
+- `payment-collection.js` already implements the three requested method labels and idempotent full-balance request contract; retain it and verify server completion/history transition.
+- POS code references `startFlameChickRealtime()` / `stopFlameChickRealtime()` but no implementation definition was found in `index.html` or other app files. Add a real private Broadcast client lifecycle; do not leave login path calling undefined functions.
+- Rider currently uses rider-filtered Postgres Changes subscriptions. Replace with private `fc:rider:<auth.uid()>` Broadcast subscription; retain token refresh, channel cleanup, debounced API refresh, reconnect/manual fallback. POS should subscribe to private `fc:branch:<branch_uuid>:pos`.
+
+### Live project configuration blockers
+- Current V3 catalog publication #2 exists. Branch website ordering remains disabled intentionally.
+- No delivery areas are configured; there are zero rows in `public.delivery_areas` and the branch Not Listed default fee is NULL. Delivery order creation must remain blocked until Admin configures delivery fees.
+- Only the Admin role exists; no Owner, Manager, Cashier or Rider profiles have been configured yet. Do not create roles/accounts without the user's approved invitations/setup process.
+- Browser inspection of the previews showed: Website static preview had an unsupported/unavailable V3 catalog message and displayed legacy fallback menu items, with checkout failing before Catalog deployment. Recheck after Catalog deployment; remove/hide legacy fallback rather than presenting old menu data if V3 API fails. POS preview is behind Vercel Authentication/SSO. Rider preview showed Failed to fetch because Delivery API is not deployed. Admin preview loaded but is not proof of backend readiness.
+- The existing `flamechick.vercel.app` tab still served the older public site. Do not assume custom domain has been cut over to the new preview. Keep it untouched until the new V3 website/API is validated and user explicitly approves production alias cutover.
+
+### Exact next implementation sequence
+1. Recheck final conclusion of run `45356673505` and current HEAD workflow status.
+2. Implement POS V3 deal selection (variant + component groups/options) and one unified IndexedDB outbox for all three fulfillment types. UUID migration for legacy local IDs; revision/hash/idempotency; retry/backoff; lost-response reconciliation; no queue deletion until matching server acknowledgement.
+3. Update POS receipt/payment flow: Dine-in saves open check then syncs; Takeaway syncs on receipt confirmation with appropriate cashier-confirmed payment; Delivery syncs unpaid and waits for Rider Delivered then cashier method selection and collection. Preserve the already built COD/Card/Online-bank popup.
+4. Add automated client/API tests for all fulfillment types, deal selections, offline/reconnect, duplicate/reordered requests, local ID migration, payment idempotency and completed/history behavior. Run local disposable Supabase behavioral workflows before further Production changes.
+5. Implement private Realtime RLS authorization + server-only Broadcast triggers/events and replace missing POS Realtime function and Rider Postgres Changes. Test branch isolation, own-rider isolation, no client publish, reconnect.
+6. Fix exact CORS origins and configure Edge Function secrets securely; deploy Order and Delivery APIs only after these prerequisites.
+7. Configure delivery areas/default fee and approved staff accounts; then test all four apps.
+8. Run manual synthetic test-order rehearsal before real restaurant launch. Keep the real customer domain off the unverified preview and preserve the current empty operational dataset until rehearsal strategy is approved.
+
+No customer/order/payment/delivery records were created in this stage.
