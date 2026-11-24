@@ -209,15 +209,13 @@
         if (!locality || locality.length > 120) throw fail('Enter the locality for a Not Listed delivery before saving it.', 'POS_DELIVERY_LOCALITY_REQUIRED');
         delivery = { selection_type: 'not_listed', area_id: null, other_locality: locality, address, instructions: '' };
       } else {
-        const area = (snapshot.deliveryAreas || []).find(row =>
-          String(row.deliveryAreaId || row.id || '') === String(identity.deliveryAreaId || '') ||
-          String(row.nameEn || '').trim().toLowerCase() === areaChoice.toLowerCase());
-        if (!area || !UUID_RE.test(String(area.deliveryAreaId || area.id || ''))) {
-          throw fail('Choose an active listed delivery area from the current published menu.', 'POS_DELIVERY_AREA_REQUIRED');
+        const areaId = String(identity.deliveryAreaId || identity.areaId || '').trim();
+        if (!UUID_RE.test(areaId)) {
+          throw fail('Choose an active listed delivery area loaded from your Production branch settings.', 'POS_DELIVERY_AREA_REQUIRED');
         }
         delivery = {
           selection_type: 'listed_area',
-          area_id: String(area.deliveryAreaId || area.id),
+          area_id: areaId,
           other_locality: null,
           address,
           instructions: String(identity.deliveryInstructions || '').trim()
