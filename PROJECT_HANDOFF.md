@@ -4291,3 +4291,13 @@ User priorities/constraints unchanged: Flame Chick Production is the system bein
 - Re-run 64 was triggered from this corrected test on commit `038bb1c1b7680144a8ea2cb9e1cc5485378e966a`; it is currently in progress. Final SQL behavioral result is not yet verified; check the failing/passing step logs before proceeding.
 - Full migration replay had succeeded on run 63 before the fixture test began. Run 63 failure does not establish that the POS sync behavior passed or failed.
 - Production remains untouched; local fixture transaction is rolled back by the SQL test. No fake records were written to the hosted project.
+
+
+# 2026-11-24 — POS behavioral QA run 64 diagnosis; run 65 rerun
+
+- Run 64 passed the full disposable migration replay, then the POS behavioral SQL stopped at the first Dine-in create with `POS_STAFF_REQUIRED`.
+- Root cause: `public.flame_chick_get_staff_role_rows` intentionally projects only staff rows for the canonical `flame-chick` restaurant slug; the fixture used `qa-pos-sync-flame-chick`. The production role boundary is correct.
+- Corrected the disposable fixture to use slug `flame-chick` and added an explicit preflight assertion that the synthetic Cashier is visible through the real role-projection RPC. The test still creates synthetic Admin/Cashier/Rider identities and rolls all rows back.
+- Run 65, URL https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45347377217, was triggered on commit `22b783518f8efbc9899ad019cd0305502e8fb5b0`. At handoff update time it had passed source checks and was starting disposable Supabase; behavioral SQL result is pending and must be inspected.
+- Run 63's earlier self-assignment fixture error and run 64's slug mismatch are test fixture defects, not evidence of the POS sync RPC passing. Do not claim behavioral integration passed until run 65 or a later corrected run passes the SQL step.
+- Production project was not changed. No migrations deployed and no operational records created there.
