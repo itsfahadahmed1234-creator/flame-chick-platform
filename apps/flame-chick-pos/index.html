@@ -1528,10 +1528,12 @@ async function submitOrderPaymentCollection(){
   const button=$('submitPaymentCollectionBtn');
   button.disabled=true;button.textContent='Collecting payment…';
   try{
-    const result=await flameChickOrderRequest('POST',null,{
-      action:'collect_payment',order_id:state.orderId,amount,
-      payment_method:method,request_id:state.requestId
-    });
+    const paymentRequest=window.FlameChickPosPaymentCollection
+      ? window.FlameChickPosPaymentCollection.createFullBalanceRequest({
+          orderId:state.orderId,requestId:state.requestId,balance:amount,method
+        })
+      : {action:'collect_payment',order_id:state.orderId,amount,payment_method:method,request_id:state.requestId};
+    const result=await flameChickOrderRequest('POST',null,paymentRequest);
     if(result?.ok!==true||!result?.payment_id||result.completed!==true||Number(result.balance_due)!==0){
       throw new Error('The database has not confirmed full payment and order completion.');
     }
