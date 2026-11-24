@@ -30,13 +30,13 @@ DECLARE
   area uuid:=gen_random_uuid();
   now_at timestamptz:=clock_timestamp();
 BEGIN
-  IF EXISTS(SELECT 1 FROM public.restaurants WHERE slug='qa-pos-sync-flame-chick')
+  IF EXISTS(SELECT 1 FROM public.restaurants WHERE slug='flame-chick')
      OR EXISTS(SELECT 1 FROM auth.users WHERE id IN(admin,cashier,rider)) THEN
     RAISE EXCEPTION 'POS_SYNC_TEST_FIXTURE_CONFLICT';
   END IF;
 
   INSERT INTO public.restaurants(id,name,slug,currency_code,timezone,is_active)
-  VALUES(r,'QA Flame Chick POS Sync','qa-pos-sync-flame-chick','PKR','Asia/Karachi',true);
+  VALUES(r,'QA Flame Chick POS Sync','flame-chick','PKR','Asia/Karachi',true);
   INSERT INTO public.branches(id,restaurant_id,branch_code,name,is_active,timezone)
   VALUES(b,r,'qa-pos','QA POS Branch',true,'Asia/Karachi');
 
@@ -61,6 +61,11 @@ BEGIN
   ) VALUES
     (r,cashier,'cashier',b,true,admin,'Disposable POS sync QA',gen_random_uuid()),
     (r,rider,'rider',b,true,admin,'Disposable POS sync QA',gen_random_uuid());
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.flame_chick_get_staff_role_rows(cashier)
+    WHERE restaurant_id=r AND role_key='cashier' AND branch_id=b AND is_active
+  ) THEN RAISE EXCEPTION 'POS_TEST_CASHIER_ROLE_PROJECTION_MISSING'; END IF;
 
   INSERT INTO public.categories(id,restaurant_id,category_kind,name_en,is_active)
   VALUES(category,r,'menu','QA POS Menu',true);
@@ -292,7 +297,7 @@ ROLLBACK;
 
 DO $cleanup$
 BEGIN
-  IF EXISTS(SELECT 1 FROM public.restaurants WHERE slug='qa-pos-sync-flame-chick')
+  IF EXISTS(SELECT 1 FROM public.restaurants WHERE slug='flame-chick')
      OR EXISTS(SELECT 1 FROM auth.users WHERE email IN('qa-pos-admin@example.invalid','qa-pos-cashier@example.invalid','qa-pos-rider@example.invalid')) THEN
     RAISE EXCEPTION 'POS_SYNC_TEST_FIXTURES_NOT_ROLLED_BACK';
   END IF;
