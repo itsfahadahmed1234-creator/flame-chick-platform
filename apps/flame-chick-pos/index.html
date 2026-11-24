@@ -1283,6 +1283,7 @@ html,body{background:var(--bg);overflow:hidden}
 <script src="../flame-chick-website/js/catalog-v3.js"></script>
 <script src="../flame-chick-website/js/catalog-v3-deal-view.js"></script>
 <script src="./catalog-v3-adapter.js"></script>
+  <script src="./sync-v3.js"></script>
 <script src="./payment-collection.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
 <script>
@@ -1421,8 +1422,8 @@ async function flameChickOrderRequest(method,query,body){
   const r=await fetch(url,{method,headers:flameChickAuthHeaders(),body:method==='GET'?undefined:JSON.stringify(body||{}),cache:'no-store'});
   let data={};try{data=await r.json()}catch(e){}
   if(r.status===401){flameChickStaffSignOut();throw new Error('Your staff session expired. Please sign in again.');}
-  if(r.status===403)throw new Error(data?.error?.message||'Your Flame Chick account does not have permission to view or manage orders.');
-  if(!r.ok||data.ok===false)throw new Error(data?.error?.message||'Flame Chick order request failed.');
+  if(r.status===403){const e=new Error(data?.error?.message||'Your Flame Chick account does not have permission to view or manage orders.');e.status=r.status;e.code=data?.error?.code||'FORBIDDEN';throw e;}
+  if(!r.ok||data.ok===false){const e=new Error(data?.error?.message||'Flame Chick order request failed.');e.status=r.status;e.code=data?.error?.code||'ORDER_API_ERROR';throw e;}
   return data;
 }
 async function flameChickDeliveryRequest(method,query,body){
@@ -3617,239 +3618,136 @@ async function reconcileLocalOrderByLegacyFingerprint(order){
   }
 }
 
-async function syncPending(){
-  if(FLAME_CHICK_ORDER_API_READY){await syncPendingPosDeliveryOrders();return;}
-  if(FLAME_CHICK_ORDER_API_READY){await updateSyncBox();if($('syncText'))$('syncText').textContent='Local POS orders are saved on this device. Cloud sync is not enabled. Website orders are handled in Online Orders.';return}
-  if(!navigator.onLine || !db){await updateSyncBox();return}
-  if(syncInProgress)return;
-  syncInProgress=true;
-  try{
-    const queueRows=await all(STORES.queue);
-    if(!queueRows.length){
-      if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null;}
-      $('syncText').textContent='';
-      await updateSyncBox();
-      return;
-    }
-
-    let working=queueRows.slice();
-    $('syncText').textContent='Syncing '+working.length+'…';
-    let failedCount=0;
-
-    for(let offset=0; offset<working.length; offset+=SYNC_BATCH_SIZE){
-      const batchIds=working.slice(offset,offset+SYNC_BATCH_SIZE).map(r=>r.localOrderId).filter(Boolean);
-      const batch=[];
-      for(const id of batchIds){
-        const order=await get(STORES.queue,id);
-        if(!order)continue;
-        const attempt=(Number(order.syncAttempts)||0)+1;
-        order.syncStatus='syncing';
-        order.syncAttempts=attempt;
-        order.lastSyncAttemptAt=new Date().toISOString();
-        order.nextSyncAt=0;
-        order.lastSyncError='';
-        await put(STORES.orders,order);
-        await put(STORES.queue,order);
-        batch.push(order);
-      }
-      if(!batch.length)continue;
-
-      $('syncText').textContent='Syncing '+Math.min(offset+batch.length,working.length)+' / '+working.length+'…';
-      let results=[];
-      try{
-        const res=await fetchJSON(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'sync',orders:batch}),timeoutMs:30000});
-        const result=res?.data||res;
-        if(Array.isArray(result?.results)) results=result.results;
-        else if(result?.success) results=batch.map(o=>({localOrderId:o.localOrderId,success:true,status:'synced',orderId:result.orderId||''}));
-        else throw new Error(result?.error||'Batch sync failed');
-      }catch(batchErr){
-        // A lost response can still mean the server committed every order.
-        // Reconcile each order before leaving it in the queue.
-        for(const order of batch){
-          try{
-            let recovered=await reconcileLocalOrderOnServer(order.localOrderId);
-            if(!recovered)recovered=await reconcileLocalOrderByLegacyFingerprint(order);
-            if(recovered){
-              const latest=await get(STORES.orders,order.localOrderId)||order;
-              latest.serverOrderId=recovered.orderId;
-              latest.syncStatus='synced';
-              latest.syncedAt=new Date().toISOString();
-              latest.lastSyncError='';
-              latest.nextSyncAt=0;
-              latest.syncAttempts=0;
-              await put(STORES.orders,latest);
-              await del(STORES.queue,latest.localOrderId);
-              continue;
-            }
-          }catch(_e){}
-          failedCount++;
-          const latest=await get(STORES.orders,order.localOrderId)||order;
-          const attempts=Number(latest.syncAttempts)||1;
-          const delay=Math.min(SYNC_RETRY_MAX_MS,SYNC_RETRY_BASE_MS*Math.pow(2,Math.min(3,attempts-1)));
-          latest.syncStatus='failed';
-          latest.lastSyncError=batchErr?.message||String(batchErr)||'Batch sync failed';
-          latest.nextSyncAt=new Date(Date.now()+delay).toISOString();
-          await put(STORES.orders,latest);
-          await put(STORES.queue,latest);
-        }
-        continue;
-      }
-
-      const resultMap=new Map(results.map(r=>[String(r?.localOrderId||''),r]));
-      for(const order of batch){
-        const r=resultMap.get(String(order.localOrderId));
-        if(r?.success){
-          const latest=await get(STORES.orders,order.localOrderId)||order;
-          if(r.orderId)latest.serverOrderId=String(r.orderId);
-          latest.syncStatus='synced';
-          latest.syncedAt=new Date().toISOString();
-          latest.lastSyncError='';
-          latest.nextSyncAt=0;
-          latest.syncAttempts=0;
-          await put(STORES.orders,latest);
-          await del(STORES.queue,latest.localOrderId);
-        }else{
-          failedCount++;
-          let recovered=null;
-          try{recovered=await reconcileLocalOrderOnServer(order.localOrderId);}catch(_e){}
-          if(!recovered){try{recovered=await reconcileLocalOrderByLegacyFingerprint(order);}catch(_e){}}
-          if(recovered){
-            const latest=await get(STORES.orders,order.localOrderId)||order;
-            latest.serverOrderId=recovered.orderId;
-            latest.syncStatus='synced';
-            latest.syncedAt=new Date().toISOString();
-            latest.lastSyncError='';
-            latest.nextSyncAt=0;
-            latest.syncAttempts=0;
-            await put(STORES.orders,latest);
-            await del(STORES.queue,latest.localOrderId);
-            failedCount=Math.max(0,failedCount-1);
-            continue;
-          }
-          const latest=await get(STORES.orders,order.localOrderId)||order;
-          const attempts=Number(latest.syncAttempts)||1;
-          const delay=Math.min(SYNC_RETRY_MAX_MS,SYNC_RETRY_BASE_MS*Math.pow(2,Math.min(3,attempts-1)));
-          latest.syncStatus='failed';
-          latest.lastSyncError=r?.error||'Sync failed';
-          latest.nextSyncAt=new Date(Date.now()+delay).toISOString();
-          await put(STORES.orders,latest);
-          await put(STORES.queue,latest);
-        }
-      }
-    }
-
-    $('syncText').textContent='';
-    await put(STORES.settings,{key:'lastSync',value:new Date().toISOString()});
-    await updateSyncBox();
-
-    const remaining=await all(STORES.queue);
-    if(remaining.length){
-      const nextTimes=remaining.map(o=>Date.parse(String(o.nextSyncAt||''))).filter(Number.isFinite);
-      const nextAt=nextTimes.length?Math.min(...nextTimes):Date.now()+SYNC_RETRY_BASE_MS;
-      const delay=Math.max(1000,nextAt-Date.now());
-      if(syncRetryTimer)clearTimeout(syncRetryTimer);
-      syncRetryTimer=setTimeout(()=>{syncRetryTimer=null;if(navigator.onLine)syncPending();},Math.min(SYNC_RETRY_MAX_MS,delay));
-      $('syncText').textContent='Retrying in '+Math.max(1,Math.ceil(delay/1000))+'s…';
-    }else if(syncRetryTimer){
-      clearTimeout(syncRetryTimer);syncRetryTimer=null;
-    }
-  }finally{syncInProgress=false;}
-}
-function flameChickIsPosDeliveryOrder(order){
-  if(!order||typeof order!=='object')return false;
-  const source=String(order.orderSource??order.OrderSource??'pos').trim().toLowerCase();
-  const fulfillment=String(order.fulfillmentType??order.FulfillmentType??'').trim().toLowerCase();
-  return (!source||source==='pos')&&fulfillment==='delivery';
-}
-function flameChickIsTerminalLocalOrder(order){
-  return ['delivered','collected','served','completed','cancelled','canceled','rejected','merged'].includes(String(order?.status??order?.Status??'').trim().toLowerCase());
-}
-async function syncPendingPosDeliveryOrders(){
-  if(syncInProgress)return;
-  if(!navigator.onLine||!db){
-    await updateSyncBox();
-    if($('syncText'))$('syncText').textContent='Connect to the internet to send pending POS delivery orders.';
-    return;
+function prepareLocalPosSyncOrder(order,{bumpRevision=false}={}) {
+  if(!window.FlameChickPosSyncV3)throw new Error('The V3 POS synchronization module is unavailable.');
+  const previous=order||{};
+  const next=window.FlameChickPosSyncV3.ensureIdentity(previous);
+  if(bumpRevision)next.localRevision=window.FlameChickPosSyncV3.nextRevision(previous,previous);
+  if(catalogSnapshot?.schemaVersion===3){
+    next.catalogPublicationId=catalogSnapshot.publicationId;
+    next.catalogVersion=catalogSnapshot.publicationNumber;
   }
-  if(!flameChickStaffSession?.access_token){
-    await updateSyncBox();
-    if($('syncText'))$('syncText').textContent='Sign in to Flame Chick staff access to send pending POS delivery orders.';
-    return;
+  next.syncStatus=next.serverOrderId?'pending':'pending';
+  next.syncAttempts=Number(next.syncAttempts)||0;
+  next.lastSyncError='';
+  next.nextSyncAt=0;
+  return next;
+}
+async function syncPendingUnifiedPosOrders(){
+  if(syncInProgress)return;
+  if(!db||!navigator.onLine){await updateSyncBox();if($('syncText'))$('syncText').textContent='Offline · POS orders remain safely stored on this device.';return;}
+  if(!flameChickStaffSession?.access_token||!flameChickStaffProfile?.branch_id){
+    await updateSyncBox();if($('syncText'))$('syncText').textContent='Sign in to Flame Chick staff access to synchronize POS orders.';return;
+  }
+  if(!catalogSnapshot||catalogSnapshot.schemaVersion!==3){
+    await updateSyncBox();if($('syncText'))$('syncText').textContent='A verified V3 catalog is required. Local orders are preserved until the catalog is available.';return;
   }
   syncInProgress=true;
-  let sent=0,failed=0;
+  let sent=0,failed=0,review=0;
   try{
-    const [localRows,queueRows]=await Promise.all([all(STORES.orders),all(STORES.queue)]);
-    const queuedById=new Map(queueRows.filter(x=>x?.localOrderId).map(x=>[String(x.localOrderId),x]));
-    const localById=new Map(localRows.filter(x=>x?.localOrderId).map(x=>[String(x.localOrderId),x]));
-    for(const [id,row] of queuedById)if(!localById.has(id))localById.set(id,row);
-
+    const [orders,queueRows]=await Promise.all([all(STORES.orders),all(STORES.queue)]);
+    const byId=new Map();
+    for(const row of orders)if(row?.localOrderId)byId.set(String(row.localOrderId),row);
+    for(const row of queueRows)if(row?.localOrderId&&!byId.has(String(row.localOrderId)))byId.set(String(row.localOrderId),row);
     const candidates=[];
-    for(const [id,row] of localById){
-      if(!flameChickIsPosDeliveryOrder(row)||flameChickIsTerminalLocalOrder(row))continue;
-      const queued=queuedById.has(id);
-      const state=String(row.syncStatus||'').trim().toLowerCase();
-      const needsSend=queued||row.checkoutPending===true||['pending','failed','syncing'].includes(state);
-      if(row.serverOrderId){
-        if(queued)await del(STORES.queue,id);
-        continue;
-      }
-      if(needsSend)candidates.push({id,order:row});
+    for(const [id,row] of byId){
+      if(row.orderSource!=='POS'||flameChickIsTerminalLocalOrder(row))continue;
+      if(row.syncStatus==='needs_review')continue;
+      const queued=queueRows.some(q=>String(q.localOrderId)===id);
+      if(!queued)continue;
+      if(row.nextSyncAt&&Date.parse(String(row.nextSyncAt))>Date.now())continue;
+      candidates.push({id,order:row});
     }
+    candidates.sort((a,b)=>String(a.order.createdAt||'').localeCompare(String(b.order.createdAt||'')));
     if(!candidates.length){
-      if($('syncText'))$('syncText').textContent='No pending POS delivery orders. Takeaway and dine-in orders remain local.';
-      await updateSyncBox();
-      return;
+      if($('syncText'))$('syncText').textContent=queueRows.some(x=>x.syncStatus==='needs_review')
+        ?'Some saved orders need staff review before they can sync.'
+        :'No pending POS orders.';
+      await updateSyncBox();return;
     }
-
-    const batch=candidates.slice(0,20);
-    if($('syncText'))$('syncText').textContent='Sending '+batch.length+' pending delivery order'+(batch.length===1?'':'s')+'…';
-    for(let index=0;index<batch.length;index++){
-      const candidate=batch[index];
+    if($('syncText'))$('syncText').textContent='Syncing '+candidates.length+' POS order'+(candidates.length===1?'':'s')+'…';
+    for(let index=0;index<candidates.length;index++){
+      const candidate=candidates[index];
       let order=await get(STORES.orders,candidate.id)||candidate.order;
-      if(order.serverOrderId){await del(STORES.queue,candidate.id);continue;}
-      const attempt=(Number(order.syncAttempts)||0)+1;
-      order.syncStatus='syncing';
-      order.syncAttempts=attempt;
-      order.lastSyncAttemptAt=new Date().toISOString();
-      order.lastSyncError='';
-      order.checkoutPending=true;
-      await put(STORES.orders,order);
-      await put(STORES.queue,order);
-      if($('syncText'))$('syncText').textContent='Sending '+(index+1)+' / '+batch.length+'…';
+      if(order.syncStatus==='needs_review')continue;
+      if(!order.syncOrderId){
+        // Preserve the legacy receipt/local key; use a separate UUID only for
+        // the Production API identity. A legacy menu row is never rewritten.
+        order=prepareLocalPosSyncOrder(order);
+        await put(STORES.orders,order);await put(STORES.queue,order);
+      }
+      const revision=Number(order.localRevision)||1;
       try{
-        const synced=await flameChickCreatePosDeliveryOrder(order,{refreshBoard:false});
-        const saved={...synced,checkoutPending:false,syncStatus:'synced',syncAttempts:0,lastSyncError:'',nextSyncAt:0,updatedAt:new Date().toISOString()};
-        await put(STORES.orders,saved);
-        await del(STORES.queue,candidate.id);
+        if(String(order.catalogPublicationId||'')!==String(catalogSnapshot.publicationId)||
+           Number(order.catalogVersion)!==Number(catalogSnapshot.publicationNumber)){
+          const error=new Error('This order was saved against a different catalog publication. Refresh and review the items before syncing.');
+          error.code='POS_CATALOG_STALE';error.status=409;throw error;
+        }
+        const payload=window.FlameChickPosSyncV3.buildSyncPayload(order,catalogSnapshot,flameChickStaffProfile.branch_id,{
+          contract:window.FlameChickCatalogV3,dealView:window.FlameChickCatalogV3DealView
+        });
+        const latestBefore=await get(STORES.orders,candidate.id)||order;
+        latestBefore.syncStatus='syncing';latestBefore.syncAttempts=(Number(latestBefore.syncAttempts)||0)+1;
+        latestBefore.lastSyncAttemptAt=new Date().toISOString();latestBefore.lastSyncError='';latestBefore.nextSyncAt=0;
+        await put(STORES.orders,latestBefore);await put(STORES.queue,latestBefore);
+        if($('syncText'))$('syncText').textContent='Syncing '+(index+1)+' / '+candidates.length+' · '+String(order.fulfillmentType||'POS');
+        const response=await flameChickOrderRequest('POST',null,payload);
+        if(!window.FlameChickPosSyncV3.acknowledgementMatches(payload,response)){
+          const error=new Error('The server response did not confirm the exact local order identity and revision. The order remains queued.');
+          error.code='POS_SYNC_ACK_MISMATCH';error.status=503;throw error;
+        }
+        const latest=await get(STORES.orders,candidate.id)||order;
+        latest.serverOrderId=response.order_id;latest.serverOrderNumber=response.order_number||'';
+        latest.serverLocalOrderId=response.local_order_id;latest.serverLocalRevision=response.local_revision;
+        latest.serverStatus=response.status;latest.paymentStatus=String(response.payment_status||latest.paymentStatus||'unpaid').toLowerCase()==='paid'?'Paid':'Unpaid';
+        latest.paidAmount=Number(response.paid_amount)||0;latest.balanceDue=Number(response.balance_due)||0;
+        if(response.status==='completed')latest.status='Completed';
+        else if(response.status==='delivered')latest.status='Delivered';
+        else if(response.status==='served')latest.status='Served';
+        else if(response.status==='cancelled')latest.status='Cancelled';
+        else if(response.status==='rejected')latest.status='Rejected';
+        else if(response.status==='returned')latest.status='Returned';
+        else latest.status=latest.fulfillmentType==='Dine-in'?'Open':'Pending';
+        latest.syncAttempts=0;latest.lastSyncError='';latest.nextSyncAt=0;latest.syncedAt=new Date().toISOString();
+        latest.checkoutPending=false;
+        if(response.payment_status==='paid'||Number(response.balance_due)===0)delete latest.pendingPayment;
+        if(Number(latest.localRevision||1)===Number(response.local_revision)){
+          latest.syncStatus='synced';await put(STORES.orders,latest);await del(STORES.queue,candidate.id);
+        }else{
+          latest.syncStatus='pending';await put(STORES.orders,latest);await put(STORES.queue,latest);
+        }
         sent++;
       }catch(error){
         const latest=await get(STORES.orders,candidate.id)||order;
-        latest.checkoutPending=true;
-        latest.syncStatus='failed';
-        latest.syncAttempts=attempt;
-        latest.lastSyncError=String(error?.message||'Online Orders submission failed').slice(0,500);
-        latest.nextSyncAt=0;
-        await put(STORES.orders,latest);
-        await put(STORES.queue,latest);
-        failed++;
+        const status=Number(error?.status)||0;
+        const permanent=status>=400&&status<500&&status!==408&&status!==425&&status!==429;
+        latest.syncStatus=permanent?'needs_review':'failed';
+        latest.syncAttempts=(Number(latest.syncAttempts)||0)+1;
+        latest.lastSyncError=String(error?.message||'POS synchronization failed').slice(0,500);
+        const delay=Math.min(SYNC_RETRY_MAX_MS,SYNC_RETRY_BASE_MS*Math.pow(2,Math.min(4,Math.max(0,latest.syncAttempts-1))));
+        latest.nextSyncAt=permanent?0:new Date(Date.now()+delay).toISOString();
+        await put(STORES.orders,latest);await put(STORES.queue,latest);
+        if(permanent)review++;else failed++;
       }
-    }
-    if(sent){
-      try{await loadInitialOnlineInbox();}
-      catch(error){console.warn('POS delivery sync completed; Online Orders board refresh will retry on Refresh.',error);}
     }
     await put(STORES.settings,{key:'lastSync',value:new Date().toISOString()});
     await updateSyncBox();
-    if($('syncText')){
-      $('syncText').textContent=failed
-        ? sent+' delivery order'+(sent===1?'':'s')+' sent · '+failed+' need retry.'
-        : sent
-          ? sent+' POS delivery order'+(sent===1?'':'s')+' sent to Online Orders.'
-          : 'Pending delivery orders remain saved on this POS.';
-    }
+    if(sent){try{await loadInitialOnlineInbox();}catch(e){console.warn('Order sync succeeded; board refresh will retry.',e);}}
+    const remaining=await all(STORES.queue);
+    const retryable=remaining.filter(x=>x.syncStatus!=='needs_review');
+    if(retryable.length){
+      const due=retryable.map(x=>Date.parse(String(x.nextSyncAt||''))).filter(Number.isFinite);
+      const nextAt=due.length?Math.min(...due):Date.now()+SYNC_RETRY_BASE_MS;
+      const delay=Math.max(1000,nextAt-Date.now());
+      if(syncRetryTimer)clearTimeout(syncRetryTimer);
+      syncRetryTimer=setTimeout(()=>{syncRetryTimer=null;if(navigator.onLine)syncPending();},Math.min(SYNC_RETRY_MAX_MS,delay));
+    }else if(syncRetryTimer){clearTimeout(syncRetryTimer);syncRetryTimer=null;}
+    if($('syncText'))$('syncText').textContent=[
+      sent?sent+' synced':'',failed?failed+' waiting to retry':'',review?review+' need review':''
+    ].filter(Boolean).join(' · ')||'All POS orders are up to date.';
   }finally{syncInProgress=false;}
 }
+async function syncPending(){return syncPendingUnifiedPosOrders();}
 
 function formatTime(iso){if(!iso)return'Never';try{return new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}catch(e){return'Never'}}
 async function updateSystemPanel(){
