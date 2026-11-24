@@ -107,7 +107,7 @@ DECLARE
   result jsonb;
   payload jsonb;
   changed jsonb;
-  order_id uuid;
+  v_dine_order_id uuid;
   pickup_order_id uuid;
   delivery_order_id uuid;
   payment_request uuid:='e3333333-3333-4333-8333-333333333331';
@@ -137,13 +137,13 @@ BEGIN
      OR (SELECT payment_method_summary FROM public.orders WHERE local_order_id=dine_local::text) IS NOT NULL THEN
     RAISE EXCEPTION 'POS_DINE_IN_WALKIN_CREATE_FAILED: %',result;
   END IF;
-  order_id:=(result->>'order_id')::uuid;
+  v_dine_order_id:=(result->>'order_id')::uuid;
 
   -- Exact retry replays the same server order; changed facts at the same
   -- revision are rejected. A later revision updates that still-new order.
   result:=public.flame_chick_sync_pos_order(payload);
   IF result->>'ok'<>'true' OR result->>'already_processed'<>'true'
-     OR (result->>'order_id')::uuid<>order_id
+     OR (result->>'order_id')::uuid<>v_dine_order_id
      OR (SELECT count(*) FROM public.orders WHERE local_order_id=dine_local::text)<>1 THEN
     RAISE EXCEPTION 'POS_DINE_IN_IDEMPOTENT_REPLAY_FAILED: %',result;
   END IF;
@@ -161,8 +161,8 @@ BEGIN
   changed:=jsonb_set(changed,'{request_hash}',to_jsonb(repeat('2',64)),true);
   result:=public.flame_chick_sync_pos_order(changed);
   IF result->>'ok'<>'true' OR (result->>'local_revision')::bigint<>2
-     OR (SELECT notes FROM public.orders WHERE id=order_id)<>'valid later revision'
-     OR (SELECT count(*) FROM public.order_items WHERE order_id=order_id)<>1 THEN
+     OR (SELECT notes FROM public.orders WHERE id=v_dine_order_id)<>'valid later revision'
+     OR (SELECT count(*) FROM public.order_items WHERE order_id=v_dine_order_id)<>1 THEN
     RAISE EXCEPTION 'POS_DINE_IN_REVISION_UPDATE_FAILED: %',result;
   END IF;
 
