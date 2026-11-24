@@ -2808,6 +2808,7 @@ async function ensureDeliveryAreas(){
   }
   if(!deliveryAreas.length&&getDefaultDeliveryFee()!==null){
     const area=$('area');if(area)area.value='Not Listed';
+    updateOrderFieldsByType();
   }
 }
 
