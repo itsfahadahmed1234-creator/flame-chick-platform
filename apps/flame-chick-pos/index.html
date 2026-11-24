@@ -3524,7 +3524,10 @@ async function takePaymentAndCloseTable(){
      This makes Back to Order safe: no premature completion, no lost edits. */
   order.items=cart.map(x=>({...x}));order.subtotal=subtotal;order.deliveryFee=0;order.discount=discount;order.total=total;order.customerName=$('customerName').value.trim()||order.customerName||'Dine-in Customer';order.phone=$('phone').value.trim()||order.phone||'';order.notes=$('notes').value.trim();order.paymentMethod=method;order.paymentStatus='Unpaid';order.status='Open';order.updatedAt=now;order.checkoutPending=true;
   if(table){order.tableId=table.id;order.tableNumber=table.name}
-  await put(STORES.orders,order);await del(STORES.queue,order.localOrderId);
+  order=prepareLocalPosSyncOrder(order,{bumpRevision:true});
+  await put(STORES.orders,order);await put(STORES.queue,order);
+  receiptOrder.syncOrderId=order.syncOrderId;receiptOrder.localRevision=order.localRevision;
+  receiptOrder.catalogPublicationId=order.catalogPublicationId;receiptOrder.catalogVersion=order.catalogVersion;
 
   window.editingLocalOrderId=order.localOrderId;receiptEditContext={localOrderId:order.localOrderId,order:receiptOrder};
   /* Keep the live order/cart visible underneath the receipt overlay.
@@ -4098,47 +4101,59 @@ async function flameChickCreatePosDeliveryOrder(order,options={}){
 
 async function finalizeReceiptOrder(order){
   const current=await get(STORES.orders,order.localOrderId);
-  if(!current){showToast('Order not found locally');return false}
-  const isDelivery=String(current.fulfillmentType||'').toLowerCase()==='delivery';
-  let finalized;
-
-  if(isDelivery){
-    try{
-      finalized=await flameChickCreatePosDeliveryOrder(current);
-    }catch(e){
-      const message=String(e?.message||'Could not send the delivery order to Online Orders.');
-      const status=$('receiptStatusText');
-      if(status){
-        status.textContent='NOT SENT TO ONLINE ORDERS · '+message+' · Your order remains saved on this POS.';
-        status.classList.add('receipt-status-error');
-      }
-      showToast(message);
-      return false;
+  if(!current){showToast('Order not found locally');return false;}
+  const type=String(current.fulfillmentType||'').toLowerCase();
+  if(current.serverOrderId){
+    const printOpened=printThermalReceipt(current);
+    if(!printOpened){showToast('Unable to open the receipt for printing.');return false;}
+    closeModal('receiptModal');resetNewOrderMode();return true;
+  }
+  // Use one immutable request ID for the payment + order command. A lost
+  // response can be retried without creating a second payment ledger entry.
+  if(type!=='delivery'&&String(order.paymentStatus||'').toLowerCase()==='paid'){
+    const method=String(order.paymentMethod||current.paymentMethod||'Cash').toLowerCase();
+    const paymentMethod=method==='card'?'card':method==='online'?'bank':'cash';
+    if(!current.pendingPayment){
+      current.pendingPayment={
+        requestId:crypto.randomUUID(),
+        amount:Number(current.total),
+        method:paymentMethod,
+        createdAt:new Date().toISOString()
+      };
     }
-    finalized={...finalized,checkoutPending:false,updatedAt:new Date().toISOString(),syncStatus:'synced',status:'Pending',orderSource:'POS',items:Array.isArray(finalized.items)?finalized.items.map(x=>({...x})):[]};
-    await put(STORES.orders,finalized);
-    await del(STORES.queue,finalized.localOrderId);
-    receiptEditContext=null;
-    $('backToOrderBtn').style.display='none';
+  }
+  current.checkoutPending=false;
+  current.updatedAt=new Date().toISOString();
+  current.syncStatus='pending';
+  current.lastSyncError='';
+  current.nextSyncAt=0;
+  if(type==='dine-in'){
+    current.status='Open';
+    current.paymentStatus='Unpaid';
   }else{
-    finalized={...current,checkoutPending:false,updatedAt:new Date().toISOString(),syncStatus:'pending',paymentStatus:current.fulfillmentType==='Delivery'&&current.paymentMethod==='COD'?'Unpaid':'Paid',status:'Completed',items:Array.isArray(current.items)?current.items.map(x=>({...x})):[]};
+    current.status='Pending';
+    if(!current.pendingPayment)current.paymentStatus='Unpaid';
   }
-
-  const printOpened=printThermalReceipt(finalized);
-  if(!printOpened){
-    showToast(isDelivery?'Delivery order is already in Online Orders. Reopen its receipt to print again.':'Unable to open the receipt for printing.');
-    return false;
-  }
-  await put(STORES.orders,finalized);
-  if(isDelivery){
-    await del(STORES.queue,finalized.localOrderId);
+  await put(STORES.orders,current);
+  await put(STORES.queue,current);
+  const printOpened=printThermalReceipt({
+    ...current,
+    paymentStatus:current.pendingPayment?'Paid':'Unpaid',
+    status:current.pendingPayment?'Completed':current.status
+  });
+  if(!printOpened){showToast('Unable to open the receipt. The order remains safely queued on this device.');return false;}
+  closeModal('receiptModal');
+  window.editingLocalOrderId='';receiptEditContext=null;resetNewOrderMode();
+  if(navigator.onLine&&flameChickStaffSession?.access_token)await syncPending();
+  const latest=await get(STORES.orders,current.localOrderId)||current;
+  if(latest.serverOrderId){
+    showToast(latest.serverStatus==='completed'
+      ?'Payment confirmed. Order completed and moved to Order History.'
+      :'Order synchronized to Production · '+(latest.serverOrderNumber||latest.serverOrderId));
   }else{
-    await put(STORES.queue,finalized);
+    showToast('Receipt saved · order remains in the offline sync queue and will sync after reconnection/sign-in.');
   }
-  window.editingLocalOrderId='';receiptEditContext=null;closeModal('receiptModal');resetNewOrderMode();
-  const paymentNote=isDelivery&&String(finalized.paymentMethod||'COD').trim().toLowerCase()!=='cod'?' · payment remains unpaid in the server record':'';
-  showToast(isDelivery?'Delivery order sent to Online Orders · Source: POS'+paymentNote:'Order completed locally; syncing in background');
-  if(!isDelivery&&navigator.onLine)syncPending();
+  await updateSyncBox();
   return true;
 }
 function printThermalReceipt(order){
