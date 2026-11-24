@@ -92,8 +92,8 @@ test("POS delivery order payload sends explicit delivery selection without fee o
 
 test("POS keeps an unset delivery-area fee distinct from an explicitly free area", () => {
   const html=source[0].html;
-  assert.match(html,/rawFee===null\|\|rawFee===undefined\|\|rawFee===''\?null:Number\(rawFee\)/);
-  assert.match(html,/Number\.isFinite\(n\)&&n>=0\?n:null/);
+  assert.match(html,/const fee=row\.deliveryFee===null\|\|row\.deliveryFee===undefined\?null:Number\(row\.deliveryFee\)/);
+  assert.match(html,/Number\.isFinite\(fee\)&&fee>=0\?fee:null/);
   assert.match(html,/if\(type==='Delivery'&&deliveryFee===null\)/);
   assert.match(html,/getDeliveryFeeForArea\(order\.area\)===null/);
   assert.doesNotMatch(html,/function deliveryAreaFee\(row\)[^\n]*:0\}/);
