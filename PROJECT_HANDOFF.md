@@ -4701,3 +4701,49 @@ The disposable behavioral workflow passed before the final migration filename wa
 - Vercel confirms the custom domain alias `flamechick.vercel.app` is assigned to this newest deployment. Public menu remains `https://flamechick.vercel.app/menu.html`.
 - This latest release includes the final change routing all homepage legacy Add/Cart controls to the read-only V3 menu and labels the header control as Menu.
 - The deployment is published. Runtime browser-level menu rendering smoke test remains the outstanding website verification; static tests and Vercel READY/alias are not a substitute for that visual/network test.
+
+
+## 2026-11-24 — Homepage V3 catalog + website checkout rollout (supersedes older disabled-checkout notes)
+
+### User-approved storefront requirements
+- The customer catalog must be embedded directly on the existing homepage, immediately below the large **Menu** heading. Do not route customers to `menu.html` or `order-online-v3.html`; no separate Menu-page button. The sentence “Browse the current published Flame Chick catalog, including current sizes and deals.” must not appear.
+- Preserve the original V2 homepage visual identity and illustrated product-card treatment, but render names, descriptions, variants, prices, availability and deals from the current immutable V3 publication. No hard-coded catalog prices.
+- Homepage V3 checkout must support both Delivery and Pickup.
+- For now, customer-entered/unlisted delivery localities use a temporary **Rs. 150** fee. The server reads this from `branch_delivery_settings.not_listed_delivery_fee`; the browser does not submit a fee. The Owner will later configure named delivery areas and their individual fees through Admin. At this point Main has zero active named areas, so customers use the Not Listed / Other locality input and enter their locality/address.
+- Existing secure quote → signed short-lived quote token → idempotent create order flow remains authoritative. Customer must see server-verified total before Place Order.
+
+### Source changes and checks
+- Homepage V3 checkout/catalog now occupies the Menu section and reuses V2 classes and card visual treatment (`cat`, `cat-pill`, `items`, `card`, `art`, `body`, `foot`), with product artwork from published image paths where available and Flame Chick product media/fallback illustrations otherwise.
+- V3 product customizer, modifier selections, deal configurator, branch/fulfilment selection, delivery area/locality/address, cart, server quote, order submit, retry, and success UI are mounted on the homepage.
+- Homepage header/menu/hero/feature CTAs now scroll to the embedded Menu section or cart. Removed the legacy V2 `js/catalog.js` loader and old page redirects. No links or redirects to `menu.html` or `order-online-v3.html` remain in the homepage.
+- Removed the requested catalogue intro sentence. Kept the printed-menu GST notice; GST calculations remain deferred.
+- V3 cart count is synced to the existing homepage cart badge.
+- Replaced old website-source-hygiene assertions with V3 homepage integration tests, including dependency order, homepage embed, V2 visual card classes, server quote/commit flow, delivery locality selection, server-side fee validation, idempotent retry, and API CORS/branch flags.
+- Website Static Checks workflow **45384177022** passed on commit `0a4394fe1533171cf9506cff980dad1e9fa28479`. All steps passed: JavaScript syntax, core catalog tests, preview tests, homepage inline-script parsing.
+- Homepage HTML source audit: no duplicate element IDs; no separate menu/order page links; requested intro sentence absent.
+
+### Hosted Supabase production changes
+- Main branch `84b1b6dc-4fd1-45fa-8d9b-23d203b36cfd` now has `website_ordering_enabled=true`, `website_delivery_enabled=true`, and `website_pickup_enabled=true`.
+- `branch_delivery_settings.not_listed_delivery_fee=150.00` on Main. No named active delivery areas exist yet. Server-side Order API reads the fee from this table; never trust client-supplied fees.
+- Deployed `flame-chick-order-api` version **2** and `flame-chick-catalog` version **2**, both ACTIVE, using exact current repository source and their bundled local dependencies. The Order API CORS handler supports OPTIONS, GET and POST; previous 404 OPTIONS log entries were from before this redeployment.
+- Do not change Edge Function JWT settings: these public APIs use their own publishable-key checks / public-read contract; Order API remains `verify_jwt=false` as before.
+
+### Latest public Production deployment
+- Vercel Production deployment **READY**: `dpl_J5y1tZeoBZfRAfxVkmjLTZ72jq6i`, source commit `0a4394fe1533171cf9506cff980dad1e9fa28479`.
+- Vercel confirms alias `https://flamechick.vercel.app` is assigned to this deployment, along with the deployment's production aliases.
+- Public root homepage: `https://flamechick.vercel.app/`. The customer catalog and checkout are embedded on this homepage below Menu.
+- This deployment is the new source of truth and supersedes the earlier read-only `menu.html` rollout and all notes saying website checkout is disabled.
+
+### Remaining verification — do not overstate readiness
+- Browser-level live smoke test of the latest Production homepage and real network checkout was not completed in this session. The connected browser only had the older `/menu.html` tab open; the browser connector available here could read tabs but not navigate them. Container DNS/network access was unavailable. Do not claim that a real order was submitted or that live quote/create has passed.
+- Earlier Supabase logs recorded OPTIONS 404 responses before Edge Function version 2 was deployed. After deployment, no fresh API request logs were returned in the checked window. Re-test browser preflight, `website_context`, catalog load, quote and create flow on the live site before treating customer checkout as fully verified.
+- Do not create real orders during smoke tests. Use explicit disposable/test customer data and clearly mark test orders if the order API creates records.
+- Check whether Admin exposes Owner-managed named delivery-area fees and test that saving one updates the same `delivery_areas` records read by the website.
+- Run the full manual synthetic restaurant rehearsal before real operations: Delivery and Pickup website checkout; POS receive; offline POS queue and automatic sync; status workflow; rider accept/reject/expiry/delivery; return; Cashier payment collection with COD/Card/Online-bank transfer; idempotent retry; history. Rider Delivered is not payment collected; Cashier collection confirmation is still required before completion/history.
+- Existing security advisor reports INFO `rls_enabled_no_policy` on 51 tables (including many private/internal tables intended to be inaccessible directly) and WARN leaked-password protection disabled. Review grants/RLS and Auth setting in the broader production-readiness pass; do not blindly add public policies to clear the informational lint.
+- GST remains deferred. No real restaurant operations were started by this deployment.
+
+### Exact next action
+1. Open `https://flamechick.vercel.app/` in a browser and verify the embedded V3 menu/cards and Delivery/Pickup selection.
+2. Verify the browser network preflight and Order API `website_context`, then perform one clearly labelled test quote/order in a safe test flow and verify the resulting order reaches POS. If any request fails, fix that exact blocker before enabling actual customer traffic.
+3. Inspect Admin's named delivery-area management and Owner permissions, then complete the full manual rehearsal above.
