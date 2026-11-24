@@ -1835,3 +1835,43 @@ The disposable behavioral workflow passed before the final migration filename wa
 - Commits: POS source change `89c950785bbf73ff5ae0a6a3870fba8da21337ce`; test addition `8f64002dd4ec31a2acaa76099cf64e706d4fefa7`.
 - **CI for these two latest commits has not yet been inspected/confirmed.** The earlier static check `45372567729` and disposable behavior run `45372567275` passed on `716ae15863794f0a1a5cc893be43ffccb2110c93`, before the UUID integration fix and Production-generated migration filename alignment. Re-run/inspect the current-HEAD static and full disposable migration + POS behavioral workflows before declaring the current branch green.
 - The deployed Order API version 1 still uses wildcard CORS and required Edge Function secrets have not been securely verified/set; this small POS payload fix does not resolve those deployment blockers.
+
+
+## 2026-11-24 — Production system build rollout: database migrations and public V3 menu
+
+**Important terminology:** This is the build-out of the Flame Chick Production system. No restaurant operation is currently running. Hosted Supabase is the intended production environment, but its empty operational tables are not evidence of live restaurant operations.
+
+### Database migration state
+- Verified hosted Supabase project `adkrxfnawdiljhjaavnj` migration ledger contains **35 applied migrations**.
+- The repository currently contains the matching 35 versioned SQL migration files. The final applied version is `20261124102922_flame_chick_order_status_commands_v1`.
+- The full operational schema is installed: catalog, staff roles, operational orders, delivery, payments, website order API, unified POS sync and order status commands.
+- The catalog publication is already live in the database: Flame Chick publication **#2**, schema V3, **25 products, 28 variants, 6 deals**, checksum `8062b1961ee2c9e7668ed4039c9d2396c0fe66a7571a2591b1146eea113913c5`.
+- Main branch is intentionally not accepting website orders yet: `website_ordering_enabled=false`, `website_delivery_enabled=false`, `website_pickup_enabled=false`; active delivery areas=0 and Not Listed default fee=NULL. Do not flip these flags until branch fulfilment and end-to-end checkout rehearsal are completed.
+- No customer/order/payment/delivery operational fixtures have been created. The current environment is still being built and rehearsed.
+
+### Public website catalog publication
+- Root homepage `apps/flame-chick-website/index.html` previously loaded the legacy V2 catalog client against the published V3 API and fell back to hard-coded legacy menu markup. That stale embedded menu and its legacy catalog loader have now been disabled; homepage menu/CTA links point to the current published V3 menu.
+- Added `apps/flame-chick-website/menu.html` and `js/public-menu-v3.js`: read-only public menu page. It fetches the immutable V3 publication through the public catalog API, verifies publication metadata/checksum using the existing V3 client/validator, renders current products/variants and scheduled deal variants, and offers branch selection. It contains no cart, quote, checkout, or order-write path.
+- This keeps the public menu visible without exposing a checkout that cannot yet accept orders safely. Homepage copy now states that online checkout is not enabled yet; do not claim customer ordering is live.
+- Added the new public menu JavaScript to website syntax CI.
+- Website static workflow **45377068545** passed on homepage-correction commit `5653713cd6a41f6efe3954691a41f9c573d721ac`; all syntax, catalog regression, preview regression and inline-script checks passed.
+- Website static workflow **45376873630** also passed for the initial V3 public-menu module.
+- Vercel Production deployment **READY**: `dpl_GCFHz8afyKw4d7z95ofwBZJoQZ2B`, commit `5653713cd6a41f6efe3954691a41f9c573d721ac`. Production aliases now map to this deployment, including public custom domain **`https://flamechick.vercel.app`** and `flame-chick-website-production-six.vercel.app`.
+- Public menu URL: **`https://flamechick.vercel.app/menu.html`**. Root homepage URL: **`https://flamechick.vercel.app/`**.
+- A staging build `dpl_HvRANAF51hQoZbjLzoVbx7gdfCGZ` also reached READY before the Production deployment. The current Production deployment was built from the exact reviewed branch commit, not promoted from staging.
+- Verification boundary: Vercel reports the Production deployment READY and the custom-domain alias assigned. Website static tests passed. A browser-level visual/network smoke test of the newly live `/menu.html` has **not yet been recorded**; do not claim that runtime rendering has been manually verified until that check is done.
+
+### POS status request idempotency integration
+- `apps/flame-chick-pos/index.html` now generates a UUID for each status mutation and sends it as `request_id`.
+- `tests/ops-source-hygiene.test.mjs` checks the UUID is created and sent.
+- POS/Rider static workflow **45375639994** and Staff Admin role-boundary QA **45375639906** passed on commit `8f64002dd4ec31a2acaa76099cf64e706d4fefa7`.
+
+### Exact next steps
+1. Perform a browser-level smoke test of `https://flamechick.vercel.app/` and `https://flamechick.vercel.app/menu.html`: verify the live V3 publication loads, all product categories/variants and deals render, no V2 fallback or stale hard-coded prices appear, and branch switching works if applicable.
+2. Finish app/API launch readiness: CORS allowlists, secure Edge secrets, Admin/POS/Rider deployment verification, staff account setup, delivery area/default fee configuration and private Realtime or supported polling fallback.
+3. Keep website checkout disabled until all checkout/fulfilment configuration is complete and a manual synthetic end-to-end rehearsal passes.
+4. Run the complete manual rehearsal with clearly identified test orders and test accounts: Dine-in, Takeaway, Delivery, offline POS queue + automatic IndexedDB sync after reconnection, status transitions, Rider accept/reject/expiry/delivery, physical return, Cashier payment collection with COD/Card/Online-bank transfer, idempotent retries and Order History.
+5. Preserve the rule: Rider Delivered does not mean payment collected. Cashier must explicitly select collection method and confirm full collection before the order is completed and moved to History.
+6. GST remains deferred. Do not enable public order intake or represent the system as operational until rehearsal and user approval.
+
+**No live restaurant operation or real customer transaction was started by this deployment.**
