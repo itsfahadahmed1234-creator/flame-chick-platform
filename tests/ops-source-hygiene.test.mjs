@@ -177,8 +177,8 @@ test("POS displays the authoritative outstanding balance rather than treating de
 
 test("POS loads only the published V3 catalog contract and rejects legacy V2 cache",()=>{
   const html=source[0].html;
-  assert.match(html,/\.\.\/flame-chick-website\/js\/catalog-v3\.js/);
-  assert.match(html,/\.\.\/flame-chick-website\/js\/catalog-v3-deal-view\.js/);
+  assert.match(html,/\.\/catalog-v3\.js/);
+  assert.match(html,/\.\/catalog-v3-deal-view\.js/);
   assert.match(html,/\.\/catalog-v3-adapter\.js/);
   assert.match(html,/FlameChickCatalogV3\?\.validateHealth/);
   assert.match(html,/snapshot\.schemaVersion!==3/);
