@@ -78,6 +78,8 @@
     var selectedVariantId = null;
     var quantities = Object.create(null);
     var customizations = Object.create(null);
+    var burgerSlotValues = Object.create(null);
+    var expandedBurgerGroupId = null;
     var lastError = null;
 
     function key(groupId, optionId) {
@@ -140,6 +142,8 @@
       selectedVariantId = variantId;
       quantities = Object.create(null);
       customizations = Object.create(null);
+      burgerSlotValues = Object.create(null);
+      expandedBurgerGroupId = null;
       // Fixed one-option groups are canonicalized immediately. The UI locks
       // them; the server still validates every emitted product/variant ID.
       variant.groups.forEach(function (group) {
@@ -356,48 +360,156 @@
       var variant = selectedVariant();
       if (variant) {
         variant.groups.forEach(function (group) {
-          var groupSet = makeElement(doc, 'fieldset', 'fc-deal-component-group');
-          groupSet.appendChild(makeElement(doc, 'legend', '', group.name + ' — choose ' +
-            group.minUnits + ' to ' + group.maxUnits));
+          var burgerChoiceGroup = /burger/i.test(String(group.name || '')) && group.options.length > 1;
+          var groupSet = makeElement(doc, 'fieldset', 'fc-deal-component-group' + (burgerChoiceGroup ? ' fc-deal-burger-group' : ''));
+          if (!burgerChoiceGroup) {
+            groupSet.appendChild(makeElement(doc, 'legend', '', group.name + ' — choose ' +
+              group.minUnits + ' to ' + group.maxUnits));
+          }
+
+          var burgerDetails = null;
+          var burgerDetailsContent = null;
+          if (burgerChoiceGroup) {
+            var slotCount = Math.max(Number(group.maxUnits) || 0, Number(group.minUnits) || 0, 1);
+            var slots = burgerSlotValues[group.id];
+            if (!Array.isArray(slots) || slots.length !== slotCount) {
+              slots = Array.from({ length: slotCount }, function () { return ''; });
+              burgerSlotValues[group.id] = slots;
+            }
+            var pickedNames = slots.map(function (optionId) {
+              var selectedOption = findOption(group, optionId);
+              return selectedOption ? selectedOption.productName : '';
+            }).filter(Boolean);
+            burgerDetails = makeElement(doc, 'details', 'fc-deal-burger-picker');
+            burgerDetails.open = expandedBurgerGroupId === group.id;
+            burgerDetails.addEventListener('toggle', function () {
+              expandedBurgerGroupId = burgerDetails.open ? group.id :
+                (expandedBurgerGroupId === group.id ? null : expandedBurgerGroupId);
+            });
+            var summary = makeElement(doc, 'summary', 'fc-deal-burger-summary');
+            var summaryCopy = makeElement(doc, 'span', 'fc-deal-burger-summary-copy');
+            var requiredText = group.minUnits === group.maxUnits
+              ? 'Choose ' + slotCount + ' burgers'
+              : 'Choose ' + group.minUnits + '–' + group.maxUnits + ' burgers';
+            summaryCopy.appendChild(makeElement(doc, 'strong', '', requiredText));
+            summaryCopy.appendChild(makeElement(doc, 'small', '', pickedNames.length
+              ? pickedNames.length + '/' + slotCount + ' selected · ' + pickedNames.join(' + ')
+              : 'No burgers selected yet'));
+            summary.appendChild(summaryCopy);
+            summary.appendChild(makeElement(doc, 'span', 'fc-deal-burger-edit', 'Edit'));
+            burgerDetails.appendChild(summary);
+            burgerDetailsContent = makeElement(doc, 'div', 'fc-deal-burger-content');
+            var burgerSlots = makeElement(doc, 'div', 'fc-deal-burger-slots');
+            for (let slot = 0; slot < slotCount; slot++) {
+              var slotLabel = makeElement(doc, 'label', 'fc-deal-burger-slot');
+              slotLabel.appendChild(makeElement(doc, 'span', '', 'Burger ' + (slot + 1)));
+              let select = makeElement(doc, 'select');
+              let controlKey = 'burger-slot:' + group.id + ':' + slot;
+              select.setAttribute('data-control-key', controlKey);
+              select.setAttribute('aria-label', 'Choose burger ' + (slot + 1));
+              controls[controlKey] = select;
+              var placeholder = makeElement(doc, 'option', '', 'Select a burger');
+              placeholder.value = '';
+              select.appendChild(placeholder);
+              group.options.forEach(function (option) {
+                var alreadyUsed = slots.some(function (optionId, index) {
+                  return index !== slot && optionId === option.id;
+                });
+                var selectedQuantity = selectedCount(group, option);
+                var optionCap = Number(option.maxQuantity) || Number(group.maxUnits) || 1;
+                var disabled = readOnly ||
+                  (!group.allowRepeatOption && alreadyUsed) ||
+                  (selectedQuantity >= optionCap && slots[slot] !== option.id);
+                var optionEl = makeElement(doc, 'option', '',
+                  option.productName + (option.variantLabel ? ' — ' + option.variantLabel : ''));
+                optionEl.value = option.id;
+                optionEl.disabled = disabled;
+                select.appendChild(optionEl);
+              });
+              select.value = slots[slot] || '';
+              select.addEventListener('change', function () {
+                var nextSlots = slots.slice();
+                nextSlots[slot] = select.value || '';
+                var desired = Object.create(null);
+                nextSlots.forEach(function (optionId) {
+                  if (optionId) desired[optionId] = (desired[optionId] || 0) + 1;
+                });
+                var failure = null;
+                group.options.forEach(function (option) {
+                  var currentQuantity = selectedCount(group, option);
+                  var targetQuantity = desired[option.id] || 0;
+                  if (!failure && currentQuantity > 0 && targetQuantity !== currentQuantity) {
+                    var cleared = setOptionQuantity(group.id, option.id, 0);
+                    if (!cleared.ok) failure = cleared;
+                  }
+                });
+                group.options.forEach(function (option) {
+                  var targetQuantity = desired[option.id] || 0;
+                  if (!failure && targetQuantity > 0 && selectedCount(group, option) !== targetQuantity) {
+                    var changed = setOptionQuantity(group.id, option.id, targetQuantity);
+                    if (!changed.ok) failure = changed;
+                  }
+                });
+                if (failure) {
+                  lastError = failure;
+                } else {
+                  burgerSlotValues[group.id] = nextSlots;
+                  expandedBurgerGroupId = group.id;
+                  lastError = null;
+                }
+                render(container, { document: doc, onComplete: options.onComplete,
+                  restoreFocusKey: controlKey, formatMoney: options.formatMoney,
+                  completeButtonLabel: options.completeButtonLabel,
+                  showVariantBasePrice: options.showVariantBasePrice });
+              });
+              slotLabel.appendChild(select);
+              burgerSlots.appendChild(slotLabel);
+            }
+            burgerDetailsContent.appendChild(burgerSlots);
+            burgerDetails.appendChild(burgerDetailsContent);
+            groupSet.appendChild(burgerDetails);
+          }
+
           group.options.forEach(function (option) {
-            var optionRow = makeElement(doc, 'div', 'fc-deal-component-option');
             var optionLabel = group.options.length === 1
               ? group.name
               : option.productName + ' — ' + option.variantLabel;
             var fixedGroup = isFixedGroup(group);
-            var priceLabel = option.pricingTreatment === 'INCLUDED'
-              ? 'Included'
-              : (option.pricingTreatment === 'SURCHARGE'
-                ? 'Additional ' + formatAmount(option.surchargeMinor, viewModel.currencyCode, options.formatMoney) + ' per item'
-                : 'Standalone item ' + formatAmount(option.standalonePriceMinor, viewModel.currencyCode, options.formatMoney));
-            optionRow.appendChild(makeElement(doc, 'span', 'fc-deal-component-label', optionLabel + ' (' + priceLabel + ')'));
-
-            var quantity = makeElement(doc, 'input', 'fc-deal-component-quantity');
-            quantity.type = option.maxQuantity === 1 ? 'checkbox' : 'number';
-            var controlKey = 'quantity:' + group.id + ':' + option.id;
-            quantity.setAttribute('data-control-key', controlKey);
-            controls[controlKey] = quantity;
-            if (quantity.type === 'checkbox') {
-              quantity.checked = selectedCount(group, option) === 1;
-            } else {
-              quantity.min = '0';
-              quantity.max = String(option.maxQuantity);
-              quantity.step = '1';
-              quantity.value = String(selectedCount(group, option));
-              quantity.inputMode = 'numeric';
+            if (!burgerChoiceGroup) {
+              var optionRow = makeElement(doc, 'div', 'fc-deal-component-option');
+              var priceLabel = option.pricingTreatment === 'INCLUDED'
+                ? 'Included'
+                : (option.pricingTreatment === 'SURCHARGE'
+                  ? 'Additional ' + formatAmount(option.surchargeMinor, viewModel.currencyCode, options.formatMoney) + ' per item'
+                  : 'Standalone item ' + formatAmount(option.standalonePriceMinor, viewModel.currencyCode, options.formatMoney));
+              optionRow.appendChild(makeElement(doc, 'span', 'fc-deal-component-label', optionLabel + ' (' + priceLabel + ')'));
+              var quantity = makeElement(doc, 'input', 'fc-deal-component-quantity');
+              quantity.type = option.maxQuantity === 1 ? 'checkbox' : 'number';
+              var quantityKey = 'quantity:' + group.id + ':' + option.id;
+              quantity.setAttribute('data-control-key', quantityKey);
+              controls[quantityKey] = quantity;
+              if (quantity.type === 'checkbox') {
+                quantity.checked = selectedCount(group, option) === 1;
+              } else {
+                quantity.min = '0';
+                quantity.max = String(option.maxQuantity);
+                quantity.step = '1';
+                quantity.value = String(selectedCount(group, option));
+                quantity.inputMode = 'numeric';
+              }
+              quantity.setAttribute('aria-label', 'Quantity of ' + optionLabel);
+              quantity.disabled = readOnly || fixedGroup;
+              quantity.addEventListener('change', function () {
+                var next = quantity.type === 'checkbox' ? (quantity.checked ? 1 : 0) : Number(quantity.value);
+                var changed = setOptionQuantity(group.id, option.id, next);
+                if (!changed.ok) lastError = changed;
+                render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: quantityKey,
+                  formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel,
+                  showVariantBasePrice: options.showVariantBasePrice });
+              });
+              optionRow.appendChild(quantity);
+              groupSet.appendChild(optionRow);
             }
-            quantity.setAttribute('aria-label', 'Quantity of ' + optionLabel);
-            quantity.disabled = readOnly || fixedGroup;
-            quantity.addEventListener('change', function () {
-              var next = quantity.type === 'checkbox' ? (quantity.checked ? 1 : 0) : Number(quantity.value);
-              var changed = setOptionQuantity(group.id, option.id, next);
-              if (!changed.ok) lastError = changed;
-              render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: controlKey,
-                formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel,
-                showVariantBasePrice: options.showVariantBasePrice });
-            });
-            optionRow.appendChild(quantity);
-            groupSet.appendChild(optionRow);
 
             var count = selectedCount(group, option);
             for (let unit = 0; unit < count; unit++) {
@@ -438,7 +550,8 @@
                 });
                 unitSet.appendChild(modifierSet);
               });
-              groupSet.appendChild(unitSet);
+              if (burgerChoiceGroup) burgerDetailsContent.appendChild(unitSet);
+              else groupSet.appendChild(unitSet);
             }
           });
           fragment.appendChild(groupSet);
