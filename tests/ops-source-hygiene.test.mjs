@@ -133,14 +133,17 @@ test("POS exposes Cashier payment collection only for delivered orders and prese
   assert.match(html,/data-collect-payment=/);
   assert.ok(html.includes("async function openPaymentCollection(orderId)"));
   assert.ok(html.includes("await loadInitialOnlineInbox()"));
-  assert.ok(html.includes("state.sent&&(state.amount!==amount||state.method!==method)"));
-  assert.match(html,/action:'collect_payment',order_id:state\.orderId,amount/);
+  assert.ok(html.includes("state.sent&&state.method!==method"));
+  assert.match(html,/paymentRequest=window\.FlameChickPosPaymentCollection/);
+  assert.match(html,/createFullBalanceRequest/);
   assert.match(html,/payment_method:method,request_id:state\.requestId/);
-  assert.ok(html.includes("paymentCollectionState={orderId:key,requestId:crypto.randomUUID(),amount:null,method:'cash',sent:false}"));
-  assert.ok(html.includes("state.sent&&(state.amount!==amount||state.method!==method)"));
+  assert.ok(html.includes("paymentCollectionState={orderId:key,requestId:crypto.randomUUID(),method:'cash',sent:false}"));
   assert.ok(html.includes("state.sent=true"));
-  assert.match(html,/A partial collection keeps the order Delivered/);
+  assert.match(html,/Successful collection completes the order and moves it to Order History/);
   assert.match(html,/order\.Status!=='Delivered'/);
+  assert.match(html,/result\.completed!==true/);
+  assert.match(html,/await refreshHistoryData\(\)/);
+  assert.doesNotMatch(html,/paymentCollectionAmount|wallet|value="other"/);
   assert.doesNotMatch(html,/public\.payments\?select=|flame_chick_collect_order_payment|INSERT INTO public\.payments/);
 });
 
