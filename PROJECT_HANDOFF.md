@@ -4240,3 +4240,42 @@ Therefore:
 7. Only after tests pass, review/deploy migrations and function changes deliberately. No Production migrations, test orders, fake customer records, Edge Function deployments, Realtime changes or Vercel deployments have been made in this stage.
 
 User priorities/constraints unchanged: Flame Chick Production is the system being built and has no live customer/order production data; no GST/tax implementation; Free plan only; no rebuild of existing POS UI; no unverified migrations.
+
+
+# 2026-11-24 — Authenticated V3 POS sync API foundation (source-only; not deployed)
+
+## Implemented on this branch
+- Added Order API action `sync_pos_order` for authenticated staff POS synchronization.
+- Verifies the bearer token through Supabase Auth, resolves active staff role and single authorized branch server-side, and derives `actor_user_id`, `restaurant_id`, and `branch_id` from that trusted context. Browser-supplied actor/branch values are ignored.
+- Only Admin, Owner, Manager and Cashier may sync; Rider is denied.
+- Reads the current published V3 catalog through the service-only catalog RPC and uses shared `calculateWebsiteOrder(..., { staffPos: true })` server-side. Browser prices/totals are ignored.
+- Validates publication/version, product/deal identities, variants, modifiers, quantities and branch availability through the shared pricing contract.
+- Delivery fees are re-read from branch `delivery_areas` and `branch_delivery_settings`; listed area ID and Not Listed locality are validated. Dine-in/Takeaway cannot include delivery fields or delivery fee.
+- Builds a canonical POS request hash and stable idempotency key `flame-chick-pos-<local_order_id>`, then calls service-role-only `flame_chick_sync_pos_order(jsonb)`.
+- Does not set an initial payment method: a newly created order remains unpaid, and payment is a separate cashier collection action.
+- Added a synthetic route-level Deno test for staff auth, server-derived actor/branch, server V3 price replacing browser price, and unpaid order result.
+- Corrected the unapplied candidate SQL to allow nullable phone for Dine-in/Takeaway walk-ins and to keep payment method null until payment is actually collected. Added Not Listed locality persistence and validation.
+- Updated `.github/workflows/ci-edge-functions.yml` so changes to the candidate POS sync migration run the Edge API checks.
+
+## Verification
+- Edge Function type-check and route integration tests passed on run `45342361392`, head `908571b5f528bb338e77a96881d7956c4d3b7c5c`.
+- Run URL: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45342361392
+- The prior failed run `45342253061` was caused by the second test inheriting the first test's restored global fetch. The test now installs its own isolated synthetic fetch; the latest Edge workflow passed.
+- The Admin static workflow for the same head was also triggered and must be checked before declaring all current-head workflows green.
+
+## Critical boundary / not yet complete
+- Candidate migration `supabase/migrations/20261124050000_flame_chick_unified_pos_order_sync_v1.sql` remains source-only. It has NOT been applied to Production or any live database. Do not deploy the Edge Function or connect the UI until this migration has passed a disposable local Supabase reset/integration test.
+- The SQL RPC writes V3-priced item snapshots supplied by the trusted Edge Function and revalidates branch, delivery fee, role, revision, and monetary arithmetic. It is not a substitute for the required disposable DB tests.
+- POS UI still has its V3 fail-closed checkout gate. It does not yet call `sync_pos_order`.
+- V3 deal UI selection/cart serialization remains gated. Do not enable deal buttons until component selections serialize into the canonical V3 payload.
+- The single unified IndexedDB outbox and automatic replay for Dine-in, Takeaway and Delivery are not yet implemented. Current legacy sync paths remain and must not be represented as the completed offline design.
+- Existing payment collection API supports `cash`, `card`, `bank`, `wallet`, `other`; the POS cashier-facing labels should map COD→cash, Card→card, Online/bank transfer→bank. Keep payment collection separate from order creation; delivery is not complete merely because rider marks Delivered.
+- No Production migration, Edge Function deployment, Vercel deployment, test order/customer or fake production record was created.
+
+## Next exact work
+1. Check all workflows on the latest head; fix any failures before proceeding.
+2. Run the candidate migration only in disposable local Supabase, reset from all migrations, and add real SQL integration coverage for product/deal snapshots, three fulfilments, branch delivery fees, unpaid orders, revision conflicts, idempotency, status/payment collection, history, and two-terminal dine-in table concurrency. Inspect and fix any SQL/RPC issue before considering production.
+3. Connect existing POS UI to the V3 payload and new API; implement deal component selection before enabling deals.
+4. Replace legacy delivery-only sync short-circuit with one durable IndexedDB outbox for Dine-in, Takeaway and Delivery, with stable local UUID/idempotency, revision, pending/attempt state, server acknowledgement, retry/backoff, reconnect trigger, and reconciliation after lost responses.
+5. Test offline order capture and automatic sync after reconnect, duplicate retry, network timeout, terminal concurrency and history/payment behaviour.
+6. Only after disposable integration and current-head CI pass, review deployment/migration sequencing explicitly. Production is the system being built and currently has no live customer/order records. No GST/tax logic; Free plan only; preserve existing POS UI.
