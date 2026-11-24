@@ -353,10 +353,14 @@ export function calculateWebsiteOrder(snapshot, request, dependencies = {}) {
   const versionId = request?.version_id ?? request?.versionId;
   const branchId = request?.branch_id ?? request?.branchId;
   const fulfillmentType = request?.fulfillment_type ?? request?.fulfilmentType;
+  // This flag is supplied by the authenticated Order API after resolving a
+  // staff identity and branch. It must never be copied from browser payload.
+  const staffPos = dependencies.staffPos === true;
+  const allowedFulfilments = staffPos ? ["delivery", "pickup", "dine_in"] : ["delivery", "pickup"];
   if (!isRecord(request) || schemaVersion !== 3 ||
       !isUuid(publicationId) || !isUuid(branchId) ||
       typeof versionId !== "string" ||
-      !["delivery", "pickup"].includes(fulfillmentType)) {
+      !allowedFulfilments.includes(fulfillmentType)) {
     return fail("ORDER_REQUEST_INVALID", "The V3 order request is missing required publication, branch or fulfilment details.");
   }
   const checkedSnapshot = contract.validateSnapshot(snapshot);
@@ -367,14 +371,22 @@ export function calculateWebsiteOrder(snapshot, request, dependencies = {}) {
       versionId !== snapshot.versionId) {
     return fail("CATALOG_PUBLICATION_CHANGED", "The published menu changed. Refresh the menu and review your cart again.");
   }
-  if (!contract.isBranchOrderingEnabled(snapshot, branchId, fulfillmentType)) {
-    return fail("BRANCH_FULFILMENT_UNAVAILABLE", "Online ordering is not enabled for this branch and fulfilment method.");
+  const snapshotBranchExists = Array.isArray(snapshot.branches) &&
+    snapshot.branches.some(branch => branch?.branchId === branchId);
+  if (!snapshotBranchExists || (!staffPos && !contract.isBranchOrderingEnabled(snapshot, branchId, fulfillmentType))) {
+    return fail("BRANCH_FULFILMENT_UNAVAILABLE", staffPos
+      ? "The staff branch is not present in the current published catalog."
+      : "Online ordering is not enabled for this branch and fulfilment method.");
   }
+  const customerPhone = typeof request.customer?.phone === "string" ? request.customer.phone.trim() : "";
   if (!isRecord(request.customer) ||
       typeof request.customer.name !== "string" ||
       request.customer.name.trim().length < 1 || request.customer.name.trim().length > 160 ||
-      typeof request.customer.phone !== "string" ||
-      request.customer.phone.trim().length < 3 || request.customer.phone.trim().length > 32 ||
+      (!staffPos && (customerPhone.length < 3 || customerPhone.length > 32)) ||
+      (staffPos && request.customer.phone !== undefined && request.customer.phone !== null &&
+        customerPhone.length > 0 && (customerPhone.length < 3 || customerPhone.length > 32)) ||
+      (request.customer.phone !== undefined && request.customer.phone !== null &&
+        typeof request.customer.phone !== "string") ||
       (request.customer.email !== undefined && request.customer.email !== null &&
         (typeof request.customer.email !== "string" || request.customer.email.length > 254))) {
     return fail("CUSTOMER_DETAILS_INVALID", "Enter a valid customer name and phone number.");
@@ -390,7 +402,8 @@ export function calculateWebsiteOrder(snapshot, request, dependencies = {}) {
   const menu = dealView.buildDealViewModel(snapshot, {
     branchId,
     fulfilmentType: fulfillmentType,
-    databaseNow
+    databaseNow,
+    staffPos
   }, contract);
   if (!menu || menu.ok !== true || menu.orderingEnabled !== true) {
     return fail(menu?.code || "BRANCH_FULFILMENT_UNAVAILABLE",
@@ -427,7 +440,7 @@ export function calculateWebsiteOrder(snapshot, request, dependencies = {}) {
       fulfillment_type: fulfillmentType,
       currency_code: snapshot.settings.currency_code,
       customer_name: request.customer.name.trim(),
-      customer_phone: request.customer.phone.trim(),
+      customer_phone: customerPhone || null,
       customer_email: typeof request.customer.email === "string" ? request.customer.email.trim() || null : null,
       notes: typeof request.notes === "string" ? request.notes.trim() || null : null,
       subtotal: minorToMoney(subtotalMinor),
