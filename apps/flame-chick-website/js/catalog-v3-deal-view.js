@@ -268,8 +268,12 @@
       return fail('BRANCH_SELECTION_REQUIRED', 'A valid branch must be selected.');
     }
     var fulfilmentType = options.fulfilmentType === undefined ? null : options.fulfilmentType;
-    if (fulfilmentType !== null && fulfilmentType !== 'delivery' && fulfilmentType !== 'pickup') {
-      return fail('FULFILMENT_INVALID', 'Choose delivery or pickup before loading fulfilment-specific deal availability.');
+    // staffPos is an internal trusted-server option. Public website callers
+    // cannot use it to enable POS-only fulfilment or bypass website settings.
+    var staffPos = options.staffPos === true;
+    if (fulfilmentType !== null && fulfilmentType !== 'delivery' && fulfilmentType !== 'pickup' &&
+        !(staffPos && fulfilmentType === 'dine_in')) {
+      return fail('FULFILMENT_INVALID', 'Choose a supported fulfilment method before loading fulfilment-specific deal availability.');
     }
     var instant = options.databaseNow;
     if (instant === undefined || instant === null || !Number.isFinite(new Date(instant).getTime())) {
@@ -278,7 +282,7 @@
     // Deals can be displayed while browsing, but are never marked orderable
     // until a supported fulfilment method has been explicitly selected.
     var orderingEnabled = fulfilmentType !== null &&
-      contract.isBranchOrderingEnabled(snapshot, branchId, fulfilmentType);
+      (staffPos || contract.isBranchOrderingEnabled(snapshot, branchId, fulfilmentType));
     var collections = sortByOrder(snapshot.dealCollections, 'dealCollectionId').map(function (collection) {
       var category = find(snapshot.categories, 'categoryId', collection.categoryId);
       var deals = snapshot.deals.filter(function (deal) {
