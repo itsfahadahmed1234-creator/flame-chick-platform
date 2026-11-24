@@ -4279,3 +4279,15 @@ User priorities/constraints unchanged: Flame Chick Production is the system bein
 4. Replace legacy delivery-only sync short-circuit with one durable IndexedDB outbox for Dine-in, Takeaway and Delivery, with stable local UUID/idempotency, revision, pending/attempt state, server acknowledgement, retry/backoff, reconnect trigger, and reconciliation after lost responses.
 5. Test offline order capture and automatic sync after reconnect, duplicate retry, network timeout, terminal concurrency and history/payment behaviour.
 6. Only after disposable integration and current-head CI pass, review deployment/migration sequencing explicitly. Production is the system being built and currently has no live customer/order records. No GST/tax logic; Free plan only; preserve existing POS UI.
+
+
+# 2026-11-24 — Disposable POS SQL QA run 63 diagnosis and fixture correction
+
+- Run 63 failed in the behavioral SQL fixture before the POS sync RPC was called.
+- Exact PostgreSQL error: `STAFF_ROLE_SELF_ASSIGNMENT_DENIED` at fixture insertion into `public.user_roles`.
+- Cause: the synthetic Cashier/Rider rows listed the target user as `assigned_by`; the production staff-role trigger correctly prohibits self-assignment.
+- Corrected `supabase/tests/flame_chick_pos_order_sync_v1.sql`: bootstrap a separate synthetic Admin using the approved `assignment_method='initial_bootstrap'` path, then assign the synthetic Cashier and Rider with that Admin as actor. Added cleanup assertion for all three test Auth users.
+- No application authorization rule or production migration was weakened to accommodate the test.
+- Re-run 64 was triggered from this corrected test on commit `038bb1c1b7680144a8ea2cb9e1cc5485378e966a`; it is currently in progress. Final SQL behavioral result is not yet verified; check the failing/passing step logs before proceeding.
+- Full migration replay had succeeded on run 63 before the fixture test began. Run 63 failure does not establish that the POS sync behavior passed or failed.
+- Production remains untouched; local fixture transaction is rolled back by the SQL test. No fake records were written to the hosted project.
