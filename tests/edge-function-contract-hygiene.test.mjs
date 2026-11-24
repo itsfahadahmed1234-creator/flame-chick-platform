@@ -161,6 +161,27 @@ test("delivery dispatch resolves branch context through the restricted role proj
 });
 
 
+test("POS order-board select matches the deployed schema and keeps GST fields deferred", () => {
+  const source=sources["flame-chick-order-api"];
+  const start=source.indexOf('async function readOrderBoard(');
+  const end=source.indexOf('\nexport ',start);
+  const route=source.slice(start,end);
+  const selected=route.match(/query\.set\(\s*"select",\s*"([^"]+)"\s*\)/);
+  assert.ok(selected,"Order API must declare an explicit order-board select.");
+  const select=selected[1];
+  for(const required of [
+    "id","branch_id","order_number","local_order_id","source","fulfillment_type","status",
+    "subtotal","discount_amount","delivery_fee","total","paid_amount","balance_due",
+    "payment_status","payment_method_summary","table_reference","table_label_snapshot",
+    "order_items(id","line_total","order_item_modifiers(id","order_item_components(id",
+    "delivery_tasks(id"
+  ]) assert.ok(select.includes(required),"Missing deployed order-board field: "+required);
+  for(const retiredOrUncreated of [
+    "tax_amount","service_charge","tip_amount","table_id","table_number_snapshot"
+  ]) assert.equal(select.includes(retiredOrUncreated),false,
+    "Order board must not select a field absent from the current Production schema: "+retiredOrUncreated);
+});
+
 test("order API exposes authenticated self staff-context to Rider before restricting POS order-board roles", () => {
   const source=sources["flame-chick-order-api"];
   const getStart=source.indexOf('if (req.method === "GET")');
