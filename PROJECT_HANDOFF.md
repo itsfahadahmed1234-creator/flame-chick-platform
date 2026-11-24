@@ -4417,3 +4417,30 @@ Project `adkrxfnawdiljhjaavnj` remains ACTIVE_HEALTHY in Mumbai, Free plan. Migr
 8. Only after manual rehearsal passes and explicit go-live approval, create a production-target deployment from a reviewed release commit and assign `https://flamechick.vercel.app` to that tested Website deployment.
 
 Remember: Flame Chick is a new system under construction. Existing restaurant/branch foundation rows are present, but there are no customer/order/payment/delivery operational records. Deployment of static preview apps is not real-restaurant launch.
+
+
+## HFP / Flame Chick demo architecture review — 2026-11-24
+
+User explicitly asked to inspect the existing HFP and Flame Chick demo implementations and determine what can be adopted for Production Edge Functions, APIs and Realtime. Completed pinned-source review and added:
+`docs/architecture/hfp-demo-reference-adoption-review-2026-11-24.md`
+(commit `ba01cbc5c28c641a17ada87ee9f6370179d268df`).
+
+Reference repository: `befahad1234-cmyk/-hfp-supabase-PROJECT_HANDOFFS`.
+- HFP main pinned ref: `1b26a263767f37a767449a7493f53b666cd14df3`.
+- HFP rider offers pinned ref: `becf1a407224ed7546f51823c1719d2c54a8d506`.
+- Flame Chick demo pinned ref: `e32943f928a905914b4aad7abc90feabf39c0c70`.
+
+Decision: selectively adopt domain-separated APIs, finite action routing and stable errors, rider offer lifecycle semantics, atomic offer acceptance/idempotency concepts, Realtime client lifecycle (session token refresh, channel cleanup, debounce/coalesce, reconnect refetch/manual fallback), and IndexedDB persistence/retry/reconciliation UX concepts.
+
+Do NOT copy code wholesale:
+- Demo Order API is nearly line-for-line HFP Order API and contains HFP-specific branch/RPC conventions; not a Production V3 implementation.
+- Demo Delivery API is more adapted but still has legacy HFP-named RPCs, old schema and wildcard CORS.
+- Catalog functions are schema V2 multi-table readers; Production uses V3 immutable published catalog snapshots.
+- HFP/demo Realtime uses Postgres Changes and includes broad/unfiltered POS subscriptions to delivery offers/assignments; Production must use private Broadcast topics and DB-enforced authorization.
+- Rider user-filtered Postgres Changes is a useful UX pattern but a client filter is not the security boundary; Production uses private per-rider topics authorized against auth.uid(), role/profile and branch.
+- HFP POS has IndexedDB queue stores, retry/backoff and lost-response reconciliation ideas, but current `syncPending()` short-circuits when its API-ready flag is true and explicitly says cloud sync is not enabled. Flame Chick demo POS explicitly says local POS orders remain on-device and cloud sync is not enabled. Neither proves unified cloud sync.
+- Production still needs one unified IndexedDB outbox for Dine-in, Takeaway and Delivery with stable local ID, monotonic revision, server-computed hash, idempotency, reconnect/backoff, lost-response reconciliation and ack-before-removal.
+
+No Production schema, function, secret, Auth, Realtime publication or Vercel configuration was changed during this review. This is a documented architecture assessment only.
+
+Next: use the review to finish deployment safely. Preserve current V3 Catalog and Order API contracts; configure secrets; deploy/test the Production functions; implement private Broadcast/outbox and replace raw Postgres Changes; integrate the unified POS outbox; then manual test-order rehearsal before real restaurant go-live.
