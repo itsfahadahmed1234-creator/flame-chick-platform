@@ -2223,7 +2223,7 @@ function renderKanban(){
       const st=String(o.Status||'Pending').trim();
       if(label==='Orders') return st==='Pending'||st==='Accepted';
       if(label==='Preparing') return st==='Preparing'||st==='Ready';
-      return st==='Out for Delivery'||st==='Delivered';
+      return st==='Out for Delivery'||st==='Delivered'||st==='Served';
     }).sort((a,b)=>orderChangeTime(b)-orderChangeTime(a));
 
     const pages=[];
@@ -2240,7 +2240,7 @@ function renderKanban(){
     </section>`;
   }).join('');
 
-  const active=orders.filter(o=>['Pending','Accepted','Preparing','Ready','Out for Delivery','Delivered'].includes(String(o.Status||'Pending')));
+  const active=orders.filter(o=>['Pending','Accepted','Preparing','Ready','Out for Delivery','Delivered','Served'].includes(String(o.Status||'Pending')));
   $('ordersMeta').textContent=`${active.length} active Flame Chick orders · live updates`;
   $('onlineNavBadge').textContent=orders.filter(o=>['Pending','Accepted'].includes(String(o.Status||'Pending'))).length;
 
@@ -2293,7 +2293,7 @@ function renderOrderCard(o){
   let action='';
   if(statusSaving){
     action=`<button class="btn primary status-saving-btn" type="button" disabled aria-busy="true"><span class="status-saving-spinner" aria-hidden="true"></span>Saving…</button>`;
-  }else if(status==='Pending'){action=`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Accepted">Accept Order</button><button class="btn reject" data-order-id="${esc(o.OrderID)}" data-order-status="Rejected">Reject Order</button>`;}else if(status==='Accepted'){action=`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Preparing">Start Preparing</button>`;}else if(status==='Preparing'){action=`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Ready">Mark Ready</button><button class="btn reject" data-order-id="${esc(o.OrderID)}" data-order-status="Cancelled">Cancel</button>`;}else if(status==='Ready'){action=o.FulfillmentType==='Delivery'?renderDeliveryDispatchAction(o):`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Collected">Collected</button>`;}else if(status==='Out for Delivery'||status==='Delivered'){action=renderDeliveryDispatchAction(o);}
+  }else if(status==='Pending'){action=`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Accepted">Accept Order</button><button class="btn reject" data-order-id="${esc(o.OrderID)}" data-order-status="Rejected">Reject Order</button>`;}else if(status==='Accepted'){action=`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Preparing">Start Preparing</button>`;}else if(status==='Preparing'){action=`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Ready">Mark Ready</button><button class="btn reject" data-order-id="${esc(o.OrderID)}" data-order-status="Cancelled">Cancel</button>`;}else if(status==='Ready'){action=o.FulfillmentType==='Delivery'?renderDeliveryDispatchAction(o):o.FulfillmentType==='Dine-in'? `<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Served">Mark Served</button>`:`<button class="btn primary" data-order-id="${esc(o.OrderID)}" data-order-status="Collected">Collected</button>`;}else if(status==='Out for Delivery'||status==='Delivered'){action=renderDeliveryDispatchAction(o);}
 
   const displayStatus=status==='Pending'?'New':status;
   const cls=inboxStatusClass(status)==='out'?'out':(inboxStatusClass(status)||'accepted');
@@ -2336,7 +2336,7 @@ function openOrderDetails(orderId){
   }).join(''):(!recoveryAttemptedOrders.has(key)?'<div class="row">Loading items…</div>':'<div class="row">Item details unavailable</div>');
 
   let action='';
-  if(status==='Pending'){action=`<button class="btn primary" data-detail-order-id="${esc(key)}" data-detail-status="Accepted">Accept Order</button><button class="btn reject" data-detail-order-id="${esc(key)}" data-detail-status="Rejected">Reject Order</button>`;}else if(status==='Accepted'){action=`<button class="btn primary" data-detail-order-id="${esc(key)}" data-detail-status="Preparing">Start Preparing</button>`;}else if(status==='Preparing'){action=`<button class="btn primary" data-detail-order-id="${esc(key)}" data-detail-status="Ready">Mark Ready</button><button class="btn reject" data-detail-order-id="${esc(key)}" data-detail-status="Cancelled">Cancel</button>`;}else if(status==='Ready'&&o.FulfillmentType!=='Delivery'){action=`<button class="btn primary" data-detail-order-id="${esc(key)}" data-detail-status="Collected">Collected</button>`;}
+  if(status==='Pending'){action=`<button class="btn primary" data-detail-order-id="${esc(key)}" data-detail-status="Accepted">Accept Order</button><button class="btn reject" data-detail-order-id="${esc(key)}" data-detail-status="Rejected">Reject Order</button>`;}else if(status==='Accepted'){action=`<button class="btn primary" data-detail-order-id="${esc(key)}" data-detail-status="Preparing">Start Preparing</button>`;}else if(status==='Preparing'){action=`<button class="btn primary" data-detail-order-id="${esc(key)}" data-detail-status="Ready">Mark Ready</button><button class="btn reject" data-detail-order-id="${esc(key)}" data-detail-status="Cancelled">Cancel</button>`;}else if(status==='Ready'&&o.FulfillmentType!=='Delivery'){const next=o.FulfillmentType==='Dine-in'?'Served':'Collected';action=`<button class="btn primary" data-detail-order-id="${esc(key)}" data-detail-status="${next}">${next==='Served'?'Mark Served':'Collected'}</button>`;}
 
   const displayStatus=status==='Pending'?'New':status;
   const sourceValue=String(o.OrderSource||'website').toLowerCase();
