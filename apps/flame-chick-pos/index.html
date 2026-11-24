@@ -3732,7 +3732,7 @@ async function syncPendingUnifiedPosOrders(){
     for(const row of queueRows)if(row?.localOrderId&&!byId.has(String(row.localOrderId)))byId.set(String(row.localOrderId),row);
     const candidates=[];
     for(const [id,row] of byId){
-      if(row.orderSource!=='POS'||flameChickIsTerminalLocalOrder(row))continue;
+      if(row.orderSource!=='POS')continue;
       if(row.syncStatus==='needs_review')continue;
       const queued=queueRows.some(q=>String(q.localOrderId)===id);
       if(!queued)continue;
@@ -3863,8 +3863,8 @@ async function showQueue(){
         const st=String(o.syncStatus||'pending').toLowerCase();
         const cls=st==='synced'?'synced':st==='failed'?'failed':'pending';
         const when=o.lastSyncAttemptAt?new Date(o.lastSyncAttemptAt).toLocaleTimeString():'—';
-        const action=FLAME_CHICK_ORDER_API_READY&&flameChickIsPosDeliveryOrder(o)&&!o.serverOrderId&&!flameChickIsTerminalLocalOrder(o)
-          ?'<button type="button" class="btn primary" data-retry-pos-delivery="'+esc(o.localOrderId)+'">Send to Online Orders</button>'
+        const action=FLAME_CHICK_ORDER_API_READY&&!o.serverOrderId
+          ?'<button type="button" class="btn primary" data-retry-pos-delivery="'+esc(o.localOrderId)+'">Retry Production sync</button>'
           :'';
         return '<tr><td class="mono">'+esc(o.localOrderId)+'</td><td>Rs. '+money(o.total)+'</td><td><span class="pill '+cls+'">'+esc(o.syncStatus||'pending')+'</span></td><td>'+esc(Number(o.syncAttempts)||0)+'</td><td>'+esc(when)+'</td><td>'+esc(o.lastSyncError||'')+'</td><td>'+action+'</td></tr>';
       }).join('')+
@@ -4199,55 +4199,15 @@ async function openLocalOrderDetails(localOrderId){
 }
 async function retryLocalOrderSync(localOrderId){
   const order=await get(STORES.orders,localOrderId);if(!order)return;
-  if(FLAME_CHICK_ORDER_API_READY){
-    if(!flameChickIsPosDeliveryOrder(order)){
-      showToast('Takeaway and dine-in orders stay local; only delivery orders are sent to Online Orders.');
-      return;
-    }
-    if(!navigator.onLine){showToast('Connect to the internet before retrying this delivery order.');return;}
-    if(!flameChickStaffSession?.access_token){showStaffLoginGate('Sign in to send this POS delivery order to Online Orders.');showToast('Staff sign-in is required to retry this delivery.');return;}
-    if(flameChickIsTerminalLocalOrder(order)){showToast('This local order is already closed and will not be submitted.');return;}
-    if(order.serverOrderId){
-      await del(STORES.queue,order.localOrderId);
-      await loadInitialOnlineInbox();
-      await showHistory();
-      return;
-    }
-    order.syncStatus='pending';
-    order.checkoutPending=true;
-    order.lastSyncError='';
-    order.nextSyncAt=0;
-    await put(STORES.orders,order);
-    await put(STORES.queue,order);
-    try{
-      const synced=await flameChickCreatePosDeliveryOrder(order);
-      await put(STORES.orders,{...synced,checkoutPending:false,syncStatus:'synced',syncAttempts:0,lastSyncError:'',updatedAt:new Date().toISOString()});
-      await del(STORES.queue,order.localOrderId);
-      showToast('Delivery order sent to Online Orders.');
-    }catch(error){
-      const latest=await get(STORES.orders,order.localOrderId)||order;
-      latest.checkoutPending=true;
-      latest.syncStatus='failed';
-      latest.lastSyncError=String(error?.message||'Online Orders submission failed').slice(0,500);
-      await put(STORES.orders,latest);
-      await put(STORES.queue,latest);
-      showToast('Delivery not sent: '+latest.lastSyncError);
-    }
-    await showHistory();
-    return;
-  }
   order.syncStatus='pending';order.lastSyncError='';order.nextSyncAt=0;
   await put(STORES.orders,order);await put(STORES.queue,order);
-  showToast('Retrying sync…');
+  if(!navigator.onLine){showToast('Offline · order remains queued for automatic sync.');return;}
+  if(!flameChickStaffSession?.access_token){showStaffLoginGate('Sign in to synchronize this POS order.');return;}
   await syncPending();
-  await showHistory();
+  const latest=await get(STORES.orders,localOrderId);
+  showToast(latest?.serverOrderId?'Order synchronized to Production.':latest?.lastSyncError||'Order remains safely queued.');
+  await showQueue();
 }
-
-let historyActiveTab='pos';
-const HISTORY_LIST_LIMIT=25;
-let historyServerRows={pos:[],online:[],all:[],cancelled:[]};
-let historyLoading=false;
-
 function historyOrderSource(order){
   const source=String(order?.OrderSource??order?.orderSource??'').trim().toLowerCase();
   if(source) return source==='website'?'online':'pos';
