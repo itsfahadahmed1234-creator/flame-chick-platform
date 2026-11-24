@@ -162,7 +162,7 @@ test("POS loads only the published V3 catalog contract and rejects legacy V2 cac
   assert.match(html,/\.\.\/flame-chick-website\/js\/catalog-v3\.js/);
   assert.match(html,/\.\.\/flame-chick-website\/js\/catalog-v3-deal-view\.js/);
   assert.match(html,/\.\/catalog-v3-adapter\.js/);
-  assert.match(html,/FlameChickCatalogV3\.validateHealth/);
+  assert.match(html,/FlameChickCatalogV3\?\.validateHealth/);
   assert.match(html,/snapshot\.schemaVersion!==3/);
   assert.match(html,/schemaVersion:3,value:snapshot/);
   assert.match(html,/Never let an old V2 cache appear as the current Production menu/);
