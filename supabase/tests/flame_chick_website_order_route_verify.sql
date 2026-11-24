@@ -14,10 +14,15 @@ BEGIN
     RAISE EXCEPTION 'WEBSITE_ORDER_ROUTE_VERIFY_RESTAURANT_MISSING';
   END IF;
 
-  SELECT count(*), pg_catalog.min(id)
-  INTO v_order_count, v_order_id
+  SELECT count(*) INTO v_order_count
   FROM public.orders
   WHERE restaurant_id=v_restaurant_id AND source='website';
+
+  SELECT id INTO v_order_id
+  FROM public.orders
+  WHERE restaurant_id=v_restaurant_id AND source='website'
+  ORDER BY created_at,id
+  LIMIT 1;
 
   IF v_order_count <> 1 OR v_order_id IS NULL THEN
     RAISE EXCEPTION 'WEBSITE_ORDER_ROUTE_VERIFY_EXPECTED_ONE_ORDER: %',v_order_count;
