@@ -27,8 +27,8 @@ test("active storefront is Flame Chick branded and contains no retired brand/con
   const retiredGlobal = ["H", "F", "P"].join("");
   assert.equal(all.toLowerCase().includes(retiredBrand.toLowerCase()), false);
   assert.equal(all.toLowerCase().includes(retiredStorage), false);
-  assert.equal(new RegExp("\\\\b" + retiredGlobal + "\\\\b", "i").test(all), false);
-  assert.doesNotMatch(html, /window\\.HFP_CONFIG|window\\.HfpCatalog|Pizza Bite/i);
+  assert.equal(new RegExp("\\b" + retiredGlobal + "\\b", "i").test(all), false);
+  assert.doesNotMatch(html, /window\.HFP_CONFIG|window\.HfpCatalog|Pizza Bite/i);
 });
 
 test("V3 catalog and checkout modules load in dependency order on the homepage", () => {
@@ -61,9 +61,9 @@ test("live V3 catalog is embedded immediately below the homepage Menu heading", 
   assert.match(html, /id="cats" hidden/);
   assert.match(html, /id="menuRoot"/);
   assert.match(html, /id="deal-catalog"/);
-  assert.doesNotMatch(html, /Browse the current published Flame Chick catalog, including current sizes and deals\\./);
-  assert.doesNotMatch(html, /href="(?:menu|order-online-v3)\\.html"/);
-  assert.doesNotMatch(html, /window\\.location\\.assign\\(['"](?:menu|order-online-v3)\\.html/);
+  assert.doesNotMatch(html, /Browse the current published Flame Chick catalog, including current sizes and deals\./);
+  assert.doesNotMatch(html, /href="(?:menu|order-online-v3)\.html"/);
+  assert.doesNotMatch(html, /window\.location\.assign\(['"](?:menu|order-online-v3)\.html/);
 });
 
 test("V2 visual language is used for V3 catalog cards without hard-coded menu prices", () => {
@@ -74,22 +74,22 @@ test("V2 visual language is used for V3 catalog cards without hard-coded menu pr
   assert.match(order, /className = 'art'/);
   assert.match(order, /className = 'body'/);
   assert.match(order, /className = 'foot'/);
-  assert.match(order, /product\\.imagePath/);
-  assert.match(order, /variant\\.priceMinor/);
-  assert.match(order, /openProductCustomizer\\(product, variantId\\)/);
-  assert.match(order, /openDealConfigurator\\(deal\\)/);
+  assert.match(order, /product\.imagePath/);
+  assert.match(order, /variant\.priceMinor/);
+  assert.match(order, /openProductCustomizer\(product, variantId\)/);
+  assert.match(order, /openDealConfigurator\(deal\)/);
   assert.doesNotMatch(order, /unit_price_snapshot|line_total|price_minor|subtotal_minor/);
 });
 
 test("homepage ordering uses the current V3 publication and server-authoritative quote", () => {
-  assert.match(order, /FlameChickCatalogV3Client\\.load/);
-  assert.match(order, /FlameChickCatalogV3View\\.buildMenuViewModel/);
-  assert.match(order, /FlameChickCatalogV3DealView\\.buildDealViewModel/);
-  assert.match(order, /FlameChickCatalogV3DealConfigurator\\.createDealConfigurator/);
+  assert.match(order, /FlameChickCatalogV3Client\.load/);
+  assert.match(order, /FlameChickCatalogV3View\.buildMenuViewModel/);
+  assert.match(order, /FlameChickCatalogV3DealView\.buildDealViewModel/);
+  assert.match(order, /FlameChickCatalogV3DealConfigurator\.createDealConfigurator/);
   assert.match(order, /action: 'quote_website_order'/);
-  assert.match(order, /state\\.checkoutBody\\.action = 'create_website_order'/);
+  assert.match(order, /state\.checkoutBody\.action = 'create_website_order'/);
   assert.match(order, /productVariantId: variantId/);
-  assert.match(order, /item\\.quantity = row\\.quantity/);
+  assert.match(order, /item\.quantity = row\.quantity/);
   assert.match(order, /delivery: delivery/);
   assert.doesNotMatch(order, /unit_price_snapshot|line_total|price_minor|subtotal_minor|delivery_fee:/);
 });
@@ -98,25 +98,25 @@ test("delivery area and locality are sent as customer selections, never as a cli
   assert.match(order, /selection_type: 'not_listed'/);
   assert.match(order, /selection_type: 'listed_area'/);
   assert.match(order, /other_locality: locality/);
-  assert.match(order, /address: \\$\('delivery-address'\\)\\.value\\.trim\\(\\)/);
+  assert.match(order, /address: \$\('delivery-address'\)\.value\.trim\(\)/);
   assert.doesNotMatch(order, /delivery_fee:|deliveryFee:/);
 });
 
 test("checkout uses server quote tokens, idempotency and safe uncertain-response retry", () => {
   assert.match(order, /PENDING_CHECKOUT_STORAGE_KEY = 'flame-chick-v3-pending-checkout-id'/);
-  assert.match(order, /typeof result\\.quote_token !== 'string'/);
-  assert.match(order, /state\\.checkoutBody\\.quote_token = state\\.quoteToken/);
-  assert.match(order, /state\\.checkoutBody\\.request_id = state\\.checkoutRequestId/);
-  assert.match(order, /root\\.crypto\\.randomUUID/);
-  assert.match(order, /savePendingRequestId\\(state\\.checkoutRequestId\\)/);
-  assert.match(order, /var uncertain = !error\\.status \\|\\| error\\.status >= 500/);
+  assert.match(order, /typeof result\.quote_token !== 'string'/);
+  assert.match(order, /state\.checkoutBody\.quote_token = state\.quoteToken/);
+  assert.match(order, /state\.checkoutBody\.request_id = state\.checkoutRequestId/);
+  assert.match(order, /root\.crypto\.randomUUID/);
+  assert.match(order, /savePendingRequestId\(state\.checkoutRequestId\)/);
+  assert.match(order, /var uncertain = !error\.status \|\| error\.status >= 500/);
   assert.match(order, /Retry the same checkout request to verify whether it was received/);
   assert.doesNotMatch(order, /localStorage|indexedDB/);
 });
 
 test("cart badge, delivery and pickup controls are wired to the V3 order experience", () => {
   assert.match(html, /id="badge"/);
-  assert.match(order, /if \\('badge'\\)/);
+  assert.match(order, /if \('badge'\)/);
   assert.match(html, /id="branch-selector"/);
   assert.match(html, /id="delivery-area"/);
   assert.match(html, /id="request-quote"/);
@@ -124,12 +124,12 @@ test("cart badge, delivery and pickup controls are wired to the V3 order experie
   assert.match(html, /id="order-success"/);
   assert.match(order, /websiteDeliveryEnabled/);
   assert.match(order, /websitePickupEnabled/);
-  assert.match(order, /fulfillment_type: context\\.fulfilmentType/);
+  assert.match(order, /fulfillment_type: context\.fulfilmentType/);
 });
 
 test("V3 Order API calculates delivery charges from database configuration and supports CORS preflight", () => {
   const api = readFileSync("supabase/functions/flame-chick-order-api/index.ts", "utf8");
-  assert.match(api, /if \\(req\\.method === "OPTIONS"\\)/);
+  assert.match(api, /if \(req\.method === "OPTIONS"\)/);
   assert.match(api, /readBranchDeliveryConfiguration/);
   assert.match(api, /not_listed_delivery_fee/);
   assert.match(api, /delivery_fee:deliveryFee/);
