@@ -18,7 +18,7 @@ export const PRODUCTION_STAFF_ADMIN_ORIGIN = "https://flamechicadmin.vercel.app"
 export function parseStaffAdminOrigins(raw) {
   const configured = typeof raw === "string" ? raw.trim() : "";
   return parseAllowedOrigins(
-    [configured, PRODUCTION_STAFF_ADMIN_ORIGIN].filter(Boolean).join(",")
+    [configured, PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS].filter(Boolean).join(",")
   );
 }
 

@@ -4956,3 +4956,12 @@ The disposable behavioral workflow passed before the final migration filename wa
 - No catalog publication or real order/payment created. No GST/tax implementation. No production alias promotion. No restaurant operations sign-off.
 
 **Next exact steps:** open the two preview URLs in a real browser, verify existing Admin login and delivery configuration page, add/modify no actual delivery data unless Owner/Admin chooses the intended areas/fees, then sign in to POS and verify delivery total shows Rs. 150 for Not Listed, locality input, three-column layout, fixed deal summaries and selectable deal cards. After that, provision the shared Storage bucket with reviewed access policy and upload actual catalog images; update the V3 Burger deal groups through the Admin catalog workflow; validate pricing and order payload in disposable tests. Only then consider canonical production alias promotion and a full manual restaurant rehearsal. Do not create a test customer order on the live system.
+
+
+## 2026-11-24 — Admin preview login blocked by exact-origin CORS rejection
+
+- Browser context showed the Admin preview rendering its login form but displaying **“Failed to fetch”**. The existing production Admin domain remains signed in and working.
+- Supabase unified function logs directly confirmed the cause: `OPTIONS | 403` for `/functions/v1/flame-chick-staff-admin` at 2026-11-24 15:23:29Z and 15:23:47Z from the preview browser. Deployed `origin-policy.mjs` only always included `https://flamechickadmin.vercel.app`; the Admin preview hostname was not on its exact CORS allowlist. This is not an Admin account, role or password error.
+- Vercel project SSO protection remains enabled for non-custom aliases, but browser context reached the page; the verified immediate blocker is Supabase exact-origin CORS.
+- Source update pins exactly two Admin preview origins: immutable preview `https://flame-chick-admin-production-fxdrq9od9-fahad-7455.vercel.app` and branch alias `https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app`. No wildcard is added and other preview apps/subdomains remain blocked. Regression tests check exact matching.
+- **Not yet deployed:** wait for Admin static checks on exact source commit, then deploy all three Staff Admin Edge Function files from that branch. Refresh Admin preview and confirm `OPTIONS` becomes 200 and Staff Admin context loads. Do not change production Admin domain or auth accounts.

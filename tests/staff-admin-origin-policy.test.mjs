@@ -6,6 +6,7 @@ import {
   parseAllowedOrigins,
   parseStaffAdminOrigins,
   PRODUCTION_STAFF_ADMIN_ORIGIN,
+  PREVIEW_STAFF_ADMIN_ORIGINS,
   staffCorsHeaders
 } from "../supabase/functions/flame-chick-staff-admin/origin-policy.mjs";
 
@@ -69,11 +70,13 @@ test("the production Edge Function imports and enforces the tested origin policy
   assert.match(source, /if\(!isAllowedRequestOrigin\(origin,ORIGINS\)\)/);
 });
 
-test("production Admin origin remains allowed when the optional environment allowlist is unset", () => {
+test("production Admin and pinned preview origins remain allowed when optional env allowlist is unset", () => {
   const configured = parseStaffAdminOrigins("");
-  assert.deepEqual([...configured], [PRODUCTION_STAFF_ADMIN_ORIGIN]);
-  assert.equal(isAllowedRequestOrigin(PRODUCTION_STAFF_ADMIN_ORIGIN, configured), true);
-  assert.equal(staffCorsHeaders(PRODUCTION_STAFF_ADMIN_ORIGIN, configured)["Access-Control-Allow-Origin"], PRODUCTION_STAFF_ADMIN_ORIGIN);
+  assert.deepEqual([...configured], [PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS]);
+  for (const origin of [PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS]) {
+    assert.equal(isAllowedRequestOrigin(origin, configured), true);
+    assert.equal(staffCorsHeaders(origin, configured)["Access-Control-Allow-Origin"], origin);
+  }
 });
 
 test("production Admin origin is merged with explicitly configured exact origins", () => {
@@ -113,4 +116,23 @@ test("production invitation callback is pinned to the Admin domain", () => {
     "https://flamechicrider.vercel.app/accept-invitation.html",
     productionAllowed
   ), false);
+});
+
+
+test("Staff Admin preview CORS allows only the exact current and branch-stable preview origins", () => {
+  const configured = parseStaffAdminOrigins("");
+  assert.equal(PREVIEW_STAFF_ADMIN_ORIGINS.length, 2);
+  for (const origin of PREVIEW_STAFF_ADMIN_ORIGINS) {
+    assert.equal(configured.has(origin), true);
+    assert.equal(isAllowedRequestOrigin(origin, configured), true);
+    assert.equal(staffCorsHeaders(origin, configured)["Access-Control-Allow-Origin"], origin);
+  }
+  for (const origin of [
+    "https://flame-chick-admin-production-other.vercel.app",
+    "https://flame-chick-admin-production-fxdrq9od9-fahad-7455.vercel.app.evil.test",
+    "https://evil.example.test"
+  ]) {
+    assert.equal(isAllowedRequestOrigin(origin, configured), false, origin);
+    assert.equal(staffCorsHeaders(origin, configured)["Access-Control-Allow-Origin"], undefined);
+  }
 });
