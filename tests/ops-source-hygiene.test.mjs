@@ -176,7 +176,7 @@ test("POS loads only the published V3 catalog contract and rejects legacy V2 cac
 
 test("POS renders scheduled or branch-unavailable V3 deals as visible but disabled",()=>{
   const html=source[0].html;
-  assert.match(html,/const orderable=deal\.Available===true/);
+  assert.match(html,/const orderable=false/);
   assert.match(html,/Currently outside deal hours/);
   assert.match(html,/deal-unavailable/);
   assert.match(html,/d\.Active===true&&String\(d\.CategoryID\)===String\(g\.id\)/);
