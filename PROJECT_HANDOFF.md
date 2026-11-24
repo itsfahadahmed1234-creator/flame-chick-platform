@@ -4813,3 +4813,27 @@ The disposable behavioral workflow passed before the final migration filename wa
 - Assigned canonical alias `flamechicpos.vercel.app` to this READY deployment. Verified Vercel alias lookup maps the domain to `dpl_GVqLwxp6aLumC9eN5xhjsRMERmj7` and the deployment state is READY.
 - User must now open `https://flamechicpos.vercel.app` and confirm login screen loads; then test sign-in using the existing Admin email/password (or password reset already described). A READY build and alias mapping are not equivalent to a browser login/functional smoke test.
 - Do not claim full POS production readiness until POS login, incoming order board, order status RPC, payment collection and offline IndexedDB-to-Supabase sync are manually exercised.
+
+
+## 2026-11-24 — POS login/order-board failure: missing tax_amount column fixed
+
+### Root cause verified against Production
+- User reported POS displayed `column order_items_1.tax_amount does not exist` after sign-in, then returned to the login gate.
+- Production information_schema confirms neither `orders.tax_amount` nor `order_items.tax_amount` exists. GST/tax was explicitly deferred and no tax fields should be introduced now.
+- Production Edge Function logs showed `flame-chick-order-api` version 2 returning HTTP 500 to authenticated `GET ?board=active&limit=100` at 12:36–12:37Z on Nov 24.
+- Root cause: `readOrderBoard()` selected legacy/unimplemented parent and child fields: `orders.tax_amount`, `order_items.tax_amount`, as well as non-existent `service_charge`, `tip_amount`, `table_id`, and `table_number_snapshot`. Production uses `table_reference` and `table_label_snapshot` instead.
+
+### Source fix, regression tests and deployment
+- Updated `supabase/functions/flame-chick-order-api/index.ts` order-board select to match the existing operational schema. Removed tax/charge/tip and unimplemented table IDs/number fields; selected current table reference/label snapshots instead. No table/schema/business migration was applied.
+- Added a contract regression test in `tests/edge-function-contract-hygiene.test.mjs` to require current fields and reject unsupported/tax fields in the order board select.
+- Edge Function Static Checks run **45394870964 PASSED** on commit `3b786f76930d704b8b5168d9441465f6783e1ab2`; includes Deno type-check, synthetic actual Order API quote/checkout tests and Node contract tests. Admin Static Checks run **45394870914 PASSED** on the same commit.
+- Production Supabase `flame-chick-order-api` successfully deployed as **version 3**, retaining `verify_jwt=false` (the function validates its own public/staff auth contract, unchanged from v2). Deployed bundle includes `index.ts`, `catalog-v3.js`, `catalog-v3-deal-view.js`, `flame-chick-order-pricing.mjs`, `website-order-quote-token.mjs`.
+- Verified deployed function reports ACTIVE v3 and the corrected order-board select. A read-only comparison of all selected columns against Production `information_schema.columns` returned no missing columns for `orders`, `order_items`, `order_item_modifiers`, `order_item_components`, or `delivery_tasks`.
+
+### Important POS UI behavior and remaining live check
+- POS browser sign-in saves the authenticated staff session before loading the online order board. Its current catch block may still display the login gate when a downstream order-board request fails, even though the staff session was already saved. The original reported DB 500 is fixed in the server API; do not interpret a later downstream error as invalid password without checking status/logs.
+- User must hard-refresh the canonical POS domain `https://flamechicpos.vercel.app` (Ctrl+Shift+R), sign in using the existing Admin account, and verify the login gate stays closed and the Online Orders board loads. This live authenticated test has not yet been confirmed after Edge Function v3 deployment.
+- No real orders were created by this test. No business migrations or database writes were performed; only read-only schema inspection, source/test updates and Edge Function deployment occurred.
+- GST remains deferred. Never add `tax_amount` or tax/charge fields merely to satisfy an old query. Do not rebuild the POS.
+
+**Exact next action:** user hard-refreshes canonical POS, signs in with existing Admin credentials, confirms whether Online Orders board loads. If it still shows an error, inspect fresh version-3 Edge Function logs and exact response before changing code.
