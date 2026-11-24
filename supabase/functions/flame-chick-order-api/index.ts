@@ -711,7 +711,7 @@ async function readOrderBoard(board: string, limit: number, branchId: string, fi
   return { ok:true as const, data:result.data };
 }
 
-Deno.serve(async (req: Request) => {
+export async function handleOrderApiRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: CORS_HEADERS });
   if (!SUPABASE_URL || !SERVICE_KEY || PUBLIC_KEYS.length === 0) {
     return response({ ok: false, error: { code: "CONFIG_MISSING", message: "The Flame Chick order API is not configured." } }, 503);
@@ -981,4 +981,8 @@ Deno.serve(async (req: Request) => {
   }
 
   return response({ ok: false, error: { code: "ACTION_NOT_FOUND", message: "Supported actions are website_context (GET), quote_website_order, create_website_order, collect_payment, update_status, cancel and reject." } }, 404);
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleOrderApiRequest);
+}
