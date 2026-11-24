@@ -5,6 +5,7 @@ import vm from "node:vm";
 
 const files = ["apps/flame-chick-pos/index.html", "apps/flame-chick-rider/index.html"];
 const source = files.map((file) => ({ file, html: readFileSync(file, "utf8") }));
+const posCatalogAdapter = readFileSync("apps/flame-chick-pos/catalog-v3-adapter.js", "utf8");
 
 test("POS and Rider source use Flame Chick identifiers only", () => {
   const all = source.map((x) => x.html).join("\n");
