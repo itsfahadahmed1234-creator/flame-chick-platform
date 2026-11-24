@@ -6,10 +6,10 @@ import { isValidDatabaseNow } from "../supabase/functions/flame-chick-catalog/pu
 const root = "supabase/functions/";
 const names = ["flame-chick-catalog", "flame-chick-order-api", "flame-chick-delivery-api", "flame-chick-staff-admin"];
 const sources = Object.fromEntries(names.map((name) => [name, readFileSync(root + name + "/index.ts", "utf8")]));
-const paymentMigration=readFileSync("supabase/migrations/20261123173000_flame_chick_payment_collection_v1.sql","utf8");
+const paymentMigration=readFileSync("supabase/migrations/20261124033426_flame_chick_payment_collection_v1.sql","utf8");
 const deliveryFixture=readFileSync("supabase/tests/flame_chick_delivery_commands_v1.sql","utf8");
-const websiteOrderMigration=readFileSync("supabase/migrations/20261123174000_flame_chick_website_order_create_v1.sql","utf8");
-const websiteRetryMigration=readFileSync("supabase/migrations/20261123174100_flame_chick_website_order_idempotency_lookup_v1.sql","utf8");
+const websiteOrderMigration=readFileSync("supabase/migrations/20261124033430_flame_chick_website_order_create_v1.sql","utf8");
+const websiteRetryMigration=readFileSync("supabase/migrations/20261124033433_flame_chick_website_order_idempotency_lookup_v1.sql","utf8");
 const websiteOrderFixture=readFileSync("supabase/tests/flame_chick_website_order_create_v1.sql","utf8");
 const websitePricing=readFileSync("supabase/functions/_shared/flame-chick-order-pricing.mjs","utf8");
 
@@ -197,6 +197,13 @@ test("Order API exposes payment collection only to authenticated POS staff and d
   assert.match(route,/amount: body\.amount/);
   assert.match(route,/flame_chick_collect_order_payment/);
   assert.doesNotMatch(route,/actor_user_id: body\.|\["rider"\]/);
+});
+
+test("Rider Web Push stays disabled until encrypted storage and trusted RPCs are implemented", () => {
+  const source=sources["flame-chick-delivery-api"];
+  assert.match(source,/PUSH_NOT_CONFIGURED/);
+  assert.doesNotMatch(source,/@negrel\\/webpush|ApplicationServer|flame_chick_get_rider_push_config|flame_chick_verify_delivery_push_webhook/);
+  assert.doesNotMatch(source,/endpoint,p256dh,auth|endpoint:sub\\.endpoint|p256dh:sub\\.p256dh|auth:sub\\.auth/);
 });
 
 test("Payment collection database command is row-locked, idempotent, branch-authorized and service-role-only", () => {
