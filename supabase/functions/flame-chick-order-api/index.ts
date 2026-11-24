@@ -898,7 +898,7 @@ async function buildStaffPosSyncPayload(
   };
 }
 
-async function handleOrderApiRequest(req: Request): Promise<Response> {
+export async function handleOrderApiRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: CORS_HEADERS });
   if (!SUPABASE_URL || !SERVICE_KEY || PUBLIC_KEYS.length === 0) {
     return response({ ok: false, error: { code: "CONFIG_MISSING", message: "The Flame Chick order API is not configured." } }, 503);
