@@ -11,6 +11,7 @@ on:
       - "tests/flame-chick-order-pricing.test.mjs"
       - "tests/edge-function-contract-hygiene.test.mjs"
       - "supabase/functions/flame-chick-order-api/index_test.ts"
+      - "supabase/migrations/20261124050000_flame_chick_unified_pos_order_sync_v1.sql"
       - "tests/fixtures/flame-chick-published-menu-v3-fixture.cjs"
       - "ops/catalog-drafts/flame-chick-published-menu-2026-11-23.v3-draft.json"
       - "tests/website-order-quote-token.test.mjs"
