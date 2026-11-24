@@ -949,6 +949,20 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
     if (!context || !["owner", "admin", "manager", "cashier"].includes(context.role)) {
       return response({ ok: false, error: { code: "STAFF_ROLE_REQUIRED", message: "An active Flame Chick POS role is required to view incoming orders." } }, 403);
     }
+    if (view === "pos_delivery_context") {
+      const configuration = await readBranchDeliveryConfiguration(context.restaurant_id, context.branch_id);
+      if (!configuration.ok) {
+        return response({ok:false,error:{code:"POS_DELIVERY_CONFIGURATION_UNAVAILABLE",message:"Delivery areas and fees could not be loaded for this staff branch."}},503);
+      }
+      return response({ok:true,data:{
+        branch_id:context.branch_id,
+        areas:configuration.areas.map(area=>({
+          id:area.id,name:area.name,name_ur:area.name_ur,
+          delivery_fee:Number(area.delivery_fee),sort_order:Number(area.sort_order)||0
+        })),
+        not_listed_delivery_fee:configuration.notListedFee
+      }},200);
+    }
     const board = (url.searchParams.get("board") ?? "active").toLowerCase();
     const requestedLimit = Number(url.searchParams.get("limit") ?? 50);
     const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(Math.trunc(requestedLimit), 100)) : 50;
