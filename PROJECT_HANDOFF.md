@@ -4444,3 +4444,35 @@ Do NOT copy code wholesale:
 No Production schema, function, secret, Auth, Realtime publication or Vercel configuration was changed during this review. This is a documented architecture assessment only.
 
 Next: use the review to finish deployment safely. Preserve current V3 Catalog and Order API contracts; configure secrets; deploy/test the Production functions; implement private Broadcast/outbox and replace raw Postgres Changes; integrate the unified POS outbox; then manual test-order rehearsal before real restaurant go-live.
+
+
+## 2026-11-24 — Unified POS sync migration applied to the empty Production database
+
+Following the documented successful disposable local Supabase behavioral workflow #68, applied the reviewed unified POS sync migration to the hosted Flame Chick Production project `adkrxfnawdiljhjaavnj` via the controlled migration action.
+
+- Applied migration version: `20261124082809`
+- Migration name: `flame_chick_unified_pos_order_sync_v1`
+- GitHub migration source: `supabase/migrations/20261124082809_flame_chick_unified_pos_order_sync_v1.sql`
+- Source commit: `bb2bd26d6143383165076e320ca35952990d71cf`
+- Removed superseded source-only candidate `20261124050000_flame_chick_unified_pos_order_sync_v1.sql` to prevent duplicate replay/conflicting migration history (commit `6eb1e3954cd78bd7946a049fa8eeb312476708cb`).
+
+Post-apply verification:
+- Hosted migration history records `20261124082809`.
+- `public.flame_chick_sync_pos_order(jsonb)` exists.
+- `service_role` can execute it.
+- `anon`, `authenticated`, and `PUBLIC` cannot execute it.
+- `service_role` has no direct INSERT/UPDATE on `public.orders`.
+- Operational order/payment/delivery-task counts remain zero.
+- No test customer, staff, order, payment or delivery rows were inserted.
+- The Disposable SQL behavior suite was not run against hosted Production because its fixture preflight intentionally conflicts with the already-existing Flame Chick tenant. Workflow #68 remains the source of disposable behavioral verification; hosted verification was read-only.
+
+Security advisor now reports 51 informational `rls_enabled_no_policy` notices across private/locked tables plus one warning for disabled Auth leaked-password protection. The RLS-enabled/no-policy pattern is intentional for tables with no direct browser access and tightly scoped server RPC access; do not add broad permissive policies to silence the linter. Review/record this distinction in final security readiness. Performance advisor reports unindexed foreign keys, including the new outbox branch FK; address with a reviewed index migration after the functional release. No security advisor error/high/critical finding was reported in this output.
+
+### Deployment state update
+- Catalog Edge Function deployed as version 1, `verify_jwt=false`, with both `index.ts` and `publication-read-contract.mjs`.
+- Catalog deployment SHA: `9705e9a3da2609276f1bf0d5086a298cdeed8eb8d937f3c2c43ff1fc6269fbee`.
+- Existing Staff Admin remains version 1, which is stale relative to current source: its deployed file set omits `catalog-actions.mjs` while current GitHub source imports it. It must be redeployed with the complete dependency bundle.
+- Order and Delivery functions remain undeployed.
+- Catalog publication #2 is V3 and present; branch ordering is disabled intentionally; only one active Admin role exists; there are no active Rider profiles. Do not enable website checkout or attempt live Rider workflow before branch/menu/role configuration.
+- Realtime authorization baseline: `realtime.messages` exists with RLS enabled; zero policies and zero publication tables. No operational Broadcast implementation has been applied. Do not add broad policies or raw Postgres Changes publication.
+- Required secrets cannot be safely inspected/set with the available Supabase connector. Do not deploy functions that depend on unverified secrets or echo secret values. Need secure dashboard/CLI secret configuration and exact environment names from source.
