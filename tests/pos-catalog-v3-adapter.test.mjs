@@ -138,7 +138,7 @@ test('POS deal cards keep unavailable status separate from the price and action'
   assert.match(html, /class="product-card-footer '\+\(orderable\?'':'is-unavailable'\)\+"/);
   assert.match(html, /class="deal-status" role="status"/);
   assert.match(html, /Unavailable now/);
-  assert.doesNotMatch(html, /Currently outside deal hours or unavailable at this branch.*data-pos-deal/s);
+  assert.doesNotMatch(html, /\(orderable\?'Choose Deal':esc\(status\)\)/, 'Long unavailable copy must not be rendered as an oversized action button.');
 });
 
 test('POS visual refinement styles product cards consistently and colours the brand mark red', () => {
