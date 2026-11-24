@@ -1,3 +1,47 @@
+# CURRENT CHECKPOINT — 2026-11-24 — Website Order API route integration tests PASSED
+
+**Repository:** `itsfahadahmed1234-creator/flame-chick-platform`  
+**Branch:** `work/production-source-audit`  
+**Verified source head:** `a3774b80d0414ec20f71b6f2f5b9046ac28e1251`  
+**Edge Function Static Checks:** [run 45309012736 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45309012736)  
+**Admin Static Checks:** [run 45309012932 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45309012932)
+
+## Website V3 signed quote and route test
+
+- `flame-chick-order-api` now exports `handleOrderApiRequest(req)`; `Deno.serve` starts only under `import.meta.main`, allowing the actual handler to be imported by Deno tests without starting a listener.
+- Added `supabase/functions/flame-chick-order-api/index_test.ts` and wired it to Edge Function CI.
+- The Deno test uses the real handler, a synthetic V3 published-menu fixture, and in-memory mocked Supabase REST/RPC responses. It never reaches Production.
+- Covered: quote issuance/current delivery fee, no raw phone/address in token, stale-fee rejection, tampered-token rejection, exact three-minute expiry rejection, successful 201 create, safe replay after expiry returning the original order without a second commit, and changed-facts idempotency conflict.
+- First test attempt revealed a TypeScript control-flow narrowing issue in the test counter. The assertion now reads through a typed accessor and CI passes.
+
+## Verification
+
+- [Edge Function Static Checks run 45309012736](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45309012736): Deno checks for all Edge Functions passed; the new actual-route integration test passed; existing Edge/RPC/pricing/signed-token tests passed.
+- [Admin Static Checks run 45309012932](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45309012932) passed.
+- [Website Static Checks run 45308055860](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45308055860) passed 103/103 core and 25/25 preview tests, including inline script parsing.
+
+## Important test boundary
+
+This is **not yet a single combined HTTP-to-real-Postgres end-to-end test**. The new route test uses mocked Supabase REST/RPC responses. The existing `supabase/tests/flame_chick_website_order_create_v1.sql` independently exercises actual PostgreSQL create, delivery fee checks, idempotency and the 3/minute, 3/10-minute and 15/hour rolling phone quotas on disposable local Supabase. These two passing layers must not be described as one combined Edge-to-Postgres run.
+
+## Release prerequisites
+
+- Configure the server-only `FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET` (unpredictable value, minimum 32 bytes) before deploying the Order API. Never commit or expose it to the browser.
+- Apply the reviewed operational/order/delivery/payment migrations to the target Production project before deploying order/delivery APIs. Production still lacks those operational tables/RPCs.
+- Configure delivery areas and Not Listed default fee; branch website-ordering flags remain disabled until readiness is confirmed.
+- Complete a combined local Edge-to-Postgres test before considering checkout launch.
+- Deploy `flame-chick-catalog`, `flame-chick-order-api` and the V3 website only after schema/secrets/tests are ready and release review is complete.
+
+## Safety boundary
+
+Only source and handoff documentation on `work/production-source-audit` changed. No Production SQL, migration, secret, Edge Function, Realtime, Storage, branch-ordering, catalog-publication, Vercel or domain change occurred. `main` remains untouched. Flame Chick remains pre-launch; GST remains deferred.
+
+## Next step
+
+Run the actual local Order Edge Function against disposable local Supabase PostgREST/RPC after full migration replay. Use a synthetic tenant and roll back fixtures. Verify quote/create/replay, changed fee/publication, token tampering/expiry, quotas, and teardown.
+
+---
+
 # CURRENT CHECKPOINT — 2026-11-24 — Website V3 signed quote protection PASSED SOURCE CI
 
 **Active repository:** `itsfahadahmed1234-creator/flame-chick-platform`  
