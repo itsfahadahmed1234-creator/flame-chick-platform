@@ -4997,3 +4997,13 @@ The disposable behavioral workflow passed before the final migration filename wa
 - Source change is not deployed yet. Await exact CI pass, then create a fresh Admin preview deployment and reassign the already CORS-allowlisted branch preview alias. Do not change the canonical production Admin domain.
 
 - First CI run for the Delivery tab update failed one existing Catalog V3 Admin navigation test because it asserted the previous two-tab allowlist literally. The new Delivery-specific test and remaining 84 tests passed. Updated the old assertion to expect the new three-tab Admin/Owner allowlist; no application logic change beyond Delivery access was made in this correction. Await rerun before deployment.
+
+
+## 2026-11-24 — Delivery Areas Admin navigation deployed to preview
+
+- Admin Static Checks run `45427676653` completed **successfully** for exact branch HEAD `0787a008f396c76a24c471ebf8d3021f256bde5c`.
+- Created fresh Vercel deployment in the existing Admin project `flame-chick-admin-production`, project ID `prj_kPEqsepRzivOJhNeA32Io3netjav`, from that exact branch and commit.
+- Deployment `dpl_EKANAZKxB4Lzr3y9LZz98uwUQqXc` reached `READY`. Branch preview alias: `https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app`.
+- This is a preview deployment (`target=null)); canonical production Admin alias `https://flamechickadmin.vercel.app` was not promoted or changed.
+- User should open the branch preview alias and hard-refresh (Ctrl+Shift+R). Expected Admin/Owner tabs: Staff & Riders, Catalog V3 Draft, Delivery Areas. Confirm the Delivery Areas tab appears and loads configuration before any settings are saved.
+- Delivery Areas access is UI-enabled only for verified Admin/Owner sessions and continues to call the existing authenticated Staff Admin command. Other unfinished tabs remain disabled. No DB migration, fee change, delivery-area insert, or production data change was made.
