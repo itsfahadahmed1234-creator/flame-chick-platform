@@ -1961,3 +1961,29 @@ The disposable behavioral workflow passed before the final migration filename wa
 1. Resolve and verify Admin/POS/Rider sign-in and role routing for the existing intended accounts without changing role boundaries.
 2. Run a controlled browser smoke test of the live homepage catalog/quote and a clearly labelled test order only if the test flow is isolated and approved; verify it reaches POS.
 3. Complete the Dine-in, Takeaway, Delivery, offline/reconnect, rider, return, Cashier payment and History rehearsal. Update this handoff and `PROJECT_HANDOFF.md` after each verified stage.
+
+
+## 2026-11-24 — Staff access/CORS recovery checkpoint
+
+### Root cause evidence
+- Production Auth logs show the existing Admin identity `itsfahadahmed1234@gmail.com` successfully authenticated at 11:27:02Z, 11:27:25Z and 11:28:03Z (Auth `/token` and `/user` returned 200). Earlier failed attempts at 11:26Z were `invalid_credentials`; do not reset the password based on those earlier attempts.
+- Immediately after successful Auth, Staff Admin Edge Function v2 returned **OPTIONS 403** on three browser preflights (11:27:04Z, 11:27:26Z, 11:28:03Z). Thus at least the Admin failure was not an invalid password: the Staff Admin CORS allowlist rejected the browser preflight before the authenticated request reached the handler.
+- Staff Admin source had an optional exact-origin allowlist environment setting; missing/incorrect configuration failed closed. Added `parseStaffAdminOrigins()` which always includes only the verified canonical production Admin origin `https://flamechicadmin.vercel.app`, while merging any explicitly configured exact HTTPS origins. Wildcards remain rejected. Added tests for missing environment fallback and exact-origin merging.
+- **Production Staff Admin Edge Function v3 is deployed** with `verify_jwt=true`. Source includes index.ts, origin-policy.mjs and catalog-actions.mjs.
+- CI after the patch: Admin Static Checks **45387619860 PASSED** and Edge Function Static Checks **45387619991 PASSED** on commit `23bf0f96e9416e8e3c3822edab5b70ec668e0bdb`; the Edge job includes TypeScript checks, actual Website Order API route tests and contract hygiene.
+- The connected browser was showing generated Vercel deployment URLs rather than the canonical app domains. Verified custom domains: Admin `https://flamechicadmin.vercel.app`, POS `https://flamechicpos.vercel.app`, Rider `https://flamechicrider.vercel.app`. Staff Admin intentionally allows only the canonical Admin origin; use that exact domain, not the generated preview hostname. POS and Rider canonical domains should also be used for the smoke test.
+
+### Roles and account readiness (read-only Production query)
+- Active Flame Chick restaurant: 1; active branch: 1.
+- Active Admin assignments: 1; Owner, Manager, Cashier and Rider assignments: 0.
+- Active Rider profiles: 0.
+- The existing Admin is allowed by the POS backend role resolver, so a dedicated Cashier account is not required for the Admin to access POS. POS browser currently showed an old `Invalid login credentials` message; Auth logs show failed attempts followed by successful login on the Admin identity. Re-test once on canonical POS domain with the same confirmed Admin credentials; do not reset password or create duplicate Auth users.
+- Rider portal cannot activate until a Rider account has an active branch-scoped Rider role and matching active rider profile. Admin invitation/role assignment and rider profile provisioning still need a controlled setup step; do not invent an email/account or grant Rider role to Admin.
+
+### Immediate next actions
+1. User opens canonical Admin domain `https://flamechicadmin.vercel.app` and signs in with existing Admin account; verify Staff & Riders page loads without CORS error. If it still fails, capture exact visible error and check fresh Edge logs after v3.
+2. Open canonical POS domain `https://flamechicpos.vercel.app`, sign in with same Admin account and verify staff context and Online Orders board. Do not treat cached old preview page error as current.
+3. Create/assign separate Cashier/Manager/Rider accounts only when their real work email addresses are supplied/confirmed; Rider additionally requires profile setup. Keep Admin and future Owner distinct.
+4. Continue controlled website checkout → POS, offline/reconnect, rider, physical return, Cashier COD/Card/Online-bank collection and History rehearsal. No real restaurant operation until the full manual rehearsal passes.
+
+**Important:** No new business migration was applied in this recovery. Existing Production role data was read only. The CORS code change was tested and deployed as an Edge Function update.
