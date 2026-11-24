@@ -3051,45 +3051,118 @@ function posDealFixedDescription(component){
   if(type==='DRINK_INCLUDED')return phrase||'Included drink';
   return phrase||component.DisplayName||component.ComponentType||'Included item';
 }
+function getPOSDealModel(dealId){
+  if(!catalogSnapshot||catalogSnapshot.schemaVersion!==3)return null;
+  const fulfillment=window.FlameChickPosSyncV3.normalizeFulfillment($('orderType')?.value||'Dine-in');
+  const model=window.FlameChickCatalogV3DealView.buildDealViewModel(catalogSnapshot,{
+    branchId:flameChickStaffProfile?.branch_id||catalogSnapshot.branches?.[0]?.branchId,
+    fulfilmentType:fulfillment,databaseNow:catalogSnapshot.databaseNow,staffPos:true
+  },window.FlameChickCatalogV3);
+  if(!model?.ok)return null;
+  return model.collections.flatMap(c=>c.deals||[]).find(d=>String(d.id)===String(dealId))||null;
+}
 function openPOSDeal(dealId){
-  const deal=(catalogSnapshot?.deals||[]).find(d=>String(d.DealID)===String(dealId)&&d.Active===true&&d.available===true);
-  if(!deal)return;
-  const components=(catalogSnapshot.dealComponents||[]).filter(c=>String(c.DealID)===String(dealId)).sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0));
-  const slots=components.filter(c=>String(c.RefType).toUpperCase()==='CHOICE_BY_SIZE').map(c=>({...c,options:getPOSDealOptions(c)}));
-  if(slots.some(s=>!s.options.length)){showToast('This deal has an unavailable selection. Ask the manager to review it.');return;}
-  posDealChoice={deal,components,slots,selections:{}};
-  $('choiceTitle').textContent=deal.Title+' — Configure Deal';
+  const deal=getPOSDealModel(dealId);
+  if(!deal||deal.available!==true){showToast('This deal is unavailable for the selected fulfilment type or branch.');return;}
+  const variants=(deal.variants||[]).filter(v=>v.branchSatisfiable===true);
+  if(!variants.length){showToast('No valid published deal option is available.');return;}
+  const variant=variants.length===1?variants[0]:null;
+  const groups=variant?.groups||[];
+  const selections={};
+  for(const group of groups){
+    if(group.options.length===1&&group.minUnits>0){
+      selections[group.id]={[group.options[0].id]:group.minUnits};
+    }else selections[group.id]={};
+  }
+  posDealChoice={deal,variants,variantId:variant?.id||'',groups,selections};
+  $('choiceTitle').textContent=deal.title+' — Configure Deal';
   renderPOSDealChoice();openModal('choiceModal');
+}
+function posDealSelectedUnits(group,selection){
+  return Object.values(selection||{}).reduce((sum,value)=>sum+(Number(value)||0),0);
+}
+function posDealGroupValid(group,selection){
+  const units=posDealSelectedUnits(group,selection);
+  return units>=Number(group.minUnits||0)&&units<=Number(group.maxUnits||0);
+}
+function posDealEstimatedPrice(st){
+  const variant=st.variants.find(v=>String(v.id)===String(st.variantId));
+  if(!variant)return null;
+  let minor=Number(variant.basePriceMinor)||0;
+  for(const group of variant.groups){
+    const selected=st.selections[group.id]||{};
+    for(const option of group.options){
+      const quantity=Number(selected[option.id])||0;
+      if(option.pricingTreatment==='SURCHARGE')minor+=Number(option.surchargeMinor||0)*quantity;
+      else if(option.pricingTreatment==='STANDALONE'&&variant.pricingMode==='BASE_PLUS_SELECTED_ITEMS')minor+=Number(option.standalonePriceMinor||0)*quantity;
+    }
+  }
+  return minor/100;
 }
 function renderPOSDealChoice(){
   const st=posDealChoice;if(!st)return;
-  const fixed=st.components.filter(c=>String(c.RefType).toUpperCase()!=='CHOICE_BY_SIZE').map(c=>`<div class="choice-sub">• ${esc(posDealFixedDescription(c))}</div>`).join('');
-  const choiceHtml=st.slots.map(slot=>{
-    const chosen=st.selections[String(slot.ComponentID)]||'';
-    return `<div class="section-label" style="margin:13px 0 7px">${esc(slot.DescriptionPhrase||slot.DisplayName||'Choose an item')} · ${esc(slot.SizeKey||'')}</div><div class="size-grid">${slot.options.map(o=>`<button type="button" class="size-box ${chosen===o.variantId?'active':''}" data-pos-deal-slot="${esc(slot.ComponentID)}" data-pos-deal-variant="${esc(o.variantId)}"><strong>${esc(o.name)}</strong><small>${esc(o.sizeLabel)}</small></button>`).join('')}</div>`;
+  const variant=st.variants.find(v=>String(v.id)===String(st.variantId));
+  const variantHtml=st.variants.length>1
+    ? '<div class="section-label">Choose deal option</div><div class="size-grid">'+st.variants.map(v=>'<button type="button" class="size-box '+(String(v.id)===String(st.variantId)?'active':'')+'" data-pos-deal-variant="'+esc(v.id)+'"><strong>'+esc(v.label||'Option')+'</strong><small>Rs. '+money((Number(v.basePriceMinor)||0)/100)+'</small></button>').join('')+'</div>'
+    : '';
+  const groupsHtml=(variant?.groups||[]).map(group=>{
+    const selected=st.selections[group.id]||{};
+    const options=group.options.map(option=>{
+      const count=Number(selected[option.id])||0;
+      const max=Math.min(Number(option.maxQuantity)||1,Number(group.maxUnitsPerOption)||99);
+      const price=option.pricingTreatment==='INCLUDED'?'Included'
+        :option.pricingTreatment==='SURCHARGE'?'+ Rs. '+money((Number(option.surchargeMinor)||0)/100)
+        :option.pricingTreatment==='STANDALONE'?'+ Rs. '+money((Number(option.standalonePriceMinor)||0)/100)
+        :'Price included in deal';
+      return '<div class="pos-option-group-head" style="padding:8px 0"><span class="pos-option-group-title"><strong>'+esc(option.optionLabel||option.productName||'Option')+'</strong><small>'+esc(price)+'</small></span><span style="display:flex;align-items:center;gap:8px"><button type="button" class="qbtn" data-pos-deal-minus="'+esc(group.id)+'" data-pos-deal-option="'+esc(option.id)+'" '+(count<=0?'disabled':'')+'>−</button><strong>'+count+'</strong><button type="button" class="qbtn" data-pos-deal-plus="'+esc(group.id)+'" data-pos-deal-option="'+esc(option.id)+'" '+(count>=max?'disabled':'')+'>+</button></span></div>';
+    }).join('');
+    const units=posDealSelectedUnits(group,selected);
+    return '<section class="pos-option-group"><div class="pos-option-group-head"><span class="pos-option-group-title"><strong>'+esc(group.name||'Choose items')+'</strong><small>Choose '+group.minUnits+'–'+group.maxUnits+' items · '+units+' selected</small></span></div>'+options+'</section>';
   }).join('');
-  const missing=st.slots.filter(slot=>!st.selections[String(slot.ComponentID)]).length>0;
-  const choices=st.slots.map(slot=>{const o=slot.options.find(x=>x.variantId===st.selections[String(slot.ComponentID)]);return o?`${o.name} (${o.sizeLabel})`:''}).filter(Boolean);
-  $('choiceBody').innerHTML=`<div class="choice-sub">${esc(st.deal.Description||'Choose the included items for this deal.')}</div>${fixed}${choiceHtml}<div class="picker-bottom" style="margin-top:16px"><div><div style="font-size:11px;color:var(--muted)">Deal price</div><strong>Rs. ${money(st.deal.BundlePrice)}</strong>${choices.length?`<div style="font-size:10px;color:var(--muted)">${esc(choices.join(' · '))}</div>`:''}</div><button type="button" class="btn primary" id="posDealAddBtn" ${missing?'disabled':''}>Add Deal</button></div>`;
-  $('choiceBody').querySelectorAll('[data-pos-deal-slot]').forEach(btn=>btn.onclick=()=>{st.selections[String(btn.dataset.posDealSlot)]=String(btn.dataset.posDealVariant);renderPOSDealChoice()});
+  const valid=!!variant&&(variant.groups||[]).every(g=>posDealGroupValid(g,st.selections[g.id]));
+  const estimate=posDealEstimatedPrice(st);
+  $('choiceBody').innerHTML='<div class="choice-sub">'+esc(st.deal.description||'Choose the items included in this published deal.')+'</div>'+variantHtml+groupsHtml+
+    '<div class="picker-bottom" style="margin-top:16px"><div><div style="font-size:11px;color:var(--muted)">Estimated deal price</div><strong>Rs. '+money(estimate||0)+'</strong></div><button type="button" class="btn primary" id="posDealAddBtn" '+(!valid?'disabled':'')+'>Add Deal</button></div>';
+  $('choiceBody').querySelectorAll('[data-pos-deal-variant]').forEach(btn=>btn.onclick=()=>{
+    const next=st.variants.find(v=>String(v.id)===String(btn.dataset.posDealVariant));if(!next)return;
+    st.variantId=next.id;st.groups=next.groups;st.selections={};
+    for(const group of st.groups)st.selections[group.id]=group.options.length===1&&group.minUnits>0?{[group.options[0].id]:group.minUnits}:{};
+    renderPOSDealChoice();
+  });
+  $('choiceBody').querySelectorAll('[data-pos-deal-plus],[data-pos-deal-minus]').forEach(btn=>btn.onclick=()=>{
+    const group=st.groups.find(g=>String(g.id)===String(btn.dataset.posDealPlus||btn.dataset.posDealMinus));
+    const option=group?.options.find(o=>String(o.id)===String(btn.dataset.posDealOption));if(!group||!option)return;
+    const selected=st.selections[group.id]||(st.selections[group.id]={});
+    const current=Number(selected[option.id])||0;
+    const max=Math.min(Number(option.maxQuantity)||1,Number(group.maxUnitsPerOption)||99);
+    selected[option.id]=btn.hasAttribute('data-pos-deal-plus')?Math.min(max,current+1):Math.max(0,current-1);
+    if(!selected[option.id])delete selected[option.id];
+    renderPOSDealChoice();
+  });
   $('posDealAddBtn')?.addEventListener('click',confirmPOSDealChoice);
 }
 function confirmPOSDealChoice(){
   const st=posDealChoice;if(!st)return;
-  if(st.slots.some(slot=>!st.selections[String(slot.ComponentID)])){showToast('Complete every deal selection');return;}
-  const content=[];
-  for(const c of st.components){
-    if(String(c.RefType).toUpperCase()==='CHOICE_BY_SIZE'){
-      const option=c.options?.find(x=>x.variantId===st.selections[String(c.ComponentID)])||getPOSDealOptions(c).find(x=>x.variantId===st.selections[String(c.ComponentID)]);
-      if(option)content.push(`${c.DescriptionPhrase||c.DisplayName||'Choose item'}: ${option.name} (${option.sizeLabel})`);
-    }else content.push(posDealFixedDescription(c));
-  }
-  const selectionKey=st.slots.map(slot=>String(st.selections[String(slot.ComponentID)])).join('|');
-  const key='deal:'+st.deal.DealID+':'+selectionKey;
-  const existing=cart.find(x=>x.key===key);if(existing)existing.quantity++;
-  else cart.push({key,itemId:st.deal.DealID,dealId:st.deal.DealID,itemName:st.deal.Title,quantity:1,price:Number(st.deal.BundlePrice)||0,type:'deal',contents:content,choices:{...st.selections}});
-  lastAddedCartKey=key;pulseMenuCardByName(st.deal.Title);
-  posDealChoice=null;closeModal('choiceModal');renderCart();showToast(st.deal.Title+' added');
+  const variant=st.variants.find(v=>String(v.id)===String(st.variantId));
+  if(!variant||!variant.groups.every(g=>posDealGroupValid(g,st.selections[g.id]))){showToast('Complete every required deal choice');return;}
+  const componentGroups=variant.groups.map(group=>({
+    componentGroupId:group.id,
+    components:group.options.flatMap(option=>{
+      const quantity=Number(st.selections[group.id]?.[option.id])||0;
+      return quantity?[{componentOptionId:option.id,productId:option.productId,productVariantId:option.productVariantId,quantity,modifiers:[]}]:[];
+    })
+  }));
+  const content=componentGroups.flatMap(group=>group.components.map(component=>{
+    const option=variant.groups.find(g=>g.id===group.componentGroupId)?.options.find(o=>o.id===component.componentOptionId);
+    return component.quantity+' × '+(option?.optionLabel||option?.productName||'Included item');
+  }));
+  const selectionKey=componentGroups.map(g=>g.componentGroupId+':'+g.components.map(c=>c.componentOptionId+'x'+c.quantity).join(',')).join('|');
+  const key='deal:'+st.deal.id+':'+variant.id+':'+selectionKey;
+  const existing=cart.find(x=>x.key===key);
+  if(existing)existing.quantity++;
+  else cart.push({key,itemId:st.deal.id,dealId:st.deal.id,dealVariantId:variant.id,itemName:st.deal.title,quantity:1,price:posDealEstimatedPrice(st)||0,type:'deal',contents,componentGroups});
+  lastAddedCartKey=key;pulseMenuCardByName(st.deal.title);
+  posDealChoice=null;closeModal('choiceModal');renderCart();showToast(st.deal.title+' added');
 }
 function pulseMenuCardByName(name){
   const key=String(name||'').trim().toLowerCase();
