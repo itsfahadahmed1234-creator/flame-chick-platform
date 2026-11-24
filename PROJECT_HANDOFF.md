@@ -4892,3 +4892,16 @@ The disposable behavioral workflow passed before the final migration filename wa
 - Staff Admin Role Boundary QA run **45404679684** was still IN PROGRESS at the last check (on parent source commit `560a30a...`). Must retrieve final status; do not claim full QA/rehearsal complete.
 - User-facing confirmation still required: hard-refresh `https://flamechicpos.vercel.app`, open Menu, verify Deals category and six published deal cards appear, then open at least one deal and verify component choices/configurator work. Do not place an order as part of this check.
 - No Production DB/schema/migration/catalog publication changes were made for the deals fix. The six deals were already present in the immutable published snapshot. GST remains deferred.
+
+
+## 2026-11-24 — POS visual and order-type correction
+
+- User-provided POS screenshot identified crowded product/deal cards, overlapping long unavailable-deal buttons, low-visibility white wordmark, hidden Dine-in button, and Dine-in incorrectly selected on fresh startup.
+- POS markup now exposes all order-type buttons in Delivery → Takeaway → Dine-in order. POS init() and setupCashierControls() default to Delivery. Existing Dine-in table/check open/reopen routines are intentionally preserved. Delivery area/address fields now show on a fresh POS open; table and Dine-in Mode/scheduling controls remain conditional on selecting Dine-in.
+- Added responsive product/deal card refinements, readable typography, consistent thumbnails, aligned price/action footer and compact Unavailable now status instead of long disabled deal button copy. Existing deal IDs, prices, choices and configurator remain unchanged.
+- Existing Flame Chick SVG brand asset is retained and given a red CSS color filter for stronger header visibility.
+- UI implementation commit: c35073a7b356130c77646fb0a310a0c41ee7747d. Test matcher corrections culminated in final UI/test source commit 72f2977adf0d3b64d8a3e67edc2761ab4da39e9.
+- POS/Rider Static Checks **45407482554 PASSED** on exact source commit 72f2977... Tests include POS initialization default, all three order types visible, card status layout and red brand styling. Earlier failures were from overly broad/incorrect assertions; logs were inspected and those assertions were corrected before the passing run.
+- Deployed to existing Vercel project flame-chick-pos-production (prj_gh1UnkZKnFnehWEs5eYhiXa40Xj5) using existing rootDirectory apps/flame-chick-pos. Deployment **dpl_9qb42tx35mD3qcb57c4B7zAMhVur READY** from work/production-source-audit commit 72f2977.... Canonical alias **flamechicpos.vercel.app** reassigned from older deployment dpl_Gj67JUEpNrUSuvKkG8DUyHV4r5HA and independently verified in deployment aliases.
+- No database change/migration, RPC, Edge Function, catalog publication, order or payment changes; no test order created. GST/tax remains deferred.
+- **Still needs user verification:** Ctrl+Shift+R at https://flamechicpos.vercel.app. Confirm red logo, improved product/deal card alignment, no unavailable-label overlap, Delivery selected by default, visible order selector in correct order, Delivery fields on load, Takeaway hiding delivery-only fields, Dine-in revealing Table/Mode fields, and existing table/check reopen behavior. Deployment readiness and CI do not substitute for a manual browser test or full restaurant rehearsal.
