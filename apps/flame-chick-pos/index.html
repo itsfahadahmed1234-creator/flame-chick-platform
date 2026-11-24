@@ -1191,7 +1191,8 @@ html,body{background:var(--bg);overflow:hidden}
       <div class="field"><label>Customer Name</label><input id="customerName" placeholder="Customer name" autocomplete="off"></div>
       <div class="field"><label>Phone</label><input id="phone" inputmode="tel" placeholder="03XXXXXXXXX" autocomplete="off"></div>
       <div class="field full" id="addressField"><label>Full Delivery Address</label><input id="address" placeholder="House, street, area / mohalla, landmark" autocomplete="off"><small style="font-size:11px;color:var(--muted)">Enter the complete delivery address. Delivery fee is based on the selected area.</small></div>
-      <div class="field" id="areaField" style="display:none"><label>Area / Mohalla</label><input id="area" placeholder="Enter a listed area or Not Listed" autocomplete="off"></div>
+      <div class="field" id="areaField" style="display:none"><label>Area / Mohalla</label><input id="area" placeholder="Choose a listed area or type Not Listed" autocomplete="off"></div>
+      <div class="field" id="deliveryLocalityField" style="display:none"><label>Locality for Not Listed</label><input id="deliveryLocality" placeholder="Enter the locality / mohalla" autocomplete="off"></div>
       <div class="field" id="tableField" style="display:none"><label>Table</label><input id="tableNumber" placeholder="Table #" inputmode="numeric"></div>
     </div></section>
     <section class="order-section"><div class="section-label">Order items</div><div id="cartList" class="order-items"><div class="empty">Add items from the menu.</div></div></section>
@@ -1300,7 +1301,7 @@ const FLAME_CHICK_SUPABASE_URL='https://adkrxfnawdiljhjaavnj.supabase.co';
 const STAFF_API_KEY='';
 const DB_NAME='FLAME_CHICK_POS'; const DB_VERSION=6;
 const STORES={settings:'settings',menu:'menu',categories:'categories',deliveryAreas:'deliveryAreas',orders:'orders',queue:'queue',statusQueue:'statusQueue',tables:'tables',catalog:'catalog'};
-let db=null,menu=[],categories=[],deliveryAreas=[],cart=[],menuVersion='',choicePending=null;
+let db=null,menu=[],categories=[],deliveryAreas=[],cart=[],menuVersion='',choicePending=null,posDeliveryConfig=null;
 let selectedCategoryId='all',selectedSubcategoryId='';
 let lastAddedCartKey='';
 const FLAME_CHICK_CATALOG_API='https://adkrxfnawdiljhjaavnj.supabase.co/functions/v1/flame-chick-catalog';
@@ -2350,7 +2351,7 @@ function setPOSPaymentMethod(method){
 
 function updateOrderFieldsByType(){
  const t=$('orderType').value; const delivery=t==='Delivery'; const dine=t==='Dine-in';
- $('addressField').style.display=(delivery?'grid':'none'); $('areaField').style.display=(delivery?'grid':'none'); $('tableField').style.display='none'; $('dineTableSection').style.display=dine?'block':'none';
+ $('addressField').style.display=(delivery?'grid':'none'); $('areaField').style.display=(delivery?'grid':'none'); $('deliveryLocalityField').style.display=(delivery&&['not listed','not listed / other'].includes(normalizeLookupText($('area').value))?'grid':'none'); $('tableField').style.display='none'; $('dineTableSection').style.display=dine?'block':'none';
  $('preorderSection').style.display=dine?'block':'none';
  $('orderHint').textContent=dine?'Table service':delivery?'Delivery order':'Fast counter entry';
  const cod=$('paymentButtons')?.querySelector('.cod-btn');
@@ -2610,10 +2611,47 @@ function normalizeLookupText(value){return String(value??'').trim().toLowerCase(
 function firstField(row,names){for(const name of names){if(Object.prototype.hasOwnProperty.call(row,name)&&row[name]!==''&&row[name]!==null&&row[name]!==undefined)return row[name]}return ''}
 function deliveryAreaName(row){return String(firstField(row,['AreaName','Area','area','Name','name','DeliveryArea','deliveryArea','Mohalla','mohalla'])||'').trim()}
 function deliveryAreaFee(row){const raw=firstField(row,['DeliveryFee','Delivery Fee','deliveryFee','delivery fee','Fee','fee','Price','price','Amount','amount']);if(raw===''||raw===null||raw===undefined)return null;const n=Number(raw);return Number.isFinite(n)&&n>=0?n:null}
-function getDefaultDeliveryFee(){const raw=catalogSnapshot?.settings?.DefaultDeliveryFee;if(raw===null||raw===undefined||raw==='')return null;const n=Number(raw);return Number.isFinite(n)&&n>=0?n:null}
-function getDeliveryFeeForArea(area){const key=normalizeLookupText(area);if(key==='not listed')return getDefaultDeliveryFee();if(!key)return null;const row=deliveryAreas.find(x=>normalizeLookupText(deliveryAreaName(x))===key);return row?deliveryAreaFee(row):null}
-async function refreshDeliveryAreas(){if(!catalogSnapshot)return;const rows=catalogSnapshot.deliveryAreas||[];await clearStore(STORES.deliveryAreas);for(const row of rows)await put(STORES.deliveryAreas,row);deliveryAreas=await all(STORES.deliveryAreas)}
-async function ensureDeliveryAreas(){deliveryAreas=await all(STORES.deliveryAreas);if(!deliveryAreas.length&&navigator.onLine)await refreshDeliveryAreas()}
+function getDefaultDeliveryFee(){
+  const raw=posDeliveryConfig?.notListedFee;
+  if(raw===null||raw===undefined||raw==='')return null;
+  const n=Number(raw);return Number.isFinite(n)&&n>=0?n:null;
+}
+function getDeliveryAreaId(area){
+  const key=normalizeLookupText(area);
+  const row=deliveryAreas.find(x=>normalizeLookupText(deliveryAreaName(x))===key);
+  return row?String(row.ID||row.id||''):'';
+}
+function getDeliveryFeeForArea(area){
+  const key=normalizeLookupText(area);
+  if(key==='not listed'||key==='not listed / other')return getDefaultDeliveryFee();
+  if(!key)return null;
+  const row=deliveryAreas.find(x=>normalizeLookupText(deliveryAreaName(x))===key);
+  return row?deliveryAreaFee(row):null;
+}
+async function refreshDeliveryAreas(){
+  if(!flameChickStaffSession?.access_token||!flameChickStaffProfile?.branch_id)return;
+  const response=await flameChickOrderRequest('GET',{view:'pos_delivery_context'});
+  const data=response?.data||{};
+  if(String(data.branch_id||'')!==String(flameChickStaffProfile.branch_id))throw new Error('Delivery configuration branch mismatch.');
+  const rows=(Array.isArray(data.areas)?data.areas:[]).map(row=>({
+    ID:String(row.id||''),AreaName:String(row.name||''),AreaNameUr:String(row.name_ur||''),
+    Name:String(row.name||''),Fee:row.delivery_fee===null?null:Number(row.delivery_fee),
+    DeliveryFee:row.delivery_fee===null?null:Number(row.delivery_fee),Active:true
+  })).filter(row=>row.ID&&row.AreaName&&Number.isFinite(row.DeliveryFee)&&row.DeliveryFee>=0);
+  await clearStore(STORES.deliveryAreas);
+  for(const row of rows)await put(STORES.deliveryAreas,row);
+  deliveryAreas=rows;
+  posDeliveryConfig={branchId:data.branch_id,notListedFee:data.not_listed_delivery_fee===null?null:Number(data.not_listed_delivery_fee),loadedAt:new Date().toISOString()};
+  await put(STORES.settings,{key:'posDeliveryConfiguration',value:posDeliveryConfig});
+}
+async function ensureDeliveryAreas(){
+  deliveryAreas=await all(STORES.deliveryAreas);
+  const saved=await get(STORES.settings,'posDeliveryConfiguration');
+  if(saved?.value)posDeliveryConfig=saved.value;
+  if(navigator.onLine&&flameChickStaffSession?.access_token){
+    try{await refreshDeliveryAreas();}catch(error){console.warn('Branch delivery configuration refresh failed; cached settings remain available.',error);}
+  }
+}
 
 async function refreshMenu(force=false){
   if(!navigator.onLine&&!force)throw new Error('Internet is offline. The last verified V3 Flame Chick menu remains available locally.');
