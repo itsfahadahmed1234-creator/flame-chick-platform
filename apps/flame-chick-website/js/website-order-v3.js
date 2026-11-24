@@ -172,7 +172,9 @@
   function renderCart() {
     var list = $('cart-lines');
     list.replaceChildren();
-    $('cart-count').textContent = '(' + state.cart.reduce(function (sum, row) { return sum + row.quantity; }, 0) + ')';
+    var itemCount = state.cart.reduce(function (sum, row) { return sum + row.quantity; }, 0);
+    $('cart-count').textContent = '(' + itemCount + ')';
+    if ($('badge')) $('badge').textContent = String(itemCount);
     $('cart-empty').hidden = state.cart.length > 0;
     $('request-quote').disabled = state.cart.length === 0 || !currentContext() || state.busy || state.checkoutUncertain;
 
