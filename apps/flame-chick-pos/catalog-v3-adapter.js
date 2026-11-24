@@ -126,6 +126,8 @@
           DescriptionUr: String(deal.descriptionUr || ''),
           ImagePath: deal.imagePath || '',
           Available: deal.available === true,
+          available: deal.available === true,
+          SortOrder: Number(deal.model && deal.model.sortOrder) || 0,
           BranchAvailable: deal.branchAvailable === true,
           ScheduleAvailable: deal.scheduleAvailable === true,
           ScheduleSource: String(deal.scheduleSource || 'unknown'),
@@ -191,6 +193,7 @@
         NameUr: String(modifier.nameUr || ''),
         PriceMode: 'RESOLVED',
         FixedPrice: modifier.priceMinor / 100,
+        Price: modifier.priceMinor / 100,
         PriceMinor: modifier.priceMinor
       }))
     }));
