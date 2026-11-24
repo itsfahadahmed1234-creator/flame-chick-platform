@@ -755,8 +755,9 @@ async function buildStaffPosSyncPayload(
     return websiteError("POS_BRANCH_NOT_IN_CATALOG","Your authorized branch is not present in the current published Flame Chick catalog.",409);
   }
   const restaurant = await readFlameChickRestaurant();
-  if (!restaurant || restaurant.id !== context.restaurant_id ||
-      restaurant.currencyCode !== snapshot.settings.currency_code) {
+  const snapshotSettings = isObject(snapshot.settings) ? snapshot.settings : null;
+  if (!restaurant || restaurant.id !== context.restaurant_id || !snapshotSettings ||
+      restaurant.currencyCode !== snapshotSettings.currency_code) {
     return websiteError("POS_RESTAURANT_CONFIGURATION_INVALID","The active restaurant or catalog currency could not be verified.",503);
   }
 
@@ -775,7 +776,7 @@ async function buildStaffPosSyncPayload(
   });
   if (!isObject(priced)) return websiteError("POS_PRICING_INVALID","The POS cart could not be priced safely.",400);
   if (priced.ok !== true) {
-    const err = isObject(priced.error) ? priced.error : {};
+    const err: Record<string,unknown> = isObject(priced.error) ? priced.error : {};
     const code = String(err.code ?? "POS_PRICING_INVALID");
     const status = ["CATALOG_PUBLICATION_CHANGED","BRANCH_FULFILMENT_UNAVAILABLE","PRODUCT_UNAVAILABLE","DEAL_UNAVAILABLE","DEAL_VARIANT_UNAVAILABLE"].includes(code) ? 409 : 400;
     return websiteError(code,String(err.message ?? "The POS cart could not be validated against the published menu."),status);
