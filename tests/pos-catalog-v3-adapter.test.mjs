@@ -130,9 +130,9 @@ test('POS starts with Delivery selected and exposes all three order types', () =
   assert.match(html, /<select id="orderType" hidden><option selected>Delivery<\/option>/);
   assert.match(html, /const initialType=\$\('orderType'\)\?\.value\|\|'Delivery';/);
   const initStart = html.indexOf('async function init(){');
-  const initEnd = html.indexOf('\\n  try{', initStart);
+  const initEnd = html.indexOf('\n  try{', initStart);
   const init = html.slice(initStart, initEnd > initStart ? initEnd : initStart + 500);
-  assert.match(init, /\\$\\('orderType'\\)\\.value='Delivery'/);
+  assert.match(init, /\$\('orderType'\)\.value='Delivery'/);
   assert.match(init, /data-type==='Delivery'/);
   assert.doesNotMatch(html, /\$\('orderType'\)\.value='Dine-in';/);
 });
