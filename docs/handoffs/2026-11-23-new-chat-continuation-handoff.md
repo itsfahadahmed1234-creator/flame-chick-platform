@@ -2220,3 +2220,10 @@ The disposable behavioral workflow passed before the final migration filename wa
 - Deployed Supabase Edge Function `flame-chick-staff-admin` successfully as **version 4**, still `verify_jwt=true`. Files deployed: `index.ts`, `origin-policy.mjs`, `catalog-actions.mjs`.
 - After deployment, no new preview request had yet appeared in Supabase logs at the time of this handoff update. Browser-level login is therefore **not yet confirmed fixed**. Next action: refresh `https://flame-chick-admin-production-fxdrq9od9-fahad-7455.vercel.app` (Ctrl+Shift+R), attempt login with the existing Admin credentials, then inspect logs for preview-origin `OPTIONS 200` followed by authenticated Staff Admin `GET 200`. If it still fails, capture the exact on-screen error and inspect the new log entries. Do not reset password or alter the account unless the app now returns an actual Auth credential error.
 - Production Admin alias `https://flamechicadmin.vercel.app` was not changed. No production user data, delivery settings, orders, or payments were modified.
+
+
+### User confirmation — Admin preview login successful (2026-11-24)
+- User has confirmed: “i entered the admin panel” after Staff Admin Edge Function v4 deployment.
+- Post-deploy Supabase function logs show Staff Admin endpoint `OPTIONS 200`, `GET 200`, and multiple `POST 200` requests at 2026-11-24 15:31:08Z–15:31:36Z, replacing the previously observed preview-origin `OPTIONS 403`. This independently corroborates successful browser-to-API access.
+- Existing Admin account was retained; no password reset, Auth account mutation, or role change occurred.
+- Next: have user open **Delivery areas** in Admin preview and inspect whether Main branch, Rs. 150 Not Listed fee and area list load from the secure branch configuration command. Do not save fees or add area rows until UI read is confirmed. If values fail to load, inspect browser console and function logs for `flame_chick_delivery_configuration_command` call result. Do not promote the preview or alter production Admin alias yet.
