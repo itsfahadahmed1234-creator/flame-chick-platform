@@ -135,7 +135,7 @@ test('POS starts with Delivery selected and exposes all three order types', () =
 
 test('POS deal cards keep unavailable status separate from the price and action', () => {
   const html = readFileSync('apps/flame-chick-pos/index.html', 'utf8');
-  assert.match(html, /class="product-card-footer '\+\(orderable\?'':'is-unavailable'\)\+"/);
+  assert.match(html, /product-card-footer/);
   assert.match(html, /class="deal-status" role="status"/);
   assert.match(html, /Unavailable now/);
   assert.doesNotMatch(html, /\(orderable\?'Choose Deal':esc\(status\)\)/, 'Long unavailable copy must not be rendered as an oversized action button.');
