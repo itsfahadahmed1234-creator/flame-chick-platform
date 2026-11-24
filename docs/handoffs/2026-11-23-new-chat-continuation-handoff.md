@@ -1,3 +1,65 @@
+# CURRENT CHECKPOINT — 2026-11-24 — Production Rollout Review COMPLETE (READ ONLY)
+
+**Repository:** `itsfahadahmed1234-creator/flame-chick-platform`  
+**Branch:** `work/production-source-audit`  
+**Verified source checkpoint before this documentation update:** `1e863653ea9d3ea0bb1adc042080cb1b1fe38598`  
+**Disposable local QA:** [run 45311516506 — SUCCESS](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45311516506)
+
+## End-to-end verification completed
+
+The complete disposable QA run replayed all 33 source migrations into local Supabase, passed all security/role/schema/website-order/delivery checks, ran the actual Order API handler against local PostgREST/PostgreSQL, passed four delivery concurrency and two payment concurrency races, and stopped the disposable stack with `--no-backup`.
+
+The real local HTTP-handler-to-PostgreSQL test verified:
+- stale delivery fee rejected after quote issuance;
+- altered HMAC signature rejected;
+- valid quote committed exactly one order through the real RPC;
+- exact retry returned the original committed order;
+- same request key with changed facts was rejected;
+- persisted state was `new/unpaid/dispatch_pending`, with no payment record.
+
+## Production migration reconciliation
+
+- Branch source: 33 migrations.
+- Live Production ledger: 26 migrations.
+- All 26 shared versions/names match exactly; no source/live name mismatch and no live-only migration.
+- Seven operational/order/delivery/payment migrations are source-only and still unapplied:
+  `20261123160000`, `20261123170000`, `20261123171000`, `20261123172000`, `20261123173000`, `20261123174000`, `20261123174100`.
+- Production still has no `orders`, `order_items`, `delivery_tasks`, `delivery_task_offers`, `rider_profiles`, website-order create RPC, delivery-command RPC or payment-collection RPC.
+- The earlier preflight-hash warning has been corrected: migration preflight hashes are before-state values; source-generated after-state function bodies match current live Production hashes exactly. Do not edit the ledger or replay already-applied catalog migrations `20261123101105` and `20261123101126`.
+
+## Read-only security/dependency review of the seven pending migrations
+
+- Operational tables use RLS and FORCE RLS. `anon` and `authenticated` receive no direct table privileges. Service-role reads are explicit; broad direct DML on orders/payments/delivery is denied, with only the narrow rider-presence column updates granted.
+- Internal order/quota/counter/outbox helpers are in `app_private` with RLS/FORCE RLS and no browser table privileges.
+- The role projection, delivery command, payment collection, website create and idempotency RPCs verify as server/service-role-only in the migration chain; SECURITY DEFINER routines set an empty search path.
+- Operational tables are deliberately not added to Realtime by these migrations.
+- The local full-migration and security/role test suites passed.
+
+## Deployment requirements still outstanding
+
+1. Apply the seven pending migrations in chronological order only in a separately approved Production rollout; the local run is not evidence they exist in Production.
+2. Configure these server-only Order API secrets before deployment: `FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET` and `FLAME_CHICK_ORDER_PHONE_HMAC_SECRET` (both unpredictable, at least 32 bytes). Never commit or expose them in website config.
+3. Ensure the server-side Supabase secret key and publishable key environments are available to Edge Functions. Keep service-role/secret keys out of browsers.
+4. Deploy Catalog, Order and Delivery Edge Functions only after database/secret prerequisites and production smoke checks. Production currently has only `flame-chick-staff-admin` active.
+5. Configure the real branch delivery areas and Not Listed default fee. Website ordering/delivery/pickup flags remain disabled.
+6. The current customer homepage/config still loads the V2 catalog path; the V3 preview is a read-only page, not the live customer cart/checkout. Finish and review the V3 storefront integration before enabling customer checkout.
+
+## Additional Rider Push readiness blocker
+
+The operational migration defines `rider_push_subscriptions` with ciphertext-only columns (`endpoint_hash`, `endpoint_ciphertext`, `p256dh_ciphertext`, `auth_ciphertext`). The current Delivery Edge Function still reads/inserts plaintext `endpoint`, `p256dh`, `auth` column names and does not implement the encryption/decryption expected by that schema. The Delivery function also calls push configuration/webhook RPCs not included in the seven pending migrations reviewed here. Therefore **do not enable Rider Web Push** as part of this rollout. Align the Edge API, encrypted persistence and trusted hook/configuration RPCs in a separate tested change first. Core rider offer polling/acceptance and task commands are covered by local QA independently.
+
+## Business and safety rules retained
+
+- Rider marking Delivered does not mean payment collected. Cashier records collection; only full collection completes the order and sends it to History.
+- GST remains deferred. No tax calculation, tax field or checkout tax logic is introduced.
+- No Production SQL/migration/secret/function/Realtime/Storage change, no Vercel deployment or domain change occurred. `main` remains untouched. Flame Chick remains pre-launch.
+
+## Next step
+
+Prepare the final Production rollout bundle and operator runbook for the seven source-only migrations (preflight checks, apply order, post-apply verifications, abort/recovery checkpoints, server-secret setup and Edge Function deployment order). Keep the bundle review-only. Do not apply migrations, set secrets, deploy functions, publish catalog changes or enable website orders until that rollout is separately approved.
+
+---
+
 # CURRENT CHECKPOINT — 2026-11-24 — Local Order E2E PASSED; Production Migration Reconciliation COMPLETE (READ ONLY)
 
 **Repository:** `itsfahadahmed1234-creator/flame-chick-platform`  
