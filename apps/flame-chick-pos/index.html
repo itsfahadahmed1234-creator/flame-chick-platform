@@ -1281,7 +1281,7 @@ html,body{background:var(--bg);overflow:hidden}
       <div class="field"><label>Customer Name</label><input id="customerName" placeholder="Customer name" autocomplete="off"></div>
       <div class="field"><label>Phone</label><input id="phone" inputmode="tel" placeholder="03XXXXXXXXX" autocomplete="off"></div>
       <div class="field full" id="addressField"><label>Full Delivery Address</label><input id="address" placeholder="House, street, area / mohalla, landmark" autocomplete="off"><small style="font-size:11px;color:var(--muted)">Enter the complete delivery address. Delivery fee is based on the selected area.</small></div>
-      <div class="field" id="areaField" style="display:none"><label>Area / Mohalla</label><input id="area" placeholder="Choose a listed area or type Not Listed" autocomplete="off"></div>
+      <div class="field" id="areaField" style="display:none"><label for="area">Area / Mohalla</label><select id="area" autocomplete="off"><option value="">Choose a delivery area</option></select><small id="deliveryAreaHint" class="delivery-area-hint">Choose an area to see its saved delivery fee.</small></div>
       <div class="field" id="deliveryLocalityField" style="display:none"><label>Locality for Not Listed</label><input id="deliveryLocality" placeholder="Enter the locality / mohalla" autocomplete="off"></div>
       <div class="field" id="tableField" style="display:none"><label>Table</label><input id="tableNumber" placeholder="Table #" inputmode="numeric"></div>
     </div></section>
@@ -2468,6 +2468,10 @@ function setupCashierControls(){
     if(nextType==='Delivery')setPOSPaymentMethod('COD');
     renderCart({scrollToAdded:false,highlightAdded:false});
   });
+  $('area')?.addEventListener('change',()=>{
+    updateOrderFieldsByType();
+    renderCart({scrollToAdded:false,highlightAdded:false});
+  });
   const payments=$('paymentButtons');
   payments?.addEventListener('click',e=>{
     const btn=e.target.closest('.pay-btn'); if(!btn || btn.disabled)return;
@@ -2783,6 +2787,46 @@ function getDeliveryFeeForArea(area){
   const row=deliveryAreas.find(x=>normalizeLookupText(deliveryAreaName(x))===key);
   return row?deliveryAreaFee(row):null;
 }
+function deliveryAreaDisplayName(value){
+  return String(value||'').replace(/(^|\\s)([a-z])/g,(match,space,letter)=>space+letter.toUpperCase());
+}
+function renderDeliveryAreaOptions(){
+  const select=$('area');if(!select)return;
+  const previous=normalizeLookupText(select.value);
+  const placeholder=document.createElement('option');
+  placeholder.value='';
+  placeholder.textContent='Choose a delivery area';
+  select.replaceChildren(placeholder);
+  const availableRows=(deliveryAreas||[]).filter(row=>{
+    const fee=deliveryAreaFee(row);
+    return row&&row.Active!==false&&deliveryAreaName(row)&&fee!==null;
+  });
+  for(const row of availableRows){
+    const name=deliveryAreaName(row),fee=deliveryAreaFee(row);
+    const option=document.createElement('option');
+    option.value=name;
+    option.textContent=deliveryAreaDisplayName(name)+' — Rs. '+money(fee);
+    select.appendChild(option);
+  }
+  const defaultFee=getDefaultDeliveryFee();
+  if(defaultFee!==null){
+    const option=document.createElement('option');
+    option.value='Not Listed / Other';
+    option.textContent='Not Listed / Other — Rs. '+money(defaultFee);
+    select.appendChild(option);
+  }
+  const matching=[...select.options].find(option=>normalizeLookupText(option.value)===previous);
+  if(matching)select.value=matching.value;
+  else if(availableRows.length===0&&defaultFee!==null)select.value='Not Listed / Other';
+  else select.value='';
+  const hint=$('deliveryAreaHint');
+  if(hint){
+    hint.textContent=select.options.length>1
+      ?'Delivery fees are loaded from the Main branch settings. Choose the correct area; Not Listed / Other uses the saved default fee.'
+      :'Delivery areas are not loaded for this branch. Refresh the POS connection before placing a delivery order.';
+  }
+  updateOrderFieldsByType();
+}
 async function refreshDeliveryAreas(){
   if(!flameChickStaffSession?.access_token||!flameChickStaffProfile?.branch_id)return;
   const response=await flameChickOrderRequest('GET',{view:'pos_delivery_context'});
@@ -2803,13 +2847,18 @@ async function ensureDeliveryAreas(){
   deliveryAreas=await all(STORES.deliveryAreas);
   const saved=await get(STORES.settings,'posDeliveryConfiguration');
   if(saved?.value)posDeliveryConfig=saved.value;
+  if(flameChickStaffProfile?.branch_id&&String(posDeliveryConfig?.branchId||'')!==String(flameChickStaffProfile.branch_id)){
+    deliveryAreas=[];posDeliveryConfig=null;
+    await clearStore(STORES.deliveryAreas);
+    await del(STORES.settings,'posDeliveryConfiguration');
+  }
+  renderDeliveryAreaOptions();
   if(navigator.onLine&&flameChickStaffSession?.access_token){
-    try{await refreshDeliveryAreas();}catch(error){console.warn('Branch delivery configuration refresh failed; cached settings remain available.',error);}
+    try{await refreshDeliveryAreas();}
+    catch(error){console.warn('Branch delivery configuration refresh failed; cached settings remain available.',error);}
   }
-  if(!deliveryAreas.length&&getDefaultDeliveryFee()!==null){
-    const area=$('area');if(area)area.value='Not Listed';
-    updateOrderFieldsByType();
-  }
+  renderDeliveryAreaOptions();
+  if($('cartList'))renderCart({scrollToAdded:false,highlightAdded:false});
 }
 
 async function refreshMenu(force=false){
@@ -3339,7 +3388,7 @@ function renderPOSDealChoice(){
   const valid=!!variant&&(variant.groups||[]).every(g=>posDealGroupValid(g,st.selections[g.id]));
   const estimate=posDealEstimatedPrice(st);
   $('choiceBody').innerHTML='<div class="choice-sub">'+esc(st.deal.description||'Choose the items included in this published deal.')+'</div>'+variantHtml+groupsHtml+
-    '<div class="picker-bottom" style="margin-top:16px"><div><div style="font-size:11px;color:var(--muted)">Estimated deal price</div><strong>Rs. '+money(estimate||0)+'</strong></div><button type="button" class="btn primary" id="posDealAddBtn" '+(!valid?'disabled':'')+'>Add Deal</button></div>';
+    '<div class="picker-bottom" style="margin-top:16px"><div><div style="font-size:11px;color:var(--muted)">Estimated deal price</div><strong>Rs. '+money(estimate||0)+'</strong></div><button type="button" class="btn primary" id="posDealAddBtn" data-pos-deal-add="true" '+(!valid?'disabled':'')+'>Add Deal</button></div>';
   $('choiceBody').querySelectorAll('[data-pos-deal-variant]').forEach(btn=>btn.onclick=()=>{
     const next=st.variants.find(v=>String(v.id)===String(btn.dataset.posDealVariant));if(!next)return;
     st.variantId=next.id;st.groups=next.groups;st.selections={};
@@ -3358,30 +3407,53 @@ function renderPOSDealChoice(){
     }
     renderPOSDealChoice();
   });
-  $('posDealAddBtn')?.addEventListener('click',confirmPOSDealChoice);
+  const addDealButton=$('posDealAddBtn');
+  if(addDealButton)addDealButton.onclick=event=>{
+    event.preventDefault();event.stopPropagation();
+    confirmPOSDealChoice();
+  };
 }
 function confirmPOSDealChoice(){
-  const st=posDealChoice;if(!st)return;
-  const variant=st.variants.find(v=>String(v.id)===String(st.variantId));
-  if(!variant||!variant.groups.every(g=>posDealGroupValid(g,st.selections[g.id]))){showToast('Complete every required deal choice');return;}
-  const componentGroups=variant.groups.map(group=>({
-    componentGroupId:group.id,
-    components:group.options.flatMap(option=>{
-      const quantity=Number(st.selections[group.id]?.[option.id])||0;
-      return quantity?[{componentOptionId:option.id,productId:option.productId,productVariantId:option.productVariantId,quantity,modifiers:[]}]:[];
-    })
-  }));
-  const content=componentGroups.flatMap(group=>group.components.map(component=>{
-    const option=variant.groups.find(g=>g.id===group.componentGroupId)?.options.find(o=>o.id===component.componentOptionId);
-    return component.quantity+' × '+(option?.optionLabel||option?.productName||'Included item');
-  }));
-  const selectionKey=componentGroups.map(g=>g.componentGroupId+':'+g.components.map(c=>c.componentOptionId+'x'+c.quantity).join(',')).join('|');
-  const key='deal:'+st.deal.id+':'+variant.id+':'+selectionKey;
-  const existing=cart.find(x=>x.key===key);
-  if(existing)existing.quantity++;
-  else cart.push({key,itemId:st.deal.id,dealId:st.deal.id,dealVariantId:variant.id,itemName:st.deal.title,quantity:1,price:posDealEstimatedPrice(st)||0,type:'deal',contents,componentGroups});
-  lastAddedCartKey=key;pulseMenuCardByName(st.deal.title);
-  posDealChoice=null;closeModal('choiceModal');renderCart();showToast(st.deal.title+' added');
+  const st=posDealChoice;if(!st){showToast('Choose a deal before adding it.');return false;}
+  try{
+    const variant=st.variants.find(v=>String(v.id)===String(st.variantId));
+    if(!variant||!variant.groups.every(g=>posDealGroupValid(g,st.selections[g.id]))){showToast('Complete every required deal choice');return false;}
+    const price=posDealEstimatedPrice(st);
+    if(!Number.isFinite(price)||price<0)throw new Error('The selected deal price could not be verified.');
+    const componentGroups=variant.groups.map(group=>({
+      componentGroupId:group.id,
+      components:group.options.flatMap(option=>{
+        const quantity=Number(st.selections[group.id]?.[option.id])||0;
+        return quantity?[{componentOptionId:option.id,productId:option.productId,productVariantId:option.productVariantId,quantity,modifiers:[]}]:[];
+      })
+    }));
+    const invalidGroup=componentGroups.find(group=>{
+      const source=variant.groups.find(row=>String(row.id)===String(group.componentGroupId));
+      const units=group.components.reduce((sum,row)=>sum+Number(row.quantity||0),0);
+      return !source||units<Number(source.minUnits||0)||units>Number(source.maxUnits||0);
+    });
+    if(invalidGroup)throw new Error('One of the deal selections is incomplete. Review the deal choices and try again.');
+    const content=componentGroups.flatMap(group=>group.components.map(component=>{
+      const option=variant.groups.find(g=>g.id===group.componentGroupId)?.options.find(o=>o.id===component.componentOptionId);
+      return component.quantity+' × '+(option?.optionLabel||option?.productName||'Included item');
+    }));
+    const selectionKey=componentGroups.map(g=>g.componentGroupId+':'+g.components.map(c=>c.componentOptionId+'x'+c.quantity).join(',')).join('|');
+    const key='deal:'+st.deal.id+':'+variant.id+':'+selectionKey;
+    const existing=cart.find(x=>x.key===key);
+    if(existing)existing.quantity++;
+    else cart.push({key,itemId:st.deal.id,dealId:st.deal.id,dealVariantId:variant.id,itemName:st.deal.title,quantity:1,price,type:'deal',contents,componentGroups});
+    lastAddedCartKey=key;
+    pulseMenuCardByName(st.deal.title);
+    posDealChoice=null;
+    closeModal('choiceModal');
+    renderCart();
+    showToast(st.deal.title+' added');
+    return true;
+  }catch(error){
+    console.error('POS deal add failed',error);
+    showToast(error?.message||'The deal could not be added. Please review the selected options.');
+    return false;
+  }
 }
 function pulseMenuCardByName(name){
   const key=String(name||'').trim().toLowerCase();
@@ -3417,11 +3489,14 @@ function renderCart(options={}){
     if(addedLine&&scrollToAdded)addedLine.scrollIntoView({block:'nearest',behavior:'smooth'});
   }
   const subtotal=cart.reduce((a,x)=>a+x.price*x.quantity,0);
-  const fee=$('orderType').value==='Delivery'?getDeliveryFeeForArea($('area').value):0;
+  const deliveryMode=$('orderType').value==='Delivery';
+  const selectedArea=normalizeLookupText($('area').value);
+  const fee=deliveryMode?getDeliveryFeeForArea($('area').value):0;
   const feeKnown=fee!==null;
+  const feeFallback=selectedArea?'Fee unavailable':'Choose area';
   $('subtotal').textContent='Rs. '+money(subtotal);
-  $('deliveryFee').textContent=feeKnown?'Rs. '+money(fee):'Not configured';
-  $('total').textContent=feeKnown?'Rs. '+money(subtotal+fee):'Not configured';
+  $('deliveryFee').textContent=feeKnown?'Rs. '+money(fee):(deliveryMode?feeFallback:'Rs. 0');
+  $('total').textContent=feeKnown?'Rs. '+money(subtotal+fee):(deliveryMode?feeFallback:'Rs. '+money(subtotal));
   updateSyncBox();
 }
 function changeQty(i,op){if(!cart[i])return;if(op==='+')cart[i].quantity++;else if(op==='-')cart[i].quantity--;else cart[i].quantity=0;if(cart[i].quantity<=0)cart.splice(i,1);renderCart()}
