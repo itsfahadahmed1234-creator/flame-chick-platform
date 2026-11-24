@@ -120,3 +120,31 @@ test('rejects V2 snapshots and missing database time rather than falling back to
   const noTime = createSnapshot();
   assert.equal(adapter.adapt(noTime, { contract, dealView }).code, 'CATALOG_DATABASE_TIME_REQUIRED');
 });
+
+test('POS starts with Delivery selected and exposes all three order types', () => {
+  const html = readFileSync('apps/flame-chick-pos/index.html', 'utf8');
+  assert.match(html, /<button type="button" class="type-btn active" data-type="Delivery">Delivery<\/button>/);
+  assert.match(html, /<button type="button" class="type-btn" data-type="Takeaway">Takeaway<\/button>/);
+  assert.match(html, /<button type="button" class="type-btn" data-type="Dine-in">Dine-in<\/button>/);
+  assert.doesNotMatch(html, /data-type="Dine-in" hidden/);
+  assert.match(html, /<select id="orderType" hidden><option selected>Delivery<\/option>/);
+  assert.match(html, /const initialType=\$\('orderType'\)\?\.value\|\|'Delivery';/);
+  assert.match(html, /\$\('orderType'\)\.value='Delivery';\n\s*\$\('orderTypeButtons'\).*data-type==='Delivery'/);
+  assert.doesNotMatch(html, /\$\('orderType'\)\.value='Dine-in';/);
+});
+
+test('POS deal cards keep unavailable status separate from the price and action', () => {
+  const html = readFileSync('apps/flame-chick-pos/index.html', 'utf8');
+  assert.match(html, /class="product-card-footer '\+\(orderable\?'':'is-unavailable'\)\+"/);
+  assert.match(html, /class="deal-status" role="status"/);
+  assert.match(html, /Unavailable now/);
+  assert.doesNotMatch(html, /Currently outside deal hours or unavailable at this branch.*data-pos-deal/s);
+});
+
+test('POS visual refinement styles product cards consistently and colours the brand mark red', () => {
+  const html = readFileSync('apps/flame-chick-pos/index.html', 'utf8');
+  assert.match(html, /id="flame-chick-pos-visual-refinement"/);
+  assert.match(html, /\.pos-menu #menuGrid\{grid-template-columns:repeat\(auto-fill,minmax\(min\(100%,280px\),1fr\)\)/);
+  assert.match(html, /\.pos-menu #menuGrid \.product-card\{[\s\S]*?min-height:202px/);
+  assert.match(html, /\.brand-logo\{[\s\S]*?filter:brightness\(0\) saturate\(100%\)/);
+});
