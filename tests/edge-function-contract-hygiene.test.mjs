@@ -93,7 +93,7 @@ test("Staff Admin relies on gateway JWT validation plus database actor authoriza
 });
 
 test("Staff Admin uses exact-origin policy and the dedicated invite callback", () => {
-  assert.match(sources["flame-chick-staff-admin"], /parseAllowedOrigins/);
+  assert.match(sources["flame-chick-staff-admin"], /parseStaffAdminOrigins/);
   assert.match(sources["flame-chick-staff-admin"], /isSafeInviteRedirect/);
   assert.match(sources["flame-chick-staff-admin"], /ORIGIN_CONFIG_VALID/);
   assert.match(sources["flame-chick-staff-admin"], /staffCorsHeaders/);
