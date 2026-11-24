@@ -4761,3 +4761,16 @@ The disposable behavioral workflow passed before the final migration filename wa
 - Payment rule: Rider Delivered is not payment collected. Cashier must explicitly collect the full amount using COD, Card or Online/bank transfer before completion/History. GST remains deferred. No unlabelled test order or real restaurant operation.
 
 **Next:** diagnose existing staff sign-in/session/role routing for Admin, POS and Rider; then run controlled live browser checks and the full labelled synthetic restaurant rehearsal. Do not rebuild POS or apply unverified migrations.
+
+
+## 2026-11-24 — Staff access/CORS recovery
+
+- Auth logs confirm the existing Admin identity `itsfahadahmed1234@gmail.com` successfully authenticated at 11:27:02Z, 11:27:25Z and 11:28:03Z. Earlier failures at 11:26Z were invalid credentials, but the later successful Auth /token and /user responses prove the Admin password is valid at those later attempts.
+- Staff Admin Edge Function v2 returned OPTIONS 403 on three preflights immediately after those logins. Root cause was Staff Admin's exact-origin CORS allowlist failing closed when its optional environment allowlist was absent/misconfigured.
+- Added tested `parseStaffAdminOrigins()`: canonical Admin origin `https://flamechicadmin.vercel.app` is always included; explicitly configured exact HTTPS origins may be merged; wildcard/path origins remain rejected. Deployed **Staff Admin Edge Function v3**, retaining `verify_jwt=true` and including the helper modules.
+- CI on `23bf0f96e9416e8e3c3822edab5b70ec668e0bdb`: Admin Static Checks **45387619860 PASSED**; Edge Function Static Checks **45387619991 PASSED**.
+- Verified canonical app domains: `https://flamechicadmin.vercel.app`, `https://flamechicpos.vercel.app`, `https://flamechicrider.vercel.app`. Browser had open generated Vercel deployment URLs; use canonical domains for browser smoke tests. Staff Admin CORS intentionally only allows canonical Admin origin, not generated preview hosts.
+- Read-only Production counts: 1 active restaurant, 1 active branch, 1 Admin role; 0 Owner, Manager, Cashier, Rider assignments; 0 active Rider profiles. Admin role is accepted by POS resolver. Rider needs a separate active branch-scoped Rider role and active rider profile. Do not reset Admin password, duplicate Auth user, or assign Admin the Rider role.
+- No business migration applied during CORS recovery. Production role query was read-only. The edge function update was source-tested before deployment.
+
+**Next:** sign in on canonical Admin domain, verify Staff & Riders page and Staff Admin calls; then sign in on canonical POS domain using the existing Admin account. Only create other staff after their real work emails are confirmed; provision Rider profile as a separate step. Then complete the labelled full manual rehearsal before real operations.
