@@ -238,7 +238,7 @@ BEGIN
         delivery_address=v_address,delivery_area_id=v_area_id,delivery_area_name_snapshot=v_area_name,delivery_other_locality_snapshot=v_other_locality,
         delivery_area_fee_snapshot=v_delivery_fee,delivery_selection_type=v_selection_type,delivery_instructions=v_instructions,
         subtotal=v_subtotal,discount_amount=0,delivery_fee=v_delivery_fee,total=v_total,
-        balance_due=GREATEST(v_total-v_existing.paid_amount,0),catalog_publication_id=NULLIF(p_payload->>'catalog_publication_id','')::uuid,
+        catalog_publication_id=NULLIF(p_payload->>'catalog_publication_id','')::uuid,
         catalog_version=NULLIF(p_payload->>'catalog_version','')::bigint,
         table_reference=v_table_reference,table_label_snapshot=v_table_label,scheduled_for=v_scheduled_for,
         prepare_at=v_prepare_at,kitchen_timing=v_kitchen_timing,updated_at=v_now WHERE id=v_order_id;
@@ -255,13 +255,13 @@ BEGIN
     v_order_number:='FC-'||pg_catalog.to_char(v_business_date,'YYMMDD')||'-'||pg_catalog.lpad(v_counter::text,4,'0');
     INSERT INTO public.orders(restaurant_id,branch_id,order_number,local_order_id,idempotency_key,request_hash,source,fulfillment_type,status,
       customer_name,customer_phone,delivery_address,delivery_area_id,delivery_area_name_snapshot,delivery_other_locality_snapshot,delivery_area_fee_snapshot,
-      delivery_selection_type,delivery_instructions,catalog_publication_id,catalog_version,subtotal,discount_amount,delivery_fee,total,balance_due,
+      delivery_selection_type,delivery_instructions,catalog_publication_id,catalog_version,subtotal,discount_amount,delivery_fee,total,
       paid_amount,currency_code,payment_status,payment_method_summary,notes,cashier_id,created_by_user_id,table_reference,
       table_label_snapshot,scheduled_for,prepare_at,kitchen_timing,placed_at,created_at,updated_at,last_status_actor_type,last_status_change_reason)
     VALUES(v_restaurant_id,v_branch_id,v_order_number,v_local_order_id,v_idempotency_key,v_request_hash,'pos',v_fulfillment,'new',
       v_customer_name,v_customer_phone,v_address,v_area_id,v_area_name,v_other_locality,v_delivery_fee,v_selection_type,v_instructions,
       NULLIF(p_payload->>'catalog_publication_id','')::uuid,NULLIF(p_payload->>'catalog_version','')::bigint,
-      v_subtotal,0,v_delivery_fee,v_total,v_total,0,v_currency,'unpaid',v_payment_method,v_notes,v_actor_id,v_actor_id,
+      v_subtotal,0,v_delivery_fee,v_total,0,v_currency,'unpaid',v_payment_method,v_notes,v_actor_id,v_actor_id,
       v_table_reference,v_table_label,v_scheduled_for,v_prepare_at,v_kitchen_timing,v_now,v_now,v_now,'staff','POS order received')
     RETURNING id INTO v_order_id;
   END IF;
@@ -362,7 +362,7 @@ BEGIN
         CASE WHEN v_fully_paid THEN 'POS payment collected' ELSE 'POS partial payment collected' END,v_now,v_now)
       RETURNING id INTO v_payment_id;
       v_next_status:=CASE WHEN v_fully_paid THEN 'completed' ELSE v_order.status END;
-      UPDATE public.orders SET paid_amount=v_paid,balance_due=v_balance,payment_status=CASE WHEN v_fully_paid THEN 'paid' ELSE 'partially_paid' END,
+      UPDATE public.orders SET paid_amount=v_paid,payment_status=CASE WHEN v_fully_paid THEN 'paid' ELSE 'partially_paid' END,
         payment_method_summary=CASE WHEN v_order.paid_amount=0 THEN v_queued_payment_method WHEN v_order.payment_method_summary=v_queued_payment_method THEN v_queued_payment_method ELSE 'mixed' END,
         status=v_next_status,collected_at=CASE WHEN v_fully_paid THEN v_now ELSE collected_at END,
         completed_at=CASE WHEN v_fully_paid THEN v_now ELSE completed_at END,last_status_changed_by=v_actor_id,last_status_actor_type='staff',
