@@ -1,12 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import contract from '../apps/flame-chick-website/js/catalog-v3.js';
-import dealView from '../apps/flame-chick-website/js/catalog-v3-deal-view.js';
+import contract from '../apps/flame-chick-pos/catalog-v3.js';
+import dealView from '../apps/flame-chick-pos/catalog-v3-deal-view.js';
 import adapter from '../apps/flame-chick-pos/catalog-v3-adapter.js';
 import fixture from './fixtures/catalog-v3-fixture.cjs';
+import { readFileSync } from 'node:fs';
 
 const { IDS, createSnapshot } = fixture;
 const now = '2026-11-23T12:00:00.000Z';
+
+test('POS bundles the exact canonical V3 runtime locally and loads it before the adapter', () => {
+  const canonicalContract = readFileSync('apps/flame-chick-website/js/catalog-v3.js', 'utf8');
+  const posContract = readFileSync('apps/flame-chick-pos/catalog-v3.js', 'utf8');
+  const canonicalDealView = readFileSync('apps/flame-chick-website/js/catalog-v3-deal-view.js', 'utf8');
+  const posDealView = readFileSync('apps/flame-chick-pos/catalog-v3-deal-view.js', 'utf8');
+  const posHtml = readFileSync('apps/flame-chick-pos/index.html', 'utf8');
+
+  assert.equal(posContract, canonicalContract, 'POS V3 contract bundle drifted from canonical website module.');
+  assert.equal(posDealView, canonicalDealView, 'POS V3 deal-view bundle drifted from canonical website module.');
+
+  const contractScript = posHtml.indexOf('<script src="./catalog-v3.js"></script>');
+  const dealViewScript = posHtml.indexOf('<script src="./catalog-v3-deal-view.js"></script>');
+  const adapterScript = posHtml.indexOf('<script src="./catalog-v3-adapter.js"></script>');
+  assert.ok(contractScript >= 0 && dealViewScript > contractScript && adapterScript > dealViewScript,
+    'POS must load local V3 contract and deal modules before its adapter.');
+  assert.doesNotMatch(posHtml, /\.\.\/flame-chick-website\/js\/catalog-v3(?:-deal-view)?\.js/,
+    'Standalone POS must not reference runtime assets outside its Vercel project root.');
+});
+
+
 
 function adapt(snapshot = createSnapshot(), options = {}) {
   snapshot.databaseNow = now;
