@@ -10,6 +10,9 @@ on:
       - "apps/flame-chick-website/js/catalog-v3-deal-view.js"
       - "tests/flame-chick-order-pricing.test.mjs"
       - "tests/edge-function-contract-hygiene.test.mjs"
+      - "supabase/functions/flame-chick-order-api/index_test.ts"
+      - "tests/fixtures/flame-chick-published-menu-v3-fixture.cjs"
+      - "ops/catalog-drafts/flame-chick-published-menu-2026-11-23.v3-draft.json"
       - "tests/website-order-quote-token.test.mjs"
       - "supabase/functions/_shared/website-order-quote-token.mjs"
       - ".github/workflows/ci-edge-functions.yml"
@@ -39,5 +42,7 @@ jobs:
           deno check supabase/functions/flame-chick-delivery-api/index.ts
           deno check supabase/functions/flame-chick-staff-admin/index.ts
 
+      - name: Exercise actual Website Order API quote and checkout routes with synthetic Supabase responses
+        run: deno test --allow-env --allow-read supabase/functions/flame-chick-order-api/index_test.ts
       - name: Check Flame Chick RPC, catalog pricing and key contracts
         run: node --test tests/flame-chick-order-pricing.test.mjs tests/edge-function-contract-hygiene.test.mjs tests/website-order-quote-token.test.mjs
