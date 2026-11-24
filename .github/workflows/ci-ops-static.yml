@@ -9,6 +9,8 @@ on:
       - "apps/flame-chick-rider/**"
       - "tests/ops-source-hygiene.test.mjs"
       - "tests/pos-payment-collection.test.mjs"
+      - "tests/pos-unified-sync-v3.test.mjs"
+      - "apps/flame-chick-pos/sync-v3.js"
       - "tests/pos-catalog-v3-adapter.test.mjs"
       - "tests/fixtures/catalog-v3-fixture.cjs"
       - "apps/flame-chick-website/js/catalog-v3.js"
@@ -34,4 +36,4 @@ jobs:
           node-version: "22"
 
       - name: Check POS and Rider source
-        run: node --test tests/ops-source-hygiene.test.mjs tests/pos-payment-collection.test.mjs tests/pos-catalog-v3-adapter.test.mjs
+        run: node --test tests/ops-source-hygiene.test.mjs tests/pos-payment-collection.test.mjs tests/pos-catalog-v3-adapter.test.mjs tests/pos-unified-sync-v3.test.mjs
