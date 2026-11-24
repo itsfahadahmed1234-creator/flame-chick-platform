@@ -54,7 +54,7 @@ DECLARE
   v_branch_timezone text; v_currency text; v_order_number text; v_business_date date; v_counter bigint;
   v_now timestamptz:=pg_catalog.clock_timestamp();
   v_subtotal numeric(12,2); v_delivery_fee numeric(12,2); v_total numeric(12,2); v_calculated_subtotal numeric(12,2):=0;
-  v_area_id uuid; v_area_name text; v_area_fee numeric(12,2):=0; v_selection_type text; v_address text; v_instructions text;
+  v_area_id uuid; v_area_name text; v_area_fee numeric(12,2):=0; v_selection_type text; v_address text; v_instructions text; v_other_locality text;
   v_delivery jsonb; v_items jsonb; v_item jsonb; v_modifier jsonb; v_component jsonb; v_component_modifier jsonb;
   v_item_id uuid; v_component_id uuid; v_order_id uuid; v_order public.orders%ROWTYPE; v_existing public.orders%ROWTYPE;
   v_ordinal integer:=0; v_quantity integer; v_unit_price numeric; v_line_total numeric; v_updated boolean:=false;
@@ -144,7 +144,7 @@ BEGIN
       RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object('code','POS_DELIVERY_DETAILS_REQUIRED','message','A delivery address and area are required.'));
     END IF;
     v_selection_type:=COALESCE(v_delivery->>'selection_type',v_delivery->>'selectionType');
-    v_address:=NULLIF(pg_catalog.btrim(v_delivery->>'address'),''); v_instructions:=NULLIF(pg_catalog.btrim(v_delivery->>'instructions'),'');
+    v_address:=NULLIF(pg_catalog.btrim(v_delivery->>'address'),''); v_instructions:=NULLIF(pg_catalog.btrim(v_delivery->>'instructions'),''); v_other_locality:=NULLIF(pg_catalog.btrim(v_delivery->>'other_locality'),'');
     IF v_address IS NULL OR pg_catalog.char_length(v_address) NOT BETWEEN 5 AND 1000 OR (v_instructions IS NOT NULL AND pg_catalog.char_length(v_instructions)>500) THEN
       RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object('code','POS_DELIVERY_ADDRESS_INVALID','message','Enter a complete delivery address.'));
     END IF;
@@ -156,6 +156,7 @@ BEGIN
       IF NOT FOUND THEN RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object('code','POS_DELIVERY_AREA_UNAVAILABLE','message','The selected delivery area is no longer available.')); END IF;
     ELSIF v_selection_type='not_listed' THEN
       v_area_id:=NULL; v_area_name:='Not Listed / Other';
+      IF v_other_locality IS NULL OR pg_catalog.char_length(v_other_locality)>120 THEN RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object('code','POS_DELIVERY_LOCALITY_REQUIRED','message','Enter the locality for a Not Listed delivery.')); END IF;
       SELECT s.not_listed_delivery_fee INTO v_area_fee FROM public.branch_delivery_settings s
       WHERE s.restaurant_id=v_restaurant_id AND s.branch_id=v_branch_id FOR SHARE OF s;
       IF NOT FOUND OR v_area_fee IS NULL THEN RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object('code','POS_DEFAULT_DELIVERY_FEE_UNCONFIGURED','message','The Not Listed delivery fee is not configured for this branch.')); END IF;
@@ -167,7 +168,7 @@ BEGIN
     IF (v_delivery IS NOT NULL AND v_delivery<>'null'::jsonb) OR v_delivery_fee<>0 THEN
       RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object('code','POS_NON_DELIVERY_FIELDS_INVALID','message','Dine-in and takeaway orders cannot include delivery fees or addresses.'));
     END IF;
-    v_area_id:=NULL;v_area_name:=NULL;v_selection_type:=NULL;v_address:=NULL;v_instructions:=NULL;v_area_fee:=0;
+    v_area_id:=NULL;v_area_name:=NULL;v_selection_type:=NULL;v_address:=NULL;v_instructions:=NULL;v_other_locality:=NULL;v_area_fee:=0;
   END IF;
 
   FOR v_item IN SELECT value FROM pg_catalog.jsonb_array_elements(v_items) LOOP
@@ -225,7 +226,7 @@ BEGIN
       v_order_id:=v_existing.id; v_updated:=true;
       UPDATE public.orders SET request_hash=v_request_hash,local_revision=v_revision,customer_name=v_customer_name,
         customer_phone=v_customer_phone,notes=v_notes,payment_method_summary=v_payment_method,
-        delivery_address=v_address,delivery_area_id=v_area_id,delivery_area_name_snapshot=v_area_name,
+        delivery_address=v_address,delivery_area_id=v_area_id,delivery_area_name_snapshot=v_area_name,delivery_other_locality_snapshot=v_other_locality,
         delivery_area_fee_snapshot=v_delivery_fee,delivery_selection_type=v_selection_type,delivery_instructions=v_instructions,
         subtotal=v_subtotal,discount_amount=0,delivery_fee=v_delivery_fee,total=v_total,
         balance_due=GREATEST(v_total-v_existing.paid_amount,0),catalog_publication_id=NULLIF(p_payload->>'catalog_publication_id','')::uuid,
@@ -244,12 +245,12 @@ BEGIN
     RETURNING last_value INTO v_counter;
     v_order_number:='FC-'||pg_catalog.to_char(v_business_date,'YYMMDD')||'-'||pg_catalog.lpad(v_counter::text,4,'0');
     INSERT INTO public.orders(restaurant_id,branch_id,order_number,local_order_id,idempotency_key,request_hash,source,fulfillment_type,status,
-      customer_name,customer_phone,delivery_address,delivery_area_id,delivery_area_name_snapshot,delivery_area_fee_snapshot,
+      customer_name,customer_phone,delivery_address,delivery_area_id,delivery_area_name_snapshot,delivery_other_locality_snapshot,delivery_area_fee_snapshot,
       delivery_selection_type,delivery_instructions,catalog_publication_id,catalog_version,subtotal,discount_amount,delivery_fee,total,balance_due,
       paid_amount,currency_code,payment_status,payment_method_summary,notes,cashier_id,created_by_user_id,table_reference,
       table_label_snapshot,scheduled_for,prepare_at,kitchen_timing,placed_at,created_at,updated_at,last_status_actor_type,last_status_change_reason)
     VALUES(v_restaurant_id,v_branch_id,v_order_number,v_local_order_id,v_idempotency_key,v_request_hash,'pos',v_fulfillment,'new',
-      v_customer_name,v_customer_phone,v_address,v_area_id,v_area_name,v_delivery_fee,v_selection_type,v_instructions,
+      v_customer_name,v_customer_phone,v_address,v_area_id,v_area_name,v_other_locality,v_delivery_fee,v_selection_type,v_instructions,
       NULLIF(p_payload->>'catalog_publication_id','')::uuid,NULLIF(p_payload->>'catalog_version','')::bigint,
       v_subtotal,0,v_delivery_fee,v_total,v_total,0,v_currency,'unpaid',v_payment_method,v_notes,v_actor_id,v_actor_id,
       v_table_reference,v_table_label,v_scheduled_for,v_prepare_at,v_kitchen_timing,v_now,v_now,v_now,'staff','POS order received')
