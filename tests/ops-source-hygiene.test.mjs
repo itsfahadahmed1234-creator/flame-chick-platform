@@ -189,7 +189,7 @@ test("POS uses one unified V3 sync path for Delivery, Takeaway and Dine-in",()=>
   assert.match(html,/syncPendingUnifiedPosOrders/);
   assert.match(html,/prepareLocalPosSyncOrder/);
   assert.match(html,/acknowledgementMatches/);
-  assert.match(html,/syncStatus='needs_review'/);
+  assert.match(html,/syncStatus=permanent\?'needs_review':'failed'/);
   assert.match(html,/order\.serverOrderId/);
   assert.doesNotMatch(html,/Takeaway and dine-in orders remain local/);
 });
@@ -198,7 +198,7 @@ test("POS saves server payment collection only after cashier confirms a non-deli
   const html=source[0].html;
   assert.match(html,/pendingPayment/);
   assert.match(html,/requestId:crypto\.randomUUID\(\)/);
-  assert.match(html,/paymentStatus==='Paid'/);
+  assert.match(html,/String\(order\.paymentStatus\|\|''\)\.toLowerCase\(\)==='paid'/);
   assert.match(html,/await put\(STORES\.queue,current\)/);
 });
 
