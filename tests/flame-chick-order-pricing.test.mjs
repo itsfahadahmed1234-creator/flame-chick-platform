@@ -28,11 +28,12 @@ function request(items, changes = {}) {
   };
 }
 
-function price(payload, source = snapshot()) {
+function price(payload, source = snapshot(), options = {}) {
   return calculateWebsiteOrder(source, payload, {
     contract,
     dealView,
-    databaseNow
+    databaseNow,
+    ...options
   });
 }
 
@@ -188,6 +189,58 @@ test("rejects stale publications and branches that are not accepting the selecte
     kind: "product", productId: IDS.product,
     productVariantId: IDS.variant, quantity: 1, modifiers: []
   }]), disabledSnapshot).error.code, "BRANCH_FULFILMENT_UNAVAILABLE");
+});
+
+test("trusted POS pricing accepts dine-in without a customer phone or website fulfilment flags", () => {
+  const source = snapshot();
+  source.branches[0].websiteOrderingEnabled = false;
+  source.branches[0].websiteDeliveryEnabled = false;
+  source.branches[0].websitePickupEnabled = false;
+  const payload = request([{
+    kind: "product",
+    productId: IDS.product,
+    productVariantId: IDS.variant,
+    quantity: 1,
+    modifiers: []
+  }], {
+    fulfilmentType: "dine_in",
+    customer: { name: "Walk-in Customer" }
+  });
+
+  const websiteAttempt = price(payload, source);
+  assert.equal(websiteAttempt.ok, false);
+  assert.equal(websiteAttempt.error.code, "ORDER_REQUEST_INVALID");
+
+  const posResult = price(payload, source, { staffPos: true });
+  assert.equal(posResult.ok, true, JSON.stringify(posResult));
+  assert.equal(posResult.data.fulfillment_type, "dine_in");
+  assert.equal(posResult.data.customer_phone, null);
+  assert.equal(posResult.data.subtotal, 550);
+});
+
+test("trusted POS pricing still uses published product and deal availability while ignoring website-only gates", () => {
+  const source = snapshot();
+  source.branches[0].websiteOrderingEnabled = false;
+  source.branches[0].websiteDeliveryEnabled = false;
+  source.branches[0].websitePickupEnabled = false;
+  const productPayload = request([{
+    kind: "product",
+    productId: IDS.product,
+    productVariantId: IDS.variant,
+    quantity: 1,
+    modifiers: []
+  }], { fulfilmentType: "pickup" });
+
+  const result = price(productPayload, source, { staffPos: true });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.data.fulfillment_type, "pickup");
+
+  source.branchProductAvailability.push({
+    branchId: IDS.branch, productId: IDS.product, isAvailable: false
+  });
+  const unavailable = price(productPayload, source, { staffPos: true });
+  assert.equal(unavailable.ok, false);
+  assert.equal(unavailable.error.code, "PRODUCT_UNAVAILABLE");
 });
 
 test("rejects malformed quantities, missing DB time and oversized order lines", () => {
