@@ -2050,3 +2050,23 @@ The disposable behavioral workflow passed before the final migration filename wa
 - GST remains deferred. Never add `tax_amount` or tax/charge fields merely to satisfy an old query. Do not rebuild the POS.
 
 **Exact next action:** user hard-refreshes canonical POS, signs in with existing Admin credentials, confirms whether Online Orders board loads. If it still shows an error, inspect fresh version-3 Edge Function logs and exact response before changing code.
+
+
+## 2026-11-24 — POS V3 catalog loading recovery
+
+### User-visible issue and diagnosis
+- User confirmed Admin login and POS login/order board work, but POS local catalog remains empty with notice `Menu could not be refreshed. Retry when online.`. The customer website's published V3 menu loads successfully.
+- Production `flame_chick_catalog_public_read('flame-chick')` was checked read-only: published=true, publication #2, draft revision 92, schema V3, matching snapshot schema V3, valid 64-character SHA-256, valid UTC databaseNow, 25 products, 28 variants and 8 categories. No catalog republish or menu data changes were needed.
+- Catalog Edge Function `flame-chick-catalog` is ACTIVE v2. POS browser log showed GET `action=health` returned HTTP 200. No subsequent POS `action=catalog` request was recorded, so the POS stops between health response and full-snapshot request; this is a POS frontend runtime/assets/configuration issue, not unavailable published menu data or staff credentials.
+- POS source had been loading shared V3 contract/deal modules using paths `../flame-chick-website/js/catalog-v3.js` and `../flame-chick-website/js/catalog-v3-deal-view.js`, outside the independent POS Vercel project root. To make POS self-contained, copied the exact canonical files into `apps/flame-chick-pos/catalog-v3.js` and `apps/flame-chick-pos/catalog-v3-deal-view.js`, changed POS script tags to local `./catalog-v3.js` and `./catalog-v3-deal-view.js`, kept adapter loaded afterward, and updated test imports accordingly.
+- Added regression test to `tests/pos-catalog-v3-adapter.test.mjs`: asserts both POS-local V3 bundles are byte-for-byte identical to website canonical modules and POS loads them before adapter without cross-project paths. Updated old source-hygiene assertions in `tests/ops-source-hygiene.test.mjs` to expect local paths.
+- POS Vercel project setting corrected to `rootDirectory=apps/flame-chick-pos`, `sourceFilesOutsideRootDirectory=false`. No database migration/table changes; no catalog/menu publication changes.
+
+### Verification and deployment
+- POS/Rider Static Checks workflow **45402935904 PASSED** on commit `4d75c49126e46f2735c5daf9c49273ce835c3e82`; the Node source and POS catalog adapter suite completed successfully.
+- Fresh Vercel POS deployment `dpl_ERAfkR984GdURXKnJ9WpP99T5QqZ` from branch `work/production-source-audit`, commit `4d75c49126e46f2735c5daf9c49273ce835c3e82`, reached READY.
+- Canonical alias `flamechicpos.vercel.app` was reassigned from previous deployment `dpl_GVqLwxp6aLumC9eN5xhjsRMERmj7` to `dpl_ERAfkR984GdURXKnJ9WpP99T5QqZ`. Vercel alias lookup confirms canonical domain points to new READY deployment.
+- Full disposable Staff Admin Role Boundary QA run **45402935896** on commit `4d75c491...` remains IN PROGRESS at last check. Do not mark full system rehearsal or database QA complete based on the POS static workflow.
+- The browser still needs an actual post-deploy refresh and UI confirmation. User should Ctrl+Shift+R at `https://flamechicpos.vercel.app`, keep/sign back into the existing Admin account if required, then confirm Menu shows products. No POS order has been created for this test.
+
+**Exact next action:** wait for the user to hard-refresh POS and confirm V3 products appear. If not, inspect fresh browser-visible notice and new Catalog Function logs; check whether the second `action=catalog` request is now present and its status. Do not change catalog data, create tax fields, apply migrations or rebuild POS without new evidence.
