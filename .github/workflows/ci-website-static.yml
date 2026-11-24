@@ -54,6 +54,7 @@ jobs:
           node --check apps/flame-chick-website/js/catalog-v3-view.js
           node --check apps/flame-chick-website/js/catalog-v3-deal-view.js
           node --check apps/flame-chick-website/js/catalog-v3-deal-configurator.js
+          node --check apps/flame-chick-website/js/public-menu-v3.js
           node --check apps/flame-chick-website/js/branch-fulfilment-v3.js
           node --check apps/flame-chick-website/js/catalog-v3-preview.js
           node --check apps/flame-chick-website/js/catalog-preview-page.js
