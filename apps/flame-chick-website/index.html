@@ -438,7 +438,7 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
                 <li data-n="5"><div><b>Fresh lettuce</b><span>Cold and crisp.</span></div></li>
                 <li data-n="6"><div><b>Top bun</b><span>Closes it all in.</span></div></li>
               </ol>
-              <button class="btn btn-gold" type="button" data-act="add" data-id="og-crunch">View current menu</button>
+              <button class="btn btn-gold" type="button" data-act="go" data-target="#menu">Explore Menu</button>
             </div>
             <div class="stage" id="anaStage">
               <div class="vframe">
@@ -462,7 +462,7 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
         <div>
           <h2>Crispy outside. Juicy inside.</h2>
           <p class="lead">Twelve golden nuggets and a dip, packed in our red tray. Add them to your order and they travel with everything else.</p>
-          <button class="btn btn-gold" type="button" data-act="add" data-id="classic-nuggets-12">View current menu</button>
+          <button class="btn btn-gold" type="button" data-act="go" data-target="#menu">Explore Menu</button>
         </div>
       </div>
     </section>
@@ -471,11 +471,11 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
       <div class="wrap">
         <h2>Explore the menu</h2>
         <ol class="steps">
-          <li><b>Browse the published catalog</b><span>See current products, sizes, variants and deals from Flame Chick’s live menu publication.</span></li>
+          <li><b>Browse the live menu</b><span>See current products, sizes, options and deals from the published menu.</span></li>
           <li><b>Check availability</b><span>Published product and deal availability is shown for the selected branch.</span></li>
-          <li><b>Online ordering</b><span>Online checkout will be enabled after branch fulfilment settings and the full order rehearsal are complete.</span></li>
+          <li><b>Online ordering</b><span>Choose delivery or pickup, review the server-verified total, and place your order.</span></li>
         </ol>
-        <p class="how-note">This page is currently for menu browsing. No order is submitted from the public menu.</p>
+        <p class="how-note">Checkout is available directly below the Menu heading. Orders are sent to Flame Chick POS after confirmation.</p>
         <div class="numbox">
           <span>Need help? Call <strong class="num" id="phoneShow">+92 335 8044164</strong></span>
           <button class="btn btn-ghost btn-sm" type="button" data-act="copy-phone">Copy number</button>
@@ -498,7 +498,7 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
 
 <div class="cartbar" id="cartbar">
   <button type="button" id="cartbarBtn" data-act="open-cart" aria-label="Open your order">
-    <span>Browse the published menu</span>
+    <span>View cart</span>
   </button>
 </div>
 
@@ -624,7 +624,7 @@ var FCCore = (function () {
   };
 
   /* art: icon key. t1/t2: tile gradient. inj: show the "injected" droplet. n: piece count for broast icons. */
-  // The old embedded menu is intentionally disabled. menu.html is the sole public V3 catalog.
+  // Legacy hard-coded V2 menu is disabled; the public V3 catalog is rendered below the homepage Menu heading.
   var MENU = [];
 
   var BY_ID = {};
@@ -1310,7 +1310,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
     e.preventDefault();
     // Legacy V2 cart payloads are no longer accepted by the order API. Move
     // any old/dormant form submit to the V3 validated ordering page.
-    window.location.assign('menu.html');
+    goTo('#menu');
     return;
     if (orderSending) return;
 
@@ -1463,7 +1463,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
       case 'modal-add':
       case 'add':
       case 'open-cart':
-        window.location.assign('order-online-v3.html');
+        goTo('#menu');
         break;
       case 'inc': setQty(id, (cart[id] || 0) + 1); if (ctx) refocus(ctx, id, 'inc'); break;
       case 'dec':
@@ -2048,7 +2048,10 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
  .fc-home-product-controls{width:100%;justify-content:stretch}
  .fc-home-product-controls select,.fc-home-product-controls button{width:100%}
  .fc-home-product-card .price{font-size:clamp(19px,5vw,24px)}
-}</style>
+}
+/* Legacy V2 cart UI is dormant; all ordering uses the V3 homepage checkout. */
+.cartbar{display:none!important}
+</style>
 <script src="js/catalog-v3.js"></script>
 <script src="js/catalog-v3-client.js"></script>
 <script src="js/branch-fulfilment-v3.js"></script>
