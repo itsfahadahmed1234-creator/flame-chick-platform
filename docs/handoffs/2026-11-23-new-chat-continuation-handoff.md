@@ -2260,3 +2260,44 @@ The disposable behavioral workflow passed before the final migration filename wa
 - The Order API source was inspected: it selects active named areas and reads each area's `delivery_fee`; `not_listed` selection uses `branch_delivery_settings.not_listed_delivery_fee`. Therefore the current intended quote values are Comsats University = Rs. 0 and Not Listed / Other = Rs. 100 (plus the order subtotal). No test order was created and no quote endpoint was invoked on a customer order.
 - **Operational warning:** Comsats University is currently active with a zero fee. Any delivery order selecting this area will be charged no delivery fee until Admin edits/pauses the area. This may be intentional for testing; do not modify without user confirmation.
 - No screenshot needed; text confirmation and direct DB read are enough. No further changes performed. Next: user should confirm whether Rs. 0 on the test area is intentional or whether it should be changed/paused before accepting real orders. If they wish to test calculation safely, use the read-only configuration values first and do not create a live order until the test area fee is deliberate. Both handoffs include this exact state.
+
+
+## 2026-11-24 — User explicitly confirms Comsats University test fee is Rs. 0
+
+- User explicitly confirmed: **“zero delivery is intentional.”** This supersedes the earlier open question in the immediately preceding note.
+- Keep the active **Comsats University** test-area fee at **Rs. 0**. It is an intentional test configuration, not an accidental missing fee. Do not change, pause, or re-price it based on the earlier warning.
+- Production read-only verification at this checkpoint: Main branch active; website ordering, Delivery and Pickup flags all enabled; Not Listed / Other default fee **Rs. 100**; Comsats University active fee **Rs. 0**. The Order API reads these same branch settings and named-area rows. Any order selecting Comsats will therefore receive a Rs. 0 delivery fee, as intended for this test area.
+- No live orders, payments, order items, delivery tasks or delivery offers existed at inspection (all counts 0). No order or payment was created in this continuation.
+
+## 2026-11-24 — Production deployment-readiness audit checkpoint
+
+### Verified live Production state
+- Supabase project `adkrxfnawdiljhjaavnj` is `ACTIVE_HEALTHY` in Mumbai (`ap-south-1`), PostgreSQL 17.
+- Exact Production migration ledger count is **36**; the latest applied migrations are unified POS order sync (`20261124082809`), order-status commands (`20261124102922`) and Admin delivery configuration (`20261124142950`). No migration was applied during this audit.
+- All four Production Edge Functions are ACTIVE: Order API v3 (`verify_jwt=false`, with its own request authentication contract), Catalog v2, Delivery API v1, Staff Admin v4 (`verify_jwt=true`).
+- Current live branch flags are `website_ordering_enabled=true`, `website_delivery_enabled=true`, `website_pickup_enabled=true`. The website is therefore configured to accept both Delivery and Pickup orders; do not treat an untested checkout as verified merely because these gates are enabled.
+- Current live staff-role query found one active Admin assignment and zero active assignments for other role keys. Active Rider profile count is **0**. A Rider session cannot operate until a separate real Rider staff user is assigned the branch-scoped Rider role and has an active Rider profile. Do not grant Rider role to the Admin account.
+- Production Storage has **no buckets** at this checkpoint. Product image metadata can be projected by the apps, but actual product images are not provisioned.
+- Published V3 deal groups still contain the generic Burger placeholder for certain deals; the selectable-card UI does not replace the underlying catalog mapping. Do not publish guessed burger substitutions. A reviewed catalog decision, draft validation and pricing/checkout verification remain required.
+- Production order, order-item, payment and delivery-task counts were all zero at inspection. No real or test order was created during this audit.
+
+### CI and deployments reconciled to exact commits
+- Latest Admin Static Checks **45427676653 PASSED** on Admin app commit `0787a008f396c76a24c471ebf8d3021f256bde5c` (Delivery Areas navigation is enabled for Admin/Owner).
+- POS/Rider Static Checks **45423182302 PASSED** on `c109be13b46aab92875e3e94dff9735e0b119017`; full Staff Admin Role Boundary QA **45423181956 PASSED** on that same commit. POS/Rider application source has no later changes recorded in the handoff.
+- Website Static Checks **45384177022 PASSED** on website implementation commit `0a4394fe1533171cf9506cff980dad1e9fa28479`.
+- Edge Function Static Checks **45426073813 PASSED** and Catalog Admin API QA **45426073950 PASSED** on `921660992fcebe67a910b3f7480edb91e28315c4`.
+- Relevant Vercel deployments are READY: website `dpl_J5y1tZeoBZfRAfxVkmjLTZ72jq6i` from `0a4394fe...`; POS `dpl_EfVdNLPvNLfAvL1URmndn2xscyNv` from `c109be13...`; Admin preview `dpl_EKANAZKxB4Lzr3y9LZz98uwUQqXc` from `0787a008...`; Rider `dpl_AoAJvNZQLsBamhBGNWEspcvv3hRU` from `30d960c623d66e8a49a37c8180d5bb57f3919ab6`. A current Vercel deployment-alias lookup returned 403, so this checkpoint does not independently re-certify the custom-domain-to-deployment mappings; retain the earlier handoff's last successful alias verification and do not change aliases based on this failed lookup.
+- Current branch HEAD at start of this audit was documentation-only commit `5ecb252d225ef6956fcec6573396f7640a0057ea`; it has no new app-code CI run. The Admin app commit above is the latest relevant Admin code checked by CI.
+
+### Outstanding release gates — do not mark restaurant-live
+1. Complete an actual browser smoke test of the deployed website: `website_context`, published catalog/branch selection, server-side quote, and a clearly labelled safe test checkout reaching the POS. The checkout and order-to-POS path were not exercised in this audit; do not create an unlabelled production/customer order.
+2. Verify, without displaying or copying secret values, that Production Order API server-side HMAC secrets are present and valid. The code expects `FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET` and `FLAME_CHICK_ORDER_PHONE_HMAC_SECRET`; their Production presence was not independently verified in this audit.
+3. Provision and verify a separate real Rider account, active branch-scoped Rider assignment and Rider profile before Delivery can be rehearsed end-to-end. Push notifications are not launch-verified; Rider Web Push is designed to fail closed pending an encrypted implementation, so rely only on the verified supported dispatch/polling behavior.
+4. Rehearse the full cashier/operations path with labelled test data: POS receipt; Delivery, Takeaway and Dine-in statuses; offline queue/reconnect sync; Rider offer accept/reject/expiry; pickup/delivery; failed-delivery physical return and Manager confirmation; Cashier collection using COD, Card or Online/bank transfer; idempotent retry and History. Rider Delivered is not payment collected; do not mark an order financially complete until Cashier records collection.
+5. Review the remaining published Burger placeholders with the menu owner before changing deal component IDs. Provision the missing Storage bucket and upload/review actual menu assets before claiming product photography is live.
+
+### Security and scope notes
+- Supabase Security Advisor currently reports 51 informational `rls_enabled_no_policy` findings (RLS enabled with no policies) and one warning that leaked-password protection is disabled. These are recorded, not silently treated as fixed; review them through normal security hardening without broadening direct table access.
+- GST/tax remains explicitly deferred. Do not add tax columns or tax calculation logic.
+- No Production schema, migration, catalog publication, Storage, auth account, role, order, payment, delivery fee or deployment alias was changed in this audit.
+- Deployment in the restaurant within the requested one-hour window cannot responsibly be certified from the current evidence: the code/deployments are substantially present, but the browser checkout-to-POS test, Rider provisioning and full manual operational rehearsal remain open. Keep the system in controlled test mode until those gates pass and the operator approves live use.
