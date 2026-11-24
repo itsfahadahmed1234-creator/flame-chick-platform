@@ -1,3 +1,61 @@
+# CURRENT CHECKPOINT — 2026-11-24 — Website Order API → Local Postgres E2E PASSED
+
+**Repository:** `itsfahadahmed1234-creator/flame-chick-platform`  
+**Active branch:** `work/production-source-audit`  
+**Verified source head:** `c90e592f6c76ea0769c6c7fc921ab12afd22de1a`  
+**Full disposable QA run:** [45311516506 — SUCCESS](`https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45311516506`)
+
+## What passed in the disposable local environment
+
+- Supabase CLI installed and disposable local Supabase stack started.
+- Complete repository migration history replayed successfully.
+- Staff ACL/RLS baseline and Admin/Owner/Manager/Cashier/Rider boundaries passed.
+- Operational schema V1 constraints/security tests passed.
+- Delivery offer, accept/reject, pickup, delivered and physical-return command tests passed.
+- Website PostgreSQL order-creation, idempotency and all rolling phone-quota SQL tests passed.
+- Actual `flame-chick-order-api` request handler was run through local PostgREST into real local PostgreSQL (not mocks):
+  - quote issued from the locally published synthetic V3 catalog;
+  - live delivery fee changed between quote and create, and the stale quote was rejected;
+  - altered HMAC signature was rejected;
+  - valid signed quote created one real order through the create RPC;
+  - exact retry returned the original order without a second commit;
+  - same idempotency key with changed customer data was rejected.
+- The SQL verifier confirmed exactly one website order and its expected item, status-history and delivery-task rows; the order was `new`, `unpaid`, `dispatch_pending`, with no payment record.
+- All four delivery concurrency races and both payment-collection concurrency races passed, including one-collection-only retry and prevention of over-collection.
+- Disposable Supabase stack stopped with `supabase stop --no-backup`; no test database or synthetic rows were retained.
+
+## Exact route-test evidence
+
+The Deno output reported: `ok | 1 passed | 0 failed`. It printed:
+`Real local Order API → PostgREST → PostgreSQL: stale fee, tamper, commit, replay and conflict checks passed.`
+
+The PostgreSQL verifier reported:
+`Verified one real local website order: new/unpaid, $550 item + $50 delivery, dispatch_pending, no payment.`
+
+The delivery/payment concurrency harness reported:
+`all 4 delivery races and 2 payment races produced coherent terminal states and matching ledger/audit records`.
+
+## Important distinction
+
+The earlier HTTP-route test using mocked Supabase responses remains useful unit/integration coverage, but it is no longer the only route test. The latest successful run executed the actual request handler against local PostgREST and PostgreSQL. This is a combined local Edge-handler-to-real-Postgres test using a synthetic catalog/customer and an isolated disposable stack.
+
+## Release blockers — still unchanged
+
+- Production order/delivery/payment tables and RPCs are still absent and must not be inferred from the disposable local run.
+- Production migration history/source reconciliation is still required before any database push or hosted migration.
+- `FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET` must be configured as a server-only Edge Function secret before Order API deployment; it has not been set in Production.
+- Delivery areas and Not Listed default fee need real business configuration.
+- Branch website-ordering flags remain disabled.
+- Catalog and Order Edge Functions / V3 customer checkout remain undeployed/disabled.
+- No Vercel deployment, Production SQL, secrets, Realtime, Storage or catalog publication change occurred.
+- `main` remains untouched. GST remains deferred. Rider marking Delivered still does not collect payment; Cashier collection is the only step that completes the order and moves it to History.
+
+## Next step
+
+Perform read-only source-to-Production migration reconciliation. Compare the exact working-branch migration filenames and source hashes/preflight function-body hashes with the live Production migration ledger and live function bodies. In particular, resolve the previously identified migration timestamp/source mismatch without editing the live ledger, replaying migrations, pushing SQL or mutating Production. Only after a complete, explicit reconciliation should a separate reviewed migration rollout be considered.
+
+---
+
 # CURRENT CHECKPOINT — 2026-11-24 — Website Order API route integration tests PASSED
 
 **Repository:** `itsfahadahmed1234-creator/flame-chick-platform`  
