@@ -59,7 +59,7 @@ jobs:
           test -s supabase/tests/flame_chick_delivery_concurrency.sh
           bash -n supabase/tests/flame_chick_delivery_concurrency.sh
           grep -q "pg_sleep" supabase/tests/flame_chick_delivery_concurrency_setup.sql
-          grep -q "FOR UPDATE OF t SKIP LOCKED" supabase/migrations/20261123172000_flame_chick_delivery_commands_v1.sql
+          grep -q "FOR UPDATE OF t SKIP LOCKED" supabase/migrations/20261124033422_flame_chick_delivery_commands_v1.sql
           grep -q "race 4/4" supabase/tests/flame_chick_delivery_concurrency.sh
           grep -q "payment race 6/6" supabase/tests/flame_chick_delivery_concurrency.sh
           grep -q "test.payment.race_delay" supabase/tests/flame_chick_delivery_concurrency_setup.sql
@@ -73,8 +73,8 @@ jobs:
           grep -q "WEBSITE_ONE_MINUTE_QUOTA_NOT_ENFORCED" supabase/tests/flame_chick_website_order_create_v1.sql
           grep -q "WEBSITE_TEN_MINUTE_QUOTA_NOT_ENFORCED" supabase/tests/flame_chick_website_order_create_v1.sql
           grep -q "WEBSITE_HOURLY_QUOTA_NOT_ENFORCED" supabase/tests/flame_chick_website_order_create_v1.sql
-          grep -q "CREATE OR REPLACE FUNCTION public.flame_chick_create_website_order" supabase/migrations/20261123174000_flame_chick_website_order_create_v1.sql
-          grep -q "CREATE OR REPLACE FUNCTION public.flame_chick_get_website_order_by_idempotency" supabase/migrations/20261123174100_flame_chick_website_order_idempotency_lookup_v1.sql
+          grep -q "CREATE OR REPLACE FUNCTION public.flame_chick_create_website_order" supabase/migrations/20261124033430_flame_chick_website_order_create_v1.sql
+          grep -q "CREATE OR REPLACE FUNCTION public.flame_chick_get_website_order_by_idempotency" supabase/migrations/20261124033433_flame_chick_website_order_idempotency_lookup_v1.sql
       - name: Start disposable Supabase with hosted-only helper compatibility
         shell: bash
         run: |
