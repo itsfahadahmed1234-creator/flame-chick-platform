@@ -1771,3 +1771,18 @@ Read-only verification after deployment:
 - Deploy/validate POS preview, then run the manual synthetic-order rehearsal for Dine-in, Takeaway and Delivery (including offline/reconnect, payment and history) before any real restaurant launch.
 
 No customer, order, payment or delivery rows were created in hosted Production during this pass.
+
+
+## 2026-11-24 — Order status RPC implementation (in progress)
+
+- Added versioned candidate migration `supabase/migrations/20261124101500_flame_chick_order_status_commands_v1.sql`.
+- Implements service-role-only `public.flame_chick_update_order_status(jsonb)`, with row locking, branch-scoped staff authorization, validated transitions, audit history, request replay handling, and reason-required reject/cancel.
+- Allowed staff kitchen transitions: new/needs_confirmation → accepted → preparing → ready. Ready Takeaway → collected; Ready Dine-in → served.
+- Cashier cannot cancel; Admin/Owner/Manager can cancel only before rider dispatch and only with a reason. A paid order cannot be rejected/cancelled through this route. Delivery rider pickup/delivered/failed/return and payment collection remain in their dedicated RPCs.
+- Updated POS board: Dine-in Ready now offers **Mark Served** (not Takeaway Collected); Served orders remain visible pending payment/completion.
+- Extended disposable POS SQL behavior test with Dine-in kitchen transition, Served timestamp, request idempotency, Cashier cancellation denial, and Manager cancellation audit. Updated POS source-hygiene assertions.
+- POS/Rider static checks passed on latest source commit `716ae15863794f0a1a5cc893be43ffccb2110c93`: run `45372567729`.
+- Disposable full migration replay + unified POS behavior QA is running on that exact commit: run `45372567275`. Do not apply the candidate migration to hosted Production until this run passes.
+- Previous migration replay failure on run `45372137450` was caused by the migration ACL assertion using uppercase role name `PUBLIC`; PostgreSQL requires lowercase `public` for `has_function_privilege`. Fixed in the latest candidate migration. That failed run predates the fix and is not the current validation result.
+- Hosted Production remains unchanged by this status-command pass; no customer/order/payment fixtures were inserted.
+- Next: obtain run `45372567275` result; fix any migration or behavioral test failure; only after green local disposable replay, apply the migration to empty hosted Production, verify RPC ACL and API status path, then continue delivery config, Realtime and manual synthetic order rehearsal.
