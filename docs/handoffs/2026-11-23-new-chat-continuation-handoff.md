@@ -1996,3 +1996,13 @@ The disposable behavioral workflow passed before the final migration filename wa
 - No recovery email was requested or sent by the assistant; no password was changed. Avoid creating duplicate Auth users or granting Rider role to Admin.
 - Earlier Auth logs showed successful Admin password login at 11:27–11:28Z, but that does not prove the user still remembers the password now. The subsequent Admin browser blocker was CORS and has been fixed in Staff Admin Edge Function v3. POS's previously displayed invalid-credentials error may be a mistyped password; re-test after recovery if needed.
 - Production currently has one Admin role assignment, zero separate Rider role assignments, and zero active Rider profiles. Rider portal sign-in requires a separate real Rider account with active branch-scoped role plus rider profile.
+
+
+## 2026-11-24 — Rider portal 404 / domain alias repair
+
+- User reported `https://flamechickrider.vercel.app` returned Vercel `404 DEPLOYMENT_NOT_FOUND`. This was not an authentication/password error.
+- Vercel audit found Rider project `flame-chick-rider-production` had the canonical custom domain registered and verified, but the domain had no deployment alias. Latest production-target deployment `dpl_CH2pMCcn9Rvm7Me6aD5nDoNEmftJ` on main was BLOCKED by Vercel team-configuration protection. Newer deployment `dpl_AoAJvNZQLsBamhBGNWEspcvv3hRU` from branch `work/production-source-audit`, commit `30d960c623d66e8a49a37c8180d5bb57f3919ab6`, was READY but had only a generated preview alias.
+- Compared source from Rider deployment commit to current branch: no Rider app source changes since the READY deployment. Other changed files included POS, website, order API, migrations/tests and handoffs; those do not alter Rider app bundle. Do not promote the blocked main deployment.
+- Repaired routing by assigning canonical alias `flamechickrider.vercel.app` to READY deployment `dpl_AoAJvNZQLsBamhBGNWEspcvv3hRU`. Vercel confirmed alias mapping: canonical domain -> that READY deployment ID. This fixes the identified missing alias. A direct external page fetch was not available from the inspection tool, so user must confirm browser rendering.
+- User should hard-refresh/open `https://flamechickrider.vercel.app` now. If it renders login, password recovery can be initiated using the existing Admin email; the Rider app's recovery route routes non-Rider staff away from Rider after reset and does not grant Rider permissions. Rider sign-in still needs separate Rider role and active rider profile (Production previously had zero of each).
+- Admin and POS links have not been re-verified in this repair. Keep using their canonical domains and diagnose separately if they fail.
