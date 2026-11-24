@@ -239,6 +239,9 @@
       items
     };
     if (isRecord(identity.pendingPayment)) {
+      if (fulfillment_type === 'delivery') {
+        throw fail('Delivery payment must be collected by the Cashier after the Rider marks the order Delivered.', 'POS_PAYMENT_FULFILLMENT_INVALID');
+      }
       const payment = identity.pendingPayment;
       const requestId = String(payment.requestId || payment.request_id || '');
       const amount = Number(payment.amount);
