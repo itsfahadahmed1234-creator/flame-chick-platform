@@ -34,6 +34,7 @@ let databaseNow = initialNow;
 let deliveryFee = 50;
 let commitCount = 0;
 let orderSequence = 0;
+function readCommitCount(): number { return commitCount; }
 const originalFetch = globalThis.fetch;
 
 function json(value: unknown, status = 200): Response {
@@ -140,7 +141,7 @@ Deno.test("actual Website Order API issues, validates and replays signed quotes"
 
     deliveryFee = 75;
     const changedFee = await invoke({ ...quoteBody(staleId), action: "create_website_order", quote_token: issued.body.quote_token });
-    if (changedFee.status !== 409 || changedFee.body.error?.code !== "WEBSITE_ORDER_QUOTE_STALE" || commitCount !== 0) {
+    if (changedFee.status !== 409 || changedFee.body.error?.code !== "WEBSITE_ORDER_QUOTE_STALE" || readCommitCount() !== 0) {
       throw new Error("Changed delivery fee was not rejected: " + JSON.stringify(changedFee));
     }
     deliveryFee = 50;
@@ -150,7 +151,7 @@ Deno.test("actual Website Order API issues, validates and replays signed quotes"
     const parts = String(tamperQuote.body.quote_token).split(".");
     const changedSignature = (parts[1][0] === "A" ? "B" : "A") + parts[1].slice(1);
     const tampered = await invoke({ ...quoteBody(tamperId), action: "create_website_order", quote_token: parts[0] + "." + changedSignature });
-    if (tampered.status !== 409 || tampered.body.error?.code !== "WEBSITE_ORDER_QUOTE_TOKEN_INVALID" || commitCount !== 0) {
+    if (tampered.status !== 409 || tampered.body.error?.code !== "WEBSITE_ORDER_QUOTE_TOKEN_INVALID" || readCommitCount() !== 0) {
       throw new Error("Tampered quote was not rejected: " + JSON.stringify(tampered));
     }
 
@@ -158,7 +159,7 @@ Deno.test("actual Website Order API issues, validates and replays signed quotes"
     const expiryQuote = await invoke(quoteBody(expiryId));
     databaseNow = expiryQuote.body.quote_expires_at;
     const expired = await invoke({ ...quoteBody(expiryId), action: "create_website_order", quote_token: expiryQuote.body.quote_token });
-    if (expired.status !== 409 || expired.body.error?.code !== "WEBSITE_ORDER_QUOTE_EXPIRED" || commitCount !== 0) {
+    if (expired.status !== 409 || expired.body.error?.code !== "WEBSITE_ORDER_QUOTE_EXPIRED" || readCommitCount() !== 0) {
       throw new Error("Expired quote was not rejected at the deadline: " + JSON.stringify(expired));
     }
 
@@ -167,13 +168,13 @@ Deno.test("actual Website Order API issues, validates and replays signed quotes"
     const successQuote = await invoke(quoteBody(successId));
     const createBody = { ...quoteBody(successId), action: "create_website_order", quote_token: successQuote.body.quote_token };
     const created = await invoke(createBody);
-    if (created.status !== 201 || created.body.ok !== true || !created.body.order_id || !created.body.order_number || commitCount !== 1) {
+    if (created.status !== 201 || created.body.ok !== true || !created.body.order_id || !created.body.order_number || readCommitCount() !== 1) {
       throw new Error("Valid quote did not commit: " + JSON.stringify(created));
     }
 
     databaseNow = successQuote.body.quote_expires_at;
     const replay = await invoke(createBody);
-    if (replay.status !== 200 || replay.body.already_processed !== true || replay.body.order_id !== created.body.order_id || commitCount !== 1) {
+    if (replay.status !== 200 || replay.body.already_processed !== true || replay.body.order_id !== created.body.order_id || readCommitCount() !== 1) {
       throw new Error("Retry did not return the original order: " + JSON.stringify(replay));
     }
 
@@ -181,7 +182,7 @@ Deno.test("actual Website Order API issues, validates and replays signed quotes"
       ...createBody,
       customer: { name: "Another Customer", phone: "03001234567", email: null }
     });
-    if (conflict.status !== 409 || conflict.body.error?.code !== "WEBSITE_ORDER_IDEMPOTENCY_CONFLICT" || commitCount !== 1) {
+    if (conflict.status !== 409 || conflict.body.error?.code !== "WEBSITE_ORDER_IDEMPOTENCY_CONFLICT" || readCommitCount() !== 1) {
       throw new Error("Changed facts under a reused request ID were not rejected.");
     }
     console.log("Website Order API route integration: quote, stale-fee/tamper/expiry rejection, commit and idempotent replay passed.");
