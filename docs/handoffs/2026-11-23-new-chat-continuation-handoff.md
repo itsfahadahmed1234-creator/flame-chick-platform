@@ -1786,3 +1786,41 @@ No customer, order, payment or delivery rows were created in hosted Production d
 - Previous migration replay failure on run `45372137450` was caused by the migration ACL assertion using uppercase role name `PUBLIC`; PostgreSQL requires lowercase `public` for `has_function_privilege`. Fixed in the latest candidate migration. That failed run predates the fix and is not the current validation result.
 - Hosted Production remains unchanged by this status-command pass; no customer/order/payment fixtures were inserted.
 - Next: obtain run `45372567275` result; fix any migration or behavioral test failure; only after green local disposable replay, apply the migration to empty hosted Production, verify RPC ACL and API status path, then continue delivery config, Realtime and manual synthetic order rehearsal.
+
+
+## 2026-11-24 — POS order-status RPC applied to Production; verification checkpoint
+
+**Production project:** `adkrxfnawdiljhjaavnj` (Flame Chick Production, ap-south-1, Free)  
+**Repository:** `itsfahadahmed1234-creator/flame-chick-platform`  
+**Branch:** `work/production-source-audit`
+
+### Exact continuation and CI evidence
+- The unfinished task was the missing `public.flame_chick_update_order_status(jsonb)` RPC used by the POS Order API status route.
+- Candidate migration SQL was read from the branch and matched the disposable QA implementation.
+- GitHub Actions disposable full role-boundary + unified POS behavior run **45372567275** completed with conclusion **SUCCESS** on implementation commit `716ae15863794f0a1a5cc893be43ffccb2110c93`. All listed steps passed, including complete migration replay, staff ACL/RLS, role authorization, delivery lifecycle/physical return, unified POS Dine-in/Takeaway/Delivery/payment idempotency, website order API integration, Rider push fail-closed, concurrency race tests and disposable stack cleanup.
+- POS/Rider static checks run **45372567729** passed on the same implementation commit.
+- The current branch head at time of handoff update had two later commits that changed only these two handoff documents; compare confirmed no implementation files changed after the tested implementation commit.
+- The SQL migration was applied to hosted Production through the Supabase migration action. Supabase generated the authoritative migration version **`20261124102922_flame_chick_order_status_commands_v1`**. The candidate source file was then renamed to `supabase/migrations/20261124102922_flame_chick_order_status_commands_v1.sql`; the old `20261124101500_...` file was deleted. Do not restore or reapply the old filename.
+
+### Post-apply Production verification — PASS
+- Project status: `ACTIVE_HEALTHY`, PostgreSQL 17.12.
+- Production migration ledger now contains 35 entries, including `20261124102922_flame_chick_order_status_commands_v1`.
+- `public.flame_chick_update_order_status(jsonb)` exists.
+- Function owner is `postgres`; `SECURITY DEFINER` is enabled; function config has an empty search path.
+- EXECUTE is granted to `service_role`; EXECUTE is denied to `anon`, `authenticated` and `PUBLIC`.
+- Required operational dependencies exist: orders, order_status_history, delivery_tasks, delivery_task_offers, delivery_task_events and `app_private.flame_chick_delivery_staff_role(uuid,uuid,uuid)`.
+- Production order count and order-status-history count remain **0**. No test/business order was inserted.
+- Security advisor currently reports 51 INFO `RLS Enabled No Policy` findings and 1 WARN for disabled Auth leaked-password protection. These are not to be described as zero lints; review/remediate separately without adding broad policies.
+
+### Important verification boundary
+The disposable behavioral workflow passed before the final migration filename was aligned to the server-generated version. The SQL body was not changed by the rename, and Production ACL/existence checks passed, but rerun the full disposable migration replay/behavior workflow against the renamed current branch before treating the current HEAD as fully CI-green. No live behavioral request has been sent to the new RPC; Production has no order fixtures and the RPC's role/state behavior remains supported by disposable QA, not a live order test.
+
+### Exact next steps
+1. Re-run the full disposable Supabase migration replay and unified POS behavioral workflow on current branch HEAD; inspect all job steps and fix any issue before more rollout.
+2. Read the current Order API status handler and confirm the request payload maps exactly to the new RPC contract, including trusted actor ID, request UUID, status strings and error mapping. Do not change API behavior by assumption.
+3. Add a safe authenticated synthetic fixture path in disposable QA to exercise the deployed SQL contract; do not create hosted Production test orders.
+4. Continue launch blockers: verified CORS allowlists for Order/Delivery functions, securely set/verify required Edge secrets without displaying values, private Realtime authorization/publishers or documented polling fallback, delivery-area + Not Listed fee configuration, approved staff role setup, POS app deployment and manual synthetic end-to-end rehearsal.
+5. Do not enable public website ordering, switch customer domains, or start real restaurant operations until the manual rehearsal is complete and the user approves. Keep the real customer domain untouched. GST remains deferred.
+6. Preserve the payment rule: Rider Delivered is not payment collection; Cashier selects COD/Card/Online-bank transfer and confirms full collection before order completion/History.
+
+**No real customer orders, payments or delivery records were created by this status-RPC rollout.**
