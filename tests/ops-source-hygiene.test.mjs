@@ -105,8 +105,16 @@ test("POS keeps Rider-delivered orders active until Cashier payment collection",
   const html=source[0].html;
   assert.match(html,/return st==='Out for Delivery'\|\|st==='Delivered'/);
   assert.match(html,/Delivered · awaiting cashier payment collection/);
-  assert.match(html,/\['Pending','Accepted','Preparing','Ready','Out for Delivery','Delivered'\]/);
+  assert.match(html,/\['Pending','Accepted','Preparing','Ready','Out for Delivery','Delivered','Served'\]/);
   assert.doesNotMatch(html,/status==='Delivered'[^\\n]*data-order-status="Completed"/);
+});
+
+test("POS distinguishes Dine-in Served from Takeaway Collected",()=>{
+  const html=source[0].html;
+  assert.match(html,/data-order-status="Served"/);
+  assert.match(html,/data-detail-status="\$\{next\}"/);
+  assert.match(html,/o\.FulfillmentType==='Dine-in'\?'Served':'Collected'/);
+  assert.match(html,/st==='Out for Delivery'\|\|st==='Delivered'\|\|st==='Served'/);
 });
 
 test("POS allows Cashier and Manager to confirm physical returns", () => {
