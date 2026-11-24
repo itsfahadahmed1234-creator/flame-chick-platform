@@ -143,7 +143,9 @@ test("POS exposes Cashier payment collection only for delivered orders and prese
   assert.match(html,/order\.Status!=='Delivered'/);
   assert.match(html,/result\.completed!==true/);
   assert.match(html,/await refreshHistoryData\(\)/);
-  assert.doesNotMatch(html,/paymentCollectionAmount|wallet|value="other"/);
+  assert.match(html,/option value="cash">COD/);
+  assert.match(html,/option value="card">Card/);
+  assert.match(html,/option value="bank">Online\/bank transfer/);
   assert.doesNotMatch(html,/public\.payments\?select=|flame_chick_collect_order_payment|INSERT INTO public\.payments/);
 });
 
@@ -152,5 +154,5 @@ test("POS displays the authoritative outstanding balance rather than treating de
   assert.match(html,/BalanceDue:row\.balance_due===null/);
   assert.match(html,/PaidAmount:Number\(row\.paid_amount\)\|\|0/);
   assert.match(html,/Due Rs\. \$\{money\(balance\)\}/);
-  assert.match(html,/Payment fully collected\. Order completed and moved to Order History\./);
+  assert.match(html,/Payment collected\. Order completed and moved to Order History\./);
 });
