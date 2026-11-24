@@ -1215,7 +1215,7 @@ html,body{background:var(--bg);overflow:hidden}
 <section id="ordersPage" class="page orders-page"><div class="orders-header"><div><h2>Online Orders</h2><p id="ordersMeta">Flame Chick website orders · awaiting Flame Chick order API</p></div><div class="orders-tools"><span class="inbox-live"><span class="mini-dot"></span><span id="inboxLiveText">Live</span></span><button class="btn" id="refreshInboxBtn" type="button">Refresh</button></div></div><div id="kanban" class="kanban"></div></section>
 </div>
 <div id="toast" class="toast"></div>
-<div id="queueModal" class="modal-wrap"><div class="modal"><h3>Local POS Orders</h3><p>Takeaway and dine-in counter orders stay on this device. Pending delivery orders can be sent to Online Orders from this queue or by using Sync Now. Use Backup in System &amp; Data to export local records.</p><div id="queueBody"></div><div class="modal-actions"><button class="btn" onclick="closeModal('queueModal')">Close</button></div></div></div>
+<div id="queueModal" class="modal-wrap"><div class="modal"><h3>Local POS Orders</h3><p>Delivery, Takeaway and Dine-in orders are saved in IndexedDB first, then synchronized to the Production database when internet and staff access are available. Orders needing review stay in this queue until corrected. Use Backup in System &amp; Data to export local records.</p><div id="queueBody"></div><div class="modal-actions"><button class="btn" onclick="closeModal('queueModal')">Close</button></div></div></div>
 <div id="historyModal" class="modal-wrap"><div class="modal history-modal">
   <div class="history-head"><div><h3>Order History</h3><p>POS sales and website orders in one searchable history.</p></div><button class="close-btn" type="button" onclick="closeModal('historyModal')" aria-label="Close order history">×</button></div>
   <div class="history-tabs" id="historyTabs">
@@ -3890,7 +3890,7 @@ async function updateSystemPanel(){
     $('pendingMenuChanges').textContent=0; $('queueCountText').textContent=q.length;
     const last=s?.value||''; $('lastSyncText').textContent=formatTime(last); $('syncDetailText').textContent=last?new Date(last).toLocaleDateString():'No sync yet';
     $('dbSizeText').textContent=(ord.length+menu.length+categories.length)+' records';
-    $('cloudMiniDot').className='mini-dot '+(navigator.onLine?'ok':'bad'); $('cloudStatusText').textContent=navigator.onLine?'Internet available · Online Orders will test the API':'Offline — local mode';
+    $('cloudMiniDot').className='mini-dot '+(navigator.onLine?'ok':'bad'); $('cloudStatusText').textContent=navigator.onLine?'Internet available · Production POS sync available':'Offline — local mode';
   }catch(e){console.debug('system panel update',e.message)}
   if(FLAME_CHICK_ORDER_API_READY){$('workerStatusText').textContent='Supabase API';$('workerDetailText').textContent=flameChickStaffSession?.access_token?'Staff session available · order board connected':'Staff sign-in required for order board';return}
   try{
