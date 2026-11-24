@@ -174,12 +174,33 @@ test("POS loads only the published V3 catalog contract and rejects legacy V2 cac
   assert.doesNotMatch(adapter,/schemaVersion\)!==2|LegacyProductID|LegacyVariantID/);
 });
 
-test("POS renders scheduled or branch-unavailable V3 deals as visible but disabled",()=>{
+test("POS enables published V3 deal choices through the current variant/component-group model",()=>{
   const html=source[0].html;
-  assert.match(html,/const orderable=false/);
-  assert.match(html,/Currently outside deal hours/);
-  assert.match(html,/deal-unavailable/);
-  assert.match(html,/d\.Active===true&&String\(d\.CategoryID\)===String\(g\.id\)/);
+  assert.match(html,/FlameChickCatalogV3DealView\.buildDealViewModel/);
+  assert.match(html,/componentGroups/);
+  assert.match(html,/dealVariantId/);
+  assert.doesNotMatch(html,/const orderable=false/);
+  assert.doesNotMatch(html,/catalogSnapshot\.dealComponents/);
+});
+
+test("POS uses one unified V3 sync path for Delivery, Takeaway and Dine-in",()=>{
+  const html=source[0].html;
+  assert.match(html,/\.\/sync-v3\.js/);
+  assert.match(html,/syncPendingUnifiedPosOrders/);
+  assert.match(html,/normalizeFulfillment\('Delivery'\)/);
+  assert.match(html,/prepareLocalPosSyncOrder/);
+  assert.match(html,/acknowledgementMatches/);
+  assert.match(html,/syncStatus='needs_review'/);
+  assert.match(html,/order\.serverOrderId/);
+  assert.doesNotMatch(html,/Takeaway and dine-in orders remain local/);
+});
+
+test("POS saves server payment collection only after cashier confirms a non-delivery receipt",()=>{
+  const html=source[0].html;
+  assert.match(html,/pendingPayment/);
+  assert.match(html,/requestId:crypto\.randomUUID\(\)/);
+  assert.match(html,/paymentStatus==='Paid'/);
+  assert.match(html,/await put\(STORES\.queue,current\)/);
 });
 
 test("POS never submits legacy V2 order payloads after loading the V3 catalog",()=>{
