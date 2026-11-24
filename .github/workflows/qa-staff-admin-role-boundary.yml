@@ -11,6 +11,11 @@ on:
       - "supabase/tests/flame_chick_operational_schema_v1.sql"
       - "supabase/tests/flame_chick_delivery_commands_v1.sql"
       - "supabase/tests/flame_chick_website_order_create_v1.sql"
+      - "supabase/tests/flame_chick_website_order_route_setup.sql"
+      - "supabase/tests/flame_chick_website_order_route_verify.sql"
+      - "supabase/tests/flame_chick_website_order_route_teardown_guard.sql"
+      - "supabase/functions/flame-chick-order-api/index_local_test.ts"
+      - "tests/fixtures/catalog-v3-fixture.cjs"
       - "supabase/tests/flame_chick_delivery_concurrency_setup.sql"
       - "supabase/tests/flame_chick_delivery_concurrency.sh"
       - ".github/workflows/qa-staff-admin-role-boundary.yml"
@@ -59,6 +64,12 @@ jobs:
           grep -q "payment race 6/6" supabase/tests/flame_chick_delivery_concurrency.sh
           grep -q "test.payment.race_delay" supabase/tests/flame_chick_delivery_concurrency_setup.sql
           test -s supabase/tests/flame_chick_website_order_create_v1.sql
+          test -s supabase/tests/flame_chick_website_order_route_setup.sql
+          test -s supabase/tests/flame_chick_website_order_route_verify.sql
+          test -s supabase/tests/flame_chick_website_order_route_teardown_guard.sql
+          test -s supabase/functions/flame-chick-order-api/index_local_test.ts
+          grep -q "handleOrderApiRequest" supabase/functions/flame-chick-order-api/index_local_test.ts
+          grep -q "WEBSITE_ORDER_ROUTE_VERIFY_FINANCIAL_OR_DELIVERY_STATE_INVALID" supabase/tests/flame_chick_website_order_route_verify.sql
           grep -q "WEBSITE_ONE_MINUTE_QUOTA_NOT_ENFORCED" supabase/tests/flame_chick_website_order_create_v1.sql
           grep -q "WEBSITE_TEN_MINUTE_QUOTA_NOT_ENFORCED" supabase/tests/flame_chick_website_order_create_v1.sql
           grep -q "WEBSITE_HOURLY_QUOTA_NOT_ENFORCED" supabase/tests/flame_chick_website_order_create_v1.sql
@@ -120,6 +131,42 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_delivery_concurrency_setup.sql
       - name: Exercise simultaneous accept, decline and expiry sessions
         run: bash supabase/tests/flame_chick_delivery_concurrency.sh
+      - name: Exercise actual Website Order API against disposable local PostgREST and PostgreSQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          db="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          snapshot_b64="$(node - <<'NODE'
+          const fixture = require("./tests/fixtures/catalog-v3-fixture.cjs");
+          const snapshot = fixture.createSnapshot();
+          snapshot.publicationNumber = 2;
+          snapshot.draftRevision = 92;
+          snapshot.pricingEngineVersion = "flame-chick-pricing-v1";
+          process.stdout.write(Buffer.from(JSON.stringify(snapshot), "utf8").toString("base64"));
+          NODE
+          )"
+          psql "$db" --set ON_ERROR_STOP=1 --set snapshot_b64="$snapshot_b64" --file supabase/tests/flame_chick_website_order_route_setup.sql
+
+          supabase status --env --output-format text > "$RUNNER_TEMP/flame-chick-local-supabase.env"
+          set -a
+          . "$RUNNER_TEMP/flame-chick-local-supabase.env"
+          set +a
+          test -n "${API_URL:-}"
+          test -n "${DB_URL:-}"
+          test -n "${PUBLISHABLE_KEY:-${ANON_KEY:-}}"
+          test -n "${SERVICE_ROLE_KEY:-}"
+
+          export SUPABASE_URL="$API_URL"
+          export SUPABASE_ANON_KEY="${ANON_KEY:-}"
+          export SUPABASE_PUBLISHABLE_KEYS="$(node -e 'const key=process.env.PUBLISHABLE_KEY || process.env.ANON_KEY; if (!key) process.exit(2); process.stdout.write(JSON.stringify({local:key}));')"
+          export SUPABASE_SECRET_KEYS="$(node -e 'const key=process.env.SERVICE_ROLE_KEY; if (!key) process.exit(2); process.stdout.write(JSON.stringify({default:key}));')"
+          export FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET="disposable-local-website-quote-hmac-secret-32-bytes-min"
+          export FLAME_CHICK_ORDER_PHONE_HMAC_SECRET="disposable-local-order-phone-hmac-secret-32-bytes-min"
+
+          deno test --allow-env --allow-read --allow-net=127.0.0.1,localhost --allow-run=psql supabase/functions/flame-chick-order-api/index_local_test.ts
+          psql "$DB_URL" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_website_order_route_verify.sql
+          psql "$DB_URL" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_website_order_route_teardown_guard.sql
+
       - name: Stop disposable Supabase stack
         if: always()
         run: supabase stop --no-backup
