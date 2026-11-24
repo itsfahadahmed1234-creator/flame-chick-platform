@@ -12,6 +12,14 @@ function isLoopbackHost(hostname) {
 export const PRODUCTION_STAFF_ADMIN_ORIGIN = "https://flamechicadmin.vercel.app";
 
 /**
+ * Exact current Admin preview hosts only. Do not wildcard Vercel domains.
+ */
+export const PREVIEW_STAFF_ADMIN_ORIGINS = Object.freeze([
+  "https://flame-chick-admin-production-fxdrq9od9-fahad-7455.vercel.app",
+  "https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app"
+]);
+
+/**
  * Always include the verified production Admin origin. Keep any explicitly
  * configured exact origins for controlled environments, but never use wildcards.
  */

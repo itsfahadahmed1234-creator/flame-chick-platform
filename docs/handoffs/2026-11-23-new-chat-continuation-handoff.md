@@ -2206,3 +2206,6 @@ The disposable behavioral workflow passed before the final migration filename wa
 - Vercel project SSO protection remains enabled for non-custom aliases, but browser context reached the page; the verified immediate blocker is Supabase exact-origin CORS.
 - Source update pins exactly two Admin preview origins: immutable preview `https://flame-chick-admin-production-fxdrq9od9-fahad-7455.vercel.app` and branch alias `https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app`. No wildcard is added and other preview apps/subdomains remain blocked. Regression tests check exact matching.
 - **Not yet deployed:** wait for Admin static checks on exact source commit, then deploy all three Staff Admin Edge Function files from that branch. Refresh Admin preview and confirm `OPTIONS` becomes 200 and Staff Admin context loads. Do not change production Admin domain or auth accounts.
+
+
+- CI caught a source-edit omission before deployment: `parseStaffAdminOrigins` referenced the pinned preview list before its export was present. The failing Admin Static Checks run was inspected; failure was a module import error, not a runtime or permission issue. Added the missing explicit export. No Supabase function was deployed from the failing commit.
