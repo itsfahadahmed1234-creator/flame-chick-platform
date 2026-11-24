@@ -127,10 +127,6 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_delivery_commands_v1.sql
       - name: Exercise V3 website order creation, idempotency and phone quotas
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_website_order_create_v1.sql
-      - name: Prepare committed fixtures for parallel delivery race tests
-        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_delivery_concurrency_setup.sql
-      - name: Exercise simultaneous accept, decline and expiry sessions
-        run: bash supabase/tests/flame_chick_delivery_concurrency.sh
       - name: Exercise actual Website Order API against disposable local PostgREST and PostgreSQL
         shell: bash
         run: |
@@ -167,6 +163,10 @@ jobs:
           psql "$DB_URL" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_website_order_route_verify.sql
           psql "$DB_URL" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_website_order_route_teardown_guard.sql
 
+      - name: Prepare committed fixtures for parallel delivery race tests
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_delivery_concurrency_setup.sql
+      - name: Exercise simultaneous accept, decline and expiry sessions
+        run: bash supabase/tests/flame_chick_delivery_concurrency.sh
       - name: Stop disposable Supabase stack
         if: always()
         run: supabase stop --no-backup
