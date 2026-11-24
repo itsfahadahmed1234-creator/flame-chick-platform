@@ -9,6 +9,7 @@ on:
       - "supabase/tests/batch4_staff_admin_role_boundary.sql"
       - "supabase/tests/batch4_staff_admin_security.sql"
       - "supabase/tests/flame_chick_operational_schema_v1.sql"
+      - "supabase/tests/flame_chick_pos_order_sync_v1.sql"
       - "supabase/tests/flame_chick_delivery_commands_v1.sql"
       - "supabase/tests/flame_chick_website_order_create_v1.sql"
       - "supabase/tests/flame_chick_website_order_route_setup.sql"
@@ -128,6 +129,8 @@ jobs:
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_operational_schema_v1.sql
       - name: Exercise delivery offer, pickup, delivery and physical return commands
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_delivery_commands_v1.sql
+      - name: Exercise unified POS sync for Dine-in, Takeaway, Delivery and payment idempotency
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_pos_order_sync_v1.sql
       - name: Exercise V3 website order creation, idempotency and phone quotas
         run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 --file supabase/tests/flame_chick_website_order_create_v1.sql
       - name: Set up Deno for local Website Order API integration
