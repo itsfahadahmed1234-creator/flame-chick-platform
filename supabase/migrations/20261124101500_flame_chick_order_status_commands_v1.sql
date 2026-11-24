@@ -63,6 +63,7 @@ DECLARE
   v_now timestamptz:=pg_catalog.transaction_timestamp();
   v_fingerprint text;
   v_action text:='order_status_updated';
+  v_previous_status text;
 BEGIN
   IF p_payload IS NULL OR pg_catalog.jsonb_typeof(p_payload)<>'object' THEN
     RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
@@ -154,8 +155,8 @@ BEGIN
   WHERE h.order_id=v_order_id AND h.request_id=v_request_id
   LIMIT 1;
   IF FOUND THEN
-    IF h.action IS DISTINCT FROM v_action
-       OR h.metadata->>'request_fingerprint' IS DISTINCT FROM v_fingerprint THEN
+    IF v_history.action IS DISTINCT FROM v_action
+       OR v_history.metadata->>'request_fingerprint' IS DISTINCT FROM v_fingerprint THEN
       RETURN pg_catalog.jsonb_build_object('ok',false,'error',pg_catalog.jsonb_build_object(
         'code','ORDER_STATUS_IDEMPOTENCY_CONFLICT','message','This status request ID was already used with different details.'));
     END IF;
@@ -165,6 +166,8 @@ BEGIN
       'updated_at',v_order.updated_at,'request_id',v_request_id
     );
   END IF;
+
+  v_previous_status:=v_order.status;
 
   IF v_order.status=v_target THEN
     RETURN pg_catalog.jsonb_build_object(
@@ -262,8 +265,7 @@ BEGIN
     actor_user_id,actor_type,actor_role,reason_code,reason,metadata,request_id,changed_at
   ) VALUES(
     v_order.restaurant_id,v_order.branch_id,v_order.id,
-    (SELECT h.to_status FROM public.order_status_history h
-      WHERE h.order_id=v_order.id ORDER BY h.changed_at DESC LIMIT 1),
+    v_previous_status,
     v_target,v_action,v_actor_id,'staff',v_role,
     'ORDER_STATUS_'||pg_catalog.upper(v_target),v_reason,
     pg_catalog.jsonb_build_object(
@@ -275,7 +277,7 @@ BEGIN
   RETURN pg_catalog.jsonb_build_object(
     'ok',true,'already_processed',false,'order_id',v_order.id,
     'order_number',v_order.order_number,'status',v_order.status,
-    'updated_at',v_order.updated_at,'from_status',v_target,
+    'updated_at',v_order.updated_at,'from_status',v_previous_status,
     'to_status',v_order.status,'request_id',v_request_id,'actor_role',v_role
   );
 END;
