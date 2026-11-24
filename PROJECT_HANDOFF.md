@@ -4774,3 +4774,12 @@ The disposable behavioral workflow passed before the final migration filename wa
 - No business migration applied during CORS recovery. Production role query was read-only. The edge function update was source-tested before deployment.
 
 **Next:** sign in on canonical Admin domain, verify Staff & Riders page and Staff Admin calls; then sign in on canonical POS domain using the existing Admin account. Only create other staff after their real work emails are confirmed; provision Rider profile as a separate step. Then complete the labelled full manual rehearsal before real operations.
+
+
+## 2026-11-24 — Password recovery guidance (no password reset performed)
+
+- The Rider app contains a public `Set / reset password` action and handles Supabase Auth `recovery` callbacks. After password update, it reads the user's active Flame Chick staff roles: Rider continues into Rider profile; Admin/Owner/Manager/Cashier is explicitly signed out of the Rider app and told to use the POS portal. This makes the Rider reset route a shared staff-password recovery route, not permission to use Rider as an Admin.
+- If the existing Admin password is forgotten, open canonical Rider domain `https://flamechickrider.vercel.app`, enter the existing Admin account email, select `Set / reset password`, follow the newest recovery email on the same device, and save a new password of at least 8 characters. Then sign in to canonical Admin `https://flamechicadmin.vercel.app` and POS `https://flamechickpos.vercel.app` with that same account/email and new password. The recovery route validates the actual role and will not grant Rider access to an Admin account.
+- No recovery email was requested or sent by the assistant; no password was changed. Avoid creating duplicate Auth users or granting Rider role to Admin.
+- Earlier Auth logs showed successful Admin password login at 11:27–11:28Z, but that does not prove the user still remembers the password now. The subsequent Admin browser blocker was CORS and has been fixed in Staff Admin Edge Function v3. POS's previously displayed invalid-credentials error may be a mistyped password; re-test after recovery if needed.
+- Production currently has one Admin role assignment, zero separate Rider role assignments, and zero active Rider profiles. Rider portal sign-in requires a separate real Rider account with active branch-scoped role plus rider profile.
