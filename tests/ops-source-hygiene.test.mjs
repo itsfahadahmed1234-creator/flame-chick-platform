@@ -281,3 +281,28 @@ test("POS renders required Burger component slots as selectable dropdowns and pr
   assert.match(html,/productVariantId:option\.productVariantId/);
   assert.match(html,/group\.allowRepeatOption/);
 });
+
+
+test("POS deal Burger selectors stay collapsed until Edit and summarize selected burger slots",()=>{
+  const html=source[0].html;
+  assert.match(html,/<details class="pos-deal-burger-picker"/);
+  assert.match(html,/pos-deal-burger-summary-copy/);
+  assert.match(html,/selectedNames\\.join\\(' \\+ '\\)/);
+  assert.match(html,/st\\.expandedBurgerGroupId/);
+  assert.match(html,/st\\.burgerSlots\\[group\\.id\\]/);
+  assert.match(html,/data-pos-deal-burger-select/);
+  assert.match(html,/group\\.allowRepeatOption/);
+});
+
+test("Website deal configurator uses a compact expandable Burger picker with slot-specific choices",async()=>{
+  const configurator=await readFile(new URL("../apps/flame-chick-website/js/catalog-v3-deal-configurator.js",import.meta.url),"utf8");
+  const page=await readFile(new URL("../apps/flame-chick-website/index.html",import.meta.url),"utf8");
+  assert.match(configurator,/fc-deal-burger-picker/);
+  assert.match(configurator,/burgerSlotValues/);
+  assert.match(configurator,/Burger ' \\+ \\(slot \\+ 1\\)/);
+  assert.match(configurator,/setOptionQuantity\\(group\\.id, option\\.id, targetQuantity\\)/);
+  assert.match(configurator,/group\\.allowRepeatOption/);
+  assert.match(configurator,/expandedBurgerGroupId/);
+  assert.match(page,/\\.fc-deal-burger-picker\\[open\\]/);
+  assert.match(page,/@media\\(max-width:520px\\)\\{\\.fc-deal-burger-slots\\{grid-template-columns:1fr\\}/);
+});
