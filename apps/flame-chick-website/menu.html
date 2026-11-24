@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#941a20">
+  <title>Flame Chick — Published Menu</title>
+  <meta name="description" content="Browse the current checksum-verified Flame Chick published menu, products, variants and deals.">
+  <link rel="canonical" href="https://flamechick.vercel.app/menu.html">
+  <link rel="icon" href="assets/flame-chick-logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/catalog-preview.css">
+  <style>
+    .public-menu-note{margin:14px 0;padding:13px 15px;border:1px solid #ead8ba;border-radius:12px;background:#fffaf0;color:#634b21;font-size:13px;line-height:1.5}
+    .public-menu-meta{display:flex;flex-wrap:wrap;gap:9px 18px;margin-top:12px;color:var(--muted);font-size:12px}
+    .public-menu-meta strong{color:var(--ink)}
+    .public-menu-section{margin-top:22px;padding:22px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:var(--shadow)}
+    .public-menu-section h2{margin:0 0 14px}
+    .public-deal-collection{margin:16px 0 22px}
+    .public-deal-collection-title{margin:0 0 10px;font-size:17px}
+    .public-deal-card{margin:10px 0;padding:16px;border:1px solid var(--line);border-radius:13px;background:#fff}
+    .public-deal-title{margin:0 0 5px;font-size:16px}
+    .public-deal-description,.public-deal-note{margin:5px 0;color:var(--muted);font-size:12px;line-height:1.5}
+    .public-deal-variant{margin-top:12px;padding:12px;border-radius:10px;background:#faf7f4}
+    .public-deal-variant-heading{font-size:13px;font-weight:900}
+    .public-deal-group{margin-top:10px}
+    .public-deal-group-title{font-size:12px}
+    .public-deal-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:4px 14px;margin:7px 0 0;padding-left:19px;font-size:12px}
+    .fc-menu-ordering-disabled,.fc-menu-customization-pending{display:none!important}
+    #product-category-nav:empty{display:none}
+    .menu-footer-link{display:inline-flex;margin-top:14px}
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Flame Chick home">
+      <img src="assets/flame-chick-logo.svg" alt="Flame Chick" width="210" height="50">
+    </a>
+    <a class="button button-secondary" href="index.html">Home</a>
+  </header>
+
+  <main class="page-shell">
+    <section class="preview-intro" aria-labelledby="menu-title">
+      <p class="eyebrow">Flame Chick · Current published catalog</p>
+      <h1 id="menu-title">Our Menu</h1>
+      <p class="intro-copy">Explore the current Flame Chick products, available sizes and published deals.</p>
+      <div class="public-menu-note" role="note">
+        This page is a live, read-only menu. Online checkout is not enabled yet. Product prices and availability are shown from the published catalog; orders are not submitted from this page.
+      </div>
+    </section>
+
+    <section class="load-panel" aria-labelledby="status-heading">
+      <div class="section-heading">
+        <div><p class="eyebrow">Live menu connection</p><h2 id="status-heading">Published catalog status</h2></div>
+        <span id="menu-status-pill" class="status-pill status-pending">Not loaded</span>
+      </div>
+      <p id="menu-status" class="status-message" role="status" aria-live="polite">Verifying the current published menu…</p>
+      <div class="public-menu-meta">
+        <span>Publication <strong id="publication-number">—</strong></span>
+        <span>Published <strong id="publication-date">—</strong></span>
+      </div>
+      <div class="context-panel" style="margin-top:14px">
+        <div class="section-heading"><h2>Branch</h2><span id="selected-branch-label">—</span></div>
+        <label for="branch-select">Choose branch</label>
+        <select id="branch-select" aria-label="Choose branch" hidden></select>
+        <p id="selected-branch-name" class="order-hint"></p>
+      </div>
+      <button id="reload-menu" class="button button-secondary" type="button" onclick="window.FlameChickPublicMenuV3.load()">Reload menu</button>
+    </section>
+
+    <div id="menu-content" hidden>
+      <section class="public-menu-section" aria-labelledby="products-heading">
+        <div class="section-heading">
+          <div><p class="eyebrow">Published products</p><h2 id="products-heading">Food &amp; Drinks</h2></div>
+          <span id="product-count" class="status-pill status-ready">0</span>
+        </div>
+        <p class="order-hint"><span id="category-count">0</span> menu categories · Select a size to see its published price.</p>
+        <nav id="product-category-nav" class="category-nav" aria-label="Menu categories"></nav>
+        <div id="product-catalog"></div>
+        <div id="products-empty" class="empty-state" hidden>No products are currently listed for this branch.</div>
+      </section>
+
+      <section class="public-menu-section" aria-labelledby="deals-heading">
+        <div class="section-heading">
+          <div><p class="eyebrow">Published offers</p><h2 id="deals-heading">Deals &amp; Combos</h2></div>
+          <span id="deal-count" class="status-pill status-ready">0</span>
+        </div>
+        <p class="order-hint">Deal variants, component choices and pricing treatments are shown from the current published menu. Final deal pricing is verified by the server when ordering is enabled.</p>
+        <div id="deal-catalog"></div>
+        <div id="deals-empty" class="empty-state" hidden>No deals are currently listed for this branch.</div>
+      </section>
+    </div>
+
+    <footer class="page-footer">
+      <span>Flame Chick · Published menu</span>
+      <a href="index.html">Return to Flame Chick home</a>
+    </footer>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/catalog-v3.js"></script>
+  <script src="js/catalog-v3-client.js"></script>
+  <script src="js/catalog-v3-view.js"></script>
+  <script src="js/catalog-v3-deal-view.js"></script>
+  <script src="js/public-menu-v3.js"></script>
+</body>
+</html>
