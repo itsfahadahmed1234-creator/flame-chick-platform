@@ -9,6 +9,19 @@ function isLoopbackHost(hostname) {
  * Production entries must be HTTPS origins with no path, query, fragment or credentials.
  * HTTP is accepted only for explicitly named loopback development origins.
  */
+export const PRODUCTION_STAFF_ADMIN_ORIGIN = "https://flamechicadmin.vercel.app";
+
+/**
+ * Always include the verified production Admin origin. Keep any explicitly
+ * configured exact origins for controlled environments, but never use wildcards.
+ */
+export function parseStaffAdminOrigins(raw) {
+  const configured = typeof raw === "string" ? raw.trim() : "";
+  return parseAllowedOrigins(
+    [configured, PRODUCTION_STAFF_ADMIN_ORIGIN].filter(Boolean).join(",")
+  );
+}
+
 export function parseAllowedOrigins(raw) {
   if (typeof raw !== "string" || raw.trim() === "") {
     throw new TypeError("Staff Admin allowed-origin list is empty.");
