@@ -9,6 +9,10 @@ on:
       - "apps/flame-chick-rider/**"
       - "tests/ops-source-hygiene.test.mjs"
       - "tests/pos-payment-collection.test.mjs"
+      - "tests/pos-catalog-v3-adapter.test.mjs"
+      - "tests/fixtures/catalog-v3-fixture.cjs"
+      - "apps/flame-chick-website/js/catalog-v3.js"
+      - "apps/flame-chick-website/js/catalog-v3-deal-view.js"
       - ".github/workflows/ci-ops-static.yml"
 
 permissions:
@@ -30,4 +34,4 @@ jobs:
           node-version: "22"
 
       - name: Check POS and Rider source
-        run: node --test tests/ops-source-hygiene.test.mjs tests/pos-payment-collection.test.mjs
+        run: node --test tests/ops-source-hygiene.test.mjs tests/pos-payment-collection.test.mjs tests/pos-catalog-v3-adapter.test.mjs
