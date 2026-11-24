@@ -202,8 +202,8 @@ test("Order API exposes payment collection only to authenticated POS staff and d
 test("Rider Web Push stays disabled until encrypted storage and trusted RPCs are implemented", () => {
   const source=sources["flame-chick-delivery-api"];
   assert.match(source,/PUSH_NOT_CONFIGURED/);
-  assert.doesNotMatch(source,/@negrel\\/webpush|ApplicationServer|flame_chick_get_rider_push_config|flame_chick_verify_delivery_push_webhook/);
-  assert.doesNotMatch(source,/endpoint,p256dh,auth|endpoint:sub\\.endpoint|p256dh:sub\\.p256dh|auth:sub\\.auth/);
+  assert.doesNotMatch(source,/@negrel.*webpush|ApplicationServer|flame_chick_get_rider_push_config|flame_chick_verify_delivery_push_webhook/);
+  assert.doesNotMatch(source,/endpoint,p256dh,auth|endpoint:sub\.endpoint|p256dh:sub\.p256dh|auth:sub\.auth/);
 });
 
 test("Payment collection database command is row-locked, idempotent, branch-authorized and service-role-only", () => {
