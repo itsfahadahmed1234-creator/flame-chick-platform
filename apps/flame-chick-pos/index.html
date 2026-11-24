@@ -2762,8 +2762,8 @@ function renderDealCard(deal){
     else src='https://adkrxfnawdiljhjaavnj.supabase.co/storage/v1/object/public/flame-chick-media/'+imagePath.split('/').map(encodeURIComponent).join('/');
   }
   const art=src?'<div class="item-thumb"><img src="'+esc(src)+'" alt="'+esc(deal.Title||'Deal')+'" loading="lazy" decoding="async" onerror="this.parentElement.classList.add(String.fromCharCode(110,111,45,112,104,111,116,111));this.remove()"></div>':'<div class="item-thumb no-photo"><span>🎁</span></div>';
-  const orderable=false;
-  const status=deal.Available===true?'Deal selection is being connected to V3':'Currently outside deal hours or unavailable at this branch';
+  const orderable=deal.Available===true&&deal.available===true;
+  const status=orderable?'Choose the included items for this published deal':'Currently outside deal hours or unavailable at this branch';
   return '<article class="item product-card '+(orderable?'':'deal-unavailable')+'"><div class="product-card-main">'+art+'<div class="product-card-copy"><h3>'+esc(deal.Title||'Deal')+'</h3><p>'+esc(deal.Description||status)+'</p></div></div><div class="row"><span class="price">'+(Number.isFinite(Number(deal.BundlePrice))?'Rs. '+money(deal.BundlePrice):'Price unavailable')+'</span><button class="add" type="button" data-pos-deal="'+esc(deal.DealID)+'" '+(orderable?'':'disabled title="'+esc(status)+'"')+'>'+(orderable?'Choose Deal':esc(status))+'</button></div></article>';
 }
 function setupCategoryObserver(){if(window._categoryObserver){window._categoryObserver.disconnect();window._categoryObserver=null;}}
