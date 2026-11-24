@@ -52,6 +52,15 @@
       Active: true
     }));
     const categoryIds = new Set(categories.map(row => row.ID));
+    const subcategories = snapshot.subcategories.map(row => ({
+      SubcategoryID: String(row.subcategoryId),
+      CategoryID: String(row.categoryId),
+      Name: String(row.nameEn || ''),
+      NameEn: String(row.nameEn || ''),
+      NameUr: String(row.nameUr || ''),
+      SortOrder: Number(row.sortOrder) || 0,
+      Active: true
+    }));
     const productById = new Map(snapshot.products.map(row => [String(row.productId), row]));
     const menu = [];
     const variantById = new Map();
@@ -74,7 +83,8 @@
         SubcategoryID: product.subcategoryId ? String(product.subcategoryId) : '',
         Name: String(product.nameEn || ''),
         NameUr: String(product.nameUr || ''),
-        Description: String(variant.sizeLabel || ''),
+        Description: String(variant.sizeLabel || product.descriptionEn || ''),
+        DescriptionUr: String(product.descriptionUr || ''),
         Price: price,
         SizeKey: String(variant.sizeKey || ''),
         Available: true,
@@ -103,22 +113,29 @@
     const deals = [];
     for (const collection of dealResult.collections || []) {
       for (const deal of collection.deals || []) {
-        if (deal.available !== true) continue;
-        const usableVariants = (deal.variants || []).filter(row => row.branchSatisfiable === true &&
+        const pricedVariants = (deal.variants || []).filter(row =>
           Number.isSafeInteger(row.basePriceMinor) && row.basePriceMinor >= 0);
-        if (!usableVariants.length) continue;
+        const displayVariants = pricedVariants.length ? pricedVariants : (deal.variants || []);
         deals.push({
           DealID: String(deal.id),
+          DealCollectionID: String(collection.id),
           CategoryID: String(collection.categoryId || ''),
           Title: String(deal.title || ''),
+          TitleUr: String(deal.titleUr || ''),
           Description: String(deal.description || ''),
+          DescriptionUr: String(deal.descriptionUr || ''),
           ImagePath: deal.imagePath || '',
-          Available: true,
+          Available: deal.available === true,
+          BranchAvailable: deal.branchAvailable === true,
+          ScheduleAvailable: deal.scheduleAvailable === true,
+          ScheduleSource: String(deal.scheduleSource || 'unknown'),
           Active: true,
-          BundlePrice: Math.min(...usableVariants.map(row => row.basePriceMinor)) / 100,
+          BundlePrice: displayVariants.length
+            ? Math.min(...displayVariants.map(row => row.basePriceMinor).filter(Number.isSafeInteger)) / 100
+            : null,
           SchemaVersion: 3,
           CatalogPublicationId: snapshot.publicationId,
-          variants: usableVariants,
+          variants: displayVariants,
           model: deal
         });
       }
@@ -146,7 +163,9 @@
       databaseNow,
       branchId: branch.branchId,
       branchName: branch.name || '',
+      currencyCode: snapshot.settings.currency_code,
       categories,
+      subcategories,
       menu,
       deliveryAreas,
       deals,
@@ -170,7 +189,7 @@
         ModifierID: String(modifier.id),
         NameEn: String(modifier.name || ''),
         NameUr: String(modifier.nameUr || ''),
-        PriceMode: 'FIXED',
+        PriceMode: 'RESOLVED',
         FixedPrice: modifier.priceMinor / 100,
         PriceMinor: modifier.priceMinor
       }))
