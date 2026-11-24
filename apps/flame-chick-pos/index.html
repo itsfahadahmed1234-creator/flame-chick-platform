@@ -2025,6 +2025,7 @@ async function updateOnlineOrderStatus(orderId,status){
   const previousUpdatedAt=order.UpdatedAt||'';
   const mutation={
     token:String(Date.now())+'-'+Math.random().toString(36).slice(2,8),
+    requestId:crypto.randomUUID(),
     targetLabel:status,
     optimisticUpdatedAt:new Date().toISOString(),
     previousStatus,
@@ -2041,7 +2042,7 @@ async function updateOnlineOrderStatus(orderId,status){
   try{
     const result=await flameChickOrderRequest('POST',null,{
       action:status==='Cancelled'?'cancel':status==='Rejected'?'reject':'update_status',
-      order_id:key,to_status:toStatus,reason
+      order_id:key,to_status:toStatus,reason,request_id:mutation.requestId
     });
     if(result?.ok!==true||!result?.status)throw new Error('The database did not confirm the saved order status.');
     const liveOrder=inboxOrders.get(key)||order;
