@@ -219,7 +219,8 @@ Deno.test("actual Website Order API issues, validates and replays signed quotes"
   }
 });
 
-Deno.test("authenticated POS sync prices from V3 and derives actor and branch from staff context", async () => {
+Deno.test("authenticated POS sync prices from V3, derives trusted identity and fingerprints changed revisions", async () => {
+  const posSyncPayloads: Record<string, any>[] = [];
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const rawUrl = input instanceof Request ? input.url : String(input);
     const url = new URL(rawUrl);
@@ -245,6 +246,7 @@ Deno.test("authenticated POS sync prices from V3 and derives actor and branch fr
     }
     if (pathName.endsWith("/rpc/flame_chick_sync_pos_order")) {
       const payload = JSON.parse(String(init?.body || "{}")).p_payload;
+      posSyncPayloads.push(payload);
       if (payload.source!=="pos" || payload.actor_user_id!=="aa000000-0000-4000-8000-000000000001" ||
           payload.branch_id!==branchId || payload.fulfillment_type!=="pickup" ||
           payload.payment_method_summary!==null || payload.total!==payload.subtotal ||
@@ -278,20 +280,38 @@ Deno.test("authenticated POS sync prices from V3 and derives actor and branch fr
       subtotal:0.01,total:0.01,branch_id:"aa000000-0000-4000-8000-000000000099",
       actor_user_id:"aa000000-0000-4000-8000-000000000098"
     };
-    const request = new Request("https://flame-chick-disposable.supabase.co/functions/v1/flame-chick-order-api",{
-      method:"POST",
-      headers:{...headers,authorization:"Bearer synthetic-staff-token"},
-      body:JSON.stringify(body)
-    });
-    const result = await handleOrderApiRequest(request);
-    const responseBody = await result.json() as Record<string,any>;
-    if (result.status!==201 || responseBody.ok!==true ||
-        responseBody.order_id!=="99000000-0000-4000-8000-000000000099" ||
-        responseBody.presentation.subtotal!==Number(standaloneVariant.price) ||
-        responseBody.total!==Number(standaloneVariant.price)) {
-      throw new Error("Authenticated V3 POS sync failed or trusted browser totals: "+JSON.stringify({status:result.status,body:responseBody}));
+    async function invokePos(requestBody: Record<string, unknown>) {
+      const request = new Request("https://flame-chick-disposable.supabase.co/functions/v1/flame-chick-order-api",{
+        method:"POST",
+        headers:{...headers,authorization:"Bearer synthetic-staff-token"},
+        body:JSON.stringify(requestBody)
+      });
+      const response = await handleOrderApiRequest(request);
+      return {status:response.status,body:await response.json() as Record<string,any>};
     }
-    console.log("Authenticated POS sync: staff auth, server branch, V3 price and unpaid order state passed.");
+    const first = await invokePos(body);
+    if (first.status!==201 || first.body.ok!==true ||
+        first.body.order_id!=="99000000-0000-4000-8000-000000000099" ||
+        first.body.presentation.subtotal!==Number(standaloneVariant.price) ||
+        first.body.total!==Number(standaloneVariant.price)) {
+      throw new Error("Authenticated V3 POS sync failed or trusted browser totals: "+JSON.stringify(first));
+    }
+
+    const exactRetry = await invokePos(body);
+    if (exactRetry.status!==201 || exactRetry.body.ok!==true || posSyncPayloads.length!==2 ||
+        posSyncPayloads[0].request_hash!==posSyncPayloads[1].request_hash) {
+      throw new Error("An identical POS retry did not produce the same canonical request fingerprint.");
+    }
+
+    const changedSameRevision = await invokePos({...body,notes:"changed payload at the same local revision"});
+    if (changedSameRevision.status!==201 || changedSameRevision.body.ok!==true || posSyncPayloads.length!==3 ||
+        posSyncPayloads[2].local_order_id!==posSyncPayloads[0].local_order_id ||
+        posSyncPayloads[2].local_revision!==posSyncPayloads[0].local_revision ||
+        posSyncPayloads[2].request_hash===posSyncPayloads[0].request_hash) {
+      throw new Error("A changed POS payload at the same revision did not receive a different canonical fingerprint.");
+    }
+
+    console.log("Authenticated POS sync: staff auth, trusted branch, V3 price, exact-retry fingerprint stability and changed-payload fingerprint conflict passed.");
   } finally {
     globalThis.fetch=originalFetch;
   }
