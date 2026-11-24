@@ -228,12 +228,14 @@
     var context = currentContext();
     if (!context || !state.snapshot) {
       $('catalog-section').hidden = true;
+      $('cats').hidden = true;
       $('deals-section').hidden = true;
       $('details-section').hidden = true;
       $('catalog-context-label').textContent = 'Select a supported branch and order type to see the menu.';
       return;
     }
     $('catalog-section').hidden = false;
+    $('cats').hidden = false;
     $('deals-section').hidden = false;
     $('details-section').hidden = false;
     var live = liveBranch();
@@ -269,13 +271,78 @@
     renderDeals(deals);
   }
 
+  function productArtworkSource(product, categoryName) {
+    if (product && typeof product.imagePath === 'string' && product.imagePath) {
+      if (/^https:\/\//i.test(product.imagePath)) return product.imagePath;
+      var base = String((root.FLAME_CHICK_CONFIG || {}).imagesBaseUrl || '').replace(/\/$/, '');
+      if (base) return base + '/' + product.imagePath.split('/').filter(Boolean).map(encodeURIComponent).join('/');
+    }
+    var name = String(product && product.name || '').toLowerCase();
+    var category = String(categoryName || '').toLowerCase();
+    var files = [
+      [/fresh mint/, 'fresh-mint.png'],
+      [/strawberry blaze/, 'strawberry-blaze.png'],
+      [/peach kick/, 'peach-kick.png'],
+      [/berry burst/, 'berry-burst.png'],
+      [/blue flame/, 'blue-flame.png'],
+      [/fire wings|injected wings|wings/, 'fire-wings.png'],
+      [/wrap/, 'flame-chick-wrap.png'],
+      [/broast|simple injected|cheetos butter/, 'chicken-broast.webp'],
+      [/og crunch/, 'flame-chick-burger.png'],
+      [/injector|nashville fire|smash|marrow|burger|chick special/, 'flame-chick-burger-2.png'],
+      [/classic chick/, 'flame-chick.png']
+    ];
+    for (var i = 0; i < files.length; i++) {
+      if (files[i][0].test(name) || (i === 7 && category.indexOf('broast') >= 0)) {
+        return 'media/products/' + files[i][1];
+      }
+    }
+    return '';
+  }
+
+  function appendProductArtwork(target, product, categoryName) {
+    var source = productArtworkSource(product, categoryName);
+    if (source) {
+      var image = document.createElement('img');
+      image.src = source;
+      image.alt = product.name;
+      image.width = 320; image.height = 320; image.loading = 'lazy';
+      target.appendChild(image);
+      return;
+    }
+    var name = String(product.name || '').toLowerCase();
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 96 96');
+    svg.setAttribute('aria-hidden', 'true');
+    var art = '';
+    if (/nugget/.test(name)) {
+      art = '<g fill="#F4B53F" stroke="#C9811C" stroke-width="2"><rect x="12" y="38" width="32" height="27" rx="12" transform="rotate(-14 28 51)"/><rect x="48" y="28" width="32" height="27" rx="12" transform="rotate(12 64 41)"/><rect x="32" y="54" width="34" height="27" rx="12" transform="rotate(-4 49 67)"/></g><g fill="#C9811C" opacity=".55"><circle cx="22" cy="48" r="2"/><circle cx="35" cy="57" r="2"/><circle cx="58" cy="38" r="2"/><circle cx="69" cy="45" r="2"/><circle cx="45" cy="69" r="2"/></g>';
+    } else if (/fries/.test(name)) {
+      art = '<path d="M19 42h58l-7 43H27z" fill="#B91E27"/><g fill="#F7C34D"><rect x="26" y="16" width="9" height="45" rx="4" transform="rotate(-9 26 16)"/><rect x="40" y="10" width="9" height="48" rx="4"/><rect x="54" y="14" width="9" height="46" rx="4" transform="rotate(7 54 14)"/><rect x="68" y="23" width="8" height="38" rx="4" transform="rotate(12 68 23)"/></g>';
+    } else if (/water/.test(name)) {
+      art = '<rect x="38" y="8" width="20" height="10" rx="3" fill="#2C8FD6"/><path d="M36 20h24l5 12v50a6 6 0 0 1-6 6H37a6 6 0 0 1-6-6V32z" fill="#DDF3FF" stroke="#fff" stroke-width="2"/><rect x="32" y="46" width="32" height="22" fill="#2C8FD6"/><path d="M40 57h16" stroke="#fff" stroke-width="3" stroke-linecap="round"/>';
+    } else if (/drink|juice|cold/.test(name)) {
+      art = '<path d="M26 32h44l-6 50H32z" fill="#DB382A"/><rect x="22" y="26" width="52" height="9" rx="4.5" fill="#fff"/><path d="M57 26L65 7" stroke="#7A0A0F" stroke-width="5" stroke-linecap="round"/><g fill="#fff" opacity=".55"><rect x="36" y="41" width="9" height="9" rx="2"/><rect x="51" y="57" width="9" height="9" rx="2"/></g>';
+    } else {
+      art = '<path d="M16 44C16 26 32 15 48 15s32 11 32 29z" fill="#E8A33D"/><path d="M13 48q8-9 16 0t16 0 16 0 16 0v7H13z" fill="#69C23A"/><rect x="14" y="55" width="68" height="12" rx="6" fill="#D98A1C"/><path d="M16 69h64v5a9 9 0 0 1-9 9H25a9 9 0 0 1-9-9z" fill="#E0902F"/>';
+    }
+    svg.innerHTML = art;
+    target.appendChild(svg);
+  }
+
+  function cardPrice(minor) {
+    return 'Rs ' + (Number(minor || 0) / 100).toLocaleString('en-PK', {
+      minimumFractionDigits: 0, maximumFractionDigits: 2
+    });
+  }
+
   function renderProducts(model) {
-    var nav = $('product-category-nav'), rootNode = $('product-catalog');
+    var nav = $('catsIn'), rootNode = $('menuRoot');
     nav.replaceChildren(); rootNode.replaceChildren();
     $('products-empty').hidden = model.categories.length > 0;
     model.categories.forEach(function (category) {
       var jump = document.createElement('button');
-      jump.type = 'button'; jump.className = 'fc-menu-category-link'; jump.textContent = category.name;
+      jump.type = 'button'; jump.className = 'chip'; jump.textContent = category.name;
       jump.addEventListener('click', function () {
         var target = document.getElementById('fc-order-category-' + category.id);
         if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -283,45 +350,89 @@
       nav.appendChild(jump);
 
       var section = document.createElement('section');
-      section.className = 'fc-menu-category';
+      section.className = 'cat';
       section.id = 'fc-order-category-' + category.id;
-      var heading = document.createElement('h3');
-      heading.className = 'fc-menu-category-title'; heading.textContent = category.name;
+      var heading = document.createElement('div'); heading.className = 'cat-head';
+      var headingText = document.createElement('h3'); headingText.className = 'cat-pill';
+      headingText.textContent = category.name;
+      var line = document.createElement('span'); line.className = 'cat-line'; line.setAttribute('aria-hidden', 'true');
+      heading.append(headingText, line);
       section.appendChild(heading);
-      var grid = document.createElement('div'); grid.className = 'fc-menu-product-grid';
+
+      var grid = document.createElement('div'); grid.className = 'items';
       category.products.forEach(function (product) {
         var card = document.createElement('article');
-        card.className = 'fc-menu-product';
-        var title = document.createElement('h4'); title.className = 'fc-menu-product-name'; title.textContent = product.name;
-        var description = document.createElement('p'); description.className = 'fc-menu-product-description';
-        description.textContent = product.description || '';
-        var selector = document.createElement('select'); selector.className = 'fc-menu-variant-select';
-        selector.setAttribute('aria-label', 'Choose ' + product.name + ' option');
-        product.variants.forEach(function (variant) {
-          var option = document.createElement('option');
-          option.value = variant.id;
-          option.textContent = variant.label + ' — ' + money(variant.priceMinor / 100);
-          selector.appendChild(option);
-        });
-        if (product.variants.length > 1) selector.selectedIndex = -1;
+        card.className = 'card fc-home-product-card';
+        card.setAttribute('data-product-id', product.id);
+
+        var art = document.createElement('div'); art.className = 'art';
+        var name = String(product.name || '').toLowerCase();
+        if (/drink|juice|water/.test(name)) { art.style.setProperty('--t1', '#58B6EA'); art.style.setProperty('--t2', '#1565C0'); }
+        else if (/broast|wing|nugget/.test(name) || String(category.name).toLowerCase().indexOf('broast') >= 0) {
+          art.style.setProperty('--t1', '#F2B24D'); art.style.setProperty('--t2', '#B84A12');
+        } else { art.style.setProperty('--t1', '#FF8A1F'); art.style.setProperty('--t2', '#A9000C'); }
+        appendProductArtwork(art, product, category.name);
+
+        var body = document.createElement('div'); body.className = 'body';
+        var title = document.createElement('h3'); title.textContent = product.name;
+        body.appendChild(title);
+        if (product.description) {
+          var description = document.createElement('p'); description.className = 'desc';
+          description.textContent = product.description; body.appendChild(description);
+        }
+
+        var foot = document.createElement('div'); foot.className = 'foot';
+        var price = document.createElement('span'); price.className = 'price';
+        var firstVariant = product.variants[0];
+        price.textContent = firstVariant ? cardPrice(firstVariant.priceMinor) : 'Price unavailable';
+        var controls = document.createElement('div'); controls.className = 'ctl fc-home-product-controls';
+        var selector = null;
+        if (product.variants.length > 1) {
+          selector = document.createElement('select'); selector.className = 'fc-home-variant-select';
+          selector.setAttribute('aria-label', 'Choose size or option for ' + product.name);
+          var placeholder = document.createElement('option');
+          placeholder.value = ''; placeholder.textContent = 'Choose size / option';
+          selector.appendChild(placeholder);
+          product.variants.forEach(function (variant) {
+            var option = document.createElement('option');
+            option.value = variant.id;
+            option.textContent = variant.label + ' · ' + cardPrice(variant.priceMinor);
+            selector.appendChild(option);
+          });
+          selector.selectedIndex = 0;
+          selector.addEventListener('change', function () {
+            var selected = product.variants.find(function (variant) { return variant.id === selector.value; });
+            if (selected) price.textContent = cardPrice(selected.priceMinor);
+            else price.textContent = 'Choose an option';
+            add.disabled = !selected || !canEdit();
+          });
+          controls.appendChild(selector);
+        } else if (firstVariant) {
+          var variantLabel = document.createElement('span');
+          variantLabel.className = 'fc-home-single-variant';
+          variantLabel.textContent = firstVariant.label;
+          controls.appendChild(variantLabel);
+        }
+
         var add = document.createElement('button');
-        add.type = 'button'; add.className = 'fc-menu-add'; add.textContent = 'Customize & add';
-        add.disabled = product.variants.length > 1;
-        selector.addEventListener('change', function () { add.disabled = !selector.value; });
+        add.type = 'button'; add.className = 'add';
+        add.textContent = product.modifierGroups.length ? 'Customize & add' : 'Add';
+        add.disabled = !firstVariant || (product.variants.length > 1) || !canEdit();
         add.addEventListener('click', function () {
           if (!canEdit()) return;
-          var variantId = selector.value || (product.variants.length === 1 ? product.variants[0].id : '');
+          var variantId = selector ? selector.value : (firstVariant ? firstVariant.id : '');
           if (variantId) openProductCustomizer(product, variantId);
         });
-        card.append(title);
-        if (product.description) card.append(description);
-        card.append(selector, add);
+        controls.appendChild(add);
+        foot.append(price, controls);
+        body.appendChild(foot);
+        card.append(art, body);
         grid.appendChild(card);
       });
-      section.appendChild(grid); rootNode.appendChild(section);
+      section.appendChild(grid);
+      rootNode.appendChild(section);
     });
   }
-
   function openProductCustomizer(product, variantId) {
     var variant = product.variants.find(function (row) { return row.id === variantId; });
     if (!variant || !canEdit()) return;
@@ -395,27 +506,41 @@
     rootNode.replaceChildren();
     var count = 0;
     (model.collections || []).forEach(function (collection) {
-      var title = document.createElement('h3'); title.className = 'fc-menu-category-title'; title.textContent = collection.title;
-      rootNode.appendChild(title);
-      var grid = document.createElement('div'); grid.className = 'deal-grid';
+      var section = document.createElement('section');
+      section.className = 'fc-home-deal-collection';
+      var heading = document.createElement('div'); heading.className = 'cat-head';
+      var headingText = document.createElement('h3'); headingText.className = 'cat-pill';
+      headingText.textContent = collection.title;
+      var line = document.createElement('span'); line.className = 'cat-line'; line.setAttribute('aria-hidden', 'true');
+      heading.append(headingText, line); section.appendChild(heading);
+      var grid = document.createElement('div'); grid.className = 'items';
       (collection.deals || []).forEach(function (deal) {
         count += 1;
-        var card = document.createElement('article');
-        card.className = 'deal-card' + (deal.available ? '' : ' order-unavailable');
+        var card = document.createElement('article'); card.className = 'card fc-home-deal-card';
+        var art = document.createElement('div'); art.className = 'art';
+        art.style.setProperty('--t1', '#F7A53B'); art.style.setProperty('--t2', '#8A0010');
+        var image = document.createElement('img'); image.src = 'media/products/flame-chick-burger-2.png';
+        image.alt = deal.title; image.width = 320; image.height = 320; image.loading = 'lazy';
+        art.appendChild(image);
+        var body = document.createElement('div'); body.className = 'body';
         var name = document.createElement('h3'); name.textContent = deal.title;
-        var info = document.createElement('p'); info.className = 'order-hint';
-        info.textContent = deal.available ? 'Choose your deal options' : (deal.unavailableReason || 'Not orderable at this time');
-        var button = document.createElement('button'); button.type = 'button'; button.className = 'order-secondary';
-        button.textContent = deal.available ? 'Configure deal' : 'Currently unavailable';
+        var info = document.createElement('p'); info.className = 'desc';
+        info.textContent = deal.description || (deal.available ? 'Choose your combo options.' : (deal.unavailableReason || 'Not orderable at this time.'));
+        var foot = document.createElement('div'); foot.className = 'foot';
+        var label = document.createElement('span'); label.className = 'fc-deal-label';
+        label.textContent = deal.available ? 'Published deal' : 'Unavailable';
+        var button = document.createElement('button'); button.type = 'button';
+        button.className = 'add'; button.textContent = deal.available ? 'Configure deal' : 'Unavailable';
         button.disabled = !deal.available || !canEdit();
         button.addEventListener('click', function () { if (canEdit()) openDealConfigurator(deal); });
-        card.append(name, info, button); grid.appendChild(card);
+        foot.append(label, button);
+        body.append(name, info, foot);
+        card.append(art, body); grid.appendChild(card);
       });
-      rootNode.appendChild(grid);
+      section.appendChild(grid); rootNode.appendChild(section);
     });
     $('deals-empty').hidden = count > 0;
   }
-
   function openDealConfigurator(deal) {
     var configurator = root.FlameChickCatalogV3DealConfigurator.createDealConfigurator(
       state.dealModel, deal.id,
