@@ -2669,7 +2669,7 @@ async function ensureMenu(){
 function updateNetworkStatus(){const on=navigator.onLine;$('statusDot').className='dot '+(on?'online':'offline');$('statusText').textContent=on?'Online':'Offline';}
 
 function isPizzaCategoryId(id){return pizzaCategoryIds.has(String(id));}
-function groupedMenu(){const cats=[...categories].sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0));if(!cats.length)return [{id:'all',name:'Menu',rows:[...menu]}];return cats.map(c=>({id:c.ID,name:c.Name,rows:menu.filter(x=>String(x.CategoryID)===String(c.ID)).sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0))})).filter(g=>g.rows.length||(catalogSnapshot?.deals||[]).some(d=>d.Active===true&&d.available===true&&String(d.CategoryID)===String(g.id)))}
+function groupedMenu(){const cats=[...categories].sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0));if(!cats.length)return [{id:'all',name:'Menu',rows:[...menu]}];return cats.map(c=>({id:c.ID,name:c.Name,rows:menu.filter(x=>String(x.CategoryID)===String(c.ID)).sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0))})).filter(g=>g.rows.length||(catalogSnapshot?.deals||[]).some(d=>d.Active===true&&String(d.CategoryID)===String(g.id)))}
 function render(){
   renderCategoryBar();
   renderSubcategoryBar();
@@ -2680,7 +2680,7 @@ function render(){
 function menuCategoryItemCount(group){
   const rows=(group.rows||[]).filter(row=>row.Available!==false&&String(row.Available).toLowerCase()!=='false');
   const productCount=isPizzaCategoryId(group.id)?groupPizzas(rows).length:new Set(rows.map(row=>String(row.ProductID||row.ID))).size;
-  const dealCount=(catalogSnapshot?.deals||[]).filter(d=>d.Active===true&&d.available===true&&String(d.CategoryID)===String(group.id)).length;
+  const dealCount=(catalogSnapshot?.deals||[]).filter(d=>d.Active===true&&String(d.CategoryID)===String(group.id)).length;
   return productCount+dealCount;
 }
 function activeSubcategories(categoryId){
@@ -2761,7 +2761,9 @@ function renderDealCard(deal){
     else src='https://adkrxfnawdiljhjaavnj.supabase.co/storage/v1/object/public/flame-chick-media/'+imagePath.split('/').map(encodeURIComponent).join('/');
   }
   const art=src?'<div class="item-thumb"><img src="'+esc(src)+'" alt="'+esc(deal.Title||'Deal')+'" loading="lazy" decoding="async" onerror="this.parentElement.classList.add(String.fromCharCode(110,111,45,112,104,111,116,111));this.remove()"></div>':'<div class="item-thumb no-photo"><span>🎁</span></div>';
-  return '<article class="item product-card"><div class="product-card-main">'+art+'<div class="product-card-copy"><h3>'+esc(deal.Title||'Deal')+'</h3><p>'+esc(deal.Description||'Deal selection')+'</p></div></div><div class="row"><span class="price">Rs. '+money(deal.BundlePrice)+'</span><button class="add" type="button" data-pos-deal="'+esc(deal.DealID)+'">Choose Deal</button></div></article>';
+  const orderable=deal.Available===true;
+  const status=orderable?'Choose your deal options':(deal.ScheduleAvailable===false?'Currently outside deal hours':'Currently unavailable at this branch');
+  return '<article class="item product-card '+(orderable?'':'deal-unavailable')+'"><div class="product-card-main">'+art+'<div class="product-card-copy"><h3>'+esc(deal.Title||'Deal')+'</h3><p>'+esc(deal.Description||status)+'</p></div></div><div class="row"><span class="price">'+(Number.isFinite(Number(deal.BundlePrice))?'Rs. '+money(deal.BundlePrice):'Price unavailable')+'</span><button class="add" type="button" data-pos-deal="'+esc(deal.DealID)+'" '+(orderable?'':'disabled title="'+esc(status)+'"')+'>'+(orderable?'Choose Deal':esc(status))+'</button></div></article>';
 }
 function setupCategoryObserver(){if(window._categoryObserver){window._categoryObserver.disconnect();window._categoryObserver=null;}}
 function groupPizzas(rows){
@@ -2785,7 +2787,7 @@ function renderMenu(){
   for(const g of visibleGroups){
     let rows=g.rows.filter(row=>row.Available!==false&&String(row.Available).toLowerCase()!=='false');
     if(selectedSubcategoryId&&String(g.id)===selected)rows=rows.filter(row=>String(row.SubcategoryID||'')===String(selectedSubcategoryId));
-    const dealRows=(catalogSnapshot?.deals||[]).filter(d=>d.Active===true&&d.available===true&&String(d.CategoryID)===String(g.id)).sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0));
+    const dealRows=(catalogSnapshot?.deals||[]).filter(d=>d.Active===true&&String(d.CategoryID)===String(g.id)).sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0));
     const pizzaGroups=isPizzaCategoryId(g.id)?groupPizzas(rows):[];
     const productCount=isPizzaCategoryId(g.id)?pizzaGroups.length:new Set(rows.map(r=>String(r.ProductID||r.ID))).size;
     const itemCount=productCount+dealRows.length;
