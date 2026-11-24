@@ -108,7 +108,8 @@
        !moneyMatches(variant.base_price,variant.base_price))throw Error('Only consistent fixed-price deal records can be edited here.');
     const groups=detail.component_groups.filter(doc=>doc&&doc.group&&doc.group.is_active===true);
     const mappings=Array.isArray(variantDoc.allowed_options)?variantDoc.allowed_options.filter(item=>item.is_active===true):[];
-    if(!groups.length||groups.length!==mappings.length)throw Error('The active deal contents or mappings are incomplete; inspect before editing.');
+    const activeOptionCount=groups.reduce((count,doc)=>count+(doc.options||[]).filter(option=>option&&option.is_active===true).length,0);
+    if(!groups.length||activeOptionCount!==mappings.length)throw Error('The active deal contents or choice mappings are incomplete; inspect before editing.');
     const components=groups.map(doc=>{
       const group=doc.group,rows=doc.options||[],active=rows.filter(row=>row&&row.is_active===true);
       const q=Number(group.min_units);
