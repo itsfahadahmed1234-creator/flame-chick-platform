@@ -4687,3 +4687,9 @@ The disposable behavioral workflow passed before the final migration filename wa
 6. GST remains deferred. Do not enable public order intake or represent the system as operational until rehearsal and user approval.
 
 **No live restaurant operation or real customer transaction was started by this deployment.**
+
+
+### Homepage final navigation correction — CI pending
+- After the first Production website deployment, a final source review found that the homepage's dormant legacy Add/Cart action still routed to `order-online-v3.html`. Changed every legacy homepage action redirect to `menu.html`, relabelled the header control as Menu, and changed the bottom bar text to Browse the published menu. This ensures old embedded controls cannot lead customers to the unconfigured checkout route.
+- Commit: `2c48be760af08d7242790eb7f5967109c1fb47a5`.
+- Website static workflow **45377334847** and preview deploy workflow **45377334883** were triggered on this commit; at handoff update time CI is still running and preview workflow guard may skip it. The previous Production deployment `dpl_GCFHz8afyKw4d7z95ofwBZJoQZ2B` is READY on prior commit `5653713cd6a41f6efe3954691a41f9c573d721ac`. After current static workflow succeeds, create a fresh Vercel Production deployment for commit `2c48be760af08d7242790eb7f5967109c1fb47a5` so these final navigation corrections are live.
