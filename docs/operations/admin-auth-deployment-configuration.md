@@ -5,7 +5,7 @@ Status: configuration contract prepared; no secret-bearing deployment performed.
 ## Canonical application origins
 
 - Admin: https://flamechicadmin.vercel.app
-- Customer Website: https://flamechic.vercel.app
+- Customer Website: https://flamechick.vercel.app
 - Rider portal: https://flamechicrider.vercel.app
 
 Only the Admin origin is allowed to call the Staff Admin Edge Function from a browser. Website and Rider origins must be denied. Do not add preview wildcard origins or the old legacy Admin host.
