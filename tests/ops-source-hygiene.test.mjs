@@ -181,3 +181,15 @@ test("POS renders scheduled or branch-unavailable V3 deals as visible but disabl
   assert.match(html,/deal-unavailable/);
   assert.match(html,/d\.Active===true&&String\(d\.CategoryID\)===String\(g\.id\)/);
 });
+
+test("POS never submits legacy V2 order payloads after loading the V3 catalog",()=>{
+  const html=source[0].html;
+  assert.match(html,/if\(catalogSnapshot\?\.schemaVersion===3\)/);
+  assert.match(html,/no legacy V2 order will be submitted/);
+});
+
+test("POS does not invoke the legacy deal picker for V3 deal records",()=>{
+  const html=source[0].html;
+  assert.match(html,/const orderable=false/);
+  assert.match(html,/Deal selection is being connected to V3/);
+});
