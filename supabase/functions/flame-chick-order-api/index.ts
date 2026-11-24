@@ -643,7 +643,7 @@ function getClientIp(req: Request): string {
   return candidate.length <= 45 && /^[0-9a-fA-F:.]+$/.test(candidate) ? candidate : "";
 }
 
-async function callRpc(name: "flame_chick_create_order" | "flame_chick_create_website_order" | "flame_chick_get_website_order_by_idempotency" | "flame_chick_update_order_status" | "flame_chick_check_website_order_rate_limit" | "flame_chick_collect_order_payment", payload: Record<string, unknown>) {
+async function callRpc(name: "flame_chick_create_order" | "flame_chick_create_website_order" | "flame_chick_get_website_order_by_idempotency" | "flame_chick_update_order_status" | "flame_chick_check_website_order_rate_limit" | "flame_chick_collect_order_payment" | "flame_chick_sync_pos_order", payload: Record<string, unknown>) {
   const res = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + name, {
     method: "POST",
     headers: {
@@ -711,7 +711,193 @@ async function readOrderBoard(board: string, limit: number, branchId: string, fi
   return { ok:true as const, data:result.data };
 }
 
-export async function handleOrderApiRequest(req: Request): Promise<Response> {
+export 
+const POS_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function buildStaffPosSyncPayload(
+  body: Record<string, unknown>,
+  context: StaffContext,
+  actorId: string,
+): Promise<{ok:true;payload:Record<string,unknown>;presentation:Record<string,unknown>}|{ok:false;status:number;body:Record<string,unknown>}> {
+  const catalog = await readPublishedV3Catalog();
+  if (!catalog.ok) return catalog;
+  const snapshot = catalog.snapshot;
+  const contract = V3_RUNTIME.FlameChickCatalogV3;
+  const dealView = V3_RUNTIME.FlameChickCatalogV3DealView;
+  if (!contract || !dealView) return websiteError("CATALOG_RUNTIME_UNAVAILABLE","The trusted V3 pricing runtime is unavailable.",503);
+
+  const localOrderId = typeof body.local_order_id === "string" ? body.local_order_id.trim() : "";
+  const revision = body.local_revision;
+  const fulfillmentType = String(body.fulfillment_type ?? "").trim().toLowerCase();
+  if (!POS_ID_RE.test(localOrderId) || !Number.isSafeInteger(revision) || Number(revision) < 1 ||
+      !["delivery","pickup","dine_in"].includes(fulfillmentType)) {
+    return websiteError("POS_ORDER_IDENTITY_INVALID","A UUID local order ID, positive revision and supported fulfilment type are required.",400);
+  }
+  if (context.role === "rider" || !["owner","admin","manager","cashier"].includes(context.role)) {
+    return websiteError("POS_STAFF_ROLE_REQUIRED","An active Cashier, Manager, Admin or Owner role is required to synchronize POS orders.",403);
+  }
+
+  const customerInput = isObject(body.customer) ? body.customer : {};
+  const customerName = typeof customerInput.name === "string" ? customerInput.name.trim() : "";
+  const customerPhone = typeof customerInput.phone === "string" ? customerInput.phone.trim() : "";
+  const customerEmail = typeof customerInput.email === "string" ? customerInput.email.trim() || null : null;
+  if (!customerName || customerName.length > 160 ||
+      (customerPhone && (customerPhone.length < 3 || customerPhone.length > 32)) ||
+      (fulfillmentType === "delivery" && customerPhone.length < 3) ||
+      (customerEmail && (customerEmail.length > 254 || !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(customerEmail)))) {
+    return websiteError("CUSTOMER_DETAILS_INVALID","Enter a valid customer name and phone number; Delivery requires a phone number.",400);
+  }
+
+  const snapshotBranch = Array.isArray(snapshot.branches)
+    ? snapshot.branches.find((row:any)=>row && row.branchId===context.branch_id)
+    : null;
+  if (!snapshotBranch || snapshot.restaurantId !== context.restaurant_id) {
+    return websiteError("POS_BRANCH_NOT_IN_CATALOG","Your authorized branch is not present in the current published Flame Chick catalog.",409);
+  }
+  const restaurant = await readFlameChickRestaurant();
+  if (!restaurant || restaurant.id !== context.restaurant_id ||
+      restaurant.currencyCode !== snapshot.settings.currency_code) {
+    return websiteError("POS_RESTAURANT_CONFIGURATION_INVALID","The active restaurant or catalog currency could not be verified.",503);
+  }
+
+  const pricingRequest = {
+    schema_version:3,
+    publication_id:body.publication_id,
+    version_id:body.version_id,
+    branch_id:context.branch_id,
+    fulfillment_type:fulfillmentType,
+    customer:{name:customerName,phone:customerPhone || null,email:customerEmail},
+    notes:typeof body.notes === "string" ? body.notes.trim() : null,
+    items:body.items
+  };
+  const priced = calculateWebsiteOrder(snapshot,pricingRequest,{
+    contract,dealView,databaseNow:snapshot.databaseNow,staffPos:true
+  });
+  if (!isObject(priced)) return websiteError("POS_PRICING_INVALID","The POS cart could not be priced safely.",400);
+  if (priced.ok !== true) {
+    const err = isObject(priced.error) ? priced.error : {};
+    const code = String(err.code ?? "POS_PRICING_INVALID");
+    const status = ["CATALOG_PUBLICATION_CHANGED","BRANCH_FULFILMENT_UNAVAILABLE","PRODUCT_UNAVAILABLE","DEAL_UNAVAILABLE","DEAL_VARIANT_UNAVAILABLE"].includes(code) ? 409 : 400;
+    return websiteError(code,String(err.message ?? "The POS cart could not be validated against the published menu."),status);
+  }
+
+  let deliveryFee = 0;
+  let delivery: Record<string,unknown>|null = null;
+  if (fulfillmentType === "delivery") {
+    const input = isObject(body.delivery) ? body.delivery : {};
+    const selectionType = String(input.selection_type ?? "").trim().toLowerCase();
+    const address = typeof input.address === "string" ? input.address.trim() : "";
+    const instructions = typeof input.instructions === "string" ? input.instructions.trim() : "";
+    if (address.length < 5 || address.length > 1000 || instructions.length > 500) {
+      return websiteError("POS_DELIVERY_ADDRESS_INVALID","Enter a complete delivery address.",400);
+    }
+    const config = await readBranchDeliveryConfiguration(context.restaurant_id,context.branch_id);
+    if (!config.ok) return websiteError("DELIVERY_CONFIGURATION_UNAVAILABLE","Delivery configuration could not be verified for this branch.",503);
+    let areaId: string|null = null;
+    let areaName = "";
+    let otherLocality: string|null = null;
+    if (selectionType === "listed_area") {
+      const candidate = typeof input.area_id === "string" ? input.area_id.trim() : "";
+      if (!POS_ID_RE.test(candidate)) return websiteError("POS_DELIVERY_AREA_REQUIRED","Choose a listed delivery area.",400);
+      const area = config.areas.find(row => row.id === candidate);
+      if (!area) return websiteError("POS_DELIVERY_AREA_UNAVAILABLE","The selected delivery area is not active for this branch.",409);
+      const fee = Number(area.delivery_fee);
+      if (!Number.isFinite(fee) || fee < 0) return websiteError("POS_DELIVERY_FEE_INVALID","The delivery area fee is not configured correctly.",503);
+      areaId = String(area.id);
+      areaName = String(area.name);
+      deliveryFee = fee;
+    } else if (selectionType === "not_listed") {
+      otherLocality = typeof input.other_locality === "string" ? input.other_locality.trim() : "";
+      if (!otherLocality || otherLocality.length > 120) return websiteError("POS_DELIVERY_LOCALITY_REQUIRED","Enter the locality for a Not Listed delivery.",400);
+      if (config.notListedFee === null) return websiteError("POS_DEFAULT_DELIVERY_FEE_UNCONFIGURED","The Not Listed delivery fee is not configured for this branch.",409);
+      areaName = "Not Listed / Other";
+      deliveryFee = config.notListedFee;
+    } else {
+      return websiteError("POS_DELIVERY_SELECTION_INVALID","Choose a listed area or Not Listed / Other.",400);
+    }
+    delivery = {
+      selection_type:selectionType,
+      area_id:areaId,
+      area_name_snapshot:areaName,
+      other_locality:otherLocality,
+      address,
+      instructions:instructions || null
+    };
+  } else if (body.delivery !== undefined && body.delivery !== null) {
+    return websiteError("POS_NON_DELIVERY_FIELDS_INVALID","Dine-in and Takeaway orders cannot contain delivery details.",400);
+  }
+
+  const subtotal = Number(priced.data.subtotal);
+  const total = subtotal + deliveryFee;
+  if (!Number.isFinite(subtotal) || subtotal < 0 || !Number.isFinite(total) || total > 9999999999.99) {
+    return websiteError("POS_ORDER_TOTAL_INVALID","The server-calculated order total is invalid.",400);
+  }
+
+  const tableReference = typeof body.table_reference === "string" ? body.table_reference.trim() || null : null;
+  const tableLabel = typeof body.table_label_snapshot === "string" ? body.table_label_snapshot.trim() || null : null;
+  const kitchenTiming = typeof body.kitchen_timing === "string" ? body.kitchen_timing.trim().toLowerCase() || null : null;
+  const scheduledFor = typeof body.scheduled_for === "string" ? body.scheduled_for : null;
+  const prepareAt = typeof body.prepare_at === "string" ? body.prepare_at : null;
+  if (tableReference && tableReference.length > 120 || tableLabel && tableLabel.length > 120) {
+    return websiteError("POS_TABLE_REFERENCE_INVALID","The selected table reference is too long.",400);
+  }
+  if (fulfillmentType !== "dine_in" && (tableReference || tableLabel || kitchenTiming || scheduledFor || prepareAt)) {
+    return websiteError("POS_TABLE_FIELDS_INVALID","Table and scheduling fields are only valid for Dine-in.",400);
+  }
+  if (fulfillmentType === "dine_in" && !tableReference && kitchenTiming !== "schedule") {
+    return websiteError("POS_TABLE_REQUIRED","Choose a table before saving a Dine-in check.",400);
+  }
+
+  const canonical: Record<string,unknown> = {
+    source:"pos",
+    restaurant_id:context.restaurant_id,
+    branch_id:context.branch_id,
+    actor_user_id:actorId,
+    local_order_id:localOrderId,
+    idempotency_key:"flame-chick-pos-"+localOrderId,
+    local_revision:Number(revision),
+    fulfillment_type:fulfillmentType,
+    customer_name:customerName,
+    customer_phone:customerPhone || null,
+    notes:typeof body.notes === "string" ? body.notes.trim() || null : null,
+    payment_method_summary:null,
+    table_reference:tableReference,
+    table_label_snapshot:tableLabel,
+    scheduled_for:scheduledFor,
+    prepare_at:prepareAt,
+    kitchen_timing:kitchenTiming,
+    catalog_publication_id:snapshot.publicationId,
+    catalog_version:snapshot.publicationNumber,
+    subtotal,
+    delivery_fee:deliveryFee,
+    total,
+    delivery,
+    items:priced.data.items
+  };
+  const requestHash = await sha256Hex(stableJson(canonical));
+  if (!requestHash) return websiteError("POS_REQUEST_HASH_FAILED","The POS request could not be secured for safe retry.",503);
+  const payload = {...canonical,request_hash:requestHash};
+  return {
+    ok:true,
+    payload,
+    presentation:{
+      local_order_id:localOrderId,
+      local_revision:Number(revision),
+      fulfillment_type:fulfillmentType,
+      branch_id:context.branch_id,
+      publication_id:snapshot.publicationId,
+      catalog_version:snapshot.publicationNumber,
+      currency_code:restaurant.currencyCode,
+      subtotal,
+      delivery_fee:deliveryFee,
+      total,
+      items:priced.data.items,
+      delivery
+    }
+  };
+}
+
+async function handleOrderApiRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: CORS_HEADERS });
   if (!SUPABASE_URL || !SERVICE_KEY || PUBLIC_KEYS.length === 0) {
     return response({ ok: false, error: { code: "CONFIG_MISSING", message: "The Flame Chick order API is not configured." } }, 503);
@@ -882,6 +1068,57 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
     return response(result.data,result.data.already_processed===true?200:201);
   }
 
+  if (action === "sync_pos_order") {
+    const authorization = req.headers.get("authorization") ?? "";
+    const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+    const user = await verifyStaffUser(token,apiKey);
+    if (!user) return response({ok:false,error:{code:"STAFF_AUTH_REQUIRED",message:"Sign in with a Flame Chick staff account to synchronize POS orders."}},401);
+    const context = await resolveStaffContext(user.id);
+    if (!context || !["owner","admin","manager","cashier"].includes(context.role)) {
+      return response({ok:false,error:{code:"POS_STAFF_ROLE_REQUIRED",message:"An active Cashier, Manager, Admin or Owner role is required for POS order synchronization."}},403);
+    }
+    const prepared = await buildStaffPosSyncPayload(body,context,user.id);
+    if (!prepared.ok) return response(prepared.body,prepared.status);
+    const result = await callRpc("flame_chick_sync_pos_order",prepared.payload);
+    if (!result.ok) return response(result.body,result.status);
+    if (!isObject(result.data)) return response({ok:false,error:{code:"POS_SYNC_RESPONSE_INVALID",message:"The database did not return a verifiable POS order result."}},503);
+    if (result.data.ok === false) {
+      const err = isObject(result.data.error) ? result.data.error : {};
+      const code = String(err.code ?? "POS_SYNC_FAILED");
+      const status = [
+        "POS_ORDER_IDENTITY_CONFLICT","POS_ORDER_REVISION_CONFLICT","POS_ORDER_NO_LONGER_EDITABLE",
+        "POS_DELIVERY_FEE_CHANGED","POS_DELIVERY_AREA_UNAVAILABLE","POS_DEFAULT_DELIVERY_FEE_UNCONFIGURED",
+        "POS_STAFF_REQUIRED","POS_BRANCH_UNAVAILABLE","POS_RESTAURANT_UNAVAILABLE"
+      ].includes(code) ? 409 : ["POS_STAFF_REQUIRED"].includes(code) ? 403 : 400;
+      return response({ok:false,error:{code,message:String(err.message ?? "The POS order could not be synchronized.")}},status);
+    }
+    if (result.data.ok !== true || typeof result.data.order_id !== "string" ||
+        result.data.local_order_id !== prepared.payload.local_order_id ||
+        !Number.isSafeInteger(result.data.local_revision)) {
+      return response({ok:false,error:{code:"POS_SYNC_RESPONSE_INVALID",message:"The database response did not confirm the requested local order identity and revision."}},503);
+    }
+    return response({
+      ok:true,
+      already_processed:result.data.already_processed===true,
+      stale_revision:result.data.stale_revision===true,
+      order_id:result.data.order_id,
+      order_number:result.data.order_number,
+      local_order_id:result.data.local_order_id,
+      local_revision:result.data.local_revision,
+      status:result.data.status,
+      payment_status:result.data.payment_status,
+      fulfillment_type:result.data.fulfillment_type,
+      subtotal:result.data.subtotal,
+      delivery_fee:result.data.delivery_fee,
+      total:result.data.total,
+      paid_amount:result.data.paid_amount,
+      balance_due:result.data.balance_due,
+      currency_code:result.data.currency_code,
+      created_at:result.data.created_at,
+      presentation:prepared.presentation
+    },result.data.already_processed===true?200:201);
+  }
+
   if (action === "create") {
     const sourceType = String(body.source ?? "website").toLowerCase();
     if (!["website", "pos", "whatsapp", "phone", "third_party", "manual", "other"].includes(sourceType)) {
@@ -980,7 +1217,7 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
     return response(result.data, 200);
   }
 
-  return response({ ok: false, error: { code: "ACTION_NOT_FOUND", message: "Supported actions are website_context (GET), quote_website_order, create_website_order, collect_payment, update_status, cancel and reject." } }, 404);
+  return response({ ok: false, error: { code: "ACTION_NOT_FOUND", message: "Supported actions are website_context (GET), quote_website_order, create_website_order, sync_pos_order, collect_payment, update_status, cancel and reject." } }, 404);
 }
 
 if (import.meta.main) {
