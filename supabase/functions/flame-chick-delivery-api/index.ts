@@ -1,9 +1,7 @@
 // Flame Chick delivery dispatch API v1.
-import { ApplicationServer, importVapidKeys, Urgency } from "jsr:@negrel/webpush@0.5.0";
 // Separate function for Flame Chick rider dispatch and delivery lifecycle.
 // All writes go through service-role-only public.flame_chick_manage_delivery(jsonb).
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const RIDER_PORTAL_URL = (Deno.env.get("FLAME_CHICK_RIDER_PORTAL_URL") ?? "").trim();
 
 function readKeyMap(name: string): Record<string, string> {
   const raw = Deno.env.get(name);
@@ -287,139 +285,19 @@ async function isActiveRider(userId: string, token: string, apiKey: string) {
   return { ok:true as const, branchId:riderRole.branch_id };
 }
 
-async function sendOfferPushBatch(offerIdsInput: string[]) {
-  const offerIds = [...new Set(offerIdsInput.filter((id) => typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)))].slice(0, 100);
-  if (!offerIds.length) return { sent:0, offers:0, subscriptions:0, skipped:true };
-
-  const offerQuery = new URLSearchParams();
-  offerQuery.set("select", "id,rider_user_id,expires_at,delivery_tasks!inner(id,status,area_name_snapshot,delivery_fee_snapshot,orders!inner(order_number,status))");
-  offerQuery.set("id", "in.(" + offerIds.join(",") + ")");
-  offerQuery.set("status", "eq.offered");
-  offerQuery.set("expires_at", "gt." + new Date().toISOString());
-  offerQuery.set("delivery_tasks.status", "eq.offering");
-  offerQuery.set("delivery_tasks.orders.status", "eq.ready");
-
-  const offers = await readAsService("delivery_task_offers?" + offerQuery.toString());
-  if (!offers.ok) return { sent:0, offers:0, subscriptions:0, error:"Could not load delivery offers." };
-  const offerRows = Array.isArray(offers.data) ? offers.data.filter(isObject) : [];
-  if (!offerRows.length) return { sent:0, offers:0, subscriptions:0, skipped:true };
-
-  const riderIds = [...new Set(offerRows.map((offer) => String(offer.rider_user_id ?? "")).filter((id) => id.length > 0))];
-  if (!riderIds.length) return { sent:0, offers:offerRows.length, subscriptions:0, skipped:true };
-
-  const subscriptionQuery = new URLSearchParams();
-  subscriptionQuery.set("select", "id,rider_user_id,endpoint,p256dh,auth");
-  subscriptionQuery.set("rider_user_id", "in.(" + riderIds.join(",") + ")");
-  subscriptionQuery.set("is_active", "eq.true");
-  const subResult = await readAsService("rider_push_subscriptions?" + subscriptionQuery.toString());
-  if (!subResult.ok) return { sent:0, offers:offerRows.length, subscriptions:0, error:"Could not load rider notification subscriptions." };
-  const subscriptions = Array.isArray(subResult.data) ? subResult.data.filter(isObject) : [];
-  if (!subscriptions.length) return { sent:0, offers:offerRows.length, subscriptions:0, skipped:true };
-
-  const configResult = await callServiceRpc("flame_chick_get_rider_push_config", {});
-  const config = configResult.ok && isObject(configResult.data) ? configResult.data : null;
-  if (!config || !isObject(config.vapid_keys) || typeof config.contact_information !== "string") {
-    return { sent:0, offers:offerRows.length, subscriptions:subscriptions.length, error:"Push notification configuration is unavailable." };
-  }
-
-  const appServer = await ApplicationServer.new({
-    contactInformation: config.contact_information,
-    vapidKeys: await importVapidKeys(config.vapid_keys as { publicKey: JsonWebKey; privateKey: JsonWebKey }),
-  });
-
-  const subscriptionsByRider = new Map<string, Record<string, unknown>[]>();
-  for (const row of subscriptions) {
-    const riderId = String(row.rider_user_id ?? "");
-    if (!riderId) continue;
-    const list = subscriptionsByRider.get(riderId) ?? [];
-    list.push(row);
-    subscriptionsByRider.set(riderId, list);
-  }
-
-  const pushJobs: Array<{
-    offerId:string;
-    orderNumber:string;
-    areaName:string;
-    deliveryFee:string;
-    subscription:Record<string, unknown>;
-  }> = [];
-  for (const offer of offerRows) {
-    const riderId = String(offer.rider_user_id ?? "");
-    const riderSubscriptions = subscriptionsByRider.get(riderId) ?? [];
-    const task = Array.isArray(offer.delivery_tasks) ? offer.delivery_tasks[0] : offer.delivery_tasks;
-    const order = isObject(task) ? (Array.isArray(task.orders) ? task.orders[0] : task.orders) : null;
-    if (!riderId || !isObject(task) || !isObject(order)) continue;
-    for (const subscription of riderSubscriptions) {
-      if (typeof subscription.endpoint !== "string" || typeof subscription.p256dh !== "string" || typeof subscription.auth !== "string") continue;
-      pushJobs.push({
-        offerId:String(offer.id),
-        orderNumber:String(order.order_number ?? "ready"),
-        areaName:String(task.area_name_snapshot ?? "Delivery"),
-        deliveryFee:String(task.delivery_fee_snapshot ?? 0),
-        subscription,
-      });
-    }
-  }
-
-  let sent = 0;
-  let cursor = 0;
-  const worker = async () => {
-    while (true) {
-      const index = cursor++;
-      if (index >= pushJobs.length) return;
-      const job = pushJobs[index];
-      const row = job.subscription;
-      try {
-        const subscriber = appServer.subscribe({
-          endpoint:String(row.endpoint),
-          keys:{ p256dh:String(row.p256dh), auth:String(row.auth) },
-        });
-        await subscriber.pushTextMessage(JSON.stringify({
-          title:"Flame Chick · New delivery offer",
-          body:"Order " + job.orderNumber + " · " + job.areaName + " · Rs. " + job.deliveryFee + ". Open the Rider app to accept.",
-          offer_id:job.offerId,
-          url:RIDER_PORTAL_URL || undefined,
-        }), { urgency:Urgency.High, ttl:25, topic:job.offerId.replace(/-/g,"").slice(0,32) });
-        sent++;
-      } catch (error) {
-        const status = isObject(error) && isObject(error.response) ? Number(error.response.status) : 0;
-        if (status === 404 || status === 410) {
-          await fetch(SUPABASE_URL + "/rest/v1/rider_push_subscriptions?id=eq." + encodeURIComponent(String(row.id)), {
-            method:"PATCH",
-            headers:{ apikey:SERVICE_KEY, Authorization:"Bearer "+SERVICE_KEY, "Content-Type":"application/json", Prefer:"return=minimal" },
-            body:JSON.stringify({ is_active:false, updated_at:new Date().toISOString() }),
-          }).catch(()=>{});
-        }
-        console.warn("Flame Chick push delivery failed.", status || String(error));
-      }
-    }
-  };
-  const workerCount = Math.min(8, pushJobs.length);
-  await Promise.all(Array.from({length:workerCount}, () => worker()));
-  return { sent, offers:offerRows.length, subscriptions:subscriptions.length };
-}
-
-Deno.serve(async (req: Request) => {
+export async function handleDeliveryApiRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: CORS_HEADERS });
   if (!SUPABASE_URL || !SERVICE_KEY || PUBLIC_KEYS.length === 0) {
     return response({ ok: false, error: { code: "CONFIG_MISSING", message: "The Flame Chick delivery API is not configured." } }, 503);
   }
 
-  // The database trigger calls this server-to-server hook using a random Vault-stored token.
-  // This route is handled before the rider/staff JWT gate and never trusts a client-supplied rider id.
-  const pushHook = req.headers.get("x-flame-chick-push-hook") ?? "";
-  if (req.method === "POST" && pushHook) {
-    let hookBody: unknown;
-    try { hookBody = await req.json(); } catch { return response({ ok:false, error:{ code:"INVALID_JSON", message:"Invalid push hook payload." } },400); }
-    if (!isObject(hookBody)) return response({ ok:false, error:{ code:"OFFER_IDS_REQUIRED", message:"A delivery offer id or list of offer ids is required." } },400);
-    const requestedIds = typeof hookBody.offer_id === "string"
-      ? [hookBody.offer_id]
-      : Array.isArray(hookBody.offer_ids) ? hookBody.offer_ids.filter((id): id is string => typeof id === "string") : [];
-    if (!requestedIds.length || requestedIds.length > 100) return response({ ok:false, error:{ code:"OFFER_IDS_INVALID", message:"Provide between 1 and 100 delivery offer ids." } },400);
-    const verified = await callServiceRpc("flame_chick_verify_delivery_push_webhook", { p_token:pushHook });
-    if (!verified.ok || verified.data !== true) return response({ ok:false, error:{ code:"PUSH_HOOK_UNAUTHORIZED", message:"The internal push hook is not authorized." } },401);
-    const result = await sendOfferPushBatch(requestedIds);
-    return response({ ok:true, ...result });
+  // Rider Web Push stays disabled until encrypted subscription persistence,
+  // server-only key management, and trusted hook/config RPCs are implemented.
+  if (req.method === "POST" && req.headers.has("x-flame-chick-push-hook")) {
+    return response({ ok:false, error:{
+      code:"PUSH_NOT_CONFIGURED",
+      message:"Rider push notifications are temporarily unavailable. Keep the Rider app open and refresh offers."
+    } },503);
   }
 
   const apiKey = req.headers.get("apikey") ?? "";
@@ -485,13 +363,10 @@ Deno.serve(async (req: Request) => {
     }
 
     if (view === "push-config") {
-      const riderScope = await isActiveRider(user.id, token, apiKey);
-      if (!riderScope.ok) return response(riderScope.body, riderScope.status);
-      const pushConfig = await callServiceRpc("flame_chick_get_rider_push_config", {});
-      if (!pushConfig.ok || !isObject(pushConfig.data) || typeof pushConfig.data.vapid_public_key !== "string") {
-        return response({ ok:false, error:{ code:"PUSH_NOT_CONFIGURED", message:"Push notifications are not configured." } },503);
-      }
-      return response({ ok:true, vapid_public_key:pushConfig.data.vapid_public_key });
+      return response({ ok:false, error:{
+        code:"PUSH_NOT_CONFIGURED",
+        message:"Rider push notifications are temporarily unavailable. Keep the Rider app open and refresh offers."
+      } },503);
     }
     if (view !== "dispatch") {
       return response({ ok: false, error: { code: "DELIVERY_VIEW_INVALID", message: "Choose dispatch or rider." } }, 400);
@@ -572,40 +447,10 @@ Deno.serve(async (req: Request) => {
   }
 
   if (action === "push_subscribe" || action === "push_unsubscribe") {
-    const riderScope = await isActiveRider(user.id, token, apiKey);
-    if (!riderScope.ok) return response(riderScope.body, riderScope.status);
-    if(action === "push_subscribe") {
-      const sub = body.subscription;
-      if(!isObject(sub) || typeof sub.endpoint !== "string" || typeof sub.p256dh !== "string" || typeof sub.auth !== "string") {
-        return response({ ok:false, error:{ code:"PUSH_SUBSCRIPTION_INVALID", message:"The browser notification subscription is invalid." } },400);
-      }
-      let endpoint:URL;
-      try { endpoint=new URL(sub.endpoint); } catch { return response({ ok:false, error:{ code:"PUSH_ENDPOINT_INVALID", message:"The notification endpoint is invalid." } },400); }
-      if(endpoint.protocol !== "https:" || sub.endpoint.length>2048 || sub.p256dh.length>256 || sub.auth.length>256) {
-        return response({ ok:false, error:{ code:"PUSH_SUBSCRIPTION_INVALID", message:"The notification subscription is not valid." } },400);
-      }
-      const url=SUPABASE_URL+"/rest/v1/rider_push_subscriptions?on_conflict=endpoint";
-      const saved=await fetch(url,{
-        method:"POST",
-        headers:{apikey:SERVICE_KEY,Authorization:"Bearer "+SERVICE_KEY,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=representation"},
-        body:JSON.stringify({rider_user_id:user.id,endpoint:sub.endpoint,p256dh:sub.p256dh,auth:sub.auth,user_agent:String(body.user_agent||"").slice(0,500),is_active:true,last_seen_at:new Date().toISOString(),updated_at:new Date().toISOString()}),
-        cache:"no-store",
-      });
-      const savedData=await saved.json().catch(()=>[]);
-      if(!saved.ok) return response({ok:false,error:{code:"PUSH_SUBSCRIPTION_SAVE_FAILED",message:"Could not save notification settings."}},500);
-      return response({ok:true,subscribed:true});
-    } else {
-      const endpoint = typeof body.endpoint==="string" ? body.endpoint : "";
-      if(!endpoint) return response({ok:false,error:{code:"PUSH_ENDPOINT_REQUIRED",message:"The notification endpoint is required."}},400);
-      const disabled=await fetch(SUPABASE_URL+"/rest/v1/rider_push_subscriptions?rider_user_id=eq."+encodeURIComponent(user.id)+"&endpoint=eq."+encodeURIComponent(endpoint),{
-        method:"PATCH",
-        headers:{apikey:SERVICE_KEY,Authorization:"Bearer "+SERVICE_KEY,"Content-Type":"application/json",Prefer:"return=minimal"},
-        body:JSON.stringify({is_active:false,updated_at:new Date().toISOString()}),
-        cache:"no-store",
-      });
-      if(!disabled.ok)return response({ok:false,error:{code:"PUSH_SUBSCRIPTION_REMOVE_FAILED",message:"Could not disable notifications."}},500);
-      return response({ok:true,subscribed:false});
-    }
+    return response({ ok:false, error:{
+      code:"PUSH_NOT_CONFIGURED",
+      message:"Rider push notifications are temporarily unavailable. Keep the Rider app open and refresh offers."
+    } },503);
   }
 
   const allowed = new Set(["assign", "picked_up", "delivered", "reject", "failed", "return_reported", "confirm_return"]);
@@ -625,4 +470,8 @@ Deno.serve(async (req: Request) => {
   const result = await callDeliveryRpc(payload);
   if (!result.ok) return response(result.body, result.status);
   return response(result.data, 200);
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleDeliveryApiRequest);
+}
