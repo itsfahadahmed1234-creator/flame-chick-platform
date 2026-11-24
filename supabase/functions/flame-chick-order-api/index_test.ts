@@ -220,6 +220,47 @@ Deno.test("actual Website Order API issues, validates and replays signed quotes"
 });
 
 Deno.test("authenticated POS sync prices from V3 and derives actor and branch from staff context", async () => {
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const rawUrl = input instanceof Request ? input.url : String(input);
+    const url = new URL(rawUrl);
+    const pathName = url.pathname;
+    if (pathName.endsWith("/auth/v1/user")) {
+      return new Response(JSON.stringify({id:"aa000000-0000-4000-8000-000000000001"}),{status:200});
+    }
+    if (pathName.endsWith("/rpc/flame_chick_get_staff_role_rows")) {
+      return new Response(JSON.stringify([{restaurant_id:restaurantId,role_key:"cashier",branch_id:branchId,is_active:true}]),{status:200});
+    }
+    if (pathName.endsWith("/rpc/flame_chick_catalog_public_read")) {
+      return new Response(JSON.stringify({
+        published:true,snapshot,publicationId,publicationNumber,schemaVersion:3,
+        snapshotSha256,draftRevision:92,pricingEngineVersion:"flame-chick-pricing-v1",
+        publishedAt,databaseNow
+      }),{status:200});
+    }
+    if (pathName.endsWith("/restaurants")) {
+      return new Response(JSON.stringify([{id:restaurantId,currency_code:"PKR",timezone:"Asia/Karachi"}]),{status:200});
+    }
+    if (pathName.endsWith("/branches")) {
+      return new Response(JSON.stringify([{id:branchId,branch_code:"main",name:"Main Branch",is_active:true}]),{status:200});
+    }
+    if (pathName.endsWith("/rpc/flame_chick_sync_pos_order")) {
+      const payload = JSON.parse(String(init?.body || "{}")).p_payload;
+      if (payload.source!=="pos" || payload.actor_user_id!=="aa000000-0000-4000-8000-000000000001" ||
+          payload.branch_id!==branchId || payload.fulfillment_type!=="pickup" ||
+          payload.payment_method_summary!==null || payload.total!==payload.subtotal ||
+          !/^[0-9a-f]{64}$/.test(String(payload.request_hash))) {
+        return new Response(JSON.stringify({message:"POS canonical payload invalid"}),{status:400});
+      }
+      return new Response(JSON.stringify({
+        ok:true,already_processed:false,order_id:"99000000-0000-4000-8000-000000000099",
+        order_number:"FC-261124-0099",local_order_id:payload.local_order_id,
+        local_revision:payload.local_revision,status:"new",payment_status:"unpaid",
+        fulfillment_type:"pickup",subtotal:payload.subtotal,delivery_fee:0,total:payload.total,
+        paid_amount:0,balance_due:payload.total,currency_code:"PKR",created_at:databaseNow
+      }),{status:200});
+    }
+    return new Response(JSON.stringify({message:"Unexpected synthetic request: "+pathName}),{status:500});
+  }) as typeof fetch;
   try {
     const localOrderId = "bb000000-0000-4000-8000-000000000001";
     const body = {
