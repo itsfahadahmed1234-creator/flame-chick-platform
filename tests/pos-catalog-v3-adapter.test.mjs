@@ -134,7 +134,7 @@ test('POS starts with Delivery selected and exposes all three order types', () =
   const init = html.slice(initStart, initEnd > initStart ? initEnd : initStart + 500);
   assert.match(init, /\$\('orderType'\)\.value='Delivery'/);
   assert.ok(init.includes("b.dataset.type==='Delivery'"));
-  assert.doesNotMatch(html, /\$\('orderType'\)\.value='Dine-in';/);
+  assert.doesNotMatch(init, /\$\('orderType'\)\.value='Dine-in';/, 'Startup must not override Delivery with Dine-in.');
 });
 
 test('POS deal cards keep unavailable status separate from the price and action', () => {
