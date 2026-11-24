@@ -3534,94 +3534,99 @@ async function takePaymentAndCloseTable(){
   openLocalReceipt(receiptOrder,{editable:true});
 }
 async function saveLocalOrder(){
-  if(catalogSnapshot?.schemaVersion===3){
-    showToast('The published V3 menu is loaded. V3 staff order pricing and synchronization must be connected before placing orders; no legacy V2 order will be submitted.');
-    return;
-  }
-  if(!cart.length){showToast('Add at least one item');return}
+  if(!cart.length){showToast('Add at least one item');return;}
+  if(!catalogSnapshot||catalogSnapshot.schemaVersion!==3){showToast('Connect to the internet and load the published Flame Chick V3 catalog before creating a new order.');return;}
+  if(!window.FlameChickPosSyncV3){showToast('The unified POS sync module is unavailable.');return;}
   const type=$('orderType').value;
   const subtotal=cart.reduce((a,x)=>a+(Number(x.price)||0)*(Number(x.quantity)||1),0);
   const deliveryFee=type==='Delivery'?getDeliveryFeeForArea($('area').value):0;
-  if(type==='Delivery'&&deliveryFee===null){showToast('Choose a listed area or Not Listed. The default fee for Not Listed must be configured in Admin.');$('area').focus();return}
+  if(type==='Delivery'&&deliveryFee===null){showToast('Choose a listed area or Not Listed. The default fee for Not Listed must be configured in Admin.');$('area').focus();return;}
   const customerName=$('customerName').value.trim();
   const phone=$('phone').value.trim();
-  if(!customerName){showToast(type==='Dine-in'?'Customer name is required for dine-in':'Customer name is required');$('customerName').focus();return}
-  if(type==='Delivery'){
-    if(!phone){showToast('Customer phone is required for delivery orders');$('phone').focus();return}
-    if(!$('address').value.trim()){showToast('Delivery address is required');$('address').focus();return}
-  }
-  const paymentMethod=$('paymentMethod').value;
-  const paymentStatus=(type==='Dine-in' && !activeDineCheckId)?'Unpaid':(paymentMethod==='COD'?'Unpaid':'Paid');
-
-  /* Existing dine-in checks are saved as open checks exactly as before. */
+  if(!customerName){showToast('Customer name is required');$('customerName').focus();return;}
+  if(type==='Delivery'&&(!phone||!$('address').value.trim())){showToast('Delivery requires a customer phone number and complete address.');(!phone?$('phone'):$('address')).focus();return;}
+  const paymentMethod=$('paymentMethod').value||'Cash';
+  const now=new Date().toISOString();
   if(type==='Dine-in'){
     const table=selectedTableId?findTable(selectedTableId):null;
     const arrivalISO=computeArrivalISO();
     const isPreorder=dineInMode==='preorder'&&kitchenTiming==='schedule'&&arrivalISO;
-    if(!isPreorder && !table){showToast('Select a table first — your items are still in the cart');$('selectTableBtn').focus();return}
+    if(!isPreorder&&!table){showToast('Select a table first — your items are still in the cart');$('selectTableBtn').focus();return;}
     const prepareAtISO=isPreorder?computePrepareAtISO(arrivalISO,defaultPrepMinutes):null;
     const orderStatus=isPreorder?'Scheduled':'Open';
     let order=activeDineCheckId?await get(STORES.orders,activeDineCheckId):null;
     if(order){
-      order.updatedAt=new Date().toISOString();order.customerName=customerName;order.phone=phone;order.notes=$('notes').value.trim();order.items=cart.map(x=>({...x}));order.subtotal=subtotal;order.deliveryFee=0;order.discount=Number(order.discount)||0;order.total=Math.max(0,subtotal-order.discount);order.paymentMethod=paymentMethod;order.paymentStatus='Unpaid';order.status=orderStatus;order.tableId=table?table.id:'';order.tableNumber=table?table.name:'';
-      if(isPreorder){order.arrivalTime=arrivalISO;order.prepareAt=prepareAtISO;order.kitchenTiming='schedule';}else{delete order.arrivalTime;delete order.prepareAt;delete order.kitchenTiming;}
-      await put(STORES.orders,order); await put(STORES.queue,order); showToast(isPreorder?`Scheduled · arrive ${formatArrivalTime(arrivalISO)} · prepare ${formatArrivalTime(prepareAtISO)}`:`${table?table.name:'Check'} updated`);
+      if(order.serverOrderId&&order.serverStatus&&!['new','needs_confirmation'].includes(order.serverStatus)){
+        showToast('This dine-in order has moved forward on the server and cannot be edited from this offline check.');return;
+      }
+      order.updatedAt=now;order.customerName=customerName;order.phone=phone;order.notes=$('notes').value.trim();
+      order.items=cart.map(x=>({...x}));order.subtotal=subtotal;order.deliveryFee=0;
+      order.discount=Number(order.discount)||0;order.total=Math.max(0,subtotal-order.discount);
+      order.paymentMethod=paymentMethod;order.paymentStatus='Unpaid';order.status=orderStatus;
+      order.tableId=table?table.id:'';order.tableNumber=table?table.name:'';
+      if(isPreorder){order.arrivalTime=arrivalISO;order.prepareAt=prepareAtISO;order.kitchenTiming='schedule';}
+      else{delete order.arrivalTime;delete order.prepareAt;delete order.kitchenTiming;}
+      order=prepareLocalPosSyncOrder(order,{bumpRevision:true});
     }else{
       const localOrderId='LOCAL-'+new Date().toISOString().replace(/[-:TZ.]/g,'').slice(0,14)+'-'+crypto.randomUUID().slice(0,8);
-      order={localOrderId,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),orderSource:'POS',fulfillmentType:'Dine-in',customerName,phone,address:'',area:'',deliveryFee:0,subtotal,discount:0,total:subtotal,paymentMethod,paymentStatus:'Unpaid',status:orderStatus,notes:$('notes').value.trim(),tableId:table?table.id:'',tableNumber:table?table.name:'',items:cart.map(x=>({...x})),syncStatus:'pending',syncAttempts:0};
+      order=prepareLocalPosSyncOrder({
+        localOrderId,createdAt:now,updatedAt:now,orderSource:'POS',fulfillmentType:'Dine-in',
+        customerName,phone,address:'',area:'',deliveryFee:0,subtotal,discount:0,total:subtotal,
+        paymentMethod,paymentStatus:'Unpaid',status:orderStatus,notes:$('notes').value.trim(),
+        tableId:table?table.id:'',tableNumber:table?table.name:'',items:cart.map(x=>({...x})),
+        syncStatus:'pending',syncAttempts:0
+      });
       if(isPreorder){order.arrivalTime=arrivalISO;order.prepareAt=prepareAtISO;order.kitchenTiming='schedule';}
-      await put(STORES.orders,order); await put(STORES.queue,order); activeDineCheckId=order.localOrderId; showToast(isPreorder?`Scheduled · arrive ${formatArrivalTime(arrivalISO)} · prepare ${formatArrivalTime(prepareAtISO)}`:`${table?table.name:'Check'} saved as open check`);
     }
-    cart=[]; $('customerName').value='';$('phone').value='';$('notes').value=''; renderCart(); $('placeBtn').textContent='PLACE ORDER'; $('payCloseBtn').style.display='none'; activeDineCheckId=''; selectedTableId=''; $('selectedTableBadge').textContent='No table'; $('selectTableBtn').textContent='Select table'; resetPreorderState(); resetMenuToStart(); updateSyncBox(); if(navigator.onLine)syncPending();
-    return;
+    await put(STORES.orders,order);await put(STORES.queue,order);
+    activeDineCheckId=order.localOrderId;
+    showToast(isPreorder?('Scheduled · arrive '+formatArrivalTime(arrivalISO)+' · prepare '+formatArrivalTime(prepareAtISO)):(table?table.name:'Check')+' saved locally and queued for Production sync');
+    cart=[];$('customerName').value='';$('phone').value='';$('notes').value='';renderCart();
+    $('placeBtn').textContent='PLACE ORDER';$('payCloseBtn').style.display='none';
+    activeDineCheckId='';selectedTableId='';$('selectedTableBadge').textContent='No table';$('selectTableBtn').textContent='Select table';
+    resetPreorderState();resetMenuToStart();await updateSyncBox();if(navigator.onLine)syncPending();return;
   }
 
-  /* A receipt from a fresh POS checkout is an editable confirmation step.
-     It is saved locally first, but cloud sync is held until the cashier
-     confirms the receipt, so Back to Order can safely edit the same local ID. */
-  const now=new Date().toISOString();
   const existingEditId=window.editingLocalOrderId||'';
   let order=existingEditId?await get(STORES.orders,existingEditId):null;
+  if(order?.serverOrderId){showToast('This order is already in Production and can no longer be edited from its local receipt.');return;}
   if(order){
-    order.updatedAt=now;order.customerName=customerName;order.phone=phone;order.address=$('address').value.trim();order.area=$('area').value.trim();order.deliveryFee=deliveryFee;order.subtotal=subtotal;order.discount=Number(order.discount)||0;order.total=Math.max(0,subtotal-order.discount+deliveryFee);order.paymentMethod=paymentMethod;order.paymentStatus=(paymentMethod==='COD'?'Unpaid':'Paid');order.status='Pending';order.notes=$('notes').value.trim();order.fulfillmentType=type;order.items=cart.map(x=>({...x}));order.checkoutPending=true;order.syncStatus='pending';order.lastSyncError='';
-    await put(STORES.orders,order); await del(STORES.queue,order.localOrderId);
+    order.updatedAt=now;order.customerName=customerName;order.phone=phone;
+    order.address=$('address').value.trim();order.area=$('area').value.trim();order.deliveryFee=deliveryFee;
+    order.subtotal=subtotal;order.discount=Number(order.discount)||0;order.total=Math.max(0,subtotal-order.discount+deliveryFee);
+    order.paymentMethod=paymentMethod;
+    order.paymentStatus=type==='Delivery'||paymentMethod==='COD'?'Unpaid':'Paid';
+    order.status='Pending';order.notes=$('notes').value.trim();order.fulfillmentType=type;
+    order.items=cart.map(x=>({...x}));order.checkoutPending=true;
+    order=prepareLocalPosSyncOrder(order,{bumpRevision:true});
   }else{
     const localOrderId='LOCAL-'+new Date().toISOString().replace(/[-:TZ.]/g,'').slice(0,14)+'-'+crypto.randomUUID().slice(0,8);
-    order={localOrderId,createdAt:now,updatedAt:now,orderSource:'POS',fulfillmentType:type,customerName,phone,address:$('address').value.trim(),area:$('area').value.trim(),deliveryFee,subtotal,discount:0,total:subtotal+deliveryFee,paymentMethod,paymentStatus:(paymentMethod==='COD'?'Unpaid':'Paid'),status:'Pending',notes:$('notes').value.trim(),tableNumber:'',items:cart.map(x=>({...x})),syncStatus:'pending',syncAttempts:0,checkoutPending:true};
-    await put(STORES.orders,order); await del(STORES.queue,order.localOrderId);
+    order=prepareLocalPosSyncOrder({
+      localOrderId,createdAt:now,updatedAt:now,orderSource:'POS',fulfillmentType:type,
+      customerName,phone,address:$('address').value.trim(),area:$('area').value.trim(),
+      deliveryFee,subtotal,discount:0,total:subtotal+deliveryFee,paymentMethod,
+      paymentStatus:type==='Delivery'||paymentMethod==='COD'?'Unpaid':'Paid',
+      status:'Pending',notes:$('notes').value.trim(),tableNumber:'',items:cart.map(x=>({...x})),
+      syncStatus:'pending',syncAttempts:0,checkoutPending:true
+    });
   }
   window.editingLocalOrderId=order.localOrderId;
-  /* Delivery orders must enter the shared Online Orders workflow as soon as
-     Place Order is pressed. Keep the local record first so a failed request
-     can be retried safely from the receipt without losing the cashier's work. */
-  renderCart();
-  await updateSyncBox();
+  await put(STORES.orders,order);
   if(type==='Delivery'){
-    try{
-      const synced=await flameChickCreatePosDeliveryOrder(order);
-      order={...synced,checkoutPending:false,updatedAt:new Date().toISOString(),syncStatus:'synced',status:'Pending',orderSource:'POS'};
-      await put(STORES.orders,order);
-      await del(STORES.queue,order.localOrderId);
-      window.editingLocalOrderId='';
-      receiptEditContext=null;
-      await updateSyncBox();
-      openLocalReceipt(order,{editable:false});
-      showToast('Delivery order sent to Online Orders · Source: POS');
-    }catch(e){
-      const saved=await get(STORES.orders,order.localOrderId)||order;
-      saved.checkoutPending=true;
-      saved.syncStatus='pending';
-      saved.lastSyncError=String(e?.message||'Online Orders submission failed').slice(0,500);
-      await put(STORES.orders,saved);
-      await put(STORES.queue,saved);
-      openLocalReceipt(saved,{editable:true});
-      showToast('Not sent to Online Orders: '+String(e?.message||'Please retry')+' · Order remains saved on this POS');
-    }
+    await put(STORES.queue,order);
+    await updateSyncBox();
+    if(navigator.onLine&&flameChickStaffSession?.access_token)await syncPending();
+    const latest=await get(STORES.orders,order.localOrderId)||order;
+    openLocalReceipt(latest,{editable:!latest.serverOrderId});
+    showToast(latest.serverOrderId?'Delivery order synced to Production · awaiting rider dispatch':'Delivery order saved offline/locally and queued for automatic sync');
     return;
   }
-  /* Takeaway retains the existing local receipt-confirmation flow. */
+  // Takeaway waits for cashier receipt confirmation; confirmation records any
+  // selected payment in the same idempotent server command as the order.
+  await del(STORES.queue,order.localOrderId);
+  renderCart();await updateSyncBox();
   openLocalReceipt(order,{editable:true});
-  showToast('Order saved locally — confirm receipt to finish');
+  showToast('Takeaway saved locally — confirm the receipt to sync it to Production');
 }
 async function reconcileLocalOrderOnServer(localOrderId){
   if(!FLAME_CHICK_ORDER_API_READY)return null;
