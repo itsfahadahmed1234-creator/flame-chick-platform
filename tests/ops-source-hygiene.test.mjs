@@ -194,6 +194,25 @@ test("POS uses one unified V3 sync path for Delivery, Takeaway and Dine-in",()=>
   assert.doesNotMatch(html,/Takeaway and dine-in orders remain local/);
 });
 
+test("POS loads branch-scoped delivery areas and Not Listed fee from the authenticated Order API",()=>{
+  const html=source[0].html;
+  assert.match(html,/view:'pos_delivery_context'/);
+  assert.match(html,/not_listed_delivery_fee/);
+  assert.match(html,/deliveryAreaId=type==='Delivery'/);
+  assert.match(html,/deliveryLocality/);
+  assert.doesNotMatch(html,/snapshot\.deliveryAreas\|\|\[\]/);
+});
+
+test("POS defines a private Realtime lifecycle and a safe automatic refresh fallback",()=>{
+  const html=source[0].html;
+  assert.match(html,/async function startFlameChickRealtime\(\)/);
+  assert.match(html,/async function stopFlameChickRealtime\(\)/);
+  assert.match(html,/fc:branch:/);
+  assert.match(html,/config:\{private:true\}/);
+  assert.match(html,/startFlameChickRealtimeFallback/);
+  assert.match(html,/setInterval\(/);
+});
+
 test("POS saves server payment collection only after cashier confirms a non-delivery receipt",()=>{
   const html=source[0].html;
   assert.match(html,/pendingPayment/);
