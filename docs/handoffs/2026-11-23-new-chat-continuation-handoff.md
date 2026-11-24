@@ -1216,3 +1216,80 @@ Design and implement a single authenticated POS sync contract and service-role-o
 - Latest push CI was triggered after the migration source change: run `45332812304` (workflow `QA Flame Chick catalog publication validation fixes V1`) and run `45332866711` (same workflow after replay fix) were pending/in progress at checkpoint; do not report success until inspected. Other triggered workflow run: `45332866786` pending.
 - Production remains unchanged by this work: do NOT apply the candidate migration, deploy Order API/POS, set secrets, enable Realtime, or publish ordering until the complete source implementation passes disposable local QA and a separately reviewed Production rollout.
 - User has a two-hour setup deadline. Prioritize a verified working core and report honestly if the deadline cannot be met safely; do not sacrifice the database/payment/offline safeguards or pretend a partial migration completes the requirement.
+
+
+# 2026-11-24 — Unified POS sync continuation checkpoint (LATEST)
+
+## User's explicit top priority
+All POS order types — **Dine-in, Takeaway, and Delivery** — must be persisted in the Production database. IndexedDB remains the durable local-first store and offline outbox. If internet is unavailable, the order must remain safely in IndexedDB; when connectivity returns, sync must start automatically and reconcile with the database. Do not restrict cloud sync to Delivery. This is the current top priority.
+
+## Exact repository state
+- Repository: `itsfahadahmed1234-creator/flame-chick-platform` (owner spelling includes `ahmed`).
+- Branch: `work/production-source-audit`.
+- Latest commit: `897f943cff9a7a5568678a0a9c808a8a1da69808` — “Harden POS sync ledger balances and idempotent replay side effects”.
+- New source-only candidate migration: `supabase/migrations/20261124050000_flame_chick_unified_pos_order_sync_v1.sql`.
+- Updated handoff documents: `PROJECT_HANDOFF.md` and this continuation file. Read both first in the next chat.
+- Production Supabase project: `adkrxfnawdiljhjaavnj`, Mumbai `ap-south-1`, Free plan.
+
+## What was checked / workflow status
+- Previous checkpoint workflows all succeeded on commit `e376d2c4c2e010409d079eba3676b70f318048a2`: staff role boundary QA run `45332866687`, catalog publication validation run `45332866711`, Catalog V3 importer local DB run `45332866786`.
+- New workflows triggered on latest commit `897f943cff9a7a5568678a0a9c808a8a1da69808` and were **in progress** at last check: `45334043211` (catalog publication validation), `45334043248` (staff role boundary), `45334043208` (Catalog V3 importer). Recheck them before further edits; do not assume they passed.
+- Production has NOT been modified by the unified-sync candidate. Do not apply this migration or deploy any new Edge Function until the candidate is corrected, API/POS integrated, and end-to-end QA passes. Prior seven operational migrations remain the only approved/applied set.
+
+## Existing POS behavior discovered — preserve it
+- POS has manual order creation, dine-in table checks, takeaway receipts, and delivery checkout already. Do not rebuild the POS.
+- Current `syncPending()` starts with `if(FLAME_CHICK_ORDER_API_READY){await syncPendingPosDeliveryOrders();return;}`; the active delivery-only worker intentionally ignores dine-in and takeaway. This is the behavior to replace with unified sync.
+- `saveLocalOrder()` saves manual orders to IndexedDB stores `orders` and `queue`; dine-in table checks are local and need to sync as mutable open orders. Takeaway is currently finalized as local completed/paid (must change: cashier receipt/payment confirmation is the only proof of collection; don't fabricate paid records from selected payment method). Delivery currently gets sent to the Online Orders board and must remain there as source POS.
+- Existing online event handling already calls `syncPending()`; keep it and extend the worker. Ensure startup, online event, visibility/focus, and periodic retry all call a single idempotent outbox processor.
+- Existing POS API routes support staff auth, board, status, cancellation/rejection and payment collection. Board currently has invalid select columns/relations (see below).
+
+## Candidate migration status — NOT QA-READY
+File: `supabase/migrations/20261124050000_flame_chick_unified_pos_order_sync_v1.sql`.
+- Adds a proposed service-role-only SECURITY DEFINER RPC `flame_chick_sync_pos_order(jsonb)`, local order ID/idempotency, monotonic local revision, dine-in table/scheduled fields, line/modifier/component snapshots, delivery task creation, and optional payment ledger support.
+- Latest commit `897f943...` improved balance_due maintenance, normalizes legacy payment method names to DB-supported values, and wraps delivery task/history writes so same-revision replay does not duplicate those side effects.
+- Candidate is still a draft. The SQL RPC currently accepts client-supplied totals/item snapshots and only checks arithmetic consistency; it does **not yet** independently derive prices/discounts from current published V3 catalog. Never trust these amounts in Production. The API must canonicalize/prices items first; the RPC must only accept a trusted canonical payload from the server and should bind/hash it. Verify all column constraints, idempotency uniqueness, locking, stale revision handling, and SQL syntax against disposable local Supabase before applying.
+- Recheck that payment writes occur only after an explicit cashier-confirmed payment action. A chosen payment method or printed receipt does not mean cash collected. Delivery marked Delivered is still unpaid until cashier collects. Partial collection updates balance; full collection completes and moves order to history. Do not send payment entries just because an offline local UI has a payment-method selection.
+
+## Critical architecture gap: Catalog V3 vs current POS
+- Catalog API returns immutable V3 snapshots and explicitly does not adapt them to legacy schema V2.
+- Current POS `adaptFlameChickCatalog()` expects schemaVersion 2, fields such as `CategoryID`, `ProductID`, `VariantID`, `DealID`, and legacy compatibility rows. The published catalog API returns V3 and currently fails closed in POS. Do not change the API to lie about schema version.
+- Current POS cart holds a mixture of legacy product variant IDs, deal IDs, and deal choice IDs. The trusted order API uses `calculateWebsiteOrder` plus `FlameChickCatalogV3` and `FlameChickCatalogV3DealView`; it expects canonical V3 product/deal/modifier selections.
+- Implement/review a real POS catalog adapter from canonical V3 to POS UI, or change POS selection payload creation to retain V3 IDs and component option IDs. Do not guess legacy-to-V3 mapping. Ensure deals including fixed and choice components, product modifiers, size pricing, availability, and delivery area fee are handled server-side.
+- Server must resolve branch/restaurant/actor from verified staff profile; do not accept body-supplied branch/restaurant as authority. POS delivery must be allowed by staff even if public website ordering flags are disabled.
+
+## Order API integration still missing
+- `supabase/functions/flame-chick-order-api/index.ts` currently calls missing DB RPCs `flame_chick_create_order` and `flame_chick_update_order_status`; implement the correct unified POS sync endpoint using `flame_chick_sync_pos_order` after canonical V3 pricing/validation is complete.
+- Extend RPC allowlist/type and route; authenticate Admin/Owner/Manager/Cashier, derive actor/branch from `resolveStaffContext`, and use service-role-only RPC.
+- Board `readOrderBoard()` currently selects nonexistent columns `table_id`, `table_number_snapshot`, `tax_amount`, `service_charge`, `tip_amount`, nested `order_items.tax_amount`, and nonexistent relation `order_item_components` (verify actual FK relation names before select). Production schema has `table_reference`, `table_label_snapshot` (candidate migration adds these), and no GST/tax/service-charge/tip fields; `order_item_components` is a real table and FK relation, but confirm PostgREST embed name/relationship. Remove unsupported columns, preserve product/deal snapshots and modifiers/components.
+- Production `orders` supports fulfillment types `delivery`, `pickup`, `dine_in`; statuses include new, accepted, preparing, ready, out_for_delivery, delivered, collected, served, completed, rejected, cancelled, returned. It has check constraints: total = subtotal - discount + delivery_fee, delivery fee snapshot matches, customer phone currently has a NOT NULL/check constraint until candidate migration relaxes it, and payment method summaries are not the same as payments ledger methods.
+- Production `order_item_components`, `order_item_modifiers`, `order_status_history`, and `payments` exist. `payments.payment_method` accepts only cash/card/bank/wallet/other; map bank_transfer→bank, cod→cash, online→other only for summary display, never claim payment is collected.
+
+## Required implementation order in next chat
+1. Re-read both handoffs, inspect branch head, inspect all workflow runs above. Do not ask user to repeat context.
+2. Audit and fix candidate SQL against exact live schema/check constraints. Use a disposable local DB replay. Add a deterministic SQL fixture that covers dine-in, takeaway, delivery, update revision, identical replay, conflicting replay, concurrent duplicate, and partial/full payment semantics. Fix any constraint mismatch before API integration.
+3. Resolve V3 catalog/POS compatibility correctly. Inspect catalog snapshot schema, POS UI selection model, deal configurator and pricing engine. Implement adapter or V3 payload path and tests; no legacy ID guessing.
+4. Implement server-side POS quote/canonicalization using current published V3 snapshot and `calculateWebsiteOrder`/deal view, but do not apply website-only branch enablement or website phone rate limits to POS. Compute server totals, delivery fee, modifiers, deals, components, publication version, stable request hash. Verify current catalog sellability.
+5. Implement Order API sync route and use only trusted server-derived actor/restaurant/branch. Use `flame_chick_sync_pos_order` only after the trusted canonicalization is in place.
+6. Replace delivery-only `syncPendingPosDeliveryOrders()` early return with unified IndexedDB outbox sync for all three fulfillment types. Preserve unsynced rows until server confirms/reconciles; never delete queue row on timeout. Use stable local order ID + revision + request hash; on lost response, query by local identity/idempotency and retry safely. Backoff must not stop future automatic sync. Do not let stale in-flight response overwrite a newer local edit.
+7. Distinguish local dine-in open check updates from takeaway and delivery finalization; sync edits and status/receipt state. All order types should appear in database and POS board/history according to lifecycle, source POS. Do not force dine-in and takeaway into delivery board if UI should show separate views; persistence is mandatory.
+8. Payment semantics: order created unpaid by default; only explicit cashier collection records payment; delivery Delivered does not collect; partial balance remains; full payment completes. Offline payment actions need their own stable payment request UUID and queue, replay-safe. Do not report a payment as collected until the server acknowledges it.
+9. Fix board query to exact schema and test PostgREST embeds/normalization for website + POS orders of all fulfillment types.
+10. Run full local migration replay + Edge Function API/PostgREST/Postgres end-to-end tests including offline/reconnect, timeout/lost response, duplicate/concurrent retries, edited order, deal/modifier selections, delivery task, payment replay, branch/role boundaries. Then run all relevant GitHub Actions and inspect logs.
+11. Update both handoffs with exact commits, workflow IDs/results, what's done, what remains, and explicit Production safety status.
+12. Only after local QA passes, prepare a separate reviewed Production rollout. No Production migration apply, Edge Function deploy, secret setup, Realtime enablement, or customer-order activation without explicit authorization for that stage.
+
+## Fixed business constraints — preserve
+- Production is being built; no real customer orders currently operating.
+- Free Supabase plan only; no paid upgrade without explicit approval.
+- GST/tax fields and calculations deferred; do not add GST now.
+- Rider lifecycle only Accept → Picked up → Delivered; no “At restaurant”.
+- Rider Delivered does NOT mean payment collected. Cashier collection completes the order.
+- Delivery offer expiry 60 seconds; reject/expire returns to POS for reassignment.
+- Delivery failure: rider reports return; Manager physically confirms return; cancellation/return audit preserved.
+- Roles: Admin + Owner full authority; Manager POS/return confirmation, no admin panel/deletion; Cashier POS/rider assignment/rejection/cancellation audit, no deletion; Rider only own assigned offers.
+- Website order rate limits are website-only (3/min, 3/10 min, 15/hour), never POS.
+- Manual backup/restore procedure deferred until before real customer orders are accepted; must be done then.
+- Do not deploy Rider Web Push: push remains deliberately disabled/fail-closed (PUSH_NOT_CONFIGURED 503); polling/commands remain the current approach.
+
+## Next-chat opening instruction
+Continue on `work/production-source-audit` at latest branch head. Read `docs/handoffs/2026-11-23-new-chat-continuation-handoff.md` first, then `PROJECT_HANDOFF.md`. Start by checking workflow runs `45334043211`, `45334043248`, `45334043208`; then audit candidate SQL. The immediate target is unified offline-safe sync for Dine-in + Takeaway + Delivery, not a new POS UI. Proceed carefully without asking user to restate known requirements. Do not claim completion or touch Production until end-to-end tests pass and rollout is separately authorized.
