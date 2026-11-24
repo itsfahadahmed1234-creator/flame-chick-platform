@@ -1,6 +1,6 @@
 -- Disposable local-only fixture for exercising the real Website Order API against local PostgREST/RPC.
 -- The owning CI job always tears down the disposable Supabase stack with --no-backup.
-SELECT pg_catalog.set_config('test.flame_chick_route.snapshot_b64', :'snapshot_b64', false) \\gset
+SELECT pg_catalog.set_config('test.flame_chick_route.snapshot_b64', :'snapshot_b64', false) \gset
 
 DO $fixture$
 DECLARE
