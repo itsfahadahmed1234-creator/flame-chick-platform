@@ -4857,3 +4857,28 @@ The disposable behavioral workflow passed before the final migration filename wa
 - The browser still needs an actual post-deploy refresh and UI confirmation. User should Ctrl+Shift+R at `https://flamechicpos.vercel.app`, keep/sign back into the existing Admin account if required, then confirm Menu shows products. No POS order has been created for this test.
 
 **Exact next action:** wait for the user to hard-refresh POS and confirm V3 products appear. If not, inspect fresh browser-visible notice and new Catalog Function logs; check whether the second `action=catalog` request is now present and its status. Do not change catalog data, create tax fields, apply migrations or rebuild POS without new evidence.
+
+
+## 2026-11-24 — POS published deals missing after catalog recovery
+
+### Diagnosis (Production read-only checks)
+- User confirmed product catalog now appears in POS but published deals are absent. Customer website menu continues to load.
+- Read-only Production RPC `public.flame_chick_catalog_public_read('flame-chick')` confirms published V3 snapshot contains 6 deals, 1 deal collection, 6 deal variants, 18 component groups, 18 component options and 18 variant-option mappings. Existing deal names include Flame Hour — The Injector + Cold Drink; Flame Hour — Quarter Broast + Burger + Cold Drink; Flame Duo; Flame Feast; Mini Flame; Little Crunch. No menu/catalog data changes or republish needed.
+- Catalog Edge Function logs show POS health GET and full `action=catalog` GET both HTTP 200 at 2026-11-24 13:28:35–36Z. So the previous missing-script/asset issue is resolved; the POS now downloads the snapshot.
+- Confirmed data-shape mismatch in POS renderer: the raw V3 snapshot uses canonical lower-camel fields such as `dealId`, `dealCollectionId`, `title`, and collection `categoryId`. POS renderer expects projected legacy display fields `DealID`, `Title`, `CategoryID`, `Active`, `Available`, etc. `catalog-v3-adapter.js` already correctly generates that display projection as `adapted.deals`, but POS was rendering/filtering `catalogSnapshot.deals` (raw rows), which have no `Active===true` or display `CategoryID` fields. Therefore product rows displayed while deal cards were filtered out.
+
+### Source fix on branch
+- Commit `560a30ab79ae0d96c63bb4d93ba81fe09f7d18dd`: introduce dedicated `posDeals` state, derive it from `adaptFlameChickCatalog(saved).deals` when restoring local IndexedDB snapshot, and assign `adapted.deals` on successful cloud refresh.
+- Updated category grouping, category counts, and deal rendering to read `posDeals`, never raw `catalogSnapshot.deals`.
+- Added regression test to `tests/pos-catalog-v3-adapter.test.mjs` requiring local and refreshed projection initialization and rejecting raw snapshot deal rendering.
+- Test update commit `b4dd721d2f4f5a1cae27514e5b681194641dd5a5` (branch HEAD at handoff write).
+- No database schema/migrations/data edits; no menu republish; no order created. GST/tax remains deferred.
+
+### CI / deployment status at handoff update
+- New POS/Rider static workflow run **45404679429** on commit `560a30a...` was IN PROGRESS at last check; Admin static workflow **45404679927** succeeded; full disposable Staff Admin Role Boundary QA **45404679684** was IN PROGRESS. Must retrieve final conclusions before deployment.
+- Previous commit's POS/Rider Static Checks **45402935904** and Staff Admin Role Boundary QA **45402935896** passed, but those precede this deals fix and do not validate it.
+- Do NOT deploy the deals fix until run **45404679429** passes. If it fails, inspect logs and fix tests before deployment.
+- After CI passes, create a fresh Vercel POS deployment from current branch HEAD (the later test commit `b4dd721...`, not old `4d75c491...`), wait for READY, assign canonical alias `flamechicpos.vercel.app`, verify alias points to the new deployment, then ask user to hard-refresh and confirm deal cards and deal configurator.
+- Important: previous POS Vercel project root is configured as `apps/flame-chick-pos`. Preserve this root setting and the local V3 runtime bundles.
+
+**Exact next action:** check GitHub Actions run 45404679429. Only after success deploy current HEAD to POS and validate Flame Hour / Flame Duo / Flame Feast / Mini Flame / Little Crunch deal cards plus at least one deal configurator. Keep database untouched.
