@@ -298,13 +298,13 @@ Deno.test("authenticated POS sync prices from V3, derives trusted identity and f
     }
 
     const exactRetry = await invokePos(body);
-    if (exactRetry.status!==201 || exactRetry.body.ok!==true || posSyncPayloads.length!==2 ||
+    if (exactRetry.status!==201 || exactRetry.body.ok!==true || Array.from(posSyncPayloads).length!==2 ||
         posSyncPayloads[0].request_hash!==posSyncPayloads[1].request_hash) {
       throw new Error("An identical POS retry did not produce the same canonical request fingerprint.");
     }
 
     const changedSameRevision = await invokePos({...body,notes:"changed payload at the same local revision"});
-    if (changedSameRevision.status!==201 || changedSameRevision.body.ok!==true || posSyncPayloads.length!==3 ||
+    if (changedSameRevision.status!==201 || changedSameRevision.body.ok!==true || Array.from(posSyncPayloads).length!==3 ||
         posSyncPayloads[2].local_order_id!==posSyncPayloads[0].local_order_id ||
         posSyncPayloads[2].local_revision!==posSyncPayloads[0].local_revision ||
         posSyncPayloads[2].request_hash===posSyncPayloads[0].request_hash) {
