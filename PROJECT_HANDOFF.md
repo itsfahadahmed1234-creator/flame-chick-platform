@@ -1,3 +1,78 @@
+# CURRENT CHECKPOINT — 2026-11-24 — Local Order E2E PASSED; Production Migration Reconciliation COMPLETE (READ ONLY)
+
+**Repository:** `itsfahadahmed1234-creator/flame-chick-platform`  
+**Branch:** `work/production-source-audit`  
+**Source checkpoint before this documentation update:** `1ea0b6762d0c16bc2efed3dcc2923cc2626eebea`  
+**Disposable full QA:** [run 45311516506 — SUCCESS](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45311516506)  
+**Production Supabase project:** `adkrxfnawdiljhjaavnj` (`ap-south-1`, healthy)
+
+## 1. Website Order API → actual local PostgreSQL is green
+
+The full disposable QA run passed. It:
+- replayed all 33 source migrations on a fresh local Supabase stack;
+- passed RLS/security, Admin/Owner/Manager/Cashier/Rider authorization, operational schema and delivery command tests;
+- passed website order create/idempotency and the 3/minute, 3/10-minute and 15/hour quota SQL tests;
+- invoked the actual `handleOrderApiRequest(req)` handler against real local Supabase PostgREST/RPC/PostgreSQL, not mocks;
+- verified stale delivery-fee and tampered-signature rejection, valid quote/commit, safe idempotent replay and changed-facts conflict rejection;
+- confirmed one persisted local website order, one item, one status-history row, one delivery task, one quota event and zero payment rows; its state was `new`, `unpaid`, `dispatch_pending`;
+- passed all 4 delivery concurrency races and both payment-collection concurrency races;
+- stopped the disposable Supabase stack with `supabase stop --no-backup`.
+
+The local test does not write to or deploy anything to Production.
+
+## 2. Production/source migration reconciliation — exact result
+
+Read-only comparison against Production project `adkrxfnawdiljhjaavnj`:
+
+- Current branch contains **33** SQL migrations.
+- Production migration ledger contains **26**.
+- All **26/26 shared versions have exactly matching migration names**.
+- There are **zero** live-only/unknown Production migrations.
+- There are **zero** version/name mismatches.
+
+Seven branch migrations are source-only and are not yet recorded/applied in Production:
+
+1. `20261123160000_flame_chick_operational_schema_v1`
+2. `20261123170000_flame_chick_staff_role_projection_rpc_v1`
+3. `20261123171000_flame_chick_delivery_offer_identity_guard_v1`
+4. `20261123172000_flame_chick_delivery_commands_v1`
+5. `20261123173000_flame_chick_payment_collection_v1`
+6. `20261123174000_flame_chick_website_order_create_v1`
+7. `20261123174100_flame_chick_website_order_idempotency_lookup_v1`
+
+Live Production checks confirm the corresponding operational tables and RPCs remain absent: `orders`, `order_items`, `delivery_tasks`, `delivery_task_offers`, `rider_profiles`, website order create RPC, delivery command RPC and payment collection RPC all resolve to NULL. This is expected at this pre-launch stage.
+
+## 3. Important correction: previous function-hash warning was a false positive
+
+The old warning compared preflight hashes (the expected *before* state of each migration) with the currently live functions (the *after* state). The migration ledger confirms both migrations have already been applied, and the source chain proves the transition:
+
+- Source body from `20261121155900_flame_chick_catalog_public_snapshot_read_v1` hashes to `450bb2ea8671bcc581240c7af2400f49323efeef2aa3f1d2e6e5c9dbe6c919e4`, exactly the baseline required by `20261123101105`.
+- The resulting source body from `20261123101105_flame_chick_catalog_database_time_metadata_v1` hashes to `110dc450d835d15662a01bc72c7d750933ee145834a0abee75f45ea4700abab2`, exactly the live Production `public.flame_chick_catalog_public_read(text)` body.
+- Source body from `20261122105821_flame_chick_catalog_publication_validation_fixes_v1` gives validator hash `f179cc3b15b1d6ad5b07b90587513001bed97b752b09b13ce2d9c946e88a7750` and compiler hash `1cee9543d131260f71573afc2f0a5a204422a59fa7f46ef0b24f4c2e277e3808), exactly the two baselines required by `20261123101126`.
+- The resulting source validator body from `20261123101126_flame_chick_deal_only_variant_pricing_v1` hashes to `270133a76cb649e70190945028b87b916b9e946d63e2794550fef31ad3fec86d`, exactly the live Production validator body; the live compiler remains `1cee9543...`, as expected.
+- Both live function definitions remain owned by `postgres`, `SECURITY DEFINER`, with `search_path=""`; the public catalog read is executable only by `service_role`.
+
+**Do not edit the Production migration ledger, renumber these two applied migrations, or replay them.** The before-state preflight hashes are correct and the deployed after-state function bodies match source.
+
+## 4. Deployment / Production boundary
+
+This reconciliation was read-only. No Production SQL, migration, key, secret, Edge Function, Realtime, Storage, branch-ordering, catalog publication, Vercel deployment or domain change occurred. `main` remains untouched.
+
+Still not configured/deployed:
+- the seven operational migrations and their tables/RPCs;
+- server-only `FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET`;
+- real delivery-area records and Not Listed default fee;
+- Catalog and Order Edge Function deployment;
+- V3 customer checkout activation.
+
+Keep website ordering flags disabled. Do not apply the seven migrations or deploy APIs until the operational migration rollout is separately reviewed and explicitly approved. GST remains deferred. Rider marking Delivered still does not collect payment; only Cashier payment collection completes an order and moves it to History.
+
+## 5. Next step
+
+Prepare a final read-only rollout review for the seven source-only operational migrations: dependency/order, grants/RLS, SECURITY DEFINER boundaries, rollback/recovery, server-only secret requirements, function deployment order and post-migration verification. Produce a specific checklist and exact SQL/function versions to be applied, but do not push migrations, configure secrets, deploy functions or enable checkout without a separate explicit approval.
+
+---
+
 # CURRENT CHECKPOINT — 2026-11-24 — Website Order API → Local Postgres E2E PASSED
 
 **Repository:** `itsfahadahmed1234-creator/flame-chick-platform`  
