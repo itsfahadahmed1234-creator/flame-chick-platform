@@ -1,3 +1,45 @@
+# CURRENT CHECKPOINT — 2026-11-24 — Website V3 signed quote protection PASSED SOURCE CI
+
+**Active repository:** `itsfahadahmed1234-creator/flame-chick-platform`  
+**Active branch:** `work/production-source-audit`  
+**Verified head:** `520e79e0276bfea205d7a3ebdb2bf6931e947b86`  
+**Website Static Checks:** [run 45308055860 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45308055860)  
+**Edge Function Static Checks:** [run 45233268331 — success](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45233268331), on parent code commit `38d4501bc8f372eceed0e4316dadd8e7348b4081`; the Edge Function/helper source is unchanged in the current head.
+
+## Website V3 quote and checkout protection
+
+- Added `supabase/functions/_shared/website-order-quote-token.mjs` and six tests in `tests/website-order-quote-token.test.mjs`.
+- The Order API now signs a short-lived (3-minute) HMAC-SHA-256 quote token using the server-only `FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET` environment secret.
+- The signed claims contain a quote UUID, DB-issued time, expiry and an HMAC fingerprint of the canonical server-calculated order. Raw customer name, phone, address, cart contents and prices are not embedded in the token.
+- On checkout, the Edge Function rebuilds the canonical quote from the current published V3 catalog and live branch/delivery settings, then checks the submitted token against the newly calculated order. Changed/expired/tampered/missing quote tokens fail closed.
+- The database create-order RPC still independently rechecks the current publication, branch fulfilment, delivery fee, totals, idempotency and atomic per-phone quotas. The signed token is an additional “customer reviewed this exact quote” control; it does not replace database authority.
+- Website V3 now requires the returned token before enabling a checkout submit. It keeps the quote token and exact submit body in memory; only a random retry UUID is saved in sessionStorage. Checkout fails closed if secure UUID generation or sessionStorage write/read is unavailable.
+- The legacy homepage cart remains redirected to the separate V3 ordering page; the V2 order payload is still rejected.
+- GST remains deferred. This work does not add online payment gateway settlement, refunds, tax calculations or tax fields.
+
+## CI evidence
+
+- Website Static Checks [run 45308055860](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45308055860), exact head `520e79e0276bfea205d7a3ebdb2bf6931e947b86`: passed active JavaScript syntax, **103/103 core website/catalog tests**, **25/25 preview tests**, and inline-script parsing.
+- Edge Function Static Checks [run 45233268331](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45233268331), exact code parent `38d4501bc8f372eceed0e4316dadd8e7348b4081`: passed Deno checks for all Edge Functions and **42/42 Edge/RPC/pricing/quote-token tests**. Quote tests cover canonical binding, no raw PII, stale totals, exact expiry boundary, tampering, missing tokens/secrets and invalid DB time.
+- The earlier Website Static Checks failure on `31bfc13ec5e50ce4100de9a697d50750867a3d7d` was a bad test regex expecting the old random UUID expression. The assertion was corrected in the current head, and run 45308055860 passed.
+
+## Required before deployment — not yet configured or deployed
+
+1. Configure a separate random `FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET` (minimum 32 bytes) in Supabase Edge Function secrets. Never commit it or expose it to the browser. The Order API intentionally returns 503 for quote signing until this secret exists.
+2. Reconcile and apply the already-tested operational/order/delivery/payment migrations to the target Production project in the separately reviewed rollout stage. Production still lacks operational order/delivery/payment tables/RPCs and the Order API deployment.
+3. Complete the website delivery-area/default-fee configuration, enable branch website ordering only after the required operational data is correct, and run the complete Edge HTTP/browser checkout verification before launch.
+4. Deploy the Catalog and Order Edge Functions and website only after the preceding prerequisites and explicit release review. No deployment occurred in this checkpoint.
+
+## Safety boundary
+
+This checkpoint is source code plus CI only. No Supabase Production SQL/migration/secret change, Edge Function deploy, Vercel deploy, Realtime activation, branch order enablement, catalog publication or checkout activation occurred. `main` was not changed. Flame Chick remains a pre-launch build, not an operating restaurant system.
+
+## Next step
+
+Build an end-to-end disposable checkout verification harness around the actual Order API routes: quote issuance, stale/expired/tampered quote rejection, idempotent retry, current-publication change, delivery fee revalidation, and the 3/minute, 3/10-minute, 15/hour phone quotas. Keep all test data synthetic and rolled back. Then review deployment prerequisites separately.
+
+---
+
 # CURRENT CHECKPOINT — 2026-11-23 — Step 3 Cashier payment collection V1 PASSED
 
 **Active branch:** `work/production-source-audit`  
