@@ -1329,3 +1329,33 @@ Continue on `work/production-source-audit` at latest branch head. Read `docs/han
 ## Production safety
 Production remains unchanged by this source-only work. The live migration ledger remains at 33 applied migrations; the candidate `20261124050000_flame_chick_unified_pos_order_sync_v1.sql` remains unapplied. Do not deploy functions, set secrets, enable Realtime, apply this candidate migration, enable website orders, or deploy Vercel as part of this step. No GST/tax fields or calculations. Free plan only. Keep IndexedDB; do not rebuild the POS.
 
+
+
+# 2026-11-24 — POS V3 database-catalog adapter foundation (NOT YET WIRED INTO POS)
+
+**User clarification:** Flame Chick Production is the intended production system being built. There is no live operation and no real customer/order production data. Continue building the real Production architecture; use disposable local Supabase for migration and integration tests. Do not seed fake operational data into the Production project.
+
+**Catalog-source decision (explicit):** The POS must use the new published database-backed V3 catalog as its only menu source. Do not use the old V2 catalog or V2 legacy identifiers as a fallback. Keep the existing POS screen/workflow; replace its catalog integration, not the POS itself.
+
+## Source files added
+- `apps/flame-chick-pos/catalog-v3-adapter.js`: standalone V3-to-POS display projection. It validates the V3 snapshot through the shared catalog contract, resolves a branch, uses database time and the shared V3 deal view, carries V3 product/variant/category/deal/component-option IDs, respects branch availability and sellable/priced variant requirements, and does not map legacy IDs.
+- `tests/pos-catalog-v3-adapter.test.mjs`: regression tests for V3 identity preservation, branch availability, null/non-standalone pricing, exact deal IDs, unavailable deals, multi-branch selection and fail-closed V2/time handling.
+
+## Important current status
+- These files are a separate adapter/test foundation only. The existing `apps/flame-chick-pos/index.html` has **not yet been wired to load/use this adapter** and still expects schema V2. Do not describe the POS as V3-integrated or operational.
+- The test file has been added, but its execution has not yet been confirmed by a CI run. Existing successful POS static checks ran on the earlier adapter commit and do not validate this new adapter/test.
+- The current published database snapshot read-only inspection returned schema V3, publication number 2, 1 branch, 8 categories, 25 products, 28 variants, 6 deals, 18 component groups/options/mappings. It currently has zero modifiers, zero modifier assignments/rules, zero delivery areas, and zero drink options. Do not infer that empty tables mean the POS can assume modifiers or delivery fee data exist; fail closed for any required unavailable setup.
+- The single current branch has website ordering disabled; POS staff ordering must not depend on those website flags.
+
+## Next exact work
+1. Execute the new adapter test with the existing V3 fixture and correct any mismatches against the actual contract.
+2. Wire the POS page to load the V3 contract, V3 deal view and adapter before the POS application code. Replace the V2 health/schema check and V2-shaped cache adapter with V3-only loading; persist the immutable V3 snapshot and a normalized display projection in IndexedDB. Keep V3 IDs in cart lines.
+3. Replace the V2 modifier UI adapter with the shared V3 `buildProductModifierGroups` / `validateModifierSelections` contract. Keep size-specific modifier prices from V3 rules; do not infer FREE/FIXED/BY_SIZE fields.
+4. Replace the old V2 deal UI with V3 `buildDealViewModel` variants/groups/options and `validateDealSelections`. Submit exact `deal_variant_id`, `component_group_id`, `component_option_id`, quantity and nested modifier IDs to server pricing.
+5. Implement authenticated staff POS quote/create/update API. Derive staff, branch, source and permissions from the authenticated staff context; never trust browser totals or browser-provided `staffPos`. Use V3 server pricing and current publication/database time.
+6. Integrate all three fulfilments with the durable IndexedDB outbox and the unified sync RPC; preserve stable local identity, revision conflict protection, server acknowledgement, lost-response reconciliation and offline retry.
+7. Test dine-in table leases/uniqueness across two terminals, all three fulfilments, edits, modifiers/deals, delivery fee validation, payments, concurrency, realtime board and offline reconnect against disposable local Supabase.
+8. Only after full disposable integration tests pass, review the migration and deploy/cut over deliberately. No unverified migration.
+
+## Safety
+No Production DB changes, test orders, customer records, function deployment, Vercel deployment or Realtime changes were made in this adapter step. No GST/tax changes. Free plan only. Keep the existing POS UI and IndexedDB offline-first design.
