@@ -13,6 +13,9 @@ BEGIN
   IF pg_catalog.to_regprocedure('public.flame_chick_collect_order_payment(jsonb)') IS NULL THEN
     RAISE EXCEPTION 'POS_PAYMENT_RPC_MISSING';
   END IF;
+  IF pg_catalog.to_regprocedure('public.flame_chick_update_order_status(jsonb)') IS NULL THEN
+    RAISE EXCEPTION 'POS_ORDER_STATUS_RPC_MISSING';
+  END IF;
 END;
 $preflight$;
 
@@ -23,6 +26,7 @@ DECLARE
   admin uuid:='d1111111-1111-4111-8111-111111111110';
   cashier uuid:='d1111111-1111-4111-8111-111111111111';
   rider uuid:='d1111111-1111-4111-8111-111111111112';
+  manager uuid:='d1111111-1111-4111-8111-111111111113';
   category uuid:=gen_random_uuid();
   product uuid:=gen_random_uuid();
   variant uuid:=gen_random_uuid();
@@ -49,10 +53,12 @@ BEGIN
     (cashier,'authenticated','authenticated','qa-pos-cashier@example.invalid','',now_at,
       '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,now_at,now_at,false,false),
     (rider,'authenticated','authenticated','qa-pos-rider@example.invalid','',now_at,
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,now_at,now_at,false,false),
+    (manager,'authenticated','authenticated','qa-pos-manager@example.invalid','',now_at,
       '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,now_at,now_at,false,false);
 
   INSERT INTO public.user_profiles(user_id,display_name,is_active)
-  VALUES(admin,'QA POS Admin',true),(cashier,'QA POS Cashier',true),(rider,'QA POS Rider',true);
+  VALUES(admin,'QA POS Admin',true),(cashier,'QA POS Cashier',true),(rider,'QA POS Rider',true),(manager,'QA POS Manager',true);
   INSERT INTO public.user_roles(
     restaurant_id,user_id,role_key,branch_id,is_active,assigned_by,reason,request_id,assignment_method
   ) VALUES(r,admin,'admin',NULL,true,admin,'Disposable POS bootstrap QA',gen_random_uuid(),'initial_bootstrap');
@@ -60,7 +66,8 @@ BEGIN
     restaurant_id,user_id,role_key,branch_id,is_active,assigned_by,reason,request_id
   ) VALUES
     (r,cashier,'cashier',b,true,admin,'Disposable POS sync QA',gen_random_uuid()),
-    (r,rider,'rider',b,true,admin,'Disposable POS sync QA',gen_random_uuid());
+    (r,rider,'rider',b,true,admin,'Disposable POS sync QA',gen_random_uuid()),
+    (r,manager,'manager',b,true,admin,'Disposable POS sync QA',gen_random_uuid());
 
   IF NOT EXISTS (
     SELECT 1 FROM public.flame_chick_get_staff_role_rows(cashier)
@@ -93,6 +100,7 @@ BEGIN
   PERFORM set_config('qa.pos.branch_id',b::text,true);
   PERFORM set_config('qa.pos.cashier_id',cashier::text,true);
   PERFORM set_config('qa.pos.rider_id',rider::text,true);
+  PERFORM set_config('qa.pos.manager_id',manager::text,true);
   PERFORM set_config('qa.pos.product_id',product::text,true);
   PERFORM set_config('qa.pos.variant_id',variant::text,true);
   PERFORM set_config('qa.pos.publication_id',publication::text,true);
@@ -106,6 +114,7 @@ DECLARE
   b uuid:=current_setting('qa.pos.branch_id')::uuid;
   cashier uuid:=current_setting('qa.pos.cashier_id')::uuid;
   rider uuid:=current_setting('qa.pos.rider_id')::uuid;
+  manager uuid:=current_setting('qa.pos.manager_id')::uuid;
   product uuid:=current_setting('qa.pos.product_id')::uuid;
   variant uuid:=current_setting('qa.pos.variant_id')::uuid;
   publication uuid:=current_setting('qa.pos.publication_id')::uuid;
@@ -123,6 +132,10 @@ DECLARE
   delivery_order_id uuid;
   payment_request uuid:='e3333333-3333-4333-8333-333333333331';
   unique_table_rejected boolean:=false;
+  status_request uuid:='e4444444-4444-4444-8444-444444444441';
+  cancel_local uuid:='e1111111-1111-4111-8111-111111111115';
+  cancel_order_id uuid;
+  status_payload jsonb;
 BEGIN
   -- Dine-in walk-in: no phone, no payment method, table is server persisted.
   payload:=jsonb_build_object(
@@ -149,6 +162,56 @@ BEGIN
     RAISE EXCEPTION 'POS_DINE_IN_WALKIN_CREATE_FAILED: %',result;
   END IF;
   v_dine_order_id:=(result->>'order_id')::uuid;
+
+  -- Cashier advances Dine-in through kitchen and marks it Served.
+  status_payload:=jsonb_build_object('order_id',v_dine_order_id,'actor_user_id',cashier,'request_id',status_request,'to_status','accepted');
+  result:=public.flame_chick_update_order_status(status_payload);
+  IF result->>'ok'<>'true' OR result->>'from_status'<>'new' OR result->>'status'<>'accepted' THEN
+    RAISE EXCEPTION 'POS_STATUS_ACCEPT_FAILED: %',result;
+  END IF;
+  result:=public.flame_chick_update_order_status(status_payload);
+  IF result->>'ok'<>'true' OR result->>'already_processed'<>'true' THEN
+    RAISE EXCEPTION 'POS_STATUS_IDEMPOTENT_REPLAY_FAILED: %',result;
+  END IF;
+  changed:=jsonb_set(status_payload,'{to_status}',to_jsonb('preparing'::text),true);
+  changed:=jsonb_set(changed,'{request_id}',to_jsonb(gen_random_uuid()),true);
+  result:=public.flame_chick_update_order_status(changed);
+  IF result->>'ok'<>'true' OR result->>'status'<>'preparing' THEN RAISE EXCEPTION 'POS_STATUS_PREPARING_FAILED: %',result; END IF;
+  changed:=jsonb_set(changed,'{to_status}',to_jsonb('ready'::text),true);
+  changed:=jsonb_set(changed,'{request_id}',to_jsonb(gen_random_uuid()),true);
+  result:=public.flame_chick_update_order_status(changed);
+  IF result->>'ok'<>'true' OR result->>'status'<>'ready' THEN RAISE EXCEPTION 'POS_STATUS_READY_FAILED: %',result; END IF;
+  changed:=jsonb_set(changed,'{to_status}',to_jsonb('served'::text),true);
+  changed:=jsonb_set(changed,'{request_id}',to_jsonb(gen_random_uuid()),true);
+  result:=public.flame_chick_update_order_status(changed);
+  IF result->>'ok'<>'true' OR result->>'status'<>'served'
+     OR (SELECT served_at FROM public.orders WHERE id=v_dine_order_id) IS NULL THEN
+    RAISE EXCEPTION 'POS_STATUS_DINE_IN_SERVED_FAILED: %',result;
+  END IF;
+
+  -- Cashier cannot cancel. Manager can cancel with a required audit reason.
+  changed:=jsonb_set(payload,'{local_order_id}',to_jsonb(cancel_local::text),true);
+  changed:=jsonb_set(changed,'{idempotency_key}',to_jsonb('flame-chick-pos-'||cancel_local::text),true);
+  changed:=jsonb_set(changed,'{request_hash}',to_jsonb(repeat('7',64)),true);
+  changed:=jsonb_set(changed,'{table_reference}',to_jsonb('TABLE-02'::text),true);
+  changed:=jsonb_set(changed,'{table_label_snapshot}',to_jsonb('Table 2'::text),true);
+  result:=public.flame_chick_sync_pos_order(changed);
+  IF result->>'ok'<>'true' THEN RAISE EXCEPTION 'POS_CANCEL_FIXTURE_CREATE_FAILED: %',result; END IF;
+  cancel_order_id:=(result->>'order_id')::uuid;
+  status_payload:=jsonb_build_object('order_id',cancel_order_id,'actor_user_id',cashier,'to_status','cancelled','reason','Customer changed mind');
+  result:=public.flame_chick_update_order_status(status_payload);
+  IF result->>'ok'<>'false' OR result#>>'{error,code}'<>'ORDER_STATUS_CANCEL_ROLE_REQUIRED' THEN
+    RAISE EXCEPTION 'POS_CASHIER_CANCEL_NOT_DENIED: %',result;
+  END IF;
+  status_payload:=jsonb_set(status_payload,'{actor_user_id}',to_jsonb(manager::text),true);
+  status_payload:=jsonb_set(status_payload,'{request_id}',to_jsonb(gen_random_uuid()),true);
+  result:=public.flame_chick_update_order_status(status_payload);
+  IF result->>'ok'<>'true' OR result->>'status'<>'cancelled'
+     OR (SELECT cancelled_by_type FROM public.orders WHERE id=cancel_order_id)<>'manager'
+     OR (SELECT cancellation_reason FROM public.orders WHERE id=cancel_order_id)<>'Customer changed mind'
+     OR NOT EXISTS(SELECT 1 FROM public.order_status_history WHERE order_id=cancel_order_id AND to_status='cancelled') THEN
+    RAISE EXCEPTION 'POS_MANAGER_CANCEL_AUDIT_FAILED: %',result;
+  END IF;
 
   -- Exact retry replays the same server order; changed facts at the same
   -- revision are rejected. A later revision updates that still-new order.
@@ -304,7 +367,7 @@ ROLLBACK;
 DO $cleanup$
 BEGIN
   IF EXISTS(SELECT 1 FROM public.restaurants WHERE slug='flame-chick')
-     OR EXISTS(SELECT 1 FROM auth.users WHERE email IN('qa-pos-admin@example.invalid','qa-pos-cashier@example.invalid','qa-pos-rider@example.invalid')) THEN
+     OR EXISTS(SELECT 1 FROM auth.users WHERE email IN('qa-pos-admin@example.invalid','qa-pos-cashier@example.invalid','qa-pos-rider@example.invalid','qa-pos-manager@example.invalid')) THEN
     RAISE EXCEPTION 'POS_SYNC_TEST_FIXTURES_NOT_ROLLED_BACK';
   END IF;
 END;
