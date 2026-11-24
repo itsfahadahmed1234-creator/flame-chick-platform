@@ -6,7 +6,7 @@ BEGIN
   IF current_user<>'postgres' OR session_user<>'postgres' THEN
     RAISE EXCEPTION 'DELIVERY_CONCURRENCY_SETUP_REQUIRES_POSTGRES';
   END IF;
-  IF EXISTS(SELECT 1 FROM public.restaurants WHERE slug='flame-chick')
+  IF EXISTS(SELECT 1 FROM public.restaurants WHERE slug='qa-delivery-race')
      OR EXISTS(SELECT 1 FROM auth.users WHERE email LIKE 'qa-delivery-race-%@example.invalid') THEN
     RAISE EXCEPTION 'DELIVERY_CONCURRENCY_SETUP_IDENTITY_CONFLICT';
   END IF;
@@ -76,7 +76,7 @@ BEFORE INSERT ON public.payments
 FOR EACH ROW EXECUTE FUNCTION app_private.test_payment_collection_race_delay();
 
 INSERT INTO public.restaurants(id,name,slug,currency_code,timezone,is_active)
-VALUES('b7777777-7777-4777-8777-777777777660','QA Delivery Concurrency','flame-chick','PKR','Asia/Karachi',true);
+VALUES('b7777777-7777-4777-8777-777777777660','QA Delivery Concurrency','qa-delivery-race','PKR','Asia/Karachi',true);
 INSERT INTO public.branches(id,restaurant_id,branch_code,name,is_active)
 VALUES('b7777777-7777-4777-8777-777777777661','b7777777-7777-4777-8777-777777777660','qa-race','QA Concurrency Branch',true);
 INSERT INTO public.delivery_areas(id,restaurant_id,branch_id,name,delivery_fee,is_active)
