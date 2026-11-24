@@ -92,7 +92,6 @@ test('adds full payment as a separate idempotent request for Takeaway/Dine-in',(
 test('builds Delivery with a published area ID and never collects payment at Rider delivery time',()=>{
   const s=snapshot();
   const areaId='bb000000-0000-4000-8000-000000000001';
-  s.deliveryAreas=[{deliveryAreaId:areaId,nameEn:'Gulshan',deliveryFee:50,available:true}];
   const order=baseOrder({
     fulfillmentType:'Delivery',area:'Gulshan',deliveryAreaId:areaId,
     address:'House 10, Gulshan, Karachi',deliveryInstructions:'Ring bell'
@@ -101,7 +100,7 @@ test('builds Delivery with a published area ID and never collects payment at Rid
   assert.equal(payload.fulfillment_type,'delivery');
   assert.deepEqual(payload.delivery,{
     selection_type:'listed_area',area_id:areaId,other_locality:null,
-    address:'House 10, Gulshan, Karachi',instructions:''
+    address:'House 10, Gulshan, Karachi',instructions:'Ring bell'
   });
   assert.equal(Object.hasOwn(payload,'payment'),false);
   assert.throws(()=>sync.buildSyncPayload({...order,pendingPayment:{requestId:PAYMENT,amount:550,method:'cash'}},s,IDS.branch,{contract,dealView}),e=>e.code==='POS_PAYMENT_FULFILLMENT_INVALID');
