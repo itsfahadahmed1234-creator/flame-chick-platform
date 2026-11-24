@@ -160,6 +160,12 @@ BEGIN
   END IF;
 
   changed:=jsonb_set(payload,'{notes}',to_jsonb('changed at same revision'::text),true);
+  -- The trusted Order API hashes its canonical payload. A changed payload at the
+  -- same revision therefore arrives with a different server-computed fingerprint.
+  changed:=jsonb_set(changed,'{request_hash}',to_jsonb(repeat('6',64)),true);
+  IF changed->>'request_hash'=payload->>'request_hash' THEN
+    RAISE EXCEPTION 'POS_TEST_CHANGED_PAYLOAD_HASH_DID_NOT_CHANGE';
+  END IF;
   result:=public.flame_chick_sync_pos_order(changed);
   IF result->>'ok'<>'false' OR result#>>'{error,code}'<>'POS_ORDER_REVISION_CONFLICT' THEN
     RAISE EXCEPTION 'POS_SAME_REVISION_CHANGED_PAYLOAD_NOT_REJECTED: %',result;
