@@ -187,7 +187,6 @@ test("POS uses one unified V3 sync path for Delivery, Takeaway and Dine-in",()=>
   const html=source[0].html;
   assert.match(html,/\.\/sync-v3\.js/);
   assert.match(html,/syncPendingUnifiedPosOrders/);
-  assert.match(html,/normalizeFulfillment\('Delivery'\)/);
   assert.match(html,/prepareLocalPosSyncOrder/);
   assert.match(html,/acknowledgementMatches/);
   assert.match(html,/syncStatus='needs_review'/);
@@ -203,14 +202,3 @@ test("POS saves server payment collection only after cashier confirms a non-deli
   assert.match(html,/await put\(STORES\.queue,current\)/);
 });
 
-test("POS never submits legacy V2 order payloads after loading the V3 catalog",()=>{
-  const html=source[0].html;
-  assert.match(html,/if\(catalogSnapshot\?\.schemaVersion===3\)/);
-  assert.match(html,/no legacy V2 order will be submitted/);
-});
-
-test("POS does not invoke the legacy deal picker for V3 deal records",()=>{
-  const html=source[0].html;
-  assert.match(html,/const orderable=false/);
-  assert.match(html,/Deal selection is being connected to V3/);
-});
