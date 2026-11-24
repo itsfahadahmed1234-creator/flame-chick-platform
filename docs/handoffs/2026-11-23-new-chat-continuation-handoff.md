@@ -2015,3 +2015,14 @@ The disposable behavioral workflow passed before the final migration filename wa
 - Assigned `flamechicadmin.vercel.app` to the READY Admin deployment. Verified Vercel alias lookup maps the canonical domain to `dpl_48CK9TiY468Tyvhc6zzMmxbDFWcd` (state READY). User must hard-refresh and confirm browser rendering.
 - POS custom domain is also registered/verified but no canonical alias is currently present. Do NOT assign the existing ready POS deployment from commit `30d960c`: current branch has substantive later changes to `apps/flame-chick-pos/index.html` (+470/-402) and new `apps/flame-chick-pos/sync-v3.js` (+280), so it is stale. Build/deploy POS from current audited branch and validate CI before assigning canonical POS domain. POS latest ready deployment is not proof current POS source is deployed.
 - Rider canonical alias was separately repaired earlier to its READY deployment from `30d960c`; its app source itself has no later source changes in current compare. Rider portal still needs actual browser confirmation and separate Rider role/profile.
+
+
+## 2026-11-24 — POS canonical deployment alias repaired
+
+- User confirmed canonical Admin portal opens after Admin alias was assigned to READY deployment `dpl_48CK9TiY468Tyvhc6zzMmxbDFWcd`.
+- POS project `flame-chick-pos-production` had verified custom domain `flamechicpos.vercel.app` registered but no deployment alias, causing the same Vercel 404. POS app source had changed substantially after the older READY deployment, so that stale build was not assigned.
+- Confirmed POS/Rider static workflow passed at commit `8f64002dd4ec31a2acaa76099cf64e706d4fefa7` (run `45375639994`). Compared that commit to current branch HEAD `1bbbd45f597847d03a7ec6cda0c64be16fd54661`: no POS or Rider app source changed after the passing workflow; only website, Staff Admin CORS, tests and handoffs changed.
+- Created Vercel deployment `dpl_GVqLwxp6aLumC9eN5xhjsRMERmj7` from the current branch HEAD `1bbbd45f597847d03a7ec6cda0c64be16fd54661`, inheriting the existing POS project configuration/environment. Vercel build completed and state is READY.
+- Assigned canonical alias `flamechicpos.vercel.app` to this READY deployment. Verified Vercel alias lookup maps the domain to `dpl_GVqLwxp6aLumC9eN5xhjsRMERmj7` and the deployment state is READY.
+- User must now open `https://flamechicpos.vercel.app` and confirm login screen loads; then test sign-in using the existing Admin email/password (or password reset already described). A READY build and alias mapping are not equivalent to a browser login/functional smoke test.
+- Do not claim full POS production readiness until POS login, incoming order board, order status RPC, payment collection and offline IndexedDB-to-Supabase sync are manually exercised.
