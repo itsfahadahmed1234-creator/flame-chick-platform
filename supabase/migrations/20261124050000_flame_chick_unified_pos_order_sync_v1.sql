@@ -43,6 +43,15 @@ COMMENT ON COLUMN public.orders.local_revision IS 'Monotonic local POS edit revi
 COMMENT ON COLUMN public.orders.table_reference IS 'POS-local table identity for dine-in checks; not a foreign key to a shared table registry.';
 COMMENT ON COLUMN public.orders.scheduled_for IS 'Requested dine-in preorder arrival time, if applicable.';
 
+-- A dine-in table has one active check across terminals. Served/unpaid checks
+-- remain active; payment completion or cancellation releases the table.
+CREATE UNIQUE INDEX orders_one_active_dine_in_check_per_table_idx
+  ON public.orders(branch_id,table_reference)
+  WHERE fulfillment_type='dine_in'
+    AND table_reference IS NOT NULL
+    AND status NOT IN ('completed','cancelled','rejected','returned');
+
+
 CREATE OR REPLACE FUNCTION public.flame_chick_sync_pos_order(p_payload jsonb)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=''
 AS $function$
