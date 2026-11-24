@@ -15,6 +15,9 @@ on:
       - "supabase/tests/flame_chick_website_order_route_verify.sql"
       - "supabase/tests/flame_chick_website_order_route_teardown_guard.sql"
       - "supabase/functions/flame-chick-order-api/index_local_test.ts"
+      - "supabase/functions/flame-chick-delivery-api/index.ts"
+      - "supabase/functions/flame-chick-delivery-api/index_test.ts"
+      - "apps/flame-chick-rider/index.html"
       - "tests/fixtures/catalog-v3-fixture.cjs"
       - "supabase/tests/flame_chick_delivery_concurrency_setup.sql"
       - "supabase/tests/flame_chick_delivery_concurrency.sh"
@@ -131,6 +134,8 @@ jobs:
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: "2.x"
+      - name: Verify Rider Web Push fails closed until encrypted implementation is ready
+        run: deno test --allow-env supabase/functions/flame-chick-delivery-api/index_test.ts
       - name: Exercise actual Website Order API against disposable local PostgREST and PostgreSQL
         shell: bash
         run: |
