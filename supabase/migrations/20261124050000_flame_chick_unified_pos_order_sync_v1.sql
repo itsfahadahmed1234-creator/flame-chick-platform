@@ -72,6 +72,12 @@ BEGIN
   v_customer_phone:=NULLIF(pg_catalog.btrim(p_payload->>'customer_phone'),'');
   v_notes:=NULLIF(pg_catalog.btrim(p_payload->>'notes'),'');
   v_payment_method:=pg_catalog.lower(pg_catalog.btrim(COALESCE(p_payload->>'payment_method','')));
+  v_payment_method:=CASE v_payment_method
+    WHEN 'bank_transfer' THEN 'bank'
+    WHEN 'online' THEN 'other'
+    WHEN 'cod' THEN 'cash'
+    ELSE v_payment_method
+  END;
   v_table_reference:=NULLIF(pg_catalog.btrim(p_payload->>'table_reference'),'');
   v_table_label:=NULLIF(pg_catalog.btrim(p_payload->>'table_label_snapshot'),'');
   v_kitchen_timing:=NULLIF(pg_catalog.lower(pg_catalog.btrim(p_payload->>'kitchen_timing')),'');
@@ -216,7 +222,7 @@ BEGIN
         delivery_address=v_address,delivery_area_id=v_area_id,delivery_area_name_snapshot=v_area_name,
         delivery_area_fee_snapshot=v_delivery_fee,delivery_selection_type=v_selection_type,delivery_instructions=v_instructions,
         subtotal=v_subtotal,discount_amount=0,delivery_fee=v_delivery_fee,total=v_total,
-        catalog_publication_id=NULLIF(p_payload->>'catalog_publication_id','')::uuid,
+        balance_due=GREATEST(v_total-v_existing.paid_amount,0),catalog_publication_id=NULLIF(p_payload->>'catalog_publication_id','')::uuid,
         catalog_version=NULLIF(p_payload->>'catalog_version','')::bigint,
         table_reference=v_table_reference,table_label_snapshot=v_table_label,scheduled_for=v_scheduled_for,
         prepare_at=v_prepare_at,kitchen_timing=v_kitchen_timing,updated_at=v_now WHERE id=v_order_id;
@@ -233,13 +239,13 @@ BEGIN
     v_order_number:='FC-'||pg_catalog.to_char(v_business_date,'YYMMDD')||'-'||pg_catalog.lpad(v_counter::text,4,'0');
     INSERT INTO public.orders(restaurant_id,branch_id,order_number,local_order_id,idempotency_key,request_hash,source,fulfillment_type,status,
       customer_name,customer_phone,delivery_address,delivery_area_id,delivery_area_name_snapshot,delivery_area_fee_snapshot,
-      delivery_selection_type,delivery_instructions,catalog_publication_id,catalog_version,subtotal,discount_amount,delivery_fee,total,
+      delivery_selection_type,delivery_instructions,catalog_publication_id,catalog_version,subtotal,discount_amount,delivery_fee,total,balance_due,
       paid_amount,currency_code,payment_status,payment_method_summary,notes,cashier_id,created_by_user_id,table_reference,
       table_label_snapshot,scheduled_for,prepare_at,kitchen_timing,placed_at,created_at,updated_at,last_status_actor_type,last_status_change_reason)
     VALUES(v_restaurant_id,v_branch_id,v_order_number,v_local_order_id,v_idempotency_key,v_request_hash,'pos',v_fulfillment,'new',
       v_customer_name,v_customer_phone,v_address,v_area_id,v_area_name,v_delivery_fee,v_selection_type,v_instructions,
       NULLIF(p_payload->>'catalog_publication_id','')::uuid,NULLIF(p_payload->>'catalog_version','')::bigint,
-      v_subtotal,0,v_delivery_fee,v_total,0,v_currency,'unpaid',v_payment_method,v_notes,v_actor_id,v_actor_id,
+      v_subtotal,0,v_delivery_fee,v_total,v_total,0,v_currency,'unpaid',v_payment_method,v_notes,v_actor_id,v_actor_id,
       v_table_reference,v_table_label,v_scheduled_for,v_prepare_at,v_kitchen_timing,v_now,v_now,v_now,'staff','POS order received')
     RETURNING id INTO v_order_id;
   END IF;
@@ -283,27 +289,29 @@ BEGIN
     END LOOP;
   END IF;
 
-  IF v_fulfillment='delivery' THEN
-    INSERT INTO public.delivery_tasks(restaurant_id,branch_id,order_id,status,recipient_name_snapshot,recipient_phone_snapshot,
-      address_snapshot,area_name_snapshot,area_id_snapshot,delivery_selection_type_snapshot,delivery_fee_snapshot,delivery_instructions_snapshot)
-    VALUES(v_restaurant_id,v_branch_id,v_order_id,'dispatch_pending',v_customer_name,v_customer_phone,v_address,v_area_name,v_area_id,
-      v_selection_type,v_delivery_fee,v_instructions)
-    ON CONFLICT(order_id) DO UPDATE SET recipient_name_snapshot=EXCLUDED.recipient_name_snapshot,
-      recipient_phone_snapshot=EXCLUDED.recipient_phone_snapshot,address_snapshot=EXCLUDED.address_snapshot,
-      area_name_snapshot=EXCLUDED.area_name_snapshot,area_id_snapshot=EXCLUDED.area_id_snapshot,
-      delivery_selection_type_snapshot=EXCLUDED.delivery_selection_type_snapshot,delivery_fee_snapshot=EXCLUDED.delivery_fee_snapshot,
-      delivery_instructions_snapshot=EXCLUDED.delivery_instructions_snapshot,updated_at=v_now
-    WHERE public.delivery_tasks.status='dispatch_pending';
-  END IF;
+  IF v_updated OR v_existing.id IS NULL THEN
+    IF v_fulfillment='delivery' THEN
+      INSERT INTO public.delivery_tasks(restaurant_id,branch_id,order_id,status,recipient_name_snapshot,recipient_phone_snapshot,
+        address_snapshot,area_name_snapshot,area_id_snapshot,delivery_selection_type_snapshot,delivery_fee_snapshot,delivery_instructions_snapshot)
+      VALUES(v_restaurant_id,v_branch_id,v_order_id,'dispatch_pending',v_customer_name,v_customer_phone,v_address,v_area_name,v_area_id,
+        v_selection_type,v_delivery_fee,v_instructions)
+      ON CONFLICT(order_id) DO UPDATE SET recipient_name_snapshot=EXCLUDED.recipient_name_snapshot,
+        recipient_phone_snapshot=EXCLUDED.recipient_phone_snapshot,address_snapshot=EXCLUDED.address_snapshot,
+        area_name_snapshot=EXCLUDED.area_name_snapshot,area_id_snapshot=EXCLUDED.area_id_snapshot,
+        delivery_selection_type_snapshot=EXCLUDED.delivery_selection_type_snapshot,delivery_fee_snapshot=EXCLUDED.delivery_fee_snapshot,
+        delivery_instructions_snapshot=EXCLUDED.delivery_instructions_snapshot,updated_at=v_now
+      WHERE public.delivery_tasks.status='dispatch_pending';
+    END IF;
 
-  INSERT INTO public.order_status_history(restaurant_id,branch_id,order_id,from_status,to_status,action,actor_user_id,actor_type,actor_role,
-    reason_code,reason,metadata,request_id,changed_at)
-  VALUES(v_restaurant_id,v_branch_id,v_order_id,CASE WHEN v_updated THEN 'new' ELSE NULL END,'new',
-    CASE WHEN v_updated THEN 'pos_order_edited' ELSE 'created' END,v_actor_id,'staff',v_role,
-    CASE WHEN v_updated THEN 'POS_ORDER_EDITED' ELSE 'POS_ORDER_CREATED' END,
-    CASE WHEN v_updated THEN 'POS order edited while still pending' ELSE 'POS order received' END,
-    pg_catalog.jsonb_build_object('local_order_id',v_local_order_id,'local_revision',v_revision,'fulfillment_type',v_fulfillment,'table_reference',v_table_reference),
-    pg_catalog.gen_random_uuid(),v_now);
+    INSERT INTO public.order_status_history(restaurant_id,branch_id,order_id,from_status,to_status,action,actor_user_id,actor_type,actor_role,
+      reason_code,reason,metadata,request_id,changed_at)
+    VALUES(v_restaurant_id,v_branch_id,v_order_id,CASE WHEN v_updated THEN 'new' ELSE NULL END,'new',
+      CASE WHEN v_updated THEN 'pos_order_edited' ELSE 'created' END,v_actor_id,'staff',v_role,
+      CASE WHEN v_updated THEN 'POS_ORDER_EDITED' ELSE 'POS_ORDER_CREATED' END,
+      CASE WHEN v_updated THEN 'POS order edited while still pending' ELSE 'POS order received' END,
+      pg_catalog.jsonb_build_object('local_order_id',v_local_order_id,'local_revision',v_revision,'fulfillment_type',v_fulfillment,'table_reference',v_table_reference),
+      pg_catalog.gen_random_uuid(),v_now);
+  END IF;
 
   v_payment:=p_payload->'payment';
   IF v_payment IS NOT NULL AND v_payment<>'null'::jsonb THEN
@@ -338,7 +346,7 @@ BEGIN
         CASE WHEN v_fully_paid THEN 'POS payment collected' ELSE 'POS partial payment collected' END,v_now,v_now)
       RETURNING id INTO v_payment_id;
       v_next_status:=CASE WHEN v_fully_paid THEN 'completed' ELSE v_order.status END;
-      UPDATE public.orders SET paid_amount=v_paid,payment_status=CASE WHEN v_fully_paid THEN 'paid' ELSE 'partially_paid' END,
+      UPDATE public.orders SET paid_amount=v_paid,balance_due=v_balance,payment_status=CASE WHEN v_fully_paid THEN 'paid' ELSE 'partially_paid' END,
         payment_method_summary=CASE WHEN v_order.paid_amount=0 THEN v_queued_payment_method WHEN v_order.payment_method_summary=v_queued_payment_method THEN v_queued_payment_method ELSE 'mixed' END,
         status=v_next_status,collected_at=CASE WHEN v_fully_paid THEN v_now ELSE collected_at END,
         completed_at=CASE WHEN v_fully_paid THEN v_now ELSE completed_at END,last_status_changed_by=v_actor_id,last_status_actor_type='staff',
