@@ -2034,6 +2034,19 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
 .fc-home-deal-config #deal-configurator label{display:flex;align-items:center;gap:9px;min-height:38px}
 .fc-home-deal-config #deal-configurator input{accent-color:var(--gold)}
 .fc-home-deal-config #deal-configurator button{min-height:42px;padding:8px 14px;border-radius:999px;background:var(--gold);color:var(--ink);font-weight:800}
+ .fc-deal-burger-picker{margin:10px 0;border:1px solid rgba(255,255,255,.4);border-radius:12px;background:rgba(42,0,4,.28);overflow:hidden}
+ .fc-deal-burger-picker>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px;padding:9px 12px;cursor:pointer;list-style:none}
+ .fc-deal-burger-picker>summary::-webkit-details-marker{display:none}
+ .fc-deal-burger-summary-copy{display:grid;gap:3px;min-width:0}
+ .fc-deal-burger-summary-copy strong{font:700 16px/1.15 var(--f-ui);color:#fff}
+ .fc-deal-burger-summary-copy small{max-width:65vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.78);font:500 12px/1.2 var(--f-body)}
+ .fc-deal-burger-edit{flex:0 0 auto;border-radius:999px;padding:7px 12px;background:var(--gold);color:var(--ink);font:700 13px/1 var(--f-ui)}
+ .fc-deal-burger-picker[open]>summary{border-bottom:1px solid rgba(255,255,255,.25)}
+ .fc-deal-burger-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;padding:12px}
+ .fc-deal-burger-slot{display:grid!important;gap:5px!important;min-width:0;color:#fff;font:600 13px/1.2 var(--f-ui)}
+ .fc-deal-burger-slot select{width:100%;min-height:44px;padding:9px 11px;border:1px solid #ead7ce;border-radius:10px;background:#fff;color:#241d1c;font:600 14px var(--f-body)}
+ .fc-deal-burger-content .fc-deal-component-customization{margin:0 12px 12px}
+ @media(max-width:520px){.fc-deal-burger-slots{grid-template-columns:1fr}.fc-deal-burger-summary-copy small{max-width:56vw}}
 @media(max-width:699px){
  .fc-home-panel,.fc-home-context,.fc-home-details,.fc-home-deals,.fc-home-cart,.fc-home-deal-config{width:calc(100% - 24px);padding:13px}
  .fc-home-fields{grid-template-columns:1fr}.fc-home-full{grid-column:auto}
