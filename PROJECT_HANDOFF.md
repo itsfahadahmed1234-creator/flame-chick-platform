@@ -4105,3 +4105,39 @@ File: `supabase/migrations/20261124050000_flame_chick_unified_pos_order_sync_v1.
 
 ## Next-chat opening instruction
 Continue on `work/production-source-audit` at latest branch head. Read `docs/handoffs/2026-11-23-new-chat-continuation-handoff.md` first, then `PROJECT_HANDOFF.md`. Start by checking workflow runs `45334043211`, `45334043248`, `45334043208`; then audit candidate SQL. The immediate target is unified offline-safe sync for Dine-in + Takeaway + Delivery, not a new POS UI. Proceed carefully without asking user to restate known requirements. Do not claim completion or touch Production until end-to-end tests pass and rollout is separately authorized.
+
+
+# 2026-11-24 — Trusted POS V3 pricing foundation (SOURCE ONLY; sync still incomplete)
+
+**Latest verified source commit:** `3b9c070c966b41509670f828764fa41be821911b`  
+**Branch:** `work/production-source-audit`
+
+## What changed in this slice
+- Added an explicit `staffPos` dependency option to the shared V3 pricing engine. It is not read from the browser request; the future Order API must set it only after bearer-token verification, role authorization, and branch resolution.
+- Trusted POS pricing now accepts all three canonical fulfilments: `delivery`, `pickup` (POS UI label Takeaway), and `dine_in`. Normal website calls still accept only `delivery` and `pickup`.
+- POS pricing does not require website-ordering flags. It still requires the selected branch to exist in the current published V3 snapshot and still validates product/variant availability, deal schedule/branch availability, modifier rules, and server-side prices.
+- POS walk-in customer phone may be omitted; a supplied phone is still validated. The API must continue requiring a phone for POS Delivery before RPC submission.
+- V3 deal availability view accepts `dine_in` only when the internal `staffPos: true` option is passed. Public website callers cannot use that option.
+- Added regression tests for dine-in pricing with website ordering disabled, optional walk-in phone, pickup POS pricing with website flags disabled, and rejection of unavailable published products.
+
+## Verification
+- Website static checks passed: run `45337053027`.
+- Edge Function static/type/API/pricing checks passed on the successive source commits: `45337053042`, `45337060211`, `45337063925`.
+- Existing disposable catalog-publication validation and full migration replay passed: run `45334043211`.
+- Existing staff role boundary, operational schema, delivery commands/concurrency and actual Website Order API tests passed: run `45334043248`.
+- Catalog V3 importer local database workflow passed: run `45334043208`.
+- These green workflows do **not** test the new unified POS outbox/RPC end-to-end. The new pricing slice is covered by the Edge Function test job; it is not a claim that POS synchronization is complete.
+
+## Still unfinished — immediate next work
+1. Implement a staff-only POS sync API action. Authenticate the bearer token, resolve `resolveStaffContext`, derive restaurant/branch/actor exclusively from that trusted context, reject Rider role, and call `calculateWebsiteOrder(..., {staffPos:true})`. Do not trust browser totals, catalog IDs outside the published snapshot, actor, branch, or role.
+2. Canonicalize POS cart rows to V3 product variant IDs, modifier-group selections, deal variant IDs, and exact component option IDs. The current POS catalog adapter still expects V2; the live catalog API returns V3. Do not guess legacy ID mappings.
+3. Build the exact RPC payload expected by `flame_chick_sync_pos_order(jsonb)`, including server-derived totals, publication/version, item/component/modifier snapshots, request hash, stable local ID, and monotonic revision. For Delivery, validate current branch delivery area and Not Listed fee on the server.
+4. Extend the RPC/API integration tests for authenticated staff POS create/update and verify exact production-column/constraint compatibility against disposable local Supabase.
+5. Replace the delivery-only `syncPendingPosDeliveryOrders()` dispatch with one durable IndexedDB outbox processor for all three fulfilment modes. Preserve startup/online/visibility/focus retry, stable identity/revision, lost-response reconciliation, and queued rows until server acknowledgement.
+6. Separate order sync from payment collection. Takeaway receipt printing/payment-method choice must not mark an order paid. Dine-in table close and Delivery Delivered must not imply payment collection. Add explicit cashier collection commands with their own stable request UUIDs; replay offline collections idempotently.
+7. Fix and test `readOrderBoard()` against actual columns/embeds, then test board/history normalization for all POS fulfilment types.
+8. Run full disposable local migration replay + SQL fixture + actual Edge API/PostgREST/PostgreSQL tests for Dine-in/Takeaway/Delivery, edits, offline/reconnect, lost response, concurrent retries, deals/modifiers, delivery task, partial/full payment replay, and staff/branch boundaries.
+
+## Production safety
+Production remains unchanged by this source-only work. The live migration ledger remains at 33 applied migrations; the candidate `20261124050000_flame_chick_unified_pos_order_sync_v1.sql` remains unapplied. Do not deploy functions, set secrets, enable Realtime, apply this candidate migration, enable website orders, or deploy Vercel as part of this step. No GST/tax fields or calculations. Free plan only. Keep IndexedDB; do not rebuild the POS.
+
