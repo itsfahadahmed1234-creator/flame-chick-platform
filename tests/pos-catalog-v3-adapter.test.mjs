@@ -154,3 +154,21 @@ test('POS visual refinement styles product cards consistently and colours the br
   assert.match(html, /\.pos-menu #menuGrid \.product-card\{[\s\S]*?min-height:202px/);
   assert.match(html, /\.brand-logo\{[\s\S]*?filter:brightness\(0\) saturate\(100%\)/);
 });
+
+
+test('POS catalog projection preserves published product image metadata from the shared Supabase media bucket', () => {
+  const adapter = readFileSync('apps/flame-chick-pos/catalog-v3-adapter.js', 'utf8');
+  const html = readFileSync('apps/flame-chick-pos/index.html', 'utf8');
+  assert.match(adapter, /ImageCurrentPath: product\.imagePublished === true \? String\(product\.imageCurrentPath \|\| ''\) : ''/);
+  assert.match(adapter, /ImagePublished: product\.imagePublished === true/);
+  assert.match(html, /storage\/v1\/object\/public\/flame-chick-media/);
+});
+
+test('POS deal picker displays fixed quantities as included summaries and uses cards for selectable components', () => {
+  const html = readFileSync('apps/flame-chick-pos/index.html', 'utf8');
+  const render = html.slice(html.indexOf('function renderPOSDealChoice(){'), html.indexOf('function confirmPOSDealChoice()', html.indexOf('function renderPOSDealChoice(){')));
+  assert.match(render, /fixed-deal-summary/);
+  assert.match(render, /deal-choice-card/);
+  assert.match(render, /data-pos-deal-pick/);
+  assert.doesNotMatch(render, /data-pos-deal-plus|data-pos-deal-minus/);
+});

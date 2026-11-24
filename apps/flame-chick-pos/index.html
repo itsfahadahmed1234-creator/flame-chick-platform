@@ -1093,6 +1093,22 @@ html,body{background:var(--bg);overflow:hidden}
 }
 </style>
 <style>
+/* Deal configurator: fixed bundle quantities and visual burger choice cards */
+.deal-choice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.deal-choice-card{display:flex;align-items:center;gap:10px;min-width:0;padding:10px;border:1.5px solid #e2e6eb;border-radius:13px;background:#fff;text-align:left;color:#202832;transition:.15s ease}
+.deal-choice-card:hover:not(:disabled),.deal-choice-card.selected{border-color:#d80008;background:#fff6f5;box-shadow:0 3px 12px rgba(216,0,8,.09)}
+.deal-choice-card:disabled{opacity:.55;cursor:not-allowed}
+.deal-choice-image,.deal-choice-placeholder{width:52px;height:52px;flex:0 0 52px;border-radius:11px;object-fit:cover;background:#fff0e8;display:grid;place-items:center;font-size:25px}
+.deal-choice-copy{display:grid;gap:4px;min-width:0;flex:1}
+.deal-choice-copy strong{font-size:12px;line-height:1.25}
+.deal-choice-copy small{font-size:10px;color:#707b89}
+.deal-choice-count{font-size:10px;font-weight:900;color:#b60008;white-space:nowrap}
+.deal-choice-removers{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}
+.deal-choice-remove{border:0;background:#fff0f1;color:#b00008;border-radius:8px;padding:5px 8px;font-size:10px;font-weight:800}
+.fixed-deal-summary{display:flex;align-items:center;gap:10px;padding:8px 0;color:#2b3541;font-size:12px;font-weight:800}
+.fixed-deal-summary img,.fixed-deal-summary .deal-choice-placeholder{width:38px;height:38px;flex-basis:38px}
+</style>
+<style>
 /* POS brand uses the exact mascot + wordmark lockup from the customer website. */
 .brand{display:flex;align-items:center;gap:12px;min-width:0}
 .brand-logo{display:block;width:203px;height:38px;max-width:32vw;object-fit:contain;flex:0 0 auto}
@@ -3285,6 +3301,13 @@ function posDealEstimatedPrice(st){
   }
   return minor/100;
 }
+function posDealOptionImage(option){
+  const product=(catalogSnapshot?.products||[]).find(x=>String(x.productId)===String(option.productId));
+  if(!product||product.imagePublished!==true||!product.imageCurrentPath)return '<span class="deal-choice-placeholder">🍔</span>';
+  const path=String(product.imageCurrentPath).trim();
+  const url=/^https?:\/\//i.test(path)?path:FLAME_CHICK_SUPABASE_URL+'/storage/v1/object/public/flame-chick-media/'+path.split('/').map(encodeURIComponent).join('/');
+  return '<img class="deal-choice-image" src="'+esc(url)+'" alt="" loading="lazy" onerror="this.remove()">';
+}
 function renderPOSDealChoice(){
   const st=posDealChoice;if(!st)return;
   const variant=st.variants.find(v=>String(v.id)===String(st.variantId));
@@ -3293,17 +3316,24 @@ function renderPOSDealChoice(){
     : '';
   const groupsHtml=(variant?.groups||[]).map(group=>{
     const selected=st.selections[group.id]||{};
-    const options=group.options.map(option=>{
+    const fixed=group.options.length===1&&group.minUnits>0&&group.minUnits===group.maxUnits;
+    const units=posDealSelectedUnits(group,selected);
+    if(fixed){
+      const option=group.options[0],count=Number(selected[option.id])||group.minUnits;
+      return '<section class="pos-option-group fixed-deal-group"><div class="pos-option-group-head"><span class="pos-option-group-title"><strong>'+esc(group.name||'Included items')+'</strong><small>Included · fixed quantity</small></span></div><div class="fixed-deal-summary">'+posDealOptionImage(option)+'<span>'+esc(option.productName||option.optionLabel||group.name)+'</span><strong>× '+count+'</strong></div></section>';
+    }
+    const cards=group.options.map(option=>{
       const count=Number(selected[option.id])||0;
-      const max=Math.min(Number(option.maxQuantity)||1,Number(group.maxUnitsPerOption)||99);
+      const cap=Math.min(Number(option.maxQuantity)||Number(group.maxUnitsPerOption)||Number(group.maxUnits)||1,Number(group.maxUnitsPerOption)||Number(group.maxUnits)||1);
+      const atLimit=units>=Number(group.maxUnits||0)&&count===0;
       const price=option.pricingTreatment==='INCLUDED'?'Included'
         :option.pricingTreatment==='SURCHARGE'?'+ Rs. '+money((Number(option.surchargeMinor)||0)/100)
         :option.pricingTreatment==='STANDALONE'?'+ Rs. '+money((Number(option.standalonePriceMinor)||0)/100)
         :'Price included in deal';
-      return '<div class="pos-option-group-head" style="padding:8px 0"><span class="pos-option-group-title"><strong>'+esc(option.optionLabel||option.productName||'Option')+'</strong><small>'+esc(price)+'</small></span><span style="display:flex;align-items:center;gap:8px"><button type="button" class="qbtn" data-pos-deal-minus="'+esc(group.id)+'" data-pos-deal-option="'+esc(option.id)+'" '+(count<=0?'disabled':'')+'>−</button><strong>'+count+'</strong><button type="button" class="qbtn" data-pos-deal-plus="'+esc(group.id)+'" data-pos-deal-option="'+esc(option.id)+'" '+(count>=max?'disabled':'')+'>+</button></span></div>';
+      return '<button type="button" class="deal-choice-card '+(count?'selected':'')+'" data-pos-deal-pick="'+esc(group.id)+'" data-pos-deal-option="'+esc(option.id)+'" '+(atLimit||count>=cap?'disabled':'')+'>'+posDealOptionImage(option)+'<span class="deal-choice-copy"><strong>'+esc(option.productName||option.optionLabel||'Choose burger')+'</strong><small>'+esc(price)+'</small></span><span class="deal-choice-count">'+(count?'Selected × '+count:'Choose')+'</span></button>';
     }).join('');
-    const units=posDealSelectedUnits(group,selected);
-    return '<section class="pos-option-group"><div class="pos-option-group-head"><span class="pos-option-group-title"><strong>'+esc(group.name||'Choose items')+'</strong><small>Choose '+group.minUnits+'–'+group.maxUnits+' items · '+units+' selected</small></span></div>'+options+'</section>';
+    const removers=group.options.filter(option=>(Number(selected[option.id])||0)>0).map(option=>'<button type="button" class="deal-choice-remove" data-pos-deal-remove="'+esc(group.id)+'" data-pos-deal-option="'+esc(option.id)+'">Remove '+esc(option.productName||'selection')+'</button>').join('');
+    return '<section class="pos-option-group"><div class="pos-option-group-head"><span class="pos-option-group-title"><strong>'+esc(group.name||'Choose items')+'</strong><small>Choose '+group.minUnits+'–'+group.maxUnits+' · '+units+' of '+group.maxUnits+' selected</small></span></div><div class="deal-choice-grid">'+cards+'</div><div class="deal-choice-removers">'+removers+'</div></section>';
   }).join('');
   const valid=!!variant&&(variant.groups||[]).every(g=>posDealGroupValid(g,st.selections[g.id]));
   const estimate=posDealEstimatedPrice(st);
@@ -3315,14 +3345,16 @@ function renderPOSDealChoice(){
     for(const group of st.groups)st.selections[group.id]=group.options.length===1&&group.minUnits>0?{[group.options[0].id]:group.minUnits}:{};
     renderPOSDealChoice();
   });
-  $('choiceBody').querySelectorAll('[data-pos-deal-plus],[data-pos-deal-minus]').forEach(btn=>btn.onclick=()=>{
-    const group=st.groups.find(g=>String(g.id)===String(btn.dataset.posDealPlus||btn.dataset.posDealMinus));
+  $('choiceBody').querySelectorAll('[data-pos-deal-pick],[data-pos-deal-remove]').forEach(btn=>btn.onclick=()=>{
+    const group=st.groups.find(g=>String(g.id)===String(btn.dataset.posDealPick||btn.dataset.posDealRemove));
     const option=group?.options.find(o=>String(o.id)===String(btn.dataset.posDealOption));if(!group||!option)return;
     const selected=st.selections[group.id]||(st.selections[group.id]={});
-    const current=Number(selected[option.id])||0;
-    const max=Math.min(Number(option.maxQuantity)||1,Number(group.maxUnitsPerOption)||99);
-    selected[option.id]=btn.hasAttribute('data-pos-deal-plus')?Math.min(max,current+1):Math.max(0,current-1);
-    if(!selected[option.id])delete selected[option.id];
+    if(btn.hasAttribute('data-pos-deal-remove'))delete selected[option.id];
+    else{
+      const units=posDealSelectedUnits(group,selected),current=Number(selected[option.id])||0;
+      const cap=Math.min(Number(option.maxQuantity)||Number(group.maxUnitsPerOption)||Number(group.maxUnits)||1,Number(group.maxUnitsPerOption)||Number(group.maxUnits)||1);
+      if(units<Number(group.maxUnits||0)&&current<cap)selected[option.id]=current+1;
+    }
     renderPOSDealChoice();
   });
   $('posDealAddBtn')?.addEventListener('click',confirmPOSDealChoice);
