@@ -1935,3 +1935,29 @@ The disposable behavioral workflow passed before the final migration filename wa
 1. Open `https://flamechick.vercel.app/` in a browser and verify the embedded V3 menu/cards and Delivery/Pickup selection.
 2. Verify the browser network preflight and Order API `website_context`, then perform one clearly labelled test quote/order in a safe test flow and verify the resulting order reaches POS. If any request fails, fix that exact blocker before enabling actual customer traffic.
 3. Inspect Admin's named delivery-area management and Owner permissions, then complete the full manual rehearsal above.
+
+
+## 2026-11-24 — Verified POS status workflow + current launch checkpoint
+
+**Repository branch:** `work/production-source-audit`  
+**Branch HEAD before this handoff entry:** `da6d9c1b7b6e1df50d907c1287458e567a497174`
+
+### POS status workflow verification — COMPLETE
+- The Production status-command migration is `20261124102922_flame_chick_order_status_commands_v1.sql`; hosted Production confirms the RPC exists with postgres ownership, SECURITY DEFINER, empty search_path, and EXECUTE granted only to service_role. The migration was applied and its Production ACL/object checks passed. Production still has zero orders and zero status-history rows.
+- POS source commit `89c950785bbf73ff5ae0a6a3870fba8da21337ce` added a per-mutation UUID request ID to status updates; test commit `8f64002dd4ec31a2acaa76099cf64e706d4fefa7` added source-hygiene coverage.
+- POS/Rider static workflow **45375639994** passed on `8f64002dd4ec31a2acaa76099cf64e706d4fefa7`.
+- Full disposable Staff Admin Role Boundary QA workflow **45375639906** also passed on that same commit. Its successful job replayed the complete migration history and ran `supabase/tests/flame_chick_pos_order_sync_v1.sql`, which explicitly checks the status RPC exists, Dine-in new → accepted → preparing → ready → served, served_at, exact request replay, Cashier cancellation denial, and Manager cancellation with actor/reason audit. The same run also passed staff ACL/RLS, role-boundary, delivery lifecycle/physical return, unified POS sync/payment idempotency, website order API/quota, and concurrency checks.
+- Therefore the previous statement that a full QA rerun after the UUID integration was still pending is superseded: **the current POS/status implementation was fully replayed and behavior-tested on commit `8f64002...`**.
+- A comparison from `8f64002...` to the current branch HEAD showed subsequent changes only in website storefront files, website static workflow and the two handoff documents; no POS, Order API status handler, status migration or POS SQL behavior-test files changed after the passing QA commit. The current HEAD itself is a documentation checkpoint, not a new POS implementation build.
+
+### Current deployment / launch boundary
+- Website Static Checks workflow **45384177022** passed on website implementation commit `0a4394fe1533171cf9506cff980dad1e9fa28479`; the Production Vercel deployment `dpl_J5y1tZeoBZfRAfxVkmjLTZ72jq6i` was recorded READY for that commit, with homepage V3 catalog and checkout embedded below Menu, Delivery and Pickup, and server-side Not Listed fee Rs. 150.
+- Do not infer that the restaurant is ready for live operations from CI or deployment status. Live browser checkout/order-to-POS verification and the full manual restaurant rehearsal remain required. Never create an unlabelled real customer order during testing.
+- User has most recently reported being unable to enter Admin, POS and Rider. Treat successful staff login/role routing for the intended accounts as the immediate next operational blocker; inspect the actual Auth/session/role-gate and deployment routing before changing credentials or roles. Do not grant broader roles as a workaround.
+- Other remaining launch checks include verified CORS allowlists, secure verification of required server-side secrets without displaying values, Owner-managed delivery-area configuration, Rider account/profile setup, Realtime or documented polling fallback, offline/reconnect sync rehearsal, payment collection, return workflow and History.
+- Preserve: rider Delivered is not payment collection; Cashier must explicitly collect the full amount using COD, Card or Online/bank transfer before completion/History. GST remains deferred. Do not rebuild the POS, apply unverified migrations, enable untested customer traffic, or start real restaurant operations before the manual rehearsal and user approval.
+
+### Exact next action
+1. Resolve and verify Admin/POS/Rider sign-in and role routing for the existing intended accounts without changing role boundaries.
+2. Run a controlled browser smoke test of the live homepage catalog/quote and a clearly labelled test order only if the test flow is isolated and approved; verify it reaches POS.
+3. Complete the Dine-in, Takeaway, Delivery, offline/reconnect, rider, return, Cashier payment and History rehearsal. Update this handoff and `PROJECT_HANDOFF.md` after each verified stage.
