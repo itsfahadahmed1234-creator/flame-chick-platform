@@ -198,9 +198,6 @@
     const items = localLines.map(line => line && line.dealId
       ? dealLine(line, dealModel)
       : productLine(line || {}, snapshot, contract, dealView));
-    const subtotal = Number(identity.subtotal);
-    if (!Number.isFinite(subtotal) || subtotal < 0) throw fail('The local subtotal is not valid.', 'POS_ORDER_AMOUNT_INVALID');
-
     let delivery = null;
     if (fulfillment_type === 'delivery') {
       const address = String(identity.address || '').trim();
@@ -241,6 +238,17 @@
       notes: String(identity.notes || '').trim(),
       items
     };
+    if (isRecord(identity.pendingPayment)) {
+      const payment = identity.pendingPayment;
+      const requestId = String(payment.requestId || payment.request_id || '');
+      const amount = Number(payment.amount);
+      const method = String(payment.method || payment.payment_method || '').toLowerCase();
+      if (!UUID_RE.test(requestId) || !Number.isFinite(amount) || amount <= 0 ||
+          !['cash','card','bank','wallet','other'].includes(method)) {
+        throw fail('The saved payment collection request is invalid. Reopen the receipt and choose the payment method again.', 'POS_PAYMENT_REQUEST_INVALID');
+      }
+      payload.payment = { request_id: requestId, amount, payment_method: method };
+    }
     if (delivery) payload.delivery = delivery;
     if (fulfillment_type === 'dine_in') {
       payload.table_reference = String(identity.tableId || identity.tableReference || '').trim() || null;
