@@ -1,10 +1,10 @@
-import "../../../apps/flame-chick-website/js/catalog-v3.js";
-import "../../../apps/flame-chick-website/js/catalog-v3-deal-view.js";
-import { calculateWebsiteOrder } from "../_shared/flame-chick-order-pricing.mjs";
+import "./catalog-v3.js";
+import "./catalog-v3-deal-view.js";
+import { calculateWebsiteOrder } from "./flame-chick-order-pricing.mjs";
 import {
   createWebsiteOrderQuoteToken,
   verifyWebsiteOrderQuoteToken,
-} from "../_shared/website-order-quote-token.mjs";
+} from "./website-order-quote-token.mjs";
 
 // Flame Chick order API v1.
 // Guest website order creation plus authenticated staff POS status controls.
