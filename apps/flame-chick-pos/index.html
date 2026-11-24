@@ -3801,7 +3801,8 @@ async function syncPendingUnifiedPosOrders(){
       }catch(error){
         const latest=await get(STORES.orders,candidate.id)||order;
         const status=Number(error?.status)||0;
-        const permanent=status>=400&&status<500&&status!==408&&status!==425&&status!==429;
+        const permanent=(status>=400&&status<500&&status!==408&&status!==425&&status!==429)||
+          /^POS_(CATALOG|ITEM|DEAL|MODIFIER|CUSTOMER|DELIVERY|FULFILLMENT|TABLE|PAYMENT|ORDER_FIELDS)/.test(String(error?.code||''));
         latest.syncStatus=permanent?'needs_review':'failed';
         latest.syncAttempts=(Number(latest.syncAttempts)||0)+1;
         latest.lastSyncError=String(error?.message||'POS synchronization failed').slice(0,500);
