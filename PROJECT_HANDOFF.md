@@ -4529,3 +4529,57 @@ Inspected `apps/flame-chick-pos/index.html`, `catalog-v3-adapter.js`, `payment-c
 8. Run manual synthetic test-order rehearsal before real restaurant launch. Keep the real customer domain off the unverified preview and preserve the current empty operational dataset until rehearsal strategy is approved.
 
 No customer/order/payment/delivery records were created in this stage.
+
+
+## 2026-11-24 — POS unified V3 sync implementation and API deployment pass
+
+### Implemented on `work/production-source-audit`
+- Added `apps/flame-chick-pos/sync-v3.js`: a pure V3 payload/identity adapter. It preserves the existing IndexedDB `localOrderId` receipt key, adds a separate stable UUID `syncOrderId`, carries monotonic `localRevision`, maps Delivery/Takeaway/Dine-in to `delivery`/`pickup`/`dine_in`, and refuses stale publications, invalid product/variant/modifier IDs, invalid deal variant/component selections, and mismatched server acknowledgements. Client prices/totals are not submitted as pricing authority.
+- POS now uses one `syncPendingUnifiedPosOrders()` path for all POS fulfilment types. IndexedDB orders and queue records are retained until the API confirms the same sync UUID and revision. Transient/network errors back off and retry; permanent 4xx/catalog conflicts are retained as `needs_review`, never silently deleted. Existing LOCAL receipt keys remain intact.
+- Delivery is queued immediately and remains unpaid; the delivery payload takes its area UUID and fee from authenticated branch configuration, not the immutable menu publication. Not Listed requires a locality and a configured branch default fee.
+- Takeaway is saved locally first and queued after cashier receipt confirmation; a selected counter payment is carried as a separate idempotent payment request in the same server sync command. Dine-in checks queue on save; table reference and scheduling fields are sent to the server. The existing Delivery post-delivery Cashier payment popup (COD/Card/Online-bank transfer) remains the separate collection path.
+- Replaced disabled V3 deal cards with the V3 deal-view model and component-group/variant selection UI.
+- Added a branch-scoped authenticated Order API view `pos_delivery_context` for delivery area/default-fee settings.
+- Restored a POS Realtime lifecycle with a private branch channel and automatic polling fallback. Current hosted Realtime has no `realtime.messages` policies and no Broadcast publisher/triggers, so private subscription will not be considered operational until that separate authorization/publisher work is completed; polling fallback is the reliable current refresh mechanism.
+- Added `tests/pos-unified-sync-v3.test.mjs`, deployment-bundle parity tests, POS source hygiene checks, and CI coverage for the disposable unified POS SQL behavior suite. The disposable SQL suite exercises Dine-in, Takeaway, Delivery, payment idempotency and rollback.
+
+### CI verification
+- POS/Rider static checks passed on commit `51805cd5e80067d4dbe2b25811c54b031b22476b`: run `45362269181`.
+- Disposable Supabase full role-boundary + unified POS SQL behavior suite passed on commit `f438d4e0ec65251eb1f5f228f88d7002e3c5a0c0`: run `45362226277`. The unified POS behavior step passed.
+- Latest Edge Function static/type/integration checks passed on commit `c35fd9af61cd5162f09e43faca78102b9beff426`: run `45363516078`.
+- The preceding Edge check `45363246346` failed only because the new deployment-bundle test incorrectly expected side-effect imports to use `from`; corrected to `import "./..."`, and the later run passed.
+- Latest branch HEAD after this pass: `c35fd9af61cd5162f09e43faca78102b9beff426`.
+
+### Supabase Edge Functions deployed
+Hosted Flame Chick project `adkrxfnawdiljhjaavnj`:
+- `flame-chick-order-api`: ACTIVE version 1, self-contained five-file bundle (entrypoint, catalog V3 validator, deal-view module, trusted pricing module, quote-token module), `verify_jwt=false` because the handler performs its own publishable-key + Auth bearer-token validation.
+- `flame-chick-delivery-api`: ACTIVE version 1, `verify_jwt=false` because the handler performs its own publishable-key + Auth bearer-token validation.
+- The Order API source bundle now imports only same-function local files; parity CI verifies the bundle files stay byte-identical to canonical shared modules.
+- These deployments are not yet declared production-operational: function secrets have not been securely verified/set through the available connector, CORS still uses wildcard origins, and no authenticated end-to-end invocation has been performed from the deployed POS.
+- Catalog API remains ACTIVE version 1; Staff Admin remains ACTIVE version 2 with its required dependencies.
+
+### Hosted Production remains empty
+Read-only verification after deployment:
+- `orders=0`, `order_items=0`, `payments=0`, `delivery_tasks=0`, `delivery_offers=0`.
+- Active staff role rows: 1 (Admin only); active Rider profiles: 0.
+- Active delivery areas: 0.
+- Main branch website ordering/delivery/pickup flags are false; Not Listed delivery fee is NULL.
+- No synthetic customers/orders/payments/delivery records were created in hosted Production.
+
+### Explicit blockers — do not bypass
+1. `public.flame_chick_update_order_status(jsonb)` is absent in hosted Production (read-only `to_regprocedure` check returned false). The Order API status route currently calls this missing RPC. Kitchen status buttons must not be treated as working until a reviewed row-locked, role/branch-authorized status migration + disposable tests are implemented and applied.
+2. Delivery cannot be tested end-to-end until Admin configures at least one active delivery area and the Not Listed default fee; the branch currently has zero active areas and NULL default fee.
+3. Rider workflow cannot be rehearsed until an approved Rider Auth user, role and active rider profile are configured.
+4. Private Realtime currently has zero `realtime.messages` policies and zero tables in `supabase_realtime`; no server Broadcast publisher/trigger exists. The POS has polling fallback, not completed Realtime delivery.
+5. Order/Delivery functions still use wildcard CORS. Before public app launch, restrict to verified Website/POS/Admin/Rider origins. Do not guess preview domains.
+6. Do not enable public website ordering; branch flags are deliberately false. Website HMAC secrets for quote signing and phone digest must be set securely before checkout is enabled.
+7. Vercel POS preview workflow remains skipped by its current guard; this pass deployed Supabase Edge Functions, not a Vercel app release or production alias cutover.
+
+### Next exact steps
+- Implement and test the missing order-status RPC using explicit state-transition/role rules from the approved operational workflow; run the disposable local Supabase suite first, then apply the versioned migration to empty hosted Production.
+- Fix CORS and configure/verify Edge secrets through secure Supabase Dashboard/CLI handling (never print secret values).
+- Complete private Broadcast policies + server-only publishers or keep polling as the supported fallback.
+- Configure branch delivery areas/default fee and approved staff accounts.
+- Deploy/validate POS preview, then run the manual synthetic-order rehearsal for Dine-in, Takeaway and Delivery (including offline/reconnect, payment and history) before any real restaurant launch.
+
+No customer, order, payment or delivery rows were created in hosted Production during this pass.
