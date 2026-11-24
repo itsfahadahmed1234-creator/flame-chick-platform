@@ -1248,10 +1248,9 @@ html,body{background:var(--bg);overflow:hidden}
 <div id="paymentCollectionModal" class="modal-wrap"><div class="modal payment-collection-modal">
   <div class="tables-head"><div><h3 id="paymentCollectionTitle">Collect Order Payment</h3><p id="paymentCollectionSubtitle">Record the amount physically received by staff.</p></div><button class="close-btn" type="button" onclick="closeModal('paymentCollectionModal')" aria-label="Close payment collection">×</button></div>
   <div id="paymentCollectionBalance" class="payment-collection-summary"></div>
-  <div class="field"><label for="paymentCollectionAmount">Amount received (Rs.)</label><input id="paymentCollectionAmount" type="number" inputmode="decimal" min="0.01" step="0.01" required></div>
-  <div class="field"><label for="paymentCollectionMethod">Payment method</label><select id="paymentCollectionMethod"><option value="cash">Cash</option><option value="card">Card</option><option value="bank">Bank transfer</option><option value="wallet">Wallet</option><option value="other">Other</option></select></div>
-  <p class="payment-collection-note">A partial collection keeps the order Delivered with a remaining balance. The order moves to Completed only when the full balance is recorded.</p>
-  <div class="modal-actions"><button class="btn" type="button" onclick="closeModal('paymentCollectionModal')">Cancel</button><button id="submitPaymentCollectionBtn" class="btn primary" type="button" onclick="submitOrderPaymentCollection()">Record payment</button></div>
+  <div class="field"><label for="paymentCollectionMethod">Collection method</label><select id="paymentCollectionMethod"><option value="cash">COD</option><option value="card">Card</option><option value="bank">Online/bank transfer</option></select></div>
+  <p class="payment-collection-note">Confirm the method only after receiving the full outstanding amount. Successful collection completes the order and moves it to Order History.</p>
+  <div class="modal-actions"><button class="btn" type="button" onclick="closeModal('paymentCollectionModal')">Cancel</button><button id="submitPaymentCollectionBtn" class="btn primary" type="button" onclick="submitOrderPaymentCollection()">Confirm method &amp; collect payment</button></div>
 </div></div>
 <div id="tablesModal" class="modal-wrap"><div class="modal tables-modal">
   <div class="tables-head"><div><h3 id="tablesModalTitle">Open Tables</h3><p id="tablesModalHint">Open checks stay active until payment is completed.</p></div><button class="close-btn" type="button" onclick="closeModal('tablesModal')">×</button></div>
@@ -1281,6 +1280,7 @@ html,body{background:var(--bg);overflow:hidden}
   </div>
 </div>
 <div id="printArea"></div>
+<script src="./payment-collection.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
 <script>
 'use strict';
@@ -1505,57 +1505,44 @@ async function openPaymentCollection(orderId){
   if(!order||order.Status!=='Delivered'){showToast('Only a delivered order can be settled from this screen.');return;}
   const balance=Number(order.BalanceDue);
   if(!Number.isFinite(balance)||balance<=0){showToast('This order has no outstanding balance. Refresh the order board.');return;}
-  paymentCollectionState={orderId:key,requestId:crypto.randomUUID(),amount:null,method:'cash',sent:false};
+  paymentCollectionState={orderId:key,requestId:crypto.randomUUID(),method:'cash',sent:false};
   $('paymentCollectionTitle').textContent='Collect Payment · '+(order.OrderNumber||'Flame Chick order');
   $('paymentCollectionSubtitle').textContent=(order.CustomerName||'Customer')+' · '+(order.Phone||'');
-  $('paymentCollectionBalance').textContent='Order total Rs. '+money(order.Total)+' · Already paid Rs. '+money(order.PaidAmount)+' · Outstanding Rs. '+money(balance);
-  $('paymentCollectionAmount').value=balance.toFixed(2).replace(/\.00$/,'');
-  $('paymentCollectionAmount').max=balance.toFixed(2);
+  $('paymentCollectionBalance').textContent='Collect full outstanding balance: Rs. '+money(balance);
   $('paymentCollectionMethod').value='cash';
   $('submitPaymentCollectionBtn').disabled=false;
-  $('submitPaymentCollectionBtn').textContent='Record payment';
+  $('submitPaymentCollectionBtn').textContent='Confirm method & collect payment';
   openModal('paymentCollectionModal');
-  $('paymentCollectionAmount').focus();
+  $('paymentCollectionMethod').focus();
 }
 async function submitOrderPaymentCollection(){
   const state=paymentCollectionState;
   if(!state)return;
   const order=inboxOrders.get(state.orderId);
-  if(!order||order.Status!=='Delivered'){showToast('The order is no longer awaiting payment. Refresh and try again.');return;}
-  const amount=Number($('paymentCollectionAmount').value);
+  if(!order||order.Status!=='Delivered'){showToast('The order is no longer awaiting payment. Refresh the order board.');return;}
+  const amount=Number(order.BalanceDue);
   const method=String($('paymentCollectionMethod').value||'').toLowerCase();
-  if(!Number.isFinite(amount)||amount<=0||Math.round(amount*100)!==amount*100){showToast('Enter an amount greater than zero with no more than two decimal places.');return;}
-  if(amount>Number(order.BalanceDue)){showToast('The collected amount cannot exceed the outstanding balance.');return;}
-  if(!['cash','card','bank','wallet','other'].includes(method)){showToast('Choose a valid payment method.');return;}
-  // Preserve the request ID after an uncertain network result. Never turn
-  // an ambiguous retry into a fresh financial movement; close and reopen
-  // after refresh before changing the amount or method.
-  if(state.sent&&(state.amount!==amount||state.method!==method)){
-    showToast('This payment request may already have reached the database. Retry the same amount and method, or close and reopen after refreshing the order board.');
-    return;
-  }
-  if(!state.sent){
-    state.amount=amount;
-    state.method=method;
-    state.sent=true;
-  }
+  if(!['cash','card','bank'].includes(method)){showToast('Choose COD, Card or Online/bank transfer.');return;}
+  if(state.sent&&state.method!==method){showToast('This payment may already have reached the database. Retry the same method, or refresh and reopen the order.');return;}
+  if(!state.sent){state.method=method;state.sent=true;}
   const button=$('submitPaymentCollectionBtn');
-  button.disabled=true;button.textContent='Recording…';
+  button.disabled=true;button.textContent='Collecting payment…';
   try{
     const result=await flameChickOrderRequest('POST',null,{
       action:'collect_payment',order_id:state.orderId,amount,
       payment_method:method,request_id:state.requestId
     });
-    if(result?.ok!==true||!result?.payment_id)throw new Error('The database did not confirm the payment collection.');
+    if(result?.ok!==true||!result?.payment_id||result.completed!==true||Number(result.balance_due)!==0){
+      throw new Error('The database has not confirmed full payment and order completion.');
+    }
     closeModal('paymentCollectionModal');
     paymentCollectionState=null;
     await loadInitialOnlineInbox();
-    showToast(result.completed
-      ? 'Payment fully collected. Order completed and moved to Order History.'
-      : 'Partial payment recorded. Rs. '+money(result.balance_due)+' remains outstanding.');
+    await refreshHistoryData();
+    showToast('Payment collected. Order completed and moved to Order History.');
   }catch(error){
-    showToast(error?.message||'Payment collection failed. Retry the same amount and method safely.');
-    button.disabled=false;button.textContent='Retry payment';
+    showToast(error?.message||'Payment collection failed. Retry the same method safely.');
+    button.disabled=false;button.textContent='Retry collection';
   }
 }
 
