@@ -1280,6 +1280,9 @@ html,body{background:var(--bg);overflow:hidden}
   </div>
 </div>
 <div id="printArea"></div>
+<script src="../flame-chick-website/js/catalog-v3.js"></script>
+<script src="../flame-chick-website/js/catalog-v3-deal-view.js"></script>
+<script src="./catalog-v3-adapter.js"></script>
 <script src="./payment-collection.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
 <script>
@@ -2554,7 +2557,21 @@ async function init(){
   if(navigator.onLine){ syncPending(); syncStatusUpdates(); }
 }
 
-async function loadLocal(){menu=await all(STORES.menu);categories=await all(STORES.categories);deliveryAreas=await all(STORES.deliveryAreas);const s=await get(STORES.settings,'menuVersion');menuVersion=String(s?.value||'');const c=await get(STORES.catalog,'snapshot');catalogSnapshot=c?.value||null;pizzaCategoryIds=new Set(categories.filter(c=>/pizza/i.test(c.Name||'')).map(c=>String(c.ID)));}
+async function loadLocal(){
+  const c=await get(STORES.catalog,'snapshot');
+  const saved=c?.value||null;
+  if(!saved||saved.schemaVersion!==3){
+    // Never let an old V2 cache appear as the current Production menu.
+    await Promise.all([clearStore(STORES.menu),clearStore(STORES.categories),clearStore(STORES.deliveryAreas),clearStore(STORES.catalog)]);
+    await del(STORES.settings,'menuVersion');
+    menu=[];categories=[];deliveryAreas=[];catalogSnapshot=null;menuVersion='';pizzaCategoryIds=new Set();
+    return;
+  }
+  catalogSnapshot=saved;
+  menu=await all(STORES.menu);categories=await all(STORES.categories);deliveryAreas=await all(STORES.deliveryAreas);
+  const setting=await get(STORES.settings,'menuVersion');menuVersion=String(setting?.value||'');
+  pizzaCategoryIds=new Set(categories.filter(c=>/pizza/i.test(c.Name||'')).map(c=>String(c.ID)));
+}
 async function fetchJSON(url,opts={}){
   if(!url)throw new Error('Flame Chick online order API is not connected yet.');
   const controller=new AbortController();
@@ -2578,45 +2595,15 @@ async function fetchFlameChickCatalog(action){
   });
 }
 function adaptFlameChickCatalog(snapshot){
-  if(!snapshot||Number(snapshot.schemaVersion)!==2)throw new Error('Unsupported Flame Chick catalog schema.');
-  const required=['categories','products','productVariants','subcategories','deals','dealComponents','modifierGroups','modifiers','modifierPriceRules','modifierGroupAssignments','deliveryAreas','drinkOptions'];
-  for(const k of required)if(!Array.isArray(snapshot[k]))throw new Error('Flame Chick catalog is missing '+k+'.');
-  const activeCategories=snapshot.categories.filter(c=>c.Active===true).map(c=>({
-    ID:String(c.CategoryID),Name:String(c.LegacyID==="CAT-DEALS"?"Normal Deals":c.NameEn||""),NameUr:String(c.NameUr||''),
-    SortOrder:Number(c.SortOrder)||0,Active:true,LegacyID:c.LegacyID||''
-  }));
-  const activeCategoryIds=new Set(activeCategories.map(c=>c.ID));
-  const products=new Map(snapshot.products.map(p=>[String(p.ProductID),p]));
-  const rows=[];
-  for(const v of snapshot.productVariants){
-    const p=products.get(String(v.ProductID));
-    if(!p||p.Active!==true||!activeCategoryIds.has(String(p.CategoryID))||v.Active!==true)continue;
-    rows.push({
-      ID:String(v.VariantID),VariantID:String(v.VariantID),ProductID:String(p.ProductID),
-      LegacyProductID:String(p.LegacyID||''),LegacyVariantID:String(v.LegacyID||''),
-      CategoryID:String(p.CategoryID),SubcategoryID:String(p.SubcategoryID||''),
-      Name:String(p.NameEn||''),NameUr:String(p.NameUr||''),
-      Description:String(v.SizeLabel||''),DescriptionUr:String(p.DescriptionUr||''),
-      Price:Number(v.Price)||0,SizeKey:String(v.SizeKey||''),
-      Available:p.Available===true&&v.Available===true,Active:true,
-      Featured:p.Featured===true,SortOrder:(Number(p.SortOrder)||0)*100+(Number(v.SortOrder)||0),
-      ImageFolderKey:p.ImageFolderKey||'',ImageGroupID:p.ImageGroupID||'',
-      ImagePublished:p.ImagePublished===true,ImageExtension:p.ImageExtension||'',
-      ImageCurrentPath:p.ImageCurrentPath||''
-    });
-  }
-  rows.sort((a,b)=>a.SortOrder-b.SortOrder||a.Name.localeCompare(b.Name));
-  const areas=snapshot.deliveryAreas.filter(a=>a.Active===true).map(a=>{
-    const rawFee=a.Fee;
-    const n=rawFee===null||rawFee===undefined||rawFee===''?null:Number(rawFee);
-    const fee=Number.isFinite(n)&&n>=0?n:null;
-    return {
-      ID:String(a.ID),AreaName:String(a.AreaName||''),AreaNameUr:String(a.AreaNameUr||''),
-      Name:String(a.AreaName||''),Fee:fee,DeliveryFee:fee,Active:true
-    };
+  const result=window.FlameChickPosCatalogV3?.adapt(snapshot,{
+    contract:window.FlameChickCatalogV3,
+    dealView:window.FlameChickCatalogV3DealView,
+    branchId:flameChickStaffProfile?.branch_id||flameChickStaffProfile?.branchId||undefined,
+    fulfilmentType:'dine_in'
   });
-  const pizzaIds=new Set(activeCategories.filter(c=>/pizza/i.test(c.Name)).map(c=>c.ID));
-  return {categories:activeCategories,menu:rows,deliveryAreas:areas,pizzaCategoryIds:pizzaIds};
+  if(!result?.ok)throw new Error(result?.message||'Published V3 Flame Chick catalog could not be adapted.');
+  const pizzaIds=new Set(result.categories.filter(c=>/pizza/i.test(c.Name)).map(c=>String(c.ID)));
+  return {...result,pizzaCategoryIds:pizzaIds};
 }
 function normalizeLookupText(value){return String(value??'').trim().toLowerCase().replace(/\s+/g,' ')}
 function firstField(row,names){for(const name of names){if(Object.prototype.hasOwnProperty.call(row,name)&&row[name]!==''&&row[name]!==null&&row[name]!==undefined)return row[name]}return ''}
@@ -2628,32 +2615,37 @@ async function refreshDeliveryAreas(){if(!catalogSnapshot)return;const rows=cata
 async function ensureDeliveryAreas(){deliveryAreas=await all(STORES.deliveryAreas);if(!deliveryAreas.length&&navigator.onLine)await refreshDeliveryAreas()}
 
 async function refreshMenu(force=false){
-  if(!navigator.onLine&&!force)throw new Error('Internet is offline. The last verified Flame Chick menu remains available locally.');
-  $('notice').textContent='Checking Flame Chick catalog…';$('notice').className='notice';
+  if(!navigator.onLine&&!force)throw new Error('Internet is offline. The last verified V3 Flame Chick menu remains available locally.');
+  $('notice').textContent='Checking published Flame Chick V3 catalog…';$('notice').className='notice';
   const health=await fetchFlameChickCatalog('health');
-  if(!health?.ok||!health.data||Number(health.data.schemaVersion)!==2)throw new Error(health?.error?.message||'Flame Chick catalog health check failed.');
-  if(health.data.published!==true||!health.data.versionId)throw new Error('Flame Chick menu is not published yet.');
+  const healthCheck=window.FlameChickCatalogV3?.validateHealth(health);
+  if(!healthCheck?.ok||healthCheck.schemaVersion!==3)throw new Error(health?.error?.message||'Published V3 catalog health check failed.');
+  if(healthCheck.published!==true||!healthCheck.versionId)throw new Error('Flame Chick V3 menu is not published yet.');
   const current=await get(STORES.settings,'menuVersion');
-  if(!force&&String(current?.value||'')===String(health.data.versionId)&&menu.length){
-    $('notice').textContent='Flame Chick menu is up to date · '+menu.length+' variants';$('notice').className='notice ok';
+  if(!force&&String(current?.value||'')===String(healthCheck.versionId)&&menu.length&&catalogSnapshot?.schemaVersion===3){
+    $('notice').textContent='Published V3 menu is up to date · '+menu.length+' variants';$('notice').className='notice ok';
     return;
   }
   const response=await fetchFlameChickCatalog('catalog');
-  if(!response?.ok||!response.data)throw new Error(response?.error?.message||'Flame Chick catalog download failed.');
+  if(!response?.ok||!response.data)throw new Error(response?.error?.message||'Flame Chick V3 catalog download failed.');
   const snapshot=response.data;
-  if(String(snapshot.versionId)!==String(health.data.versionId))throw new Error('Flame Chick menu changed during download. Refresh and try again.');
+  if(snapshot.schemaVersion!==3||String(snapshot.versionId)!==String(healthCheck.versionId)||String(snapshot.publicationId)!==String(healthCheck.publicationId)){
+    throw new Error('Flame Chick V3 publication changed or mismatched during download. Refresh and try again.');
+  }
   const adapted=adaptFlameChickCatalog(snapshot);
-  if(!adapted.menu.length)throw new Error('Flame Chick catalog returned no active product variants.');
+  if(!adapted.menu.length)throw new Error('Published V3 catalog returned no sellable standalone product variants.');
+  // Replace only menu/catalog cache stores. Local orders, tables, outbox and status queues remain intact.
   await Promise.all([clearStore(STORES.menu),clearStore(STORES.categories),clearStore(STORES.deliveryAreas)]);
   for(const row of adapted.menu)await put(STORES.menu,row);
   for(const row of adapted.categories)await put(STORES.categories,row);
   for(const row of adapted.deliveryAreas)await put(STORES.deliveryAreas,row);
-  await put(STORES.catalog,{key:'snapshot',versionId:snapshot.versionId,schemaVersion:2,value:snapshot,savedAt:new Date().toISOString()});
+  await put(STORES.catalog,{key:'snapshot',versionId:snapshot.versionId,schemaVersion:3,value:snapshot,savedAt:new Date().toISOString(),publicationId:snapshot.publicationId,publicationNumber:snapshot.publicationNumber});
   await put(STORES.settings,{key:'menuVersion',value:snapshot.versionId,updatedAt:new Date().toISOString()});
   menu=adapted.menu;categories=adapted.categories;deliveryAreas=adapted.deliveryAreas;
   catalogSnapshot=snapshot;pizzaCategoryIds=adapted.pizzaCategoryIds;menuVersion=snapshot.versionId;
-  $('notice').textContent='Flame Chick menu synced locally · '+menu.length+' variants · version '+String(menuVersion).slice(0,19);$('notice').className='notice ok';
-  render();showToast('Flame Chick menu updated');
+  $('notice').textContent='Published V3 Flame Chick menu cached locally · '+menu.length+' sellable variants · publication '+snapshot.publicationNumber;
+  $('notice').className='notice ok';
+  render();showToast('Published V3 Flame Chick menu updated');
 }
 async function ensureMenu(){
   if(menu.length){
@@ -2821,7 +2813,7 @@ function findPizzaOptions(name){
 function openPizzaChoice(p){
   const options=findPizzaOptions(p.Name);
   if(!options.length)return;
-  posPizzaChoice={name:p.Name,productId:p.ProductID,options,groups:getPOSModifierGroups(p.ProductID),variantId:'',selections:{}};
+  posPizzaChoice={name:p.Name,productId:p.ProductID,options,groups:[],variantId:'',selections:{}};
   $('choiceTitle').textContent=p.Name+' — Choose size & extras';
   renderPOSPizzaChoice();
   openModal('choiceModal');
@@ -2833,6 +2825,7 @@ function orderPOSPizzaModifierGroups(groups){
 function renderPOSPizzaChoice(){
   const st=posPizzaChoice;if(!st)return;
   const chosen=st.options.find(x=>String(x.ID)===String(st.variantId));
+  st.groups=chosen?getPOSModifierGroups(st.productId,chosen.ID):[];
   const sizeHtml=st.options.map(v=>`<button type="button" class="size-box ${String(v.ID)===String(st.variantId)?'active':''}" data-pos-variant="${esc(v.ID)}"><strong>${esc(v.Description||'Size')}</strong><small>Rs. ${money(v.Price)}</small></button>`).join('');
   const pizzaGroups=orderPOSPizzaModifierGroups(st.groups);
   const extras=pizzaGroups.length?`<div class="pos-pizza-extras-row">${posGroupSelectionsHtml(pizzaGroups,st.selections,chosen||null,'pizza')}</div>`:posGroupSelectionsHtml(pizzaGroups,st.selections,chosen||null,'pizza');
@@ -2861,7 +2854,7 @@ function confirmPOSPizzaChoice(){
   posPizzaChoice=null;closeModal('choiceModal');renderCart();showToast(st.name+' '+variant.Description+' added');
 }
 function openPOSModifierPicker(item){
-  const groups=getPOSModifierGroups(item.ProductID);
+  const groups=getPOSModifierGroups(item.ProductID,item.ID);
   if(!groups.length)return false;
   posModifierChoice={item,groups,selections:{}};
   $('choiceTitle').textContent=(item.Name||'Item')+' — Choose options';
@@ -2900,30 +2893,23 @@ function openPizzaChoiceByName(name){
 function findItem(id){
   return menu.find(x=>String(x.ID)===String(id));
 }
-function getPOSModifierGroups(productId){
-  const snap=catalogSnapshot;if(!snap)return [];
-  const groups=new Map((snap.modifierGroups||[]).map(g=>[String(g.ModifierGroupID),g]));
-  const modsByGroup=new Map();
-  (snap.modifiers||[]).filter(m=>m.Active===true).forEach(m=>{
-    const key=String(m.ModifierGroupID);if(!modsByGroup.has(key))modsByGroup.set(key,[]);modsByGroup.get(key).push(m);
-  });
-  const out=(snap.modifierGroupAssignments||[])
-    .filter(a=>a.Active===true&&String(a.TargetType).toUpperCase()==='PRODUCT'&&String(a.TargetID)===String(productId))
-    .sort((a,b)=>(Number(a.SortOrder)||0)-(Number(b.SortOrder)||0))
-    .map(a=>{
-      const group=groups.get(String(a.ModifierGroupID));
-      if(!group||group.Active!==true)return null;
-      return {...group,options:(modsByGroup.get(String(group.ModifierGroupID))||[]).sort((x,y)=>(Number(x.SortOrder)||0)-(Number(y.SortOrder)||0))};
-    }).filter(g=>g&&g.options.length);
-  return out;
+function getPOSModifierGroups(productId,variantId){
+  if(!catalogSnapshot||catalogSnapshot.schemaVersion!==3)return [];
+  if(!variantId){
+    const variants=menu.filter(row=>String(row.ProductID)===String(productId));
+    if(variants.length!==1)return [];
+    variantId=variants[0].VariantID;
+  }
+  const result=window.FlameChickPosCatalogV3?.productModifierGroups(
+    catalogSnapshot,String(productId),String(variantId),
+    window.FlameChickCatalogV3,window.FlameChickCatalogV3DealView
+  );
+  return Array.isArray(result)?result:[];
 }
 function posModifierPrice(modifier,variant){
-  const mode=String(modifier.PriceMode||'').toUpperCase();
-  if(mode==='FREE')return 0;
-  if(mode==='FIXED')return Number(modifier.FixedPrice)||0;
-  if(mode==='BY_SIZE'){
-    const r=(catalogSnapshot?.modifierPriceRules||[]).find(x=>String(x.ModifierID)===String(modifier.ModifierID)&&String(x.SizeKey)===String(variant?.SizeKey||''));
-    return r?Number(r.Price):null;
+  if(String(modifier.PriceMode||'').toUpperCase()==='RESOLVED'){
+    const minor=Number(modifier.PriceMinor);
+    return Number.isSafeInteger(minor)&&minor>=0?minor/100:null;
   }
   return null;
 }
