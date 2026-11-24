@@ -8,6 +8,7 @@ on:
       - "apps/flame-chick-pos/**"
       - "apps/flame-chick-rider/**"
       - "tests/ops-source-hygiene.test.mjs"
+      - "tests/pos-payment-collection.test.mjs"
       - ".github/workflows/ci-ops-static.yml"
 
 permissions:
@@ -29,4 +30,4 @@ jobs:
           node-version: "22"
 
       - name: Check POS and Rider source
-        run: node --test tests/ops-source-hygiene.test.mjs
+        run: node --test tests/ops-source-hygiene.test.mjs tests/pos-payment-collection.test.mjs
