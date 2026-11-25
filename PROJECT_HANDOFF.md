@@ -5137,3 +5137,10 @@ Canonical continuation: `docs/handoffs/2026-11-25-burger-choice-editor-save-chec
 ## 2026-11-25 — Admin deal editor correction Preview
 
 Canonical continuation: `docs/handoffs/2026-11-25-admin-deal-editor-correction-preview.md`. The source fix is committed at `dd6151e3bd86d9abd67cfce24b221dd4b5af3f8e`; Admin static checks run `45534384936` SUCCESS; Preview deployment `dpl_7kEfiQME3TzbV69QnA6Pj61nVKAt` is READY. No catalog data was written, and no catalog publication or production alias promotion occurred. See the dated handoff for findings, exact test status, preview URLs and the single controlled Flame Feast correction steps.
+
+
+---
+
+## 2026-11-25 — Burger selector clarification / placeholder exclusion
+
+Latest source commit `3b1475a4879931ecb51618a90b8a57d18259a7f5`; Admin static checks SUCCESS (run `45534964386`); Website static checks SUCCESS (run `45534888577`). Latest Admin Preview is READY at https://flame-chick-admin-production-k6edsdg4y-fahad-7455.vercel.app/ (deployment `dpl_EJwtuE7r5XruzyjcXCCbEWJovm9m`). Burger slot dropdowns already each offer the full configured burger alternatives; repeat is controlled by the group/option caps. Admin now excludes the exact placeholder product name `Burger` from Burger group selectors without deleting or editing the underlying catalog product. See `docs/handoffs/2026-11-25-admin-deal-editor-correction-preview.md` for the precise inspection and controlled-save procedure. No catalog changes or publication performed.
