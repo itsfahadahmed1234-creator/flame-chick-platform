@@ -35,6 +35,17 @@ Staff provisioning migration `20261125083051_flame_chick_staff_main_branch_rider
 - Preserve all existing Production data: 11 orders and 3 delivery tasks, with 0 unresolved delivery tasks at the pre-deploy check. One active Main branch; Fahad’s existing Rider role and profile remain active and matched.
 - No customer order or payment was created for deployment validation. GST remains deferred. Restaurant launch and live trading are not cleared.
 
+## Latest manual verification — 2026-11-25
+
+- Admin sign-in and Staff & Riders page: user-confirmed successful.
+- POS sign-in, Online Orders and dispatch: user-confirmed successful. POS displayed **“Realtime active · event-driven updates”** and showed a Rider online.
+- Existing Fahad Rider account: user-confirmed successful sign-in; profile `fahad`, code `R-BC80D848`, with **“Live updates”**.
+- User completed a controlled POS Delivery rehearsal and confirmed that POS/Rider Realtime updates occurred.
+- Narrow read-only Production audit matched the 15:20–15:30 PKT window to `FC-261125-0003`: delivery accepted by Fahad at 15:26:50, picked up 15:26:56, delivered 15:27:08; order completed. A successful cash collection of PKR 599.00 was recorded at 15:27:32; balance is zero. The app's cash collection record is not independent proof of physical cash movement.
+- Sanitized event timeline is preserved in `docs/handoffs/2026-11-25-rider-access-admin-main-branch-fix.md`. No broad logs export, production mutation, order deletion/refund, migration, new account, deployment, or alias change occurred.
+- Do not repeat this production test merely to reconfirm Realtime. Keep the rehearsal order as an audit record unless a separate accounting decision authorizes a correction.
+- Production remains **pre-launch** pending the remaining permission/edge-case rehearsal. GST deferred; Free plan and one Main branch preserved.
+
 ## Next steps for user
 1. Hard-refresh and sign in at Admin `https://flamechicadmin.vercel.app/`, POS `https://flamechicpos.vercel.app/`, and Rider `https://flamechickrider.vercel.app/`.
 2. Confirm POS shows Realtime connected and updates its order/dispatch board from authorized events.
