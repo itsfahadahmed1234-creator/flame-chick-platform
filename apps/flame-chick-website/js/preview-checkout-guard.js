@@ -11,35 +11,19 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
 
-  var PRODUCTION_ORDER_HOSTS = Object.freeze([
-    'flamechic.vercel.app',
-    'flame-chick-website-production-six.vercel.app',
-    'flame-chick-website-production-fahad-7455.vercel.app',
-    'flame-chick-website-production-wnkr3bp6s-fahad-7455.vercel.app'
-  ]);
-
-  // Exactly one SSO-protected Website branch Preview may submit QA records.
-  // Do not add deployment-random URLs or broad *.vercel.app matching.
-  var TEST_CHECKOUT_PREVIEW_HOSTS = Object.freeze([
-    'flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455.vercel.app'
-  ]);
+  var PRODUCTION_ORDER_HOSTS = Object.freeze(['flamechick.vercel.app']);
+  var TEST_CHECKOUT_PREVIEW_HOSTS = [];
 
   function normalizedHost(hostname) {
     if (typeof hostname !== 'string') return '';
     return hostname.trim().toLowerCase().replace(/\.$/, '');
   }
 
-  function isTestCheckoutPreview(hostname) {
-    var host = normalizedHost(hostname);
-    return !!host && TEST_CHECKOUT_PREVIEW_HOSTS.indexOf(host) !== -1;
-  }
+  function isTestCheckoutPreview() { return false; }
 
   function canSubmitOrders(hostname) {
     var host = normalizedHost(hostname);
-    return !!host && (
-      PRODUCTION_ORDER_HOSTS.indexOf(host) !== -1 ||
-      TEST_CHECKOUT_PREVIEW_HOSTS.indexOf(host) !== -1
-    );
+    return !!host && PRODUCTION_ORDER_HOSTS.indexOf(host) !== -1;
   }
 
   function shouldBlockOrderApiWrite(method, hostname) {
