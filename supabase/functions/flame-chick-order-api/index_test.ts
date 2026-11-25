@@ -8,6 +8,7 @@ Deno.env.set("FLAME_CHICK_ORDER_PHONE_HMAC_SECRET", "local-test-phone-hmac-value
 
 const require = createRequire(import.meta.url);
 const fixture = require("../../../tests/fixtures/flame-chick-published-menu-v3-fixture.cjs");
+const burgerFixture = require("../../../tests/fixtures/catalog-v3-fixture.cjs");
 const snapshot = fixture.createPublishedMenuSnapshot();
 const branchId = snapshot.branches[0].branchId;
 const restaurantId = snapshot.restaurantId;
@@ -314,5 +315,157 @@ Deno.test("authenticated POS sync prices from V3, derives trusted identity and f
     console.log("Authenticated POS sync: staff auth, trusted branch, V3 price, exact-retry fingerprint stability and changed-payload fingerprint conflict passed.");
   } finally {
     globalThis.fetch=originalFetch;
+  }
+});
+
+
+Deno.test("authenticated POS Delivery sync accepts category-driven Chicken Burger variant IDs", async () => {
+  const ids = burgerFixture.IDS;
+  const source = burgerFixture.createCategoryBurgerSnapshot({
+    quantity: 3,
+    allowRepeat: true,
+    maxPerChoice: 3
+  });
+  source.restaurantId = restaurantId;
+  source.branches = source.branches.map((row: any) => ({ ...row, branchId }));
+  source.publicationId = publicationId;
+  source.publicationNumber = publicationNumber;
+  source.versionId = "sha256:" + snapshotSha256;
+  source.databaseNow = initialNow;
+
+  const burgerGroupId = ids.componentGroup;
+  const drinkGroupId = ids.drinkComponentGroup;
+  const dealId = ids.deal;
+  const dealVariantId = ids.dealVariant;
+  const areaIdForTest = "22000000-0000-4000-8000-000000000001";
+  const posSyncPayloads: Record<string, any>[] = [];
+  const requests = [
+    {
+      local_order_id: "bb000000-0000-4000-8000-000000000101",
+      components: [
+        { component_option_id: ids.ogCrunchVariant, product_id: ids.ogCrunchProduct, product_variant_id: ids.ogCrunchVariant, modifiers: [] },
+        { component_option_id: ids.injectorVariant, product_id: ids.injectorProduct, product_variant_id: ids.injectorVariant, modifiers: [] },
+        { component_option_id: ids.nashvilleFireVariant, product_id: ids.nashvilleFireProduct, product_variant_id: ids.nashvilleFireVariant, modifiers: [] }
+      ]
+    },
+    {
+      local_order_id: "bb000000-0000-4000-8000-000000000102",
+      // POS sync expands a repeated selection into one component record per burger.
+      components: Array.from({ length: 3 }, () => ({
+        component_option_id: ids.injectorVariant,
+        product_id: ids.injectorProduct,
+        product_variant_id: ids.injectorVariant,
+        modifiers: []
+      }))
+    }
+  ];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const rawUrl = input instanceof Request ? input.url : String(input);
+    const url = new URL(rawUrl);
+    const pathName = url.pathname;
+    const method = String(init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+
+    if (pathName.endsWith("/auth/v1/user") && method === "GET") {
+      return json({ id: "aa000000-0000-4000-8000-000000000001" });
+    }
+    if (pathName.endsWith("/rpc/flame_chick_get_staff_role_rows")) {
+      return json([{ restaurant_id: restaurantId, role_key: "cashier", branch_id: branchId, is_active: true }]);
+    }
+    if (pathName.endsWith("/rpc/flame_chick_catalog_public_read")) {
+      return json({
+        published: true, snapshot: source, publicationId, publicationNumber, schemaVersion: 3,
+        snapshotSha256, draftRevision: 92, pricingEngineVersion: "flame-chick-pricing-v1",
+        publishedAt, databaseNow: initialNow
+      });
+    }
+    if (pathName.endsWith("/restaurants")) {
+      return json([{ id: restaurantId, currency_code: "PKR", timezone: "Asia/Karachi" }]);
+    }
+    if (pathName.endsWith("/branches")) {
+      return json([{ id: branchId, branch_code: "main", name: "Main Branch", is_active: true }]);
+    }
+    if (pathName.endsWith("/delivery_areas")) {
+      return json([{ id: areaIdForTest, name: "Synthetic Area", name_ur: null, delivery_fee: 50, sort_order: 1 }]);
+    }
+    if (pathName.endsWith("/branch_delivery_settings")) {
+      return json([{ not_listed_delivery_fee: null }]);
+    }
+    if (pathName.endsWith("/rpc/flame_chick_sync_pos_order")) {
+      const payload = JSON.parse(String(init?.body || "{}")).p_payload;
+      posSyncPayloads.push(payload);
+      return json({
+        ok: true, already_processed: false,
+        order_id: "99000000-0000-4000-8000-000000000099",
+        order_number: "FC-261125-0099",
+        local_order_id: payload.local_order_id,
+        local_revision: payload.local_revision,
+        status: "new", payment_status: "unpaid", fulfillment_type: "delivery",
+        subtotal: payload.subtotal, delivery_fee: payload.delivery_fee, total: payload.total,
+        paid_amount: 0, balance_due: payload.total, currency_code: "PKR", created_at: initialNow
+      });
+    }
+    return json({ message: "Unexpected synthetic POS category-burger request: " + method + " " + pathName }, 500);
+  }) as typeof fetch;
+
+  try {
+    for (const [index, item] of requests.entries()) {
+      const body = {
+        action: "sync_pos_order",
+        local_order_id: item.local_order_id,
+        local_revision: 1,
+        publication_id: publicationId,
+        version_id: "sha256:" + snapshotSha256,
+        fulfillment_type: "delivery",
+        customer: { name: "Synthetic POS Delivery", phone: "03001234567" },
+        delivery: {
+          selection_type: "listed_area",
+          area_id: areaIdForTest,
+          address: "House 12, Synthetic QA Road",
+          instructions: "Ring bell"
+        },
+        items: [{
+          kind: "deal",
+          deal_id: dealId,
+          deal_variant_id: dealVariantId,
+          quantity: 1,
+          component_groups: [
+            { component_group_id: burgerGroupId, components: item.components },
+            {
+              component_group_id: drinkGroupId,
+              components: [{
+                component_option_id: ids.drinkComponentOption,
+                product_id: ids.drinkProduct,
+                product_variant_id: ids.drinkVariant,
+                modifiers: []
+              }]
+            }
+          ]
+        }]
+      };
+      const request = new Request("https://flame-chick-disposable.supabase.co/functions/v1/flame-chick-order-api", {
+        method: "POST",
+        headers: { ...headers, authorization: "Bearer synthetic-staff-token" },
+        body: JSON.stringify(body)
+      });
+      const response = await handleOrderApiRequest(request);
+      const result = await response.json() as Record<string, any>;
+      if (response.status !== 201 || result.ok !== true || result.local_order_id !== item.local_order_id) {
+        throw new Error("Category-driven POS Delivery sync " + index + " failed: " + JSON.stringify(result));
+      }
+      const expectedBase = Number(source.dealVariants.find((row: any) => row.dealVariantId === dealVariantId)?.basePrice);
+      if (Number(result.subtotal) !== expectedBase || Number(result.delivery_fee) !== 50 ||
+          Number(result.total) !== expectedBase + 50) {
+        throw new Error("Category-driven Burger selection changed the fixed deal price or delivery fee: " + JSON.stringify(result));
+      }
+      const canonicalDeal = posSyncPayloads[index]?.items?.[0];
+      const normalizedBurger = canonicalDeal?.components?.filter((row: any) => row.deal_component_id === burgerGroupId) || [];
+      if (normalizedBurger.length !== 3 || normalizedBurger.some((row: any) => Number(row.unit_price_snapshot) !== 0)) {
+        throw new Error("The canonical POS order did not retain three INCLUDED zero-surcharge Burger components.");
+      }
+    }
+    console.log("Authenticated POS Delivery sync: dynamic Chicken Burgers allowlist, distinct/repeated selections, fixed deal price and delivery handoff passed.");
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
