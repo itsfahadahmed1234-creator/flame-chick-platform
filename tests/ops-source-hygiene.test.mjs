@@ -80,7 +80,7 @@ test("POS listens to private branch Broadcast events and refreshes after reconne
 
 test("Realtime migration limits broadcasts to active POS staff and each rider's own topic", () => {
   const migration=readFileSync(
-    "supabase/migrations/20261125090531_flame_chick_private_ops_realtime_broadcasts.sql",
+    "supabase/migrations/20261125092751_flame_chick_private_ops_realtime_broadcasts.sql",
     "utf8"
   );
   assert.match(migration, /CREATE POLICY flame_chick_private_ops_broadcast_select/);
@@ -97,7 +97,7 @@ test("Realtime migration limits broadcasts to active POS staff and each rider's 
 
 test("Realtime trigger payload contains record identifiers, not customer or rider PII", () => {
   const migration=readFileSync(
-    "supabase/migrations/20261125090531_flame_chick_private_ops_realtime_broadcasts.sql",
+    "supabase/migrations/20261125092751_flame_chick_private_ops_realtime_broadcasts.sql",
     "utf8"
   );
   assert.match(migration, /'record_id',v_record_id/);
