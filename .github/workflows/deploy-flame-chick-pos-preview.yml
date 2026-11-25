@@ -58,8 +58,7 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
-      - name: Link the exact preview project
-        working-directory: apps/flame-chick-pos
+      - name: Link the exact preview project from repository root
         run: |
           set -euo pipefail
           mkdir -p .vercel
@@ -72,11 +71,10 @@ jobs:
 
       - name: Deploy Preview only
         id: deploy
-        working-directory: apps/flame-chick-pos
         run: |
           set -euo pipefail
           set +e
-          deploy_output="$(vercel deploy --yes --target=preview --token="$VERCEL_TOKEN" 2>&1)"
+          deploy_output="$(vercel deploy --yes --environment=preview --token="$VERCEL_TOKEN" 2>&1)"
           deploy_status=$?
           set -e
           printf '%s\n' "$deploy_output"
