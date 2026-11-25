@@ -321,6 +321,9 @@ test("POS Online Orders is strictly Delivery-only at API request and display lay
 test("POS History is a primary page and not a modal that falls back to POS",()=>{
   const html=source[0].html;
   assert.match(html,/id="navHistory"/);
+  assert.match(html,/let historyActiveTab='pos';/);
+  assert.match(html,/let historyLoading=false;/);
+  assert.match(html,/const historyServerRows=\{pos:\[\],online:\[\],all:\[\],cancelled:\[\]\};/);
   assert.match(html,/id="historyPage" class="page history-page"/);
   assert.match(html,/const isOrders=which==='orders',isHistory=which==='history'/);
   assert.match(html,/\$\('historyPage'\)\.classList\.toggle\('active',isHistory\)/);
