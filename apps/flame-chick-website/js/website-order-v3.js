@@ -260,18 +260,10 @@
         else row.quantity -= 1;
         invalidateQuote();
       });
-      var quantity = document.createElement('input');
-      quantity.type = 'number'; quantity.min = '1'; quantity.max = '99'; quantity.value = String(row.quantity);
-      quantity.setAttribute('aria-label', 'Quantity for ' + row.label);
-      quantity.disabled = !canEdit();
-      quantity.addEventListener('change', function () {
-        if (!canEdit()) return;
-        var value = Number(quantity.value);
-        if (!Number.isSafeInteger(value) || value < 1 || value > 99) {
-          quantity.value = String(row.quantity); return;
-        }
-        row.quantity = value; invalidateQuote();
-      });
+      var quantity = document.createElement('output');
+      quantity.className = 'order-cart-quantity';
+      quantity.textContent = String(row.quantity);
+      quantity.setAttribute('aria-label', 'Quantity ' + row.quantity + ' for ' + row.label);
       var increment = document.createElement('button');
       increment.type = 'button'; increment.textContent = '+'; increment.disabled = !canEdit() || row.quantity >= 99;
       increment.addEventListener('click', function () {
@@ -334,6 +326,21 @@
     }
     state.dealModel = deals;
     renderDeals(deals);
+    var hasDeals = (deals.collections || []).some(function (collection) {
+      return Array.isArray(collection.deals) && collection.deals.length > 0;
+    });
+    if (hasDeals) {
+      var dealsJump = document.createElement('button');
+      dealsJump.type = 'button';
+      dealsJump.className = 'chip fc-deals-category-chip';
+      dealsJump.textContent = 'Deals';
+      dealsJump.setAttribute('aria-label', 'Jump to Deals');
+      dealsJump.addEventListener('click', function () {
+        var target = $('deals-section');
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      $('catsIn').appendChild(dealsJump);
+    }
   }
 
   function cardPrice(priceMinor) {
