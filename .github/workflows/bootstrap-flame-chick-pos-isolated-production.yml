@@ -73,7 +73,7 @@ jobs:
           deploy_output="$(vercel deploy --yes --prod --token="$VERCEL_TOKEN" 2>&1)"
           deploy_status=$?
           set -e
-          printf '%s\\n' "$deploy_output"
+          printf '%s\n' "$deploy_output"
           if [ "$deploy_status" -ne 0 ]; then
             echo "Vercel CLI exited with status $deploy_status." >&2
             exit "$deploy_status"
