@@ -74,7 +74,7 @@ test("V2 visual language is used for V3 catalog cards without hard-coded menu pr
   assert.match(order, /className = 'art'/);
   assert.match(order, /className = 'body'/);
   assert.match(order, /className = 'foot'/);
-  assert.match(order, /product\.imagePath/);
+  assert.match(order, /appendProductArtwork\(art, product, category\.name\)/);
   assert.match(order, /variant\.priceMinor/);
   assert.match(order, /openProductCustomizer\(product, variantId\)/);
   assert.match(order, /openDealConfigurator\(deal\)/);
