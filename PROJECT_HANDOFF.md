@@ -5114,3 +5114,19 @@ User requested a compact burger selection UI for deals, shared between customer 
   - POS dpl_HPwmsmATstxP1ppBSdKc3MRvsru7, URL flame-chick-pos-production-4lak0tmfg-fahad-7455.vercel.app, state BLOCKED.
   - Both Vercel deployment details point to https://vercel.com/docs/deployments/troubleshoot-project-collaboration#team-configuration. This is a team configuration / collaboration gate, not a recorded app build failure. Do not retry unchanged or claim READY. User/team owner must resolve Vercel collaboration/team configuration before preview can be opened. No Vercel CLI fallback is available in this session.
 - GitHub combined status for the attempted SHA returned no check statuses; the GitHub commit-run wrapper returns only PR-triggered runs and returned none. Do not claim GitHub CI passed. After resolving the Vercel block, rerun tests/catalog-v3-deal-configurator.test.mjs, tests/ops-source-hygiene.test.mjs, website static checks and POS/Rider static checks, then inspect preview on mobile and desktop and verify actual deal burger options are published. Existing published Burger groups still have one placeholder option; real multiple-choice options must be configured through secure Admin/Owner Catalog V3 draft commands and read back before customer/POS selections can use them. Never bypass V3 server validation or write Production catalog rows directly. Explicit user approval is still required before publishing catalog changes.
+
+
+---
+
+## 2026-11-25 — Burger choice editor save checkpoint (latest state)
+
+Canonical continuation: `docs/handoffs/2026-11-25-burger-choice-editor-save-checkpoint.md`. This dated note is the authoritative detailed checkpoint for the November 25 Burger choice editor work.
+
+- Current application source commit: `68dcbab806a511640f458bd1febdfb5e36b95b12`; Admin static checks run `45531200000` SUCCESS.
+- Admin Preview deployment `dpl_F1u84RnNLBKBEiEeveRiXEedspUj` is READY. Stable branch preview alias: `https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app/`. No production alias was changed.
+- User saved the editor while it was actually open on **Flame Feast**, not the intended Flame Hour deal. Read-only DB and audit-log inspection confirm Flame Feast deal `90899197-8bf3-4b1e-af73-9c358b678def` was saved and reactivated at draft revision 96. Price remains Rs. 3,599; availability and other component groups were preserved.
+- **Saved Burger configuration is incorrect:** required quantity 3 and repeat enabled, but group `max_units_per_option=1`; active choices are OG Crunch Regular, The Injector Regular, and **Nashville Regular** (the whole chicken broast product, not Nashville Fire burger). Each option mapping is `INCLUDED`/zero surcharge but has `max_quantity_per_deal=1`; desired limit for each is 3.
+- Current draft revision **96**; published revision **92**. No publication occurred; customer Website/POS catalog snapshots remain unchanged.
+- Immediate next task: investigate/fix Admin editor's deal identity/Edit handler, burger product filtering, `max_units_per_option` form value collection/submission, per-option mapping max quantities and strict read-back verification. Do not ask the user to save again until these are corrected and tested. Then deploy Preview only and perform one controlled correction, verifying read-only DB state after save.
+- Detailed exact product IDs, variant IDs, deal IDs, target constraints for Flame Feast/Flame Duo/Flame Hour, audit revisions, safety boundaries and step-by-step next actions are in the dated handoff file linked above. Do not edit the separate `Flame Hour — The Injector + Cold Drink` deal.
+- Continue all existing project boundaries: Free Supabase plan, no GST/tax, no direct catalog table writes or service-role bypass, no publication or production alias promotion without explicit user approval, preserve existing apps, and keep handoffs current.
