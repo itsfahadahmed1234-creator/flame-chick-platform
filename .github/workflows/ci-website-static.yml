@@ -7,6 +7,7 @@ on:
       - work/website-parallel-development
     paths:
       - "apps/flame-chick-website/**"
+      - "tests/website-preview-checkout-guard.test.mjs"
       - "tests/website-source-hygiene.test.mjs"
       - "tests/website-order-quote-token.test.mjs"
       - "supabase/functions/_shared/website-order-quote-token.mjs"
@@ -59,6 +60,7 @@ jobs:
           node --check apps/flame-chick-website/js/branch-fulfilment-v3.js
           node --check apps/flame-chick-website/js/catalog-v3-preview.js
           node --check apps/flame-chick-website/js/catalog-preview-page.js
+          node --check apps/flame-chick-website/js/preview-checkout-guard.js
           node --check apps/flame-chick-website/js/website-order-v3.js
           node --check apps/flame-chick-website/js/config.js
           node --check apps/flame-chick-website/js/hero-slider.js
@@ -69,7 +71,7 @@ jobs:
 
       - name: Run core catalog regression tests
         run: |
-          node --test tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs tests/catalog-v3-view.test.mjs tests/catalog-v3-deal-view.test.mjs tests/catalog-v3-deal-configurator.test.mjs tests/branch-fulfilment-v3.test.mjs tests/catalog-database-time-migration.test.mjs tests/published-menu-v3-draft.test.mjs
+          node --test tests/website-preview-checkout-guard.test.mjs tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs tests/catalog-v3-view.test.mjs tests/catalog-v3-deal-view.test.mjs tests/catalog-v3-deal-configurator.test.mjs tests/branch-fulfilment-v3.test.mjs tests/catalog-database-time-migration.test.mjs tests/published-menu-v3-draft.test.mjs
 
       - name: Run preview regression tests
         run: |
