@@ -90,6 +90,7 @@ DECLARE
   v_branch_id uuid;
   v_restaurant_id uuid;
   v_result jsonb;
+  v_message text;
 BEGIN
   v_restaurant_id:=pg_catalog.current_setting('test.staff_restaurant_id')::uuid;
   v_branch_id:=pg_catalog.current_setting('test.staff_branch_id')::uuid;
@@ -267,9 +268,12 @@ DECLARE
   v_role_id uuid;
   v_result jsonb;
 BEGIN
-  SELECT id INTO v_role_id FROM public.user_roles
-  WHERE user_id='a5555555-5555-4555-8555-555555555555'
-    AND role_key='rider' AND is_active;
+  v_result:=public.flame_chick_staff_admin_command('list','{}'::jsonb);
+  SELECT (item->>'role_id')::uuid INTO v_role_id
+  FROM pg_catalog.jsonb_array_elements(v_result->'staff') item
+  WHERE item->>'user_id'='a5555555-5555-4555-8555-555555555555'
+    AND item->>'role_key'='rider'
+    AND item->>'is_active'='true';
   IF v_role_id IS NULL THEN
     RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_ROLE_NOT_FOUND_FOR_DEACTIVATION';
   END IF;
