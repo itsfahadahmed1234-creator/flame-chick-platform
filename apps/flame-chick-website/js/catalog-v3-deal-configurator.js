@@ -91,7 +91,7 @@
     }
 
     function isFixedGroup(group) {
-      return group && group.options.length === 1 &&
+      return group && group.categoryDriven !== true && group.options.length === 1 &&
         group.minUnits > 0 && group.minUnits === group.maxUnits &&
         group.options[0].maxQuantity >= group.minUnits;
     }
@@ -360,7 +360,8 @@
       var variant = selectedVariant();
       if (variant) {
         variant.groups.forEach(function (group) {
-          var burgerChoiceGroup = /burger/i.test(String(group.name || '')) && group.options.length > 1;
+          var burgerChoiceGroup = group.categoryDriven === true ||
+            (/burger/i.test(String(group.name || '')) && group.options.length > 1);
           var groupSet = makeElement(doc, 'fieldset', 'fc-deal-component-group' + (burgerChoiceGroup ? ' fc-deal-burger-group' : ''));
           if (!burgerChoiceGroup) {
             groupSet.appendChild(makeElement(doc, 'legend', '', group.name + ' — choose ' +

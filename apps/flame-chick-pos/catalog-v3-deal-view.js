@@ -174,6 +174,77 @@
     return group.allowRepeatOption ? group.maxUnits : 1;
   }
 
+  function buildCategoryBurgerChoiceSet(snapshot, branchId, group, dealId, dealVariantId, sourceRows, contract) {
+    var anchors = sourceRows.map(function (row) {
+      var product = find(snapshot.products, 'productId', row.productId);
+      var productVariant = find(snapshot.productVariants, 'variantId', row.productVariantId);
+      return product && productVariant && productVariant.productId === product.productId &&
+        String(product.nameEn || '').trim().toLowerCase() === 'burger' &&
+        String(productVariant.sizeLabel || '').trim().toLowerCase() === 'included' &&
+        productVariant.standaloneSellable === false
+        ? { row: row, product: product, productVariant: productVariant }
+        : null;
+    }).filter(Boolean);
+    if (!anchors.length) return null;
+    if (anchors.length !== 1 || sourceRows.length !== 1) {
+      return { categoryDriven: true, categoryId: null, options: [] };
+    }
+    var anchor = anchors[0];
+    var category = find(snapshot.categories, 'categoryId', anchor.product.categoryId);
+    if (!category || category.categoryKind !== 'menu' || category.nameEn !== 'Chicken Burgers') {
+      return { categoryDriven: true, categoryId: null, options: [] };
+    }
+    var mapping = snapshot.dealVariantComponentOptions.find(function (item) {
+      return item.dealVariantId === dealVariantId &&
+        item.componentOptionId === anchor.row.componentOptionId &&
+        item.dealId === dealId;
+    });
+    if (!mapping || mapping.pricingTreatment !== 'INCLUDED' ||
+        contract.minorUnits(mapping.unitSurcharge) !== 0) {
+      return { categoryDriven: true, categoryId: category.categoryId, options: [] };
+    }
+    var cap = resolveOptionCap(group, mapping);
+    var options = [];
+    snapshot.products.filter(function (product) {
+      return product.categoryId === category.categoryId &&
+        String(product.nameEn || '').trim().toLowerCase() !== 'burger' &&
+        product.available === true &&
+        contract.resolveProductAvailability(snapshot, branchId, product.productId);
+    }).forEach(function (product) {
+      snapshot.productVariants.filter(function (productVariant) {
+        return productVariant.productId === product.productId &&
+          productVariant.available === true &&
+          productVariant.standaloneSellable === true &&
+          contract.resolveVariantAvailability(snapshot, branchId, product.productId, productVariant.variantId);
+      }).forEach(function (productVariant) {
+        var modifierGroups = buildProductModifierGroups(
+          snapshot, product.productId, productVariant.variantId, contract, { excludeStandaloneOnly: true }
+        );
+        if (modifierGroups.some(function (modifierGroup) {
+          return modifierGroup.branchSatisfiable === false;
+        })) return;
+        options.push({
+          id: productVariant.variantId,
+          productId: product.productId,
+          productVariantId: productVariant.variantId,
+          productName: product.nameEn,
+          variantLabel: productVariant.sizeLabel,
+          optionLabel: product.nameEn + ' — ' + productVariant.sizeLabel,
+          pricingTreatment: 'INCLUDED',
+          surchargeMinor: 0,
+          standalonePriceMinor: null,
+          modifierGroups: modifierGroups,
+          maxQuantity: cap,
+          sortOrder: Number(product.sortOrder || 0) * 1000 + Number(productVariant.sortOrder || 0)
+        });
+      });
+    });
+    options.sort(function (a, b) {
+      return a.sortOrder - b.sortOrder || a.id.localeCompare(b.id);
+    });
+    return { categoryDriven: true, categoryId: category.categoryId, options: options };
+  }
+
   function buildProductModifierGroups(snapshot, productId, productVariantId, contract, options) {
     options = options || {};
     var assignments = sortByOrder(snapshot.modifierGroupAssignments.filter(function (assignment) {
@@ -301,9 +372,14 @@
           var groups = sortByOrder(snapshot.dealComponentGroups.filter(function (group) {
             return group.dealId === deal.dealId;
           }), 'componentGroupId').map(function (group) {
-            var optionsForGroup = snapshot.dealComponentOptions.filter(function (option) {
+            var sourceRows = snapshot.dealComponentOptions.filter(function (option) {
               return option.dealId === deal.dealId && option.componentGroupId === group.componentGroupId;
-            }).map(function (option) {
+            });
+            var categoryChoiceSet = /burger/i.test(String(group.nameEn || ''))
+              ? buildCategoryBurgerChoiceSet(snapshot, branchId, group, deal.dealId, variant.dealVariantId, sourceRows, contract)
+              : null;
+            var categoryDriven = categoryChoiceSet !== null;
+            var optionsForGroup = categoryDriven ? categoryChoiceSet.options : sourceRows.map(function (option) {
               var mapping = snapshot.dealVariantComponentOptions.find(function (item) {
                 return item.dealVariantId === variant.dealVariantId &&
                   item.componentOptionId === option.componentOptionId && item.dealId === deal.dealId;
@@ -344,6 +420,8 @@
               maxUnits: group.maxUnits,
               allowRepeatOption: group.allowRepeatOption,
               maxUnitsPerOption: group.maxUnitsPerOption,
+              categoryDriven: categoryDriven,
+              categoryId: categoryDriven ? categoryChoiceSet.categoryId : null,
               options: optionsForGroup,
               branchSatisfiable: capacity >= group.minUnits
             };

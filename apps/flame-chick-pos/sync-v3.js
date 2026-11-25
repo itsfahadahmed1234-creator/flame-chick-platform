@@ -114,7 +114,7 @@
     const component_groups = variant.groups.map(group => {
       const saved = savedGroups.find(row => String(row.componentGroupId || row.component_group_id || row.groupId || '') === String(group.id));
       let selected = saved && Array.isArray(saved.components) ? saved.components : [];
-      if (!saved && group.options.length === 1 && Number(group.minUnits) > 0) {
+      if (!saved && group.categoryDriven !== true && group.options.length === 1 && Number(group.minUnits) > 0) {
         // Fixed components are unambiguous in V3; repeat the exact published
         // option to satisfy the group's required unit count.
         const option = group.options[0];
@@ -151,6 +151,19 @@
               return { modifier_group_id: modifierGroup.id, modifier_ids: ids.map(String) };
             })
           });
+        }
+      }
+      const counts = new Map();
+      components.forEach(component => counts.set(component.component_option_id, (counts.get(component.component_option_id) || 0) + 1));
+      const units = components.length;
+      if (units < Number(group.minUnits || 0) || units > Number(group.maxUnits || 0)) {
+        throw fail('Complete every required deal component choice before synchronizing.', 'POS_DEAL_COMPONENT_SELECTION_INCOMPLETE');
+      }
+      for (const [optionId, count] of counts.entries()) {
+        const option = findBy(group.options, 'id', optionId);
+        if (!option || count > Number(option.maxQuantity || group.maxUnits || 1) ||
+            (group.allowRepeatOption !== true && count > 1)) {
+          throw fail('A deal component exceeds its published repeat limit.', 'POS_DEAL_COMPONENT_REPEAT_LIMIT');
         }
       }
       return { component_group_id: group.id, components };
