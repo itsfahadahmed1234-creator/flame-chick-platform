@@ -678,3 +678,62 @@ The browser rendered the page and initialized the V3 catalogue, but stopped whil
 - No catalogue data, backend APIs, shared pricing/deal validation, Supabase schema, migrations, Edge Functions, POS, Admin or Rider files were changed.
 - No real order/payment or live business data was created or changed.
 - GST remains deferred.
+
+
+---
+
+## 2026-11-25 — Controlled Website Preview checkout enablement (QA only)
+
+### Scope and branch isolation
+- User requested the Website checkout be completed against the existing Flame Chick database and that successful website delivery orders reach the existing POS Online Orders board.
+- Work remained exclusively on `work/website-parallel-development`.
+- Production/POS source, shared Order API, shared pricing/catalogue contract, migrations, Supabase schema/data, Edge Function deployments/secrets, POS/Admin/Rider code and Production aliases were not modified.
+- The live Flame Chick Production database is pre-launch but not empty. At the read-only preflight it contained 11 POS orders, including the previously documented completed/paid rehearsal. No website-originated orders existed at that preflight.
+
+### Website-only implementation
+- Commit: `247a206cf8151d4be17ae0a530e99f913b7fe1cf`
+- Parent: `b9a3ecaefd546ed2f031ca85890aa6fa34f9fd1c`
+- Exact changed files:
+  - `apps/flame-chick-website/js/preview-checkout-guard.js`
+  - `apps/flame-chick-website/js/website-order-v3.js`
+  - `apps/flame-chick-website/index.html`
+  - `tests/website-preview-checkout-guard.test.mjs`
+  - `tests/website-source-hygiene.test.mjs`
+- Added one exact allowlisted SSO-protected branch Preview alias: `flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455.vercel.app`. Other Preview hosts remain read-only; no wildcard Vercel host matching.
+- The allowlisted Preview labels quote totals and submitted records as test-only. Customer name is prefixed `[WEBSITE QA TEST]`; notes are prefixed `[WEBSITE PREVIEW QA TEST — DO NOT PREPARE / DISPATCH / COLLECT PAYMENT]`. Confirmation copy explicitly says no payment was collected and the order must not be prepared or dispatched.
+- The existing V3 quote/create request shape is preserved. Browser sends catalogue IDs and choices; server pricing remains authoritative. The existing request UUID, quote token, retry path and idempotency behavior are preserved.
+- Production Website host allowlist is unchanged. Only the one designated Preview host was added for QA writes. All other Preview hosts remain blocked.
+- This is a guarded test Preview path, not public Production checkout activation or restaurant go-live.
+
+### Deployment
+- Vercel deployment: `dpl_FxMgV32udwyLBrmNP9tiXNv4G6PY`
+- URL: https://flame-chick-website-production-95bpp432k-fahad-7455.vercel.app
+- Alias: https://flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455.vercel.app
+- State: READY.
+- Exact source branch: `work/website-parallel-development`
+- Exact source commit: `247a206cf8151d4be17ae0a530e99f913b7fe1cf`
+- Vercel target metadata: `null` (manual Preview deployment); no Production alias was reassigned or promoted.
+
+### Existing backend/POS verification (read-only source and state inspection)
+- Live database contains the website order creation and idempotency RPCs. The creation transaction validates the canonical order amounts, branch/fulfilment/delivery fee, request hash/idempotency and phone digest; successful website commits write order/item/component/modifier snapshots, initial status history and a delivery task for delivery orders. Phone rate limits are enforced transactionally (3/minute, 3/10 minutes, 15/hour).
+- The deployed Order API is reported active, version 5. Source path uses `quote_website_order` and `create_website_order`, signs a short-lived quote token, verifies the token and request binding, performs idempotency lookup before creating, then calls `flame_chick_create_website_order`.
+- Existing POS source reads the active order board with `fulfillment_type=delivery`; it filters website orders into Online Orders and uses the shared Order API/Reatime refresh path. Takeaway/pickup and dine-in are not sent to Online Orders.
+- Existing Main branch has one active listed delivery area (Comsats University, Rs. 0) and Not Listed default fee Rs. 100. Branch website ordering, delivery and pickup flags were read as enabled.
+- Read-only order audit before QA deployment found 11 existing POS-originated orders and zero website-originated orders. No new order, payment or delivery task was created during this work.
+
+### Critical remaining blocker — do not claim checkout fully operational yet
+- Production handoff records that server-only secrets `FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET` and `FLAME_CHICK_ORDER_PHONE_HMAC_SECRET` were not configured/verified. The available Supabase connector does not expose an Edge Function secret-list/set operation.
+- A source-level/live-function bundle inspection did not return deployable file contents through the connector; no secret values were read or exposed.
+- The Order API intentionally fails closed when quote signing or phone digest configuration is missing. Therefore a valid live quote and order POST have NOT been verified from the new Preview.
+- The Preview has been deployed, but the full database-backed checkout has not been end-to-end tested. Do not submit Place Order until the two server-side secrets are securely configured and quote readiness is confirmed.
+- GitHub Actions result for commit `247a206cf8151d4be17ae0a530e99f913b7fe1cf` was not available at handoff time. Do not mark the new tests passed until the matching workflow run completes successfully.
+- Browser interaction against the newly deployed alias and POS visibility of a QA order remain unverified. No test order was created in this checkpoint.
+
+### Required next steps
+1. Production/POS coordinator must securely configure both HMAC secrets in Supabase Edge Function secrets, without sharing or committing values.
+2. Verify the secrets exist without revealing them; then make a read-only/quote-only request from the exact QA Preview and confirm the server returns a valid signed quote.
+3. Run the Website Static Checks for commit `247a206cf8151d4be17ae0a530e99f913b7fe1cf` and inspect the exact result.
+4. Only after quote success, perform one clearly marked QA delivery order using synthetic contact/address data. Do not collect payment or dispatch it.
+5. Verify the order, snapshots, status history and delivery task in Supabase, then verify it appears in POS Online Orders with the QA marker. Keep the test record as an audit row; do not delete it or mark it paid/completed.
+6. After QA, remove the exact Preview hostname from the write allowlist in a separate Website commit, unless the user explicitly wants the guarded test Preview retained.
+7. Production remains pre-launch. No public checkout activation, Production alias change, catalogue publication, GST implementation, payment gateway or live restaurant operations are authorized by this checkpoint.
