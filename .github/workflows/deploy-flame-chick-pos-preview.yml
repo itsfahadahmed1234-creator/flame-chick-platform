@@ -25,7 +25,6 @@ jobs:
       vars.FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    environment: flame-chick-preview
     env:
       VERCEL_ORG_ID: team_lrFy9ILYEz9umsBy98GCyQjI
       VERCEL_PROJECT_ID: prj_Ce8GbSsG5VZApCyEVCh9zC0qfeRv
@@ -57,6 +56,18 @@ jobs:
           echo "Vercel project scope and Preview token are present."
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Link the exact preview project
+        working-directory: apps/flame-chick-pos
+        run: |
+          set -euo pipefail
+          mkdir -p .vercel
+          cat > .vercel/project.json <<'EOF'
+          {
+            "orgId": "team_lrFy9ILYEz9umsBy98GCyQjI",
+            "projectId": "prj_Ce8GbSsG5VZApCyEVCh9zC0qfeRv"
+          }
+          EOF
 
       - name: Deploy Preview only
         id: deploy
