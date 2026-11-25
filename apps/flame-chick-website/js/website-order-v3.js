@@ -581,9 +581,15 @@
       groups.forEach(function (group) { selections[group.id] = []; });
       var groupInputs = [];
       groups.forEach(function (group) {
-        var fieldset = document.createElement('fieldset'); fieldset.className = 'order-modifier-group fc-product-popup-group';
+        var groupDetails = document.createElement('details'); groupDetails.className = 'fc-product-popup-group';
+        var groupSummary = document.createElement('summary');
+        groupSummary.textContent = group.name + (group.minSelect > 0
+          ? ' · Required ' + group.minSelect + '–' + group.maxSelect
+          : ' · Optional');
+        groupDetails.appendChild(groupSummary);
+        var fieldset = document.createElement('fieldset'); fieldset.className = 'order-modifier-group';
         var legend = document.createElement('legend');
-        legend.textContent = group.name + (group.minSelect > 0 ? ' · Choose ' + group.minSelect + '–' + group.maxSelect : ' · Optional');
+        legend.textContent = group.name;
         fieldset.appendChild(legend);
         if (group.branchSatisfiable === false) {
           var unavailable = document.createElement('p'); unavailable.className = 'fc-product-popup-prompt';
@@ -616,7 +622,8 @@
           label.append(input, textNode); fieldset.appendChild(label);
           groupInputs.push(input);
         });
-        content.appendChild(fieldset);
+        groupDetails.appendChild(fieldset);
+        content.appendChild(groupDetails);
       });
 
       var quantityField = document.createElement('div'); quantityField.className = 'fc-product-popup-quantity-row';
