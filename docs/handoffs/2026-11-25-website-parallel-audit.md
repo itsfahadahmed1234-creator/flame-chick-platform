@@ -457,3 +457,80 @@ The browser rendered the page and initialized the V3 catalogue, but stopped whil
   - repeat-choice limit and a deal with more than one variant;
   - mobile dialog scrolling and sticky/visible Add action.
 - No full interactive browser rehearsal was completed automatically in this stage.
+
+
+---
+
+## 2026-11-25 — Mobile-first compact popups, quantity controls, cart ordering and Deals navigation
+
+### User-requested design refinements
+
+- Reduce product and deal popup height; prioritize mobile viewport and prevent long item lists from rendering as oversized cards.
+- Render burger choices as a single row of numbered slots (1, 2, 3, etc.) and show only the active slot's selector/customizations at a time.
+- Add visible compact `− quantity +` controls for product popup quantity and deal quantity.
+- Keep deal item selection compact, without one oversized card per component option.
+- Show checkout/customer details before the cart item list.
+- Add a Deals shortcut to the sticky category navigation bar.
+
+### Implementation
+
+1. `apps/flame-chick-website/js/catalog-v3-deal-configurator.js`
+   - Replaced the expanded list of burger selectors with a one-row numbered slot tab group.
+   - Only the active burger slot's selector and its per-burger modifier choices are shown; selected values for the other slots are retained in configurator state.
+   - Preserved the category-driven published Burger options, per-choice maximums and repeat-selection rules.
+   - Replaced deal component quantity inputs/cards with compact inline minus/count/plus steppers.
+   - Added an independent deal quantity state and visible compact deal quantity stepper (1–99).
+   - Kept the existing validation and identifier-only `toPayload()` contract; server remains authoritative for price/validation.
+
+2. `apps/flame-chick-website/js/website-order-v3.js`
+   - Product popup uses compact plus/minus quantity controls rather than a tall number input.
+   - Product modifier groups are collapsed by default and can be expanded as needed.
+   - Deal quantity from the configurator is applied to the cart row and deal payload.
+   - Cart line quantity is shown as a compact count with existing decrement/increment/remove controls.
+   - Adds a Deals chip to the sticky category bar when published deal collections have entries.
+
+3. `apps/flame-chick-website/index.html`
+   - Moved the customer/checkout details section before the cart empty state and item list.
+   - Added mobile-first sizing and spacing for dialogs, product info, selectors, burger tabs, modifier groups, quantity controls, and deal component rows.
+   - Product/deal dialogs are viewport-bound with compact internal content; modifier groups collapse where applicable.
+
+4. Tests updated:
+   - `tests/catalog-v3-deal-configurator.test.mjs`
+   - `tests/website-source-hygiene.test.mjs`
+   - Added coverage for independent 1–99 deal quantity, numbered single-active burger slots, compact steppers, Deals navigation and cart details order.
+
+### Automated checks
+
+- Workflow: Website Static Checks
+- Run ID: `45582664217`
+- Exact deployed source commit: `273c0b3f6677fa103adba4643deafa2f9241ee85`
+- Result: **SUCCESS**
+- Covered active JS syntax, catalogue/deal/configurator and fulfilment regressions, Preview checkout guard, product/deal popup assertions, quantity controls, burger slots, cart ordering, Deals navigation, Preview fixtures and inline script parsing.
+
+### Preview deployment
+
+- Vercel project: `flame-chick-website-production`
+- Deployment ID: `dpl_DRg8SEEEAfNpd1hVq2XdiXTm29xB`
+- Preview URL: https://flame-chick-website-production-mwvij34m8-fahad-7455.vercel.app
+- State: **READY**
+- Target: Preview (`null` at deployment API level)
+- Branch: `work/website-parallel-development`
+- Source commit: `273c0b3f6677fa103adba4643deafa2f9241ee85`
+
+### Deployed-source verification
+
+- Homepage returned HTTP 200, correct Flame Chick title and Preview notice.
+- Product and deal dialog markup both present.
+- Checkout details precede cart item markup.
+- Website order script returned HTTP 200 and contains Deals chip, product stepper and deal quantity application.
+- Deal configurator returned HTTP 200 and contains one-row Burger slot tabs, active-slot selection and deal quantity stepper.
+- This was deployed asset/HTML verification, not a full interactive device/browser rehearsal. User should still test a small phone viewport and a short desktop viewport, especially a deal with multiple burger slots and optional modifiers, to confirm no content is clipped.
+
+### Production and parallel-work safety
+
+- All changes remain on `work/website-parallel-development`.
+- No POS, Admin, Rider, Production API, shared schema, migrations or shared backend code was modified.
+- No production catalogue was edited or published.
+- No Production aliases were changed/promoted.
+- No database migration or Edge Function deployment was performed.
+- Preview checkout remains disabled; do not attempt quote/order submission from this Preview.
