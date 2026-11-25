@@ -158,11 +158,11 @@ BEGIN
     END CASE;
   END IF;
 
-  v_record_id:=pg_catalog.coalesce(v_new->>'id',v_old->>'id');
+  v_record_id:=coalesce(v_new->>'id',v_old->>'id');
   IF TG_TABLE_NAME='delivery_tasks' THEN
     v_delivery_task_id:=v_record_id;
   ELSE
-    v_delivery_task_id:=pg_catalog.coalesce(v_new->>'delivery_task_id',v_old->>'delivery_task_id');
+    v_delivery_task_id:=coalesce(v_new->>'delivery_task_id',v_old->>'delivery_task_id');
   END IF;
 
   IF TG_TABLE_NAME='orders' THEN
@@ -171,7 +171,7 @@ BEGIN
     v_event:='delivery_changed';
   END IF;
 
-  SELECT pg_catalog.coalesce(pg_catalog.array_agg(x.branch_id),'{}'::uuid[])
+  SELECT coalesce(pg_catalog.array_agg(x.branch_id),'{}'::uuid[])
     INTO v_branch_ids
   FROM (
     SELECT DISTINCT ((doc.value)->>'branch_id')::uuid AS branch_id
@@ -204,7 +204,7 @@ BEGIN
   END LOOP;
 
   IF TG_TABLE_NAME='rider_profiles' THEN
-    SELECT pg_catalog.coalesce(pg_catalog.array_agg(x.rider_id),'{}'::uuid[])
+    SELECT coalesce(pg_catalog.array_agg(x.rider_id),'{}'::uuid[])
       INTO v_rider_ids
     FROM (
       SELECT DISTINCT (doc.value->>'user_id')::uuid AS rider_id
@@ -212,8 +212,20 @@ BEGIN
       WHERE doc.value ? 'user_id'
         AND (doc.value->>'user_id') IS NOT NULL
     ) x;
+  ELSIF TG_TABLE_NAME='delivery_tasks' THEN
+    SELECT coalesce(pg_catalog.array_agg(DISTINCT involved.rider_user_id),'{}'::uuid[])
+      INTO v_rider_ids
+    FROM (
+      SELECT da.rider_user_id
+      FROM public.delivery_assignments da
+      WHERE da.delivery_task_id=v_delivery_task_id::uuid
+      UNION
+      SELECT o.rider_user_id
+      FROM public.delivery_task_offers o
+      WHERE o.delivery_task_id=v_delivery_task_id::uuid
+    ) involved;
   ELSE
-    SELECT pg_catalog.coalesce(pg_catalog.array_agg(x.rider_id),'{}'::uuid[])
+    SELECT coalesce(pg_catalog.array_agg(x.rider_id),'{}'::uuid[])
       INTO v_rider_ids
     FROM (
       SELECT DISTINCT (doc.value->>'rider_user_id')::uuid AS rider_id
