@@ -723,7 +723,10 @@ $('availabilityBtn').addEventListener('click',async()=>{
       await updateRiderPresence(false,false,true);
       riderWantsOnline=false;
       stopRiderPresence();
-      stopRiderRealtime();
+      // Keep the rider's own private channel alive for already-assigned work.
+      // Availability preference only prevents new offers; it must not suppress
+      // changes to a current delivery while the rider is offline.
+      startRiderRealtime();
     }else{
       await updateRiderPresence(true,false,true);
       riderWantsOnline=true;
