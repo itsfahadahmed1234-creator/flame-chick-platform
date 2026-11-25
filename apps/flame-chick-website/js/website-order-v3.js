@@ -408,6 +408,10 @@
         var card = document.createElement('article');
         card.className = 'card fc-home-product-card';
         card.setAttribute('data-product-id', product.id);
+        card.setAttribute('role', 'group');
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('aria-label', product.name + '. Open product details.');
+        card.setAttribute('aria-haspopup', 'dialog');
 
         var art = document.createElement('div'); art.className = 'art';
         var name = String(product.name || '').toLowerCase();
@@ -425,124 +429,236 @@
           description.textContent = product.description; body.appendChild(description);
         }
 
+        var firstVariant = product.variants[0] || null;
+        var variantMeta = document.createElement('span');
+        variantMeta.className = 'fc-home-single-variant';
+        variantMeta.textContent = product.variants.length === 1
+          ? firstVariant.label
+          : (product.variants.length > 1 ? 'Multiple options' : 'Unavailable');
+
         var foot = document.createElement('div'); foot.className = 'foot';
         var price = document.createElement('span'); price.className = 'price';
-        var firstVariant = product.variants[0];
         price.textContent = firstVariant ? cardPrice(firstVariant.priceMinor) : 'Price unavailable';
         var controls = document.createElement('div'); controls.className = 'ctl fc-home-product-controls';
-        var selector = null;
-        if (product.variants.length > 1) {
-          selector = document.createElement('select'); selector.className = 'fc-home-variant-select';
-          selector.setAttribute('aria-label', 'Choose size or option for ' + product.name);
-          var placeholder = document.createElement('option');
-          placeholder.value = ''; placeholder.textContent = 'Choose size / option';
-          selector.appendChild(placeholder);
-          product.variants.forEach(function (variant) {
-            var option = document.createElement('option');
-            option.value = variant.id;
-            option.textContent = variant.label + ' · ' + cardPrice(variant.priceMinor);
-            selector.appendChild(option);
-          });
-          selector.selectedIndex = 0;
-          selector.addEventListener('change', function () {
-            var selected = product.variants.find(function (variant) { return variant.id === selector.value; });
-            if (selected) price.textContent = cardPrice(selected.priceMinor);
-            else price.textContent = 'Choose an option';
-            add.disabled = !selected || !canEdit();
-          });
-          controls.appendChild(selector);
-        } else if (firstVariant) {
-          var variantLabel = document.createElement('span');
-          variantLabel.className = 'fc-home-single-variant';
-          variantLabel.textContent = firstVariant.label;
-          controls.appendChild(variantLabel);
-        }
-
         var add = document.createElement('button');
         add.type = 'button'; add.className = 'add';
-        add.textContent = product.modifierGroups.length ? 'Customize & add' : 'Add';
-        add.disabled = !firstVariant || (product.variants.length > 1) || !canEdit();
-        add.addEventListener('click', function () {
+        var directVariant = product.variants.length === 1 ? firstVariant : null;
+        var directValidation = directVariant
+          ? root.FlameChickCatalogV3DealView.validateModifierSelections(
+              root.FlameChickCatalogV3DealView.buildProductModifierGroups(
+                state.snapshot, product.id, directVariant.id, root.FlameChickCatalogV3
+              ), Object.create(null))
+          : null;
+        var canDirectAdd = !!(directVariant && directValidation && directValidation.ok === true);
+        add.textContent = canDirectAdd ? 'Add' : 'Choose options';
+        add.disabled = !firstVariant || !canEdit();
+        add.addEventListener('click', function (event) {
+          event.stopPropagation();
           if (!canEdit()) return;
-          var variantId = selector ? selector.value : (firstVariant ? firstVariant.id : '');
-          if (variantId) openProductCustomizer(product, variantId);
+          if (canDirectAdd) addProductDirectly(product, directVariant.id);
+          else openProductCustomizer(product, null);
         });
-        controls.appendChild(add);
-        foot.append(price, controls);
-        body.appendChild(foot);
+
+        foot.append(price, add);
+        body.append(variantMeta, foot);
         card.append(art, body);
+        function openDetails() { openProductCustomizer(product, null); }
+        card.addEventListener('click', function (event) {
+          if (event.target && event.target.closest && event.target.closest('button,select,input,a')) return;
+          openDetails();
+        });
+        card.addEventListener('keydown', function (event) {
+          if ((event.key === 'Enter' || event.key === ' ') && event.target === card) {
+            event.preventDefault(); openDetails();
+          }
+        });
         grid.appendChild(card);
       });
       section.appendChild(grid);
       rootNode.appendChild(section);
     });
   }
-  function openProductCustomizer(product, variantId) {
-    var variant = product.variants.find(function (row) { return row.id === variantId; });
-    if (!variant || !canEdit()) return;
-    var groups = root.FlameChickCatalogV3DealView.buildProductModifierGroups(
+
+  function productModifierGroups(product, variantId) {
+    return root.FlameChickCatalogV3DealView.buildProductModifierGroups(
       state.snapshot, product.id, variantId, root.FlameChickCatalogV3
     );
-    var selections = Object.create(null);
-    groups.forEach(function (group) { selections[group.id] = []; });
-    var body = $('product-dialog-content');
-    body.replaceChildren();
-    var heading = document.createElement('h2'); heading.textContent = product.name + ' · ' + variant.label;
-    var basePrice = document.createElement('p'); basePrice.className = 'order-hint';
-    basePrice.textContent = 'Published base price: ' + money(variant.priceMinor / 100) + '. Final item pricing is verified at checkout.';
-    body.append(heading, basePrice);
+  }
 
-    groups.forEach(function (group) {
-      var fieldset = document.createElement('fieldset'); fieldset.className = 'order-modifier-group';
-      var legend = document.createElement('legend');
-      legend.textContent = group.name + ' (' + group.minSelect + '–' + group.maxSelect + ')';
-      fieldset.appendChild(legend);
-      if (group.branchSatisfiable === false) {
-        var unavailable = document.createElement('p'); unavailable.textContent = 'This option is currently unavailable.';
-        fieldset.appendChild(unavailable);
+  function addProductDirectly(product, variantId) {
+    if (!canEdit()) return;
+    var groups = productModifierGroups(product, variantId);
+    var validation = root.FlameChickCatalogV3DealView.validateModifierSelections(groups, Object.create(null));
+    if (!validation || validation.ok !== true) {
+      openProductCustomizer(product, variantId);
+      return;
+    }
+    var variant = product.variants.find(function (row) { return row.id === variantId; });
+    if (!variant) return;
+    state.cart.push({
+      kind: 'product',
+      label: product.name + ' · ' + variant.label,
+      quantity: 1,
+      payload: {
+        kind: 'product', productId: product.id, productVariantId: variantId,
+        quantity: 1, modifiers: validation.selections
       }
-      group.modifiers.forEach(function (modifier) {
-        var label = document.createElement('label'); label.className = 'order-modifier-option';
-        var input = document.createElement('input');
-        input.type = group.selectionMode === 'SINGLE' ? 'radio' : 'checkbox';
-        input.name = 'product-modifier-' + group.id;
-        input.value = modifier.id;
-        input.addEventListener('change', function () {
-          if (input.type === 'radio') selections[group.id] = input.checked ? [modifier.id] : [];
-          else if (input.checked) selections[group.id].push(modifier.id);
-          else selections[group.id] = selections[group.id].filter(function (id) { return id !== modifier.id; });
-        });
-        var textNode = document.createElement('span');
-        textNode.textContent = modifier.name + ' · ' + money(modifier.priceMinor / 100);
-        label.append(input, textNode); fieldset.appendChild(label);
-      });
-      body.appendChild(fieldset);
     });
+    invalidateQuote();
+    status(product.name + ' added to your cart.');
+  }
 
-    var quantityField = document.createElement('div'); quantityField.className = 'order-field';
-    var quantityLabel = document.createElement('label'); quantityLabel.textContent = 'Quantity';
-    var quantity = document.createElement('input'); quantity.type = 'number'; quantity.min = '1'; quantity.max = '99'; quantity.value = '1';
-    quantityField.append(quantityLabel, quantity); body.appendChild(quantityField);
-    var add = document.createElement('button'); add.type = 'button'; add.className = 'order-primary'; add.textContent = 'Add to cart';
-    add.addEventListener('click', function () {
-      var validation = root.FlameChickCatalogV3DealView.validateModifierSelections(groups, selections);
-      if (!validation || validation.ok !== true) { status(validation?.message || 'Check the modifier selections.', 'error'); return; }
-      var qty = Number(quantity.value);
-      if (!Number.isSafeInteger(qty) || qty < 1 || qty > 99) { status('Choose a quantity from 1 to 99.', 'error'); return; }
-      state.cart.push({
-        kind: 'product', label: product.name + ' · ' + variant.label,
-        quantity: qty,
-        payload: {
-          kind: 'product', productId: product.id, productVariantId: variantId,
-          quantity: qty, modifiers: validation.selections
+  function openProductCustomizer(product, initialVariantId) {
+    if (!canEdit()) return;
+    var dialog = $('product-dialog');
+    var content = $('product-dialog-content');
+    var selectedVariantId = initialVariantId ||
+      (product.variants.length === 1 ? product.variants[0].id : null);
+
+    function renderVariant() {
+      content.replaceChildren();
+      var variant = product.variants.find(function (row) { return row.id === selectedVariantId; }) || null;
+      var top = document.createElement('div'); top.className = 'fc-product-popup-top';
+      var art = document.createElement('div'); art.className = 'art fc-product-popup-art';
+      appendProductArtwork(art, product, '');
+      var intro = document.createElement('div'); intro.className = 'fc-product-popup-intro';
+      var heading = document.createElement('h2'); heading.textContent = product.name;
+      var description = document.createElement('p'); description.className = 'fc-product-popup-description';
+      description.textContent = product.description || 'Choose your preferred option and customize your order.';
+      intro.append(heading, description);
+      top.append(art, intro); content.appendChild(top);
+
+      if (product.variants.length > 1) {
+        var variantField = document.createElement('div'); variantField.className = 'fc-product-popup-field';
+        var variantLabel = document.createElement('label');
+        variantLabel.textContent = 'Choose size / option';
+        var variantSelect = document.createElement('select');
+        variantSelect.setAttribute('aria-label', 'Choose size or option for ' + product.name);
+        var placeholder = document.createElement('option');
+        placeholder.value = ''; placeholder.textContent = 'Select an option';
+        variantSelect.appendChild(placeholder);
+        product.variants.forEach(function (row) {
+          var option = document.createElement('option');
+          option.value = row.id;
+          option.textContent = row.label + ' · ' + cardPrice(row.priceMinor);
+          variantSelect.appendChild(option);
+        });
+        variantSelect.value = selectedVariantId || '';
+        variantSelect.addEventListener('change', function () {
+          selectedVariantId = variantSelect.value || null;
+          renderVariant();
+        });
+        variantField.append(variantLabel, variantSelect);
+        content.appendChild(variantField);
+      }
+
+      var priceRow = document.createElement('div'); priceRow.className = 'fc-product-popup-price';
+      var priceCaption = document.createElement('span'); priceCaption.textContent = 'Published price';
+      var priceValue = document.createElement('strong');
+      priceValue.textContent = variant ? cardPrice(variant.priceMinor) : 'Choose an option';
+      priceRow.append(priceCaption, priceValue); content.appendChild(priceRow);
+
+      if (!variant) {
+        var prompt = document.createElement('p'); prompt.className = 'fc-product-popup-prompt';
+        prompt.textContent = 'Select a size or option to continue.';
+        content.appendChild(prompt);
+        var waiting = document.createElement('button'); waiting.type = 'button';
+        waiting.className = 'fc-product-popup-add'; waiting.disabled = true;
+        waiting.textContent = 'Add to cart';
+        content.appendChild(waiting);
+        return;
+      }
+
+      var groups = productModifierGroups(product, variant.id);
+      var selections = Object.create(null);
+      groups.forEach(function (group) { selections[group.id] = []; });
+      var groupInputs = [];
+      groups.forEach(function (group) {
+        var fieldset = document.createElement('fieldset'); fieldset.className = 'order-modifier-group fc-product-popup-group';
+        var legend = document.createElement('legend');
+        legend.textContent = group.name + (group.minSelect > 0 ? ' · Choose ' + group.minSelect + '–' + group.maxSelect : ' · Optional');
+        fieldset.appendChild(legend);
+        if (group.branchSatisfiable === false) {
+          var unavailable = document.createElement('p'); unavailable.className = 'fc-product-popup-prompt';
+          unavailable.textContent = 'These options are currently unavailable for this product size.';
+          fieldset.appendChild(unavailable);
         }
+        group.modifiers.forEach(function (modifier) {
+          var label = document.createElement('label'); label.className = 'order-modifier-option';
+          var input = document.createElement('input');
+          input.type = group.selectionMode === 'SINGLE' ? 'radio' : 'checkbox';
+          input.name = 'product-modifier-' + group.id;
+          input.value = modifier.id;
+          input.disabled = group.branchSatisfiable === false;
+          input.addEventListener('change', function () {
+            if (input.type === 'radio') selections[group.id] = input.checked ? [modifier.id] : [];
+            else if (input.checked) {
+              if (selections[group.id].length >= group.maxSelect) {
+                input.checked = false;
+                status('Choose no more than ' + group.maxSelect + ' options for ' + group.name + '.', 'error');
+                return;
+              }
+              selections[group.id].push(modifier.id);
+            } else {
+              selections[group.id] = selections[group.id].filter(function (id) { return id !== modifier.id; });
+            }
+            updateAddState();
+          });
+          var textNode = document.createElement('span');
+          textNode.textContent = modifier.name + ' · ' + cardPrice(modifier.priceMinor);
+          label.append(input, textNode); fieldset.appendChild(label);
+          groupInputs.push(input);
+        });
+        content.appendChild(fieldset);
       });
-      $('product-dialog').close();
-      invalidateQuote(); status('Product added to your cart.');
-    });
-    body.appendChild(add);
-    if (typeof $('product-dialog').showModal === 'function') $('product-dialog').showModal();
-    else $('product-dialog').setAttribute('open', '');
+
+      var quantityField = document.createElement('div'); quantityField.className = 'fc-product-popup-field fc-product-popup-quantity';
+      var quantityLabel = document.createElement('label'); quantityLabel.textContent = 'Quantity';
+      var quantity = document.createElement('input');
+      quantity.type = 'number'; quantity.min = '1'; quantity.max = '99'; quantity.value = '1';
+      quantity.setAttribute('aria-label', 'Product quantity');
+      quantityField.append(quantityLabel, quantity); content.appendChild(quantityField);
+      var validationMessage = document.createElement('p'); validationMessage.className = 'fc-product-popup-prompt';
+      validationMessage.setAttribute('role', 'status'); validationMessage.setAttribute('aria-live', 'polite');
+      var add = document.createElement('button'); add.type = 'button';
+      add.className = 'fc-product-popup-add'; add.textContent = 'Add to cart';
+      add.addEventListener('click', function () {
+        var validation = root.FlameChickCatalogV3DealView.validateModifierSelections(groups, selections);
+        if (!validation || validation.ok !== true) {
+          validationMessage.textContent = validation?.message || 'Complete the required options.';
+          return;
+        }
+        var qty = Number(quantity.value);
+        if (!Number.isSafeInteger(qty) || qty < 1 || qty > 99) {
+          validationMessage.textContent = 'Choose a quantity from 1 to 99.';
+          return;
+        }
+        state.cart.push({
+          kind: 'product', label: product.name + ' · ' + variant.label,
+          quantity: qty,
+          payload: {
+            kind: 'product', productId: product.id, productVariantId: variant.id,
+            quantity: qty, modifiers: validation.selections
+          }
+        });
+        dialog.close();
+        invalidateQuote();
+        status(product.name + ' added to your cart.');
+      });
+      content.append(validationMessage, add);
+
+      function updateAddState() {
+        var validation = root.FlameChickCatalogV3DealView.validateModifierSelections(groups, selections);
+        add.disabled = !validation || validation.ok !== true || !canEdit();
+        validationMessage.textContent = validation && validation.ok
+          ? 'Selections are ready.' : (validation?.message || 'Complete the required options.');
+      }
+      updateAddState();
+    }
+
+    renderVariant();
+    if (!dialog.open && typeof dialog.showModal === 'function') dialog.showModal();
+    else if (!dialog.open) dialog.setAttribute('open', '');
   }
 
   function renderDeals(model) {
@@ -594,14 +710,13 @@
       status(configurator?.message || 'This deal could not be configured.', 'error'); return;
     }
     state.dealConfigurator = configurator;
-    $('deal-config-section').hidden = false;
     $('deal-configurator').replaceChildren();
     configurator.render($('deal-configurator'), {
+      formatMoney: function (minor) { return cardPrice(minor); },
+      completeButtonLabel: 'Add deal to cart',
       onComplete: function (payload) {
-        // The V3 configurator returns the selection object itself on success;
-        // only validation failures carry ok:false.
         if (!payload || payload.ok === false) {
-          if(payload && payload.message) status(payload.message,'error');
+          if (payload && payload.message) status(payload.message, 'error');
           return;
         }
         var item = payload;
@@ -609,15 +724,18 @@
         item.quantity = 1;
         state.cart.push({
           kind: 'deal',
-          label: deal.title + (payload.dealVariantLabel ? ' · ' + payload.dealVariantLabel : ''),
+          label: deal.title,
           quantity: 1,
           payload: item
         });
-        $('deal-config-section').hidden = true;
-        invalidateQuote(); status('Deal added to your cart.');
+        $('deal-dialog').close();
+        invalidateQuote();
+        status('Deal added to your cart.');
       }
     });
-    $('deal-config-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    var dialog = $('deal-dialog');
+    if (!dialog.open && typeof dialog.showModal === 'function') dialog.showModal();
+    else if (!dialog.open) dialog.setAttribute('open', '');
   }
 
   function populateDeliveryAreas(branch) {
@@ -834,7 +952,7 @@
   function bindEvents() {
 
     $('close-product-dialog').addEventListener('click', function () { $('product-dialog').close(); });
-    $('close-deal-config').addEventListener('click', function () { $('deal-config-section').hidden = true; });
+    $('close-deal-dialog').addEventListener('click', function () { $('deal-dialog').close(); });
     $('request-quote').addEventListener('click', requestQuote);
     $('place-order').addEventListener('click', function () { submitOrder(false); });
     $('retry-order').addEventListener('click', function () { submitOrder(true); });
