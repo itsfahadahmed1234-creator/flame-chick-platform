@@ -6,14 +6,14 @@
 
 - Repository: [itsfahadahmed1234-creator/flame-chick-platform](https://github.com/itsfahadahmed1234-creator/flame-chick-platform)
 - Branch: `work/website-parallel-development`
-- Branch URL: https://github.com/itsfahamed1234-creator/flame-chick-platform/tree/work/website-parallel-development
+- Branch URL: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/tree/work/website-parallel-development
 
 ## Authoritative Website handoff
 
 [Open the full Website parallel-development handoff](./2026-11-25-website-parallel-audit.md)
 
 Direct URL:
-https://github.com/itsfahamed1234-creator/flame-chick-platform/blob/work/website-parallel-development/docs/handoffs/2026-11-25-website-parallel-audit.md
+https://github.com/itsfahadahmed1234-creator/flame-chick-platform/blob/work/website-parallel-development/docs/handoffs/2026-11-25-website-parallel-audit.md
 
 The full handoff is the source of truth for:
 - Website architecture and file map
