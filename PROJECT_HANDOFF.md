@@ -1,5 +1,17 @@
+# CURRENT WORK CHECKPOINT — RIDER ACCESS / ADMIN MAIN BRANCH
+**Updated:** 2026-11-25  
+**Latest focused handoff:** `docs/handoffs/2026-11-25-rider-access-admin-main-branch-fix.md`
+
+The current task is to fix Rider portal access and simplify Admin staff provisioning. Production has exactly one active Main branch. The Admin UI no longer asks for a branch selection for Manager/Cashier/Rider and displays Main as automatic; the backend migration is designed to enforce Main, automatically provision Rider profiles when a Rider role is assigned or an invitation is accepted, and safely disable Rider offers on deactivation. Rider app Realtime initialization is now nonblocking so the first jobs request proceeds independently.
+
+**Important status:** latest full disposable QA is still running / being verified. Earlier disposable runs confirmed the revised migration replay and Staff Admin role-boundary tests passed; the broader delivery QA then exposed a legacy QA fixture issue (manual duplicate Rider profiles), which was corrected in the latest commit. Do not claim full suite pass until the latest run completes. The new migration has NOT been applied to Production, and the Admin/Rider app changes have NOT been deployed to Production. Preview deployment and user sign-in test remain pending. The only related Production data repair was the previous one-time creation of the matching `R-BC80D848` profile for the already-existing Fahad Rider role.
+
+Current repository branch remains `work/production-source-audit`; do not switch to main. GST remains deferred; no real customer orders/payments and no production promotion.
+
+---
+
 # PRODUCTION OPERATIONAL MIGRATIONS — APPLIED
-**Updated:** 2026-11-24 08:35 PKT
+**Updated:** 2026-11-25 (historical migration rollout notes retained below)
 **Production project:** adkrxfnawdiljhjaavnj (Flame Chick Production, ap-south-1, Free)
 **Repository:** itsfahadahmed1234-creator/flame-chick-platform
 **Branch:** work/production-source-audit
