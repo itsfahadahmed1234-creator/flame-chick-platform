@@ -315,7 +315,7 @@ test("POS Online Orders is strictly Delivery-only at API request and display lay
   assert.match(html,/fulfillment==='delivery'/);
   assert.match(html,/function isRecentWebsiteOrder\(o\)\{if\(!isOnlineDeliveryOrder\(o\)\)return false/);
   assert.match(html,/const orders=\[\.\.\.inboxOrders\.values\(\)\]\.filter\(isRecentWebsiteOrder\)/);
-  assert.match(html,/<h2>Online Orders<\\/h2><p id="ordersMeta">Delivery orders only · Website and POS<\\/p>/);
+  assert.ok(html.includes('<h2>Online Orders</h2><p id="ordersMeta">Delivery orders only · Website and POS</p>'));
 });
 
 test("POS History is a primary page and not a modal that falls back to POS",()=>{
