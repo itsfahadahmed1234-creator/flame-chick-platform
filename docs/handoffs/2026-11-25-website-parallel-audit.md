@@ -634,3 +634,47 @@ The browser rendered the page and initialized the V3 catalogue, but stopped whil
 - No changes to POS, Admin, Rider, shared backend APIs, pricing, catalogue contract, Supabase schema, migrations, Edge Functions, Production aliases, catalogue data, orders or payments.
 - No checkout, quote or order request was submitted. No live business data was changed.
 - GST remains deferred.
+
+
+---
+
+## 2026-11-25 — Screenshot-driven mobile Website corrections
+
+### User-reported issues reviewed
+- Deal configurator appeared oversized and visually crowded on a phone.
+- Product-card Add / Choose options buttons overflowed the right edge in two-column mobile cards.
+- Preview-mode heading was visible above the storefront.
+- Single-variant products displayed the redundant `Regular` label.
+- The deal dialog appeared to compete with page content while open.
+
+### Website-only implementation
+- Commit: `af54b90576fbb81165987dc2a7eebac2e88b1813`
+- Branch: `work/website-parallel-development`
+- Exact changed files:
+  - `apps/flame-chick-website/index.html`
+  - `apps/flame-chick-website/js/website-order-v3.js`
+  - `apps/flame-chick-website/js/catalog-v3-deal-configurator.js`
+  - `tests/website-source-hygiene.test.mjs`
+  - `tests/catalog-v3-deal-configurator.test.mjs`
+- Product-card footer now permits wrapping; price and action controls have bounded widths, flexible sizing and smaller responsive type so long Choose options labels do not force horizontal overflow.
+- The deal dialog no longer has the redundant “Build your deal” header title. Product and deal dialogs are centered, narrower, bounded to roughly three-quarters of the mobile viewport, and scroll internally. Closed dialogs are explicitly hidden.
+- While a product/deal dialog is open, the sticky anatomy section (including its floating Explore Menu button) is hidden to prevent it appearing above or through the modal.
+- The Preview-mode banner has been removed from the top of the page. The cart-only Preview checkout notice and server/API write guard remain in place; this is a visual cleanup, not enabling Preview checkout.
+- Single-variant product cards no longer render their variant label. Multi-option products still show “Multiple options”.
+- Deal component and Burger option labels now omit a redundant variant suffix when that product has only one applicable choice; variant labels remain when there are multiple choices.
+- Added regression assertions for mobile action sizing, dialog centering/scrolling/closed state, Preview write protection and variant label behavior.
+
+### Verification state
+- Branch HEAD independently verified as `af54b90576fbb81165987dc2a7eebac2e88b1813`.
+- GitHub comparison against previous HEAD `7519c8b96b2ed43f3f04a05529e90b15e842369c` lists exactly the five Website/test files above.
+- Source-level checks confirmed: top Preview banner references removed; cart Preview notice retained; checkout write guard retained; single-variant product label removed; centered bounded scrollable dialog CSS present; deal label logic variant-aware.
+- Website Static Checks have **not yet reported a run** for this commit. Do not mark automated tests as passed until a matching run is confirmed.
+- Latest real Website Preview still points to the older READY deployment `dpl_6QNcMv8HWpLrY34rgo2phRpwU3ia`, source `df04dc6f02014145edfee29ca10d3923de18f923`. No new Preview deployment for this commit was found. The visual-review Vercel project still reports its known team-invitation failure; this is separate from the real Website Preview.
+- No manual visual browser test of the new commit has been performed yet. User screenshots were used as the design reference, not as proof of a successful rendered fix.
+
+### Safety / scope
+- Preview checkout write protection is unchanged; no quote, order, payment, retry or other checkout request was submitted.
+- No Production deployment or alias was changed.
+- No catalogue data, backend APIs, shared pricing/deal validation, Supabase schema, migrations, Edge Functions, POS, Admin or Rider files were changed.
+- No real order/payment or live business data was created or changed.
+- GST remains deferred.
