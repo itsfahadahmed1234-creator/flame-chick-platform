@@ -16,3 +16,11 @@ Static cashier/POS application.
 - Existing POS Preview remains READY at the branch preview alias recorded in `PROJECT_HANDOFF.md`. No production Vercel alias has been changed.
 - **Production readiness remains gated** on retrying the previously saved local test Delivery order once, confirming it appears in Online Orders and creates the expected delivery task, and completing a controlled end-to-end rehearsal with test accounts. Do not use the POS for live restaurant operations until this gate is explicitly cleared.
 - Never create a replacement order while the saved local order is recoverable. Never retry a `needs_review` order repeatedly without fixing its validation cause.
+
+
+## Temporary POS Preview deployment via GitHub Actions
+
+- Use `.github/workflows/deploy-flame-chick-pos-preview.yml` while the original Vercel team's daily deployment quota is exhausted.
+- The workflow is restricted to `work/production-source-audit`, requires repository variable `FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED=true`, and uses repository secret `VERCEL_TOKEN`.
+- It is pinned to the isolated Vercel Preview project `flamechickpos` in the current Hobby team. The Vercel project root directory is `apps/flame-chick-pos`; therefore the CLI must run from the monorepo root (not from this folder) to avoid duplicating the root-directory path.
+- Deploy command is explicit Preview environment only. No production alias or custom domain is assigned by the workflow.
