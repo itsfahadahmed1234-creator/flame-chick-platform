@@ -479,44 +479,41 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
         <label><input id="fulfilment-delivery" type="radio" name="fc-v3-fulfilment" value="delivery" checked><span>Delivery</span></label>
         <label><input id="fulfilment-pickup" type="radio" name="fc-v3-fulfilment" value="pickup"><span>Takeaway</span></label>
       </fieldset>
-      <section id="details-section" class="fc-home-details wrap" hidden aria-labelledby="details-heading">
-          <p class="fc-home-kicker">Checkout details</p><h3 id="details-heading">Your details</h3>
-          <div class="fc-home-fields">
-            <div class="fc-home-field"><label for="customer-name">Full name</label><input id="customer-name" maxlength="160" autocomplete="name" required></div>
-            <div class="fc-home-field"><label for="customer-phone">Phone number</label><input id="customer-phone" type="tel" maxlength="32" autocomplete="tel" placeholder="03xx xxxxxxx" required></div>
-            <div class="fc-home-field fc-home-full"><label for="customer-email">Email (optional)</label><input id="customer-email" type="email" maxlength="254" autocomplete="email"></div>
-            <div id="delivery-fields" class="fc-home-fields fc-home-full" hidden>
-              <div class="fc-home-field"><label for="delivery-area">Delivery area</label><select id="delivery-area"><option value="">Choose your area</option></select></div>
-              <div id="other-locality-field" class="fc-home-field" hidden><label for="other-locality">Your locality</label><input id="other-locality" maxlength="120" placeholder="Enter locality"></div>
-              <div class="fc-home-field fc-home-full"><label for="delivery-address">Complete delivery address</label><textarea id="delivery-address" maxlength="1000" autocomplete="street-address" placeholder="House, street, building and nearby landmark"></textarea></div>
-              <div class="fc-home-field fc-home-full"><label for="delivery-instructions">Delivery instructions (optional)</label><input id="delivery-instructions" maxlength="500"></div>
-              <label id="not-listed-confirm-row" class="fc-home-confirm fc-home-full" hidden><input id="not-listed-confirm" type="checkbox"><span id="not-listed-confirm-text">I understand the temporary delivery fee for an area not listed.</span></label>
-            </div>
-            <div class="fc-home-field fc-home-full"><label for="order-notes">Order notes (optional)</label><textarea id="order-notes" maxlength="1000" placeholder="Additional instructions"></textarea></div>
-          </div>
-        </section><p id="cart-empty" class="fc-home-cart-empty">Your cart is empty. Add your favourites from the menu.</p>
-      <div id="cart-lines" class="fc-home-cart-lines"></div>
-        <section id="details-section" class="fc-home-details wrap" hidden aria-labelledby="details-heading">
-          <p class="fc-home-kicker">Checkout details</p><h3 id="details-heading">Your details</h3>
-          <div class="fc-home-fields">
-            <div class="fc-home-field"><label for="customer-name">Full name</label><input id="customer-name" maxlength="160" autocomplete="name" required></div>
-            <div class="fc-home-field"><label for="customer-phone">Phone number</label><input id="customer-phone" type="tel" maxlength="32" autocomplete="tel" placeholder="03xx xxxxxxx" required></div>
-            <div class="fc-home-field fc-home-full"><label for="customer-email">Email (optional)</label><input id="customer-email" type="email" maxlength="254" autocomplete="email"></div>
-            <div id="delivery-fields" class="fc-home-fields fc-home-full" hidden>
-              <div class="fc-home-field"><label for="delivery-area">Delivery area</label><select id="delivery-area"><option value="">Choose your area</option></select></div>
-              <div id="other-locality-field" class="fc-home-field" hidden><label for="other-locality">Your locality</label><input id="other-locality" maxlength="120" placeholder="Enter locality"></div>
-              <div class="fc-home-field fc-home-full"><label for="delivery-address">Complete delivery address</label><textarea id="delivery-address" maxlength="1000" autocomplete="street-address" placeholder="House, street, building and nearby landmark"></textarea></div>
-              <div class="fc-home-field fc-home-full"><label for="delivery-instructions">Delivery instructions (optional)</label><input id="delivery-instructions" maxlength="500"></div>
-              <label id="not-listed-confirm-row" class="fc-home-confirm fc-home-full" hidden><input id="not-listed-confirm" type="checkbox"><span id="not-listed-confirm-text">I understand the temporary delivery fee for an area not listed.</span></label>
-            </div>
-            <div class="fc-home-field fc-home-full"><label for="order-notes">Order notes (optional)</label><textarea id="order-notes" maxlength="1000" placeholder="Additional instructions"></textarea></div>
-          </div>
-        </section>
 
-      <div id="cart-summary" class="fc-home-cart-summary" hidden><div class="fc-home-total"><span>Verified total</span><strong id="cart-total">—</strong></div><p id="cart-quote-detail" class="fc-home-cart-detail"></p></div>
-      <p id="fc-preview-checkout-notice" class="fc-preview-checkout-notice" hidden role="status">You are viewing the real Flame Chick published menu in Preview mode. Cart and product selections are for review only; verified totals and order submission are disabled here.</p>
-      <div class="fc-home-cart-actions"><button id="request-quote" class="btn btn-gold" type="button" disabled>Get verified total</button><button id="place-order" class="btn btn-gold" type="button" disabled hidden>Place order</button><button id="retry-order" class="btn btn-gold" type="button" disabled hidden>Retry order confirmation</button></div>
-      <p id="order-status" class="fc-home-order-status" role="status" aria-live="polite">No order has been submitted.</p>
+      <section id="details-section" class="fc-home-details wrap" hidden aria-labelledby="details-heading">
+        <p class="fc-home-kicker">Checkout details</p><h3 id="details-heading">Your details</h3>
+        <div class="fc-home-fields">
+          <div class="fc-home-field"><label for="customer-name">Full name</label><input id="customer-name" maxlength="160" autocomplete="name" required></div>
+          <div class="fc-home-field"><label for="customer-phone">Phone number</label><input id="customer-phone" type="tel" maxlength="32" autocomplete="tel" placeholder="03xx xxxxxxx" required></div>
+          <div class="fc-home-field fc-home-full"><label for="customer-email">Email (optional)</label><input id="customer-email" type="email" maxlength="254" autocomplete="email"></div>
+          <div id="delivery-fields" class="fc-home-fields fc-home-full" hidden>
+            <div class="fc-home-field fc-home-full fc-delivery-area-picker">
+              <label for="delivery-area-search">Delivery area</label>
+              <input id="delivery-area-search" type="search" autocomplete="off" placeholder="Search your area" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="delivery-area-results">
+              <div id="delivery-area-results" class="fc-delivery-area-results" role="listbox" hidden></div>
+              <select id="delivery-area" aria-hidden="true" tabindex="-1" hidden><option value="">Choose your area</option></select>
+            </div>
+            <div id="other-locality-field" class="fc-home-field fc-home-full" hidden><label for="other-locality">Your locality</label><input id="other-locality" maxlength="120" placeholder="Enter locality"></div>
+            <div class="fc-home-field fc-home-full"><label for="delivery-address">Complete delivery address</label><textarea id="delivery-address" maxlength="1000" autocomplete="street-address" placeholder="House, street, building and nearby landmark"></textarea></div>
+            <label id="not-listed-confirm-row" class="fc-home-confirm fc-home-full" hidden><input id="not-listed-confirm" type="checkbox"><span id="not-listed-confirm-text">I understand the temporary delivery fee for an area not listed.</span></label>
+          </div>
+          <div class="fc-home-field fc-home-full"><label for="order-notes">Order notes (optional)</label><textarea id="order-notes" maxlength="1000" placeholder="Additional instructions"></textarea></div>
+        </div>
+      </section>
+
+      <p id="cart-empty" class="fc-home-cart-empty">Your cart is empty. Add your favourites from the menu.</p>
+      <div id="cart-lines" class="fc-home-cart-lines"></div>
+
+      <footer class="fc-v3-cart-footer">
+        <div id="cart-summary" class="fc-home-cart-summary" hidden><div class="fc-home-total"><span>Verified total</span><strong id="cart-total">—</strong></div><p id="cart-quote-detail" class="fc-home-cart-detail"></p></div>
+        <p id="fc-preview-checkout-notice" class="fc-preview-checkout-notice" hidden role="status">You are viewing the real Flame Chick published menu in Preview mode. Cart and product selections are for review only; verified totals and order submission are disabled here.</p>
+        <div class="fc-home-cart-actions">
+          <button id="request-quote" class="btn btn-gold" type="button" disabled>Get verified total</button>
+          <button id="place-order" class="btn btn-gold" type="button" disabled hidden>Place order</button>
+          <button id="retry-order" class="btn btn-gold" type="button" disabled hidden>Retry order confirmation</button>
+        </div>
+        <p id="order-status" class="fc-home-order-status" role="status" aria-live="polite">No order has been submitted.</p>
+      </footer>
       <div id="order-success" class="fc-home-order-success" hidden><p class="fc-home-kicker">Order received</p><h3>Your order is confirmed.</h3><p>Order reference</p><strong id="success-order-number"></strong><p id="success-order-message"></p><button id="continue-ordering" class="btn btn-ghost" type="button">Continue browsing</button></div>
     </div>
   </section>
