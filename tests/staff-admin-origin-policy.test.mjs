@@ -132,7 +132,7 @@ test("Staff Admin preview CORS allows only the exact current and branch-stable p
   }
   for (const origin of [
     "https://flame-chick-admin-production-other.vercel.app",
-    "https://flame-chick-admin-production-fxdrq9od9-fahad-7455.vercel.app.evil.test",
+    "https://flame-chick-admin-production-q58bg0vac-fahad-7455.vercel.app.evil.test",
     "https://evil.example.test"
   ]) {
     assert.equal(isAllowedRequestOrigin(origin, configured), false, origin);
