@@ -334,39 +334,46 @@
       if (deal.description) fragment.appendChild(makeElement(doc, 'p', 'fc-deal-config-description', deal.description));
       if (readOnly) fragment.appendChild(makeElement(doc, 'p', 'fc-deal-config-status', 'This deal is currently outside its orderable context. Details are shown for information only.'));
 
-      var variantSet = makeElement(doc, 'fieldset', 'fc-deal-variants');
-      variantSet.appendChild(makeElement(doc, 'legend', '', 'Choose a deal option'));
-      variants.forEach(function (variant) {
-        var label = makeElement(doc, 'label', 'fc-deal-variant');
-        var input = makeElement(doc, 'input');
-        input.type = 'radio';
-        input.name = 'fc-deal-variant-' + deal.id;
-        input.value = variant.id;
-        input.checked = selectedVariantId === variant.id;
-        input.disabled = variant.branchSatisfiable !== true;
-        var controlKey = 'variant:' + variant.id;
-        input.setAttribute('data-control-key', controlKey);
-        controls[controlKey] = input;
-        input.addEventListener('change', function () {
-          if (input.checked) {
-            var changed = selectVariant(variant.id);
-            if (!changed.ok) lastError = changed;
-            render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: controlKey,
-              formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel, showVariantBasePrice: options.showVariantBasePrice });
+      var orderableVariants = variants.filter(function (item) { return item.branchSatisfiable === true; });
+      if (orderableVariants.length === 1 && selectedVariantId !== orderableVariants[0].id) {
+        selectVariant(orderableVariants[0].id);
+      }
+      if (orderableVariants.length !== 1) {
+        var variantSet = makeElement(doc, 'fieldset', 'fc-deal-variants');
+        variantSet.appendChild(makeElement(doc, 'legend', '', 'Choose a deal option'));
+        variants.forEach(function (variant) {
+          var label = makeElement(doc, 'label', 'fc-deal-variant');
+          var input = makeElement(doc, 'input');
+          input.type = 'radio';
+          input.name = 'fc-deal-variant-' + deal.id;
+          input.value = variant.id;
+          input.checked = selectedVariantId === variant.id;
+          input.disabled = variant.branchSatisfiable !== true;
+          var controlKey = 'variant:' + variant.id;
+          input.setAttribute('data-control-key', controlKey);
+          controls[controlKey] = input;
+          input.addEventListener('change', function () {
+            if (input.checked) {
+              var changed = selectVariant(variant.id);
+              if (!changed.ok) lastError = changed;
+              render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: controlKey,
+                formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel,
+                showVariantBasePrice: options.showVariantBasePrice });
+            }
+          });
+          label.appendChild(input);
+          var variantText = variant.label;
+          if (options.showVariantBasePrice !== false) {
+            variantText += ' — ' + formatAmount(variant.basePriceMinor, viewModel.currencyCode, options.formatMoney);
           }
+          label.appendChild(makeElement(doc, 'span', '', variantText));
+          if (variant.branchSatisfiable !== true) {
+            label.appendChild(makeElement(doc, 'span', 'fc-deal-unavailable', 'Unavailable'));
+          }
+          variantSet.appendChild(label);
         });
-        label.appendChild(input);
-        var variantText = variant.label;
-        if (options.showVariantBasePrice !== false) {
-          variantText += ' — ' + formatAmount(variant.basePriceMinor, viewModel.currencyCode, options.formatMoney);
-        }
-        label.appendChild(makeElement(doc, 'span', '', variantText));
-        if (variant.branchSatisfiable !== true) {
-          label.appendChild(makeElement(doc, 'span', 'fc-deal-unavailable', 'Unavailable'));
-        }
-        variantSet.appendChild(label);
-      });
-      fragment.appendChild(variantSet);
+        fragment.appendChild(variantSet);
+      }
 
       function appendUnitCustomizations(group, option, unit, target) {
         if (!option.modifierGroups.length) return;
@@ -562,37 +569,44 @@
                 optionLabel + ' · ' + priceLabel);
               optionRow.appendChild(copy);
 
-              var stepper = makeElement(doc, 'div', 'fc-deal-option-stepper');
               var current = selectedCount(group, option);
-              var minusKey = 'quantity-minus:' + group.id + ':' + option.id;
-              var minus = makeElement(doc, 'button', 'fc-deal-option-step', '−');
-              minus.type = 'button'; minus.disabled = readOnly || fixedGroup || current <= 0;
-              minus.setAttribute('aria-label', 'Remove one ' + optionLabel);
-              minus.setAttribute('data-control-key', minusKey); controls[minusKey] = minus;
-              minus.addEventListener('click', function () {
-                var changed = setOptionQuantity(group.id, option.id, Math.max(0, selectedCount(group, option) - 1));
-                if (!changed.ok) lastError = changed;
-                render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: minusKey,
-                  formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel,
-                  showVariantBasePrice: options.showVariantBasePrice });
-              });
-              stepper.appendChild(minus);
-              stepper.appendChild(makeElement(doc, 'output', 'fc-deal-option-quantity', String(current)));
-              var plusKey = 'quantity-plus:' + group.id + ':' + option.id;
-              var plus = makeElement(doc, 'button', 'fc-deal-option-step', '+');
-              plus.type = 'button';
-              plus.disabled = readOnly || fixedGroup || current >= option.maxQuantity || groupQuantity(group) >= group.maxUnits;
-              plus.setAttribute('aria-label', 'Add one ' + optionLabel);
-              plus.setAttribute('data-control-key', plusKey); controls[plusKey] = plus;
-              plus.addEventListener('click', function () {
-                var changed = setOptionQuantity(group.id, option.id, selectedCount(group, option) + 1);
-                if (!changed.ok) lastError = changed;
-                render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: plusKey,
-                  formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel,
-                  showVariantBasePrice: options.showVariantBasePrice });
-              });
-              stepper.appendChild(plus);
-              optionRow.appendChild(stepper);
+              if (fixedGroup) {
+                var fixedValue = makeElement(doc, 'span', 'fc-deal-fixed-value',
+                  'Included' + (current > 1 ? ' × ' + current : ''));
+                optionRow.classList.add('is-fixed');
+                optionRow.appendChild(fixedValue);
+              } else {
+                var stepper = makeElement(doc, 'div', 'fc-deal-option-stepper');
+                var minusKey = 'quantity-minus:' + group.id + ':' + option.id;
+                var minus = makeElement(doc, 'button', 'fc-deal-option-step', '−');
+                minus.type = 'button'; minus.disabled = readOnly || current <= 0;
+                minus.setAttribute('aria-label', 'Remove one ' + optionLabel);
+                minus.setAttribute('data-control-key', minusKey); controls[minusKey] = minus;
+                minus.addEventListener('click', function () {
+                  var changed = setOptionQuantity(group.id, option.id, Math.max(0, selectedCount(group, option) - 1));
+                  if (!changed.ok) lastError = changed;
+                  render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: minusKey,
+                    formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel,
+                    showVariantBasePrice: options.showVariantBasePrice });
+                });
+                stepper.appendChild(minus);
+                stepper.appendChild(makeElement(doc, 'output', 'fc-deal-option-quantity', String(current)));
+                var plusKey = 'quantity-plus:' + group.id + ':' + option.id;
+                var plus = makeElement(doc, 'button', 'fc-deal-option-step', '+');
+                plus.type = 'button';
+                plus.disabled = readOnly || current >= option.maxQuantity || groupQuantity(group) >= group.maxUnits;
+                plus.setAttribute('aria-label', 'Add one ' + optionLabel);
+                plus.setAttribute('data-control-key', plusKey); controls[plusKey] = plus;
+                plus.addEventListener('click', function () {
+                  var changed = setOptionQuantity(group.id, option.id, selectedCount(group, option) + 1);
+                  if (!changed.ok) lastError = changed;
+                  render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: plusKey,
+                    formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel,
+                    showVariantBasePrice: options.showVariantBasePrice });
+                });
+                stepper.appendChild(plus);
+                optionRow.appendChild(stepper);
+              }
               groupSet.appendChild(optionRow);
 
               var count = selectedCount(group, option);
