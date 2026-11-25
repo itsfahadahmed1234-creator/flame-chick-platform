@@ -17,14 +17,31 @@ Staff provisioning migration `20261125083051_flame_chick_staff_main_branch_rider
 
 ## QA
 - Full disposable Realtime/staff/delivery/POS/website/concurrency suite passed on `c41e9e01417d54276e3f96d09e5117660c8f05dc`, run `45583412377`.
-- POS/Rider static tests passed on `878a4e71a37e2b5f1b6b12d0ff403a7670548f1`, run `45584213000`, including Rider Busy/Offline socket continuity.
+- POS/Rider static tests passed on `878a4e71a37f6088fb47f0442424586b24b5ea4e`, run `45584213000`, including Rider Busy/Offline socket continuity.
 - Admin static checks passed on `79b9a49f91613d46024da7134d0ae530c22c7d45`, run `45584204475`.
+- POS/Rider static checks including the final migration path reference passed on `9c4865204c673ab156b07e8a89e680082650577b`, run `45586021243`.
 - Final filename-aligned Staff Admin/Realtime/operations QA passed on `6cff4a250abb1bdeb59fb4bedd90f28e6915210d`, run `45586028686`.
-- Separate catalog importer and catalog publication validation QA runs for the final filename-aligned migration were still pending/in progress when this summary was updated.
-- Post-deploy Vercel error-cluster queries returned no error clusters; runtime logs had no entries in the short query window, so active browser Realtime delivery is not yet proven.
+- Catalog publication validation QA passed on the same final commit, run `45586028742`; Catalog V3 menu importer QA passed on the same final commit, run `45586028129`.
+- Post-deploy Vercel error-cluster queries returned no error clusters for Admin, POS or Rider. The short-window runtime-log queries returned no log entries, so an actual live browser Realtime event round trip remains to be confirmed by user testing.
 
-The current branch remains `work/production-source-audit`. User must hard-refresh and sign in to all 3 apps, then confirm live POS-to-Rider state updates through a controlled pre-launch rehearsal. Do not create real customer orders/payments, promote further deployments, change Main branch, create additional staff accounts, or add GST. Production remains pre-launch, not cleared for restaurant operations.
+## Production routing and live Realtime
+- Existing custom production domains have been reassigned and verified to new READY deployments from commit `6cff4a250abb1bdeb59fb4bedd90f28e6915210d`:
+  - Admin `flamechicadmin.vercel.app` → `dpl_HhALuZw9UXTercZEN3mN44JSUDUe`
+  - POS `flamechicpos.vercel.app` → `dpl_4QFxTS5gYsN8nei5iW8KCw5Ye8Us`
+  - Rider `flamechickrider.vercel.app` → `dpl_2XDw6cQ4RJReYAE1SpkBUsjhC79y`
+- The Vercel promote API returned 422 for manually created deployments. The verified custom domain aliases were instead reassigned directly to these READY deployment IDs, then read back and confirmed. Do not describe the request_promote API operation as successful.
+- Supabase Realtime migration `20261125092751_flame_chick_private_ops_realtime_broadcasts` is applied. Five triggers and one private-channel authorization policy were verified in Production. POS uses branch-private Broadcast; Rider uses a private topic bound to auth.uid(). Broadcast payloads contain identifiers only. Poll/reconnect fallback remains active.
+- Production staff provisioning migration `20261125083051_flame_chick_staff_main_branch_rider_provisioning` remains applied and verified.
+- Preserve all existing Production data: 11 orders and 3 delivery tasks, with 0 unresolved delivery tasks at the pre-deploy check. One active Main branch; Fahad’s existing Rider role and profile remain active and matched.
+- No customer order or payment was created for deployment validation. GST remains deferred. Restaurant launch and live trading are not cleared.
 
+## Next steps for user
+1. Hard-refresh and sign in at Admin `https://flamechicadmin.vercel.app/`, POS `https://flamechicpos.vercel.app/`, and Rider `https://flamechickrider.vercel.app/`.
+2. Confirm POS shows Realtime connected and updates its order/dispatch board from authorized events.
+3. Confirm Rider dashboard loads. Test an existing or specifically approved controlled assignment; verify the Rider receives only their own event and POS sees the status change.
+4. Report actual sign-in and event results. Do not create real customer orders or collect payments during this check.
+
+The current branch remains `work/production-source-audit`; do not merge main/master. Production is deployed but remains pre-launch pending manual operational rehearsal. GST stays deferred.
 
 ---
 
