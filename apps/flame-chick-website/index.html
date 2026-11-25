@@ -2330,6 +2330,51 @@ body.fc-website-preview-readonly .fc-home-cart-actions button{opacity:.48;cursor
 .fc-product-popup-group[open]>summary{border-bottom:1px solid var(--rule);background:#fff8f5;color:var(--red)}
 .fc-product-popup-group>.order-modifier-group{margin:0;padding:5px 8px;border:0;border-radius:0}
 .fc-product-popup-group .order-modifier-option{min-height:28px;padding:3px 0;font-size:11px}
+
+/* Checkout polish: searchable single-field delivery area and persistent bottom action. */
+.fc-delivery-area-picker{position:relative;min-width:0}
+#delivery-area-search{width:100%;min-height:42px;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:#fff;color:var(--ink);font:600 14px var(--f-body)}
+.fc-delivery-area-results{position:absolute;z-index:35;top:calc(100% + 4px);left:0;right:0;max-height:190px;overflow:auto;overscroll-behavior:contain;border:1px solid var(--rule);border-radius:10px;background:#fff;box-shadow:0 10px 24px rgba(30,0,4,.18)}
+.fc-delivery-area-result{display:block;width:100%;min-height:38px;padding:9px 11px;border:0;border-bottom:1px solid #f1e8e3;background:#fff;color:var(--ink);text-align:left;font:600 13px var(--f-body)}
+.fc-delivery-area-result:last-child{border-bottom:0}
+.fc-delivery-area-result[aria-selected=true],.fc-delivery-area-result:focus-visible{background:#fff0ed;color:var(--red);outline:0}
+.fc-delivery-area-result:disabled{opacity:.4}
+.fc-delivery-area-no-results{margin:0;padding:12px;color:var(--muted);font:500 12px var(--f-body)}
+.fc-v3-cart-drawer .fc-home-cart-inner{min-height:100%;display:flex;flex-direction:column;padding-bottom:0}
+.fc-v3-cart-footer{position:sticky;bottom:0;z-index:16;flex:0 0 auto;margin-top:auto;padding:9px 0 calc(9px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--rule);background:rgba(250,245,240,.98);box-shadow:0 -8px 20px rgba(35,0,5,.08);backdrop-filter:blur(10px)}
+.fc-v3-cart-drawer .fc-home-cart-summary{margin:0 0 6px}
+.fc-v3-cart-drawer .fc-home-cart-actions{display:grid;grid-template-columns:1fr;gap:6px;margin:0}
+.fc-v3-cart-drawer .fc-home-cart-actions .btn{width:100%;min-height:48px;justify-content:center;border-radius:12px;font-size:16px}
+.fc-v3-cart-drawer .fc-home-order-status{margin:5px 0 0;padding:5px 8px;font-size:11px;line-height:1.25}
+.fc-v3-cart-drawer #fc-preview-checkout-notice{margin:0 0 6px;padding:7px 9px;font-size:10px;line-height:1.25}
+.fc-v3-cart-drawer #order-success{margin-bottom:12px}
+.fc-home-product-dialog .fc-home-dialog-content{padding-bottom:0}
+.fc-home-product-dialog .fc-product-popup-add{margin-bottom:0}
+.fc-home-product-dialog{padding-bottom:0}
+.fc-home-deal-dialog .fc-deal-component-group{padding:6px 8px;border:1px solid #eee2dc;border-radius:9px;background:#fff}
+.fc-home-deal-dialog .fc-deal-component-option{display:flex;align-items:center;gap:8px;margin:0;padding:5px 0;border-top:1px solid #f3eae6;background:transparent}
+.fc-home-deal-dialog .fc-deal-component-option:first-of-type{border-top:0}
+.fc-home-deal-dialog .fc-deal-component-label{flex:1 1 auto;min-width:0;font-size:11px;line-height:1.2}
+.fc-home-deal-dialog .fc-deal-fixed-value{flex:0 0 auto;color:#398254;font:800 10px var(--f-ui);text-transform:uppercase}
+.fc-home-deal-dialog .fc-deal-option-stepper{flex:0 0 auto;gap:4px}
+.fc-home-deal-dialog .fc-deal-option-step{width:25px;height:24px;font-size:14px}
+.fc-home-deal-dialog .fc-deal-option-quantity{min-width:13px;font-size:11px}
+.fc-home-deal-dialog .fc-deal-quantity-row{min-height:38px;padding:4px 8px}
+.fc-home-deal-dialog .fc-deal-config-status{font-size:9px;padding:4px 7px}
+.fc-home-deal-dialog .fc-deal-config-continue{min-height:42px}
+@media(max-width:699px){
+  .fc-v3-cart-footer{padding-bottom:calc(9px + env(safe-area-inset-bottom,0px))}
+  .fc-v3-cart-drawer .fc-home-cart{padding-bottom:0}
+  .fc-v3-cart-drawer .fc-home-cart-inner{padding-bottom:0}
+  .fc-v3-cart-drawer .fc-home-fields{gap:7px}
+  .fc-v3-cart-drawer .fc-home-field input,.fc-v3-cart-drawer .fc-home-field select,.fc-v3-cart-drawer .fc-home-field textarea,#delivery-area-search{min-height:38px;padding:7px 9px;font-size:12px}
+}
+@media(max-height:640px){
+  .fc-home-product-dialog .fc-home-dialog-content{padding-bottom:0}
+  .fc-product-popup-top{grid-template-columns:48px minmax(0,1fr);gap:6px}
+  .fc-product-popup-art{width:48px;height:48px}
+}
+
 </style>
 <script src="js/catalog-v3.js"></script>
 <script src="js/catalog-v3-client.js"></script>
