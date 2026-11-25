@@ -585,5 +585,5 @@ test('Burger groups use a Chicken Burgers category source and Remove choice bypa
   assert.match(source, /readComponentGroups\(form,\{validate:false\}\)/);
   assert.match(source, /s\.components\[index\]\.options\.splice\(choiceIndex,1\)/);
   assert.match(source, /choiceIndex<0\|\|!s\.components\[index\]/);
-  assert.match(source, /if\(!group\|\/burger\/i\.test\(group\.display_name\)\)/);
+  assert.match(source, /if\(!group\|\|\/burger\/i\.test\(group\.display_name\)\)/);
 });

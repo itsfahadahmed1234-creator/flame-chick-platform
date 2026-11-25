@@ -116,6 +116,7 @@ test('lost-response retries are safe and acknowledgement must match identity plu
 
 test('POS synchronizes customer-selected Chicken Burgers variants with repeat caps and zero surcharge', () => {
   const s = createCategoryBurgerSnapshot({ quantity: 2, allowRepeat: true });
+  s.databaseNow = '2026-11-24T08:00:00.000Z';
   const order = baseOrder({
     catalogPublicationId: s.publicationId,
     catalogVersion: s.publicationNumber,

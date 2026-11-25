@@ -283,7 +283,7 @@ try {
   assert.equal(confirmationMessages.length,2);
   assert.match(confirmationMessages[1],/UNPUBLISHED/);
   assert.match(confirmationMessages[1],/will NOT publish the catalog/i);
-  assert.match(confirmationMessages[1],/selectable \+price upgrades/i);
+  assert.match(confirmationMessages[1],/Burger choices remain INCLUDED at zero surcharge/i);
 } finally {
   if(previousWindow===undefined) delete globalThis.window;
   else globalThis.window=previousWindow;

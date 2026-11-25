@@ -295,8 +295,8 @@ test("POS deal Burger selectors stay collapsed until Edit and summarize selected
 });
 
 test("Website deal configurator uses a compact expandable Burger picker with slot-specific choices",async()=>{
-  const configurator=readFileSync("../apps/flame-chick-website/js/catalog-v3-deal-configurator.js","utf8");
-  const page=readFileSync("../apps/flame-chick-website/index.html","utf8");
+  const configurator=readFileSync(new URL("../apps/flame-chick-website/js/catalog-v3-deal-configurator.js",import.meta.url),"utf8");
+  const page=readFileSync(new URL("../apps/flame-chick-website/index.html",import.meta.url),"utf8");
   assert.match(configurator,/fc-deal-burger-picker/);
   assert.match(configurator,/burgerSlotValues/);
   assert.match(configurator,/Burger ' \+ \(slot \+ 1\)/);
