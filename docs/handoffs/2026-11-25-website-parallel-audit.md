@@ -737,3 +737,13 @@ The browser rendered the page and initialized the V3 catalogue, but stopped whil
 5. Verify the order, snapshots, status history and delivery task in Supabase, then verify it appears in POS Online Orders with the QA marker. Keep the test record as an audit row; do not delete it or mark it paid/completed.
 6. After QA, remove the exact Preview hostname from the write allowlist in a separate Website commit, unless the user explicitly wants the guarded test Preview retained.
 7. Production remains pre-launch. No public checkout activation, Production alias change, catalogue publication, GST implementation, payment gateway or live restaurant operations are authorized by this checkpoint.
+
+
+### Follow-up — guard regression caught by CI
+- The first Website Static Checks run for implementation commit `247a206cf8151d4be17ae0a530e99f913b7fe1cf` failed: 124 passed, 2 failed. Both failures were in the new hostname-normalization assertions; the generated trailing-dot regular expression was over-escaped.
+- Corrected only `apps/flame-chick-website/js/preview-checkout-guard.js` in commit `7852abb1c951c4af1eecae73ad09acdd189b8b72` (parent `309eaf7578e316eb72c587ba79f07c53d580a941`).
+- Matching Website Static Checks run `45603145257` was queued/in progress at the last check; do not claim success until it completes.
+- The READY Preview deployment `dpl_FxMgV32udwyLBrmNP9tiXNv4G6PY` is still built from `247a206cf8151d4be17ae0a530e99f913b7fe1cf`. A redeployment of the trailing-dot-only correction was blocked by Vercel's Free-plan API deployment limit (more than 100 deployments/day; retry window 24 hours). The currently deployed exact host does not contain a trailing dot, but the corrected source commit is not yet deployed.
+- Current branch HEAD when this follow-up was recorded: `7852abb1c951c4af1eecae73ad09acdd189b8b72`.
+- No quote or order request was submitted. Website-originated order count remained zero.
+- HMAC secrets remain unverified/not recorded as configured; no order can be safely submitted until quote signing and phone digest succeed.
