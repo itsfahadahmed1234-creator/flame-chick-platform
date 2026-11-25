@@ -148,3 +148,45 @@ test("V3 Order API calculates delivery charges from database configuration and s
   assert.match(api, /selectionType === "not_listed"/);
   assert.match(api, /selectionType === "listed_area"/);
 });
+
+
+test("every V3 product card opens a product popup while a separate direct Add action remains available", () => {
+  assert.match(order, /card\.setAttribute\('role', 'group'\)/);
+  assert.match(order, /function openDetails\(\) \{ openProductCustomizer\(product, null\); \}/);
+  assert.match(order, /card\.addEventListener\('click'/);
+  assert.match(order, /function addProductDirectly\(product, variantId\)/);
+  assert.match(order, /addProductDirectly\(product, directVariant\.id\)/);
+  assert.match(order, /function openProductCustomizer\(product, initialVariantId\)/);
+  assert.match(order, /productModifierGroups\(product, variant\.id\)/);
+  assert.match(order, /validateModifierSelections\(groups, selections\)/);
+  assert.match(order, /className = 'fc-product-popup-add'/);
+  assert.match(order, /product\.variants\.forEach\(function \(row\)/);
+  assert.match(order, /cardPrice\(row\.priceMinor\)/);
+  assert.match(order, /quantity, modifiers: validation\.selections/);
+});
+
+test("deal choice configurator is hosted inside a modal, not as a separate homepage section", () => {
+  assert.match(html, /<dialog id="deal-dialog" class="fc-home-deal-dialog"/);
+  assert.match(html, /id="deal-configurator" class="fc-home-dialog-content"/);
+  assert.doesNotMatch(html, /id="deal-config-section"/);
+  assert.doesNotMatch(html, /id="close-deal-config"/);
+  assert.match(order, /function openDealConfigurator\(deal\)/);
+  assert.match(order, /configurator\.render\(\$\('deal-configurator'\)/);
+  assert.match(order, /\$\('deal-dialog'\)\.close\(\)/);
+  assert.match(order, /availableVariants\.length === 1\) configurator\.selectVariant/);
+  assert.match(order, /card\.addEventListener\('click'/);
+});
+
+test("deal popup preserves POS-style category-driven burger slots, repeat limits and per-item customization", () => {
+  const configurator = readFileSync(join(root, "js/catalog-v3-deal-configurator.js"), "utf8");
+  assert.match(configurator, /group\.categoryDriven === true/);
+  assert.match(configurator, /fc-deal-burger-picker/);
+  assert.match(configurator, /Burger ' \+ \(slot \+ 1\)/);
+  assert.match(configurator, /group\.allowRepeatOption/);
+  assert.match(configurator, /option\.maxQuantity/);
+  assert.match(configurator, /burgerSlotValues\[group\.id\]/);
+  assert.match(configurator, /option\.modifierGroups\.forEach/);
+  assert.match(configurator, /validate\(\)/);
+  assert.match(configurator, /toPayload\(\)/);
+  assert.match(order, /FlameChickCatalogV3DealConfigurator\.createDealConfigurator/);
+});
