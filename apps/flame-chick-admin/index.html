@@ -163,9 +163,9 @@
       </section>
 
       <section class="page" id="page-staff" hidden>
-        <div class="page-intro"><div><h2>Staff & riders</h2><p class="muted">Manage restaurant-wide Admin/Owner access and branch-scoped Manager, Cashier and Rider access.</p></div><button class="btn btn-primary" id="inviteStaffButton">＋ Invite team member</button></div>
+        <div class="page-intro"><div><h2>Staff & riders</h2><p class="muted">Invite the team and choose their role. Branch-based roles are automatically assigned to Main.</p></div><button class="btn btn-primary" id="inviteStaffButton">＋ Add team member</button></div>
         <div id="staffPageNote" class="data-note">Loading secured staff records…</div>
-        <div class="surface"><div class="surface-head"><div><h3>Staff roles</h3><p class="muted">Each branch assignment is separately auditable. Deactivation preserves accounts and order history.</p></div></div>
+        <div class="surface"><div class="surface-head"><div><h3>Staff roles</h3><p class="muted">Admin and Owner are restaurant-wide. Manager, Cashier and Rider are assigned to Main automatically. Deactivation preserves accounts and order history.</p></div></div>
           <div class="table-wrap"><table><thead><tr><th>TEAM MEMBER</th><th>ROLE</th><th>BRANCH SCOPE</th><th>ACCOUNT / ROLE STATUS</th><th></th></tr></thead><tbody id="staffTable"><tr><td colspan="5" class="empty-cell">Loading staff…</td></tr></tbody></table></div>
         </div>
         <div class="surface staff-invitation-surface"><div class="surface-head"><div><h3>Invitations</h3><p class="muted">Retry Finalize does not send a second email.</p></div></div>
@@ -218,10 +218,9 @@
         <label>Work email<input id="staffEmail" name="email" type="email" required maxlength="254"></label>
         <label>Phone (optional)<input id="staffPhone" name="phone" type="tel" maxlength="32"></label>
         <label>Role<select id="staffRoleSelect" name="role_key" required><option value="cashier">Cashier</option><option value="rider">Rider</option><option value="manager">Manager</option><option value="admin">Admin</option><option value="owner">Owner</option></select></label>
-        <label class="full-field" id="staffBranchField">Branch access<select id="staffBranch" name="branch_ids" multiple size="4"></select><small class="subtle-line" id="staffBranchHint">Select every active branch this person should access.</small></label>
-        <label class="full-field">Reason for access / change<input id="staffReason" name="reason" maxlength="500" required></label>
+        <div class="full-field staff-branch-note" id="staffBranchField"><strong id="staffBranchLabel">Branch scope: Main (automatic)</strong><small class="subtle-line" id="staffBranchHint">Main branch is assigned automatically. No branch selection is needed.</small></div>
       </div>
-      <p class="data-note">New invitations are sent by the secured Staff Admin service. Existing accounts are not enumerated or linked automatically: the invited user must open <a href="accept-invitation.html" target="_blank" rel="noopener">the invitation acceptance page</a>, then sign in with the exact confirmed email. Admin and Owner are restaurant-wide; Manager, Cashier and Rider require one or more branches.</p>
+      <p class="data-note">The secured Staff Admin service sends invitations. The invited person must open <a href="accept-invitation.html" target="_blank" rel="noopener">the invitation acceptance page</a> and sign in with the exact invited email. Admin and Owner receive restaurant-wide access. Manager, Cashier and Rider are assigned to Main automatically.</p>
       <div id="staffFormError" class="error-text" role="alert"></div></div>
       <div class="dialog-actions"><button type="button" class="btn btn-outline" id="staffDialogCancel">Cancel</button><button type="submit" class="btn btn-primary" id="staffDialogSave">Send invitation</button></div>
     </form>
