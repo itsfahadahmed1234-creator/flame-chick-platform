@@ -274,6 +274,17 @@
         (editing?'<label class="fcv3-check"><input type="checkbox" name="is_active"'+(category.is_active?' checked':'')+'> Active</label>':'')+'</div>'+
         '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save category changes':'Save category')+'</button></div></form>';
     }
+    function burgerCategoryAnchor(){
+      const matches=s.categories.filter(category=>category&&category.category_kind==='menu'&&category.is_active!==false&&category.name_en==='Chicken Burgers');
+      if(matches.length!==1)return null;
+      const category=matches[0];
+      const products=s.products.filter(product=>product&&product.category_id===category.id&&product.is_active!==false&&String(product.name_en||'').trim().toLowerCase()==='burger');
+      if(products.length!==1)return null;
+      const product=products[0];
+      const variants=(product.variants||[]).filter(variant=>variant&&variant.is_active!==false&&variant.is_standalone_sellable===false&&String(variant.size_label||'').trim().toLowerCase()==='included');
+      if(variants.length!==1)return null;
+      return {category,product,variant:variants[0]};
+    }
     function componentChoiceForm(option,group){
       const products=eligibleChoiceProducts(s.products,s.categories,group.display_name);
       const used=new Set((group.options||[]).filter(x=>x!==option&&x.product_variant_id).map(x=>x.product_variant_id));
@@ -296,27 +307,46 @@
         '<button type="button" class="fcv3-button fcv3-danger" data-action="component-choice-remove">Remove choice</button></article>';
     }
     function componentForm(c,index){
-      const group={...c,options:Array.isArray(c.options)&&c.options.length?c.options:[{}]},repeat=group.allow_repeat_option===true;
+      const group={...c,options:Array.isArray(c.options)?c.options:[]},repeat=group.allow_repeat_option===true;
+      const burger=/burger/i.test(String(group.display_name||'')),anchor=burger?burgerCategoryAnchor():null;
+      const anchorOptionId=group.options.find(option=>option&&option.option_id)?.option_id||'';
+      const choiceEditor=burger
+        ? '<div class="fcv3-choice-source"><strong>Customer burger choices</strong><span>'+(anchor?esc(anchor.category.name_en):'Chicken Burgers category unavailable')+'</span>'+
+          '<small>Customers choose each required burger themselves from active products and variants in this category. The Burger / Included reference is not shown to customers.</small>'+
+          '<input type="hidden" data-field="burger-anchor-option-id" value="'+esc(anchorOptionId)+'"></div>'
+        : (group.options.length
+          ? '<div class="fcv3-choice-list">'+group.options.map(option=>componentChoiceForm(option,group)).join('')+'</div>'
+          : '<div class="fcv3-choice-empty">No component choice configured.</div><button type="button" class="fcv3-button" data-action="component-choice-add">+ Add component choice</button>');
       return '<article class="fcv3-component-row" data-component-group data-group-index="'+index+'">'+(group.group_id?'<input type="hidden" data-field="group_id" value="'+esc(group.group_id)+'">':'')+
         '<div class="fcv3-component-grid"><label>Component group<input data-field="display_name" maxlength="120" required value="'+esc(group.display_name)+'"></label>'+
         '<label>Required quantity<input data-field="quantity" type="number" min="1" max="100" step="1" required value="'+esc(group.quantity||1)+'"></label>'+
-        '<label class="fcv3-check"><input type="checkbox" data-field="allow_repeat_option"'+(repeat?' checked':'')+'> Allow the same choice more than once</label>'+
+        '<label class="fcv3-check"><input type="checkbox" data-field="allow_repeat_option"'+(repeat?' checked':'')+'> Allow the same burger more than once</label>'+
         '<label>Maximum quantity per choice<input data-field="max_units_per_option" type="number" min="1" max="'+esc(group.quantity||1)+'" step="1" value="'+(repeat?esc(group.max_units_per_option??group.quantity??1):'')+'" '+(repeat?'required':'disabled')+'></label></div>'+
-        (repeat&&/burger/i.test(group.display_name)?'<small>For '+esc(group.quantity)+' burgers, set this to '+esc(group.quantity)+' so one burger can fill all required selections.</small>':'')+
-        '<div class="fcv3-choice-list">'+group.options.map(option=>componentChoiceForm(option,group)).join('')+'</div>'+
-        '<div class="fcv3-choice-actions"><button type="button" class="fcv3-button" data-action="component-choice-add">+ Add choice</button><small>Only Burger groups may contain multiple included choices.</small></div>'+
+        (repeat&&burger?'<small>For '+esc(group.quantity)+' burgers, set this to '+esc(group.quantity)+' so the same burger may fill every required slot.</small>':'')+
+        choiceEditor+
         '<button type="button" class="fcv3-button fcv3-danger" data-action="component-remove">Remove component group</button></article>';
     }
-    function readComponentGroups(form){
-      const groups=Array.from(form.querySelectorAll('[data-component-group]')).map(group=>({
-        group_id:group.querySelector('[data-field="group_id"]')?.value||null,
-        display_name:group.querySelector('[data-field="display_name"]').value,
-        quantity:Number(group.querySelector('[data-field="quantity"]').value),
-        allow_repeat_option:group.querySelector('[data-field="allow_repeat_option"]').checked,
-        max_units_per_option:group.querySelector('[data-field="allow_repeat_option"]').checked?Number(group.querySelector('[data-field="max_units_per_option"]').value):null,
-        options:Array.from(group.querySelectorAll('[data-choice-row]')).map(row=>({option_id:row.querySelector('[data-field="option_id"]')?.value||null,
-          product_id:row.querySelector('[data-field="product_id"]').value,product_variant_id:row.querySelector('[data-field="product_variant_id"]').value}))
-      }));
+    function readComponentGroups(form,options={}){
+      const validate=options.validate!==false;
+      const groups=Array.from(form.querySelectorAll('[data-component-group]')).map(group=>{
+        const displayName=group.querySelector('[data-field="display_name"]').value;
+        const burger=/burger/i.test(String(displayName||'')),anchor=burger?burgerCategoryAnchor():null;
+        const anchorOptionId=group.querySelector('[data-field="burger-anchor-option-id"]')?.value||null;
+        const choiceRows=Array.from(group.querySelectorAll('[data-choice-row]')).map(row=>({
+          option_id:row.querySelector('[data-field="option_id"]')?.value||null,
+          product_id:row.querySelector('[data-field="product_id"]').value,
+          product_variant_id:row.querySelector('[data-field="product_variant_id"]').value
+        }));
+        return {
+          group_id:group.querySelector('[data-field="group_id"]')?.value||null,
+          display_name:displayName,
+          quantity:Number(group.querySelector('[data-field="quantity"]').value),
+          allow_repeat_option:group.querySelector('[data-field="allow_repeat_option"]').checked,
+          max_units_per_option:group.querySelector('[data-field="allow_repeat_option"]').checked?Number(group.querySelector('[data-field="max_units_per_option"]').value):null,
+          options:burger?(anchor?[{option_id:anchorOptionId,product_id:anchor.product.id,product_variant_id:anchor.variant.id}]:[]):choiceRows
+        };
+      });
+      if(!validate)return groups;
       groups.forEach(group=>{
         if(!Number.isSafeInteger(group.quantity)||group.quantity<1)throw Error(group.display_name+' needs a valid required quantity.');
         if(group.allow_repeat_option){
@@ -326,13 +356,9 @@
             throw Error('Burger groups must set Maximum quantity per choice equal to the required burger quantity ('+group.quantity+').');
         }
         if(/burger/i.test(group.display_name)){
-          const eligible=new Map(eligibleChoiceProducts(s.products,s.categories,group.display_name).map(product=>[product.id,product]));
-          group.options.forEach(option=>{
-            const product=eligible.get(option.product_id);
-            if(!product)throw Error('Every Burger choice must use an active product in the Chicken Burgers category. Select a valid burger before saving.');
-            if(!product.variants.some(variant=>variant.id===option.product_variant_id&&variant.is_active!==false))
-              throw Error('A Burger choice must use an active variant belonging to its selected product.');
-          });
+          const anchor=burgerCategoryAnchor(),option=group.options[0];
+          if(!anchor||group.options.length!==1||option.product_id!==anchor.product.id||option.product_variant_id!==anchor.variant.id)
+            throw Error('Burger group must use the Chicken Burgers category source. Customer choices are loaded automatically from that category.');
         }
       });
       return groups;
@@ -659,24 +685,25 @@
           else if(a==='variant-add'){if(!s.editor.product)s.editor.product={variants:[]};s.editor.product.variants=s.editor.product.variants||[];s.editor.product.variants.push({size_key:'OPTION_'+(s.editor.product.variants.length+1),size_label:'Option '+(s.editor.product.variants.length+1),price:'',variant_kind:'standard',is_standalone_sellable:true,is_active:true,is_available:true});render();}
           else if(a==='variant-remove'){b.closest('[data-variant-row]')?.remove();}
           else if(a==='component-add'){
-             const form=el.querySelector('form[data-form="deal"]');if(form)s.components=readComponentGroups(form);
+             const form=el.querySelector('form[data-form="deal"]');if(form)s.components=readComponentGroups(form,{validate:false});
              s.components.push({display_name:'',quantity:1,allow_repeat_option:false,max_units_per_option:null,options:[{}]});render();
            }
            else if(a==='component-choice-add'){
-             const form=el.querySelector('form[data-form="deal"]');if(form)s.components=readComponentGroups(form);
+             const form=el.querySelector('form[data-form="deal"]');if(form)s.components=readComponentGroups(form,{validate:false});
              const index=Number(b.closest('[data-component-group]')?.dataset.groupIndex),group=s.components[index];
-             if(!group||!/burger/i.test(group.display_name))throw Error('Only Burger groups support multiple choices.');
-             if(group.options.length>=12)throw Error('A Burger group can contain at most 12 choices.');
+             if(!group||/burger/i.test(group.display_name))throw Error('Burger choices are loaded automatically from the Chicken Burgers category.');
+             if(group.options.length!==0)throw Error('This component already has a configured choice.');
              group.options.push({});render();
            }
            else if(a==='component-choice-remove'){
-             const form=el.querySelector('form[data-form="deal"]');if(form)s.components=readComponentGroups(form);
+             const form=el.querySelector('form[data-form="deal"]');if(form)s.components=readComponentGroups(form,{validate:false});
              const groupEl=b.closest('[data-component-group]'),index=Number(groupEl?.dataset.groupIndex);
              const choiceIndex=Array.from(groupEl.querySelectorAll('[data-choice-row]')).indexOf(b.closest('[data-choice-row]'));
-             if(s.components[index])s.components[index].options.splice(choiceIndex,1);render();
+             if(choiceIndex<0||!s.components[index]||!s.components[index].options[choiceIndex])throw Error('The selected component choice could not be found.');
+             s.components[index].options.splice(choiceIndex,1);render();
            }
            else if(a==='component-remove'){
-             const form=el.querySelector('form[data-form="deal"]');if(form)s.components=readComponentGroups(form);
+             const form=el.querySelector('form[data-form="deal"]');if(form)s.components=readComponentGroups(form,{validate:false});
              const index=Number(b.closest('[data-component-group]')?.dataset.groupIndex);s.components.splice(index,1);render();
            }
            else if(a==='editor-cancel'){s.editor=null;render();}

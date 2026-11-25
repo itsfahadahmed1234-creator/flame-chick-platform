@@ -87,3 +87,13 @@
   .fcv3-choice-row>.fcv3-choice-help,
   .fcv3-choice-row>.fcv3-button{grid-column:1}
 }
+
+
+.fcv3-choice-source{
+  display:flex;flex-direction:column;gap:5px;
+  padding:12px 14px;border:1px solid var(--line);border-radius:10px;
+  background:var(--surface-soft,rgba(127,127,127,.06));min-width:0;
+}
+.fcv3-choice-source strong{font-size:13px}
+.fcv3-choice-source span{font-weight:650}
+.fcv3-choice-source small,.fcv3-choice-empty{color:var(--muted);line-height:1.5}
