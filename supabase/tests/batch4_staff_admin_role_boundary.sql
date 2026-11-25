@@ -33,7 +33,7 @@ BEGIN
   VALUES(v_restaurant_id,'Flame Chick QA','flame-chick','PKR','Asia/Karachi',true);
 
   INSERT INTO public.branches(id,restaurant_id,branch_code,name,is_active,timezone)
-  VALUES(v_branch_id,v_restaurant_id,'qa-main','QA Main',true,'Asia/Karachi');
+  VALUES(v_branch_id,v_restaurant_id,'main','Main',true,'Asia/Karachi');
 
   -- Pass fixture identifiers through transaction-local settings so the
   -- authenticated test never queries private tenant tables directly.
@@ -133,6 +133,23 @@ BEGIN
   IF v_result->>'ok' IS DISTINCT FROM 'true' THEN
     RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_ASSIGNMENT_FAILED';
   END IF;
+
+  -- The server must reject a caller-supplied branch other than Main, even when
+  -- an authenticated Admin invokes the role command directly.
+  BEGIN
+    PERFORM public.flame_chick_staff_admin_command('assign_role',pg_catalog.jsonb_build_object(
+      'target_user_id','a3333333-3333-4333-8333-333333333333',
+      'role_key','manager','branch_ids',pg_catalog.jsonb_build_array('f3333333-3333-4333-8333-333333333333'),
+      'request_id','b6666666-6666-4666-8666-666666666666',
+      'reason','Main branch enforcement test'
+    ));
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_NON_MAIN_BRANCH_WAS_ACCEPTED';
+  EXCEPTION WHEN SQLSTATE '22023' THEN
+    GET STACKED DIAGNOSTICS v_message=MESSAGE_TEXT;
+    IF v_message IS DISTINCT FROM 'STAFF_MAIN_BRANCH_FIXED' THEN
+      RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_WRONG_NON_MAIN_DENIAL: %',v_message;
+    END IF;
+  END;
 END
 $assign$;
 
@@ -219,6 +236,68 @@ END
 $no_identity$;
 
 RESET ROLE;
+
+-- Rider assignment creates a branch-matched profile in the same transaction.
+DO $rider_profile$
+DECLARE
+  v_branch_id uuid:=pg_catalog.current_setting('test.staff_branch_id')::uuid;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.rider_profiles rp
+    WHERE rp.user_id='a5555555-5555-4555-8555-555555555555'
+      AND rp.restaurant_id=pg_catalog.current_setting('test.staff_restaurant_id')::uuid
+      AND rp.branch_id=v_branch_id
+      AND rp.rider_code='R-A5555555'
+      AND rp.display_name='QA Staff Rider'
+      AND rp.availability_status='offline'
+      AND rp.accepting_jobs
+      AND rp.is_active
+  ) THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_PROFILE_NOT_PROVISIONED';
+  END IF;
+END
+$rider_profile$;
+
+-- Rider deactivation synchronizes the delivery profile and turns off offers.
+SET LOCAL ROLE authenticated;
+SELECT pg_catalog.set_config('request.jwt.claim.role','authenticated',true);
+SELECT pg_catalog.set_config('request.jwt.claim.sub','a1111111-1111-4111-8111-111111111111',true);
+DO $deactivate_rider$
+DECLARE
+  v_role_id uuid;
+  v_result jsonb;
+BEGIN
+  SELECT id INTO v_role_id FROM public.user_roles
+  WHERE user_id='a5555555-5555-4555-8555-555555555555'
+    AND role_key='rider' AND is_active;
+  IF v_role_id IS NULL THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_ROLE_NOT_FOUND_FOR_DEACTIVATION';
+  END IF;
+  v_result:=public.flame_chick_staff_admin_command('deactivate_role',pg_catalog.jsonb_build_object(
+    'role_id',v_role_id,
+    'request_id','b7777777-7777-4777-8777-777777777777',
+    'reason','Rider profile deactivation test'
+  ));
+  IF v_result->>'ok' IS DISTINCT FROM 'true' THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_DEACTIVATION_FAILED';
+  END IF;
+END
+$deactivate_rider$;
+RESET ROLE;
+
+DO $rider_profile_disabled$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.rider_profiles rp
+    WHERE rp.user_id='a5555555-5555-4555-8555-555555555555'
+      AND NOT rp.is_active
+      AND rp.availability_status='offline'
+      AND NOT rp.accepting_jobs
+  ) THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_PROFILE_DEACTIVATION_NOT_SYNCED';
+  END IF;
+END
+$rider_profile_disabled$;
 
 -- Structural checks: no direct table access, no anon/staff Admin execute, and
 -- no Realtime publication membership for staff identity or audit tables.
