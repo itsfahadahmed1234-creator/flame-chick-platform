@@ -163,7 +163,7 @@ test("every V3 product card opens a product popup while a separate direct Add ac
   assert.match(order, /product\.variants\.forEach\(function \(row\)/);
   assert.match(order, /cardPrice\(row\.priceMinor\)/);
   assert.match(order, /quantity: qty/);
-  assert.match(order, /modifiers: validation\\.selections/);
+  assert.ok(order.includes("modifiers: validation.selections"));
 });
 
 test("deal choice configurator is hosted inside a modal, not as a separate homepage section", () => {
