@@ -239,7 +239,7 @@ test('deal read-back verifier rejects altered prices, components, surcharge mapp
       group: { ...base.component_groups[0].group, min_units: 2, max_units: 2 },
       options: [option]
     }]
-  }, expected), /component failed read-back/i);
+  }, expected), /component group failed read-back/i);
 });
 
 
