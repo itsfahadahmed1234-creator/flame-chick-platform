@@ -3,12 +3,6 @@ name: Deploy Flame Chick POS Preview
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - work/production-source-audit
-    paths:
-      - "apps/flame-chick-pos/**"
-      - ".github/workflows/deploy-flame-chick-pos-preview.yml"
 
 permissions:
   contents: read
@@ -23,7 +17,8 @@ jobs:
     # This workflow is pinned to the working branch and always targets Preview.
     if: >-
       github.ref == 'refs/heads/work/production-source-audit' &&
-      vars.FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED == 'true'
+      vars.FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED == 'true' &&
+      vars.FLAME_CHICK_POS_PREVIEW_PROJECT_READY == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
