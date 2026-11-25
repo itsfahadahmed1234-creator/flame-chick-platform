@@ -5287,3 +5287,21 @@ QZ Tray source integration is staged on `work/production-source-audit`: public c
 The leaf certificate key pair and root chain were verified. Sensitive `QZ_SIGNING_PRIVATE_KEY` exists only in Vercel Preview environment scoped to this working branch; no private key is in GitHub or the restaurant package.
 
 **Release blocker:** Vercel Preview deployment creation returned HTTP 402 `api-deployments-free-per-day` (daily API deployment quota exceeded; retry after 24 hours). No Preview deployment was created; the new code has not been runtime-tested. Production deployment/domain aliases remain unchanged. Do not install/trust the certificate or enable direct printing on the restaurant PC until a Preview is deployed and the signer handshake passes. After that, physically test Generic / Text Only and ask user to confirm output before any Production release. Flame Chick remains pre-launch.
+
+
+---
+
+## 2026-11-25 — Alternate Vercel POS Preview deployment path
+
+- Context: the connected Vercel Hobby team `befahad1234-7050` uses GitHub login namespace `befahad1234-cmyk`. The Flame Chick source repository `itsfahadahmed1234-creator/flame-chick-platform` is owned by a different personal GitHub account; the Vercel-connected identity is only a collaborator. Native Vercel Import Git Repository does not expose the Flame Chick repository under this ownership/connection arrangement. Do not disconnect HFP's existing GitHub connection.
+- Existing Vercel team: `team_lrFy9ILYEz9umsBy98GCyQjI` (Hobby / Free).
+- Isolated Preview project created in this team: `flamechickpos`, project ID `prj_Ce8GbSsG5VZApCyEVCh9zC0qfeRv`, root intended as `apps/flame-chick-pos`. It currently has no deployment and no custom domains. Deployment protection shows SSO enabled; do not weaken it. Do not add `flamechickpos.vercel.app` or any production aliases here.
+- User created a Vercel access token in the `befahad...` account and confirmed adding it as the GitHub repository Actions secret `VERCEL_TOKEN`. Never retrieve, print, store or commit its value. Token scope/validity has not been independently read.
+- Preview workflow `.github/workflows/deploy-flame-chick-pos-preview.yml` on `work/production-source-audit` is configured for manual dispatch and pushes affecting POS source/workflow. It runs only on that branch and requires repository variable `FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED == 'true'`. It writes a temporary `.vercel/project.json` pinned to the Preview project ID/team ID, runs Vercel CLI `65.17.0` with explicit `--target=preview`, and does not attach aliases or promote Production.
+- Workflow code corrections committed:
+  - `457e338837b8a11e5ca03e4c1d15f4de9976dc10` — point at new team/project, manual dispatch, correct paths.
+  - `850a8719503aa64d85c1a1eebb66268008f8e4c8` — fix shell escaping in Preview URL parsing.
+  - `b291816e183794a23f686ea6bef1635cc82f2809` — remove conflicting GitHub Environment secret scope and explicitly write the intended project link at run time.
+- Current status: workflow remains fail-closed because repository variable has not yet been enabled. No GitHub Actions run was triggered; no Vercel deployment, domain assignment, production alias change, production migration, Supabase mutation or real order occurred in this setup stage.
+- Next step: in repository Settings → Secrets and variables → Actions → Variables, create repository variable `FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED` with value `true`. Then use Actions → Deploy Flame Chick POS Preview → Run workflow, selecting `work/production-source-audit`. Verify the job's Vercel target is Preview and record the generated Preview URL/commit. If the run fails, inspect build logs before any retries.
+- Preserve all production boundaries: no main/master merge; no production target or alias; no custom domain change; no service-role secrets in client; no Production Supabase writes/test orders; GST deferred; Free plans only unless explicitly approved.
