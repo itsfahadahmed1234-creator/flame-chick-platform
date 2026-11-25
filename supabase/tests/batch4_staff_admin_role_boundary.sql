@@ -12,6 +12,7 @@ DECLARE
   v_manager uuid := 'a3333333-3333-4333-8333-333333333333';
   v_cashier uuid := 'a4444444-4444-4444-8444-444444444444';
   v_rider uuid := 'a5555555-5555-4555-8555-555555555555';
+  v_invited_rider uuid := 'a6666666-6666-4666-8666-666666666666';
   v_now timestamptz := pg_catalog.transaction_timestamp();
 BEGIN
   IF current_user <> 'postgres' OR session_user <> 'postgres' THEN
@@ -39,6 +40,7 @@ BEGIN
   -- authenticated test never queries private tenant tables directly.
   PERFORM pg_catalog.set_config('test.staff_restaurant_id',v_restaurant_id::text,true);
   PERFORM pg_catalog.set_config('test.staff_branch_id',v_branch_id::text,true);
+  PERFORM pg_catalog.set_config('test.staff_invited_rider_id',v_invited_rider::text,true);
 
   IF EXISTS(SELECT 1 FROM public.user_roles WHERE restaurant_id=v_restaurant_id) THEN
     RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_FIXTURE_EXPECTS_EMPTY_LOCAL_STAFF';
@@ -58,6 +60,8 @@ BEGIN
     (v_cashier,'authenticated','authenticated','qa-staff-admin-cashier@example.invalid','',v_now,
       '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,false,false),
     (v_rider,'authenticated','authenticated','qa-staff-admin-rider@example.invalid','',v_now,
+      '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,false,false),
+    (v_invited_rider,'authenticated','authenticated','qa-staff-admin-invited-rider@example.invalid','',v_now,
       '{"provider":"email","providers":["email"]}'::jsonb,'{}'::jsonb,v_now,v_now,false,false);
 
   INSERT INTO public.user_profiles(user_id,display_name,is_active)
@@ -151,8 +155,41 @@ BEGIN
       RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_WRONG_NON_MAIN_DENIAL: %',v_message;
     END IF;
   END;
+
+  -- Admin can invite a Rider without supplying a branch. The database resolves
+  -- the sole active Main branch and stores it as the invitation's target.
+  v_result:=public.flame_chick_staff_admin_command('begin_invitation',pg_catalog.jsonb_build_object(
+    'display_name','QA Invited Rider',
+    'email','qa-staff-admin-invited-rider@example.invalid',
+    'phone',NULL,
+    'role_key','rider',
+    'branch_ids','[]'::jsonb,
+    'request_id','b8888888-8888-4888-8888-888888888888',
+    'reason','Disposable automatic Main invitation fixture'
+  ));
+  IF v_result->>'ok' IS DISTINCT FROM 'true'
+     OR v_result->'branch_ids'<>pg_catalog.jsonb_build_array(v_branch_id::text) THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_MAIN_RIDER_INVITATION_FAILED';
+  END IF;
 END
 $assign$;
+
+-- A confirmed invited account accepts by its exact email. This must create both
+-- its Rider role row and its Main-branch Rider profile atomically.
+SELECT pg_catalog.set_config('request.jwt.claim.sub','a6666666-6666-4666-8666-666666666666',true);
+DO $accept_invitation$
+DECLARE
+  v_result jsonb;
+BEGIN
+  v_result:=public.flame_chick_staff_admin_command('accept_invitation','{}'::jsonb);
+  IF v_result->>'ok' IS DISTINCT FROM 'true'
+     OR v_result->>'status' IS DISTINCT FROM 'accepted'
+     OR v_result->>'role_key' IS DISTINCT FROM 'rider' THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_INVITATION_ACCEPTANCE_FAILED';
+  END IF;
+END
+$accept_invitation$;
+SELECT pg_catalog.set_config('request.jwt.claim.sub','a1111111-1111-4111-8111-111111111111',true);
 
 -- Admin and Owner may read the private Staff Admin context.
 DO $positive$
@@ -185,7 +222,8 @@ BEGIN
     SELECT * FROM (VALUES
       ('a3333333-3333-4333-8333-333333333333'::uuid,'manager'::text),
       ('a4444444-4444-4444-8444-444444444444'::uuid,'cashier'::text),
-      ('a5555555-5555-4555-8555-555555555555'::uuid,'rider'::text)
+      ('a5555555-5555-4555-8555-555555555555'::uuid,'rider'::text),
+      ('a6666666-6666-4666-8666-666666666666'::uuid,'rider'::text)
     ) roles(actor_id,role_key)
   LOOP
     PERFORM pg_catalog.set_config('request.jwt.claim.sub',v_actor::text,true);
@@ -255,6 +293,19 @@ BEGIN
       AND rp.is_active
   ) THEN
     RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_PROFILE_NOT_PROVISIONED';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.rider_profiles rp
+    WHERE rp.user_id='a6666666-6666-4666-8666-666666666666'
+      AND rp.restaurant_id=pg_catalog.current_setting('test.staff_restaurant_id')::uuid
+      AND rp.branch_id=v_branch_id
+      AND rp.rider_code='R-A6666666'
+      AND rp.display_name='QA Invited Rider'
+      AND rp.availability_status='offline'
+      AND rp.accepting_jobs
+      AND rp.is_active
+  ) THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_ACCEPTED_RIDER_PROFILE_NOT_PROVISIONED';
   END IF;
 END
 $rider_profile$;
