@@ -1028,7 +1028,7 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
     },200);
   }
 
-  if(action==="create_website_order"){
+  if(action==="create_website_order"||action==="place_website_order"){
     const requestId=typeof body.request_id==="string"?body.request_id.trim():
       typeof body.idempotency_key==="string"?body.idempotency_key.trim():"";
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)){
@@ -1059,18 +1059,23 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
 
     const quote=await buildWebsiteOrderQuote(body);
     if(!quote.ok)return response(quote.body,quote.status);
-    const quoteCheck=await verifyWebsiteOrderQuoteToken({
-      token:typeof body.quote_token==="string"?body.quote_token:"",
-      canonical:quote.quote.canonical,
-      databaseNow:quote.quote.databaseNow,
-      secret:WEBSITE_QUOTE_SECRET
-    });
-    if(!quoteCheck.ok){
-      const status=quoteCheck.code==="WEBSITE_ORDER_QUOTE_SIGNING_UNAVAILABLE"?503:409;
-      const message=quoteCheck.code==="WEBSITE_ORDER_QUOTE_EXPIRED"
-        ?"Your quote expired. Request a new verified total before placing the order."
-        :"The order details or delivery fee changed after the quote. Review a fresh verified total before placing the order.";
-      return response({ok:false,error:{code:quoteCheck.code,message}},status);
+    // Legacy two-step clients must present the signed quote. The customer Website
+    // uses place_website_order: this request freshly prices the cart and commits it
+    // immediately, so a browser-held quote token is neither needed nor accepted.
+    if(action==="create_website_order"){
+      const quoteCheck=await verifyWebsiteOrderQuoteToken({
+        token:typeof body.quote_token==="string"?body.quote_token:"",
+        canonical:quote.quote.canonical,
+        databaseNow:quote.quote.databaseNow,
+        secret:WEBSITE_QUOTE_SECRET
+      });
+      if(!quoteCheck.ok){
+        const status=quoteCheck.code==="WEBSITE_ORDER_QUOTE_SIGNING_UNAVAILABLE"?503:409;
+        const message=quoteCheck.code==="WEBSITE_ORDER_QUOTE_EXPIRED"
+          ?"Your quote expired. Request a fresh order before submitting."
+          :"The order details or delivery fee changed. Review your cart and submit again.";
+        return response({ok:false,error:{code:quoteCheck.code,message}},status);
+      }
     }
     const phoneDigest=await hmacPhoneDigest(normalizedPhone);
     if(!phoneDigest){
@@ -1253,7 +1258,7 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
     return response(result.data, 200);
   }
 
-  return response({ ok: false, error: { code: "ACTION_NOT_FOUND", message: "Supported actions are website_context (GET), quote_website_order, create_website_order, sync_pos_order, collect_payment, update_status, cancel and reject." } }, 404);
+  return response({ ok: false, error: { code: "ACTION_NOT_FOUND", message: "Supported actions are website_context (GET), quote_website_order, create_website_order, place_website_order, sync_pos_order, collect_payment, update_status, cancel and reject." } }, 404);
 }
 
 if (import.meta.main) {
