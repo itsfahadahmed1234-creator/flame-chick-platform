@@ -40,3 +40,12 @@
 .fcv3-detail{display:grid;gap:8px}.fcv3-detail h3{margin:0}.fcv3-detail small{color:var(--muted)}
 @media(max-width:800px){.fcv3-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.fcv3-variant-grid,.fcv3-component-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.fcv3-head,.fcv3-toolbar,.fcv3-subhead{align-items:flex-start;flex-direction:column}}
 @media(max-width:520px){.fcv3-form-grid,.fcv3-variant-grid,.fcv3-component-grid{grid-template-columns:1fr}.fcv3-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.fcv3-head{padding:14px}}
+
+.fcv3-choice-list{display:grid;gap:9px;margin:10px 0}
+.fcv3-choice-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:end;gap:10px;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+.fcv3-choice-row .fcv3-button{min-height:36px}
+.fcv3-choice-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0 12px}
+.fcv3-choice-actions small{color:var(--muted);font-size:11px;line-height:1.4}
+.fcv3-component-row>.fcv3-danger{margin-top:8px}
+@media(max-width:800px){.fcv3-choice-row{grid-template-columns:repeat(2,minmax(0,1fr))}.fcv3-choice-row>.fcv3-button{grid-column:1/-1;justify-self:start}}
+@media(max-width:520px){.fcv3-choice-row{grid-template-columns:1fr}.fcv3-choice-row>.fcv3-button{grid-column:auto}}

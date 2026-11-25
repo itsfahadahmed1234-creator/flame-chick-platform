@@ -70,48 +70,52 @@ test('product variants are unique and standalone pricing is not confused with de
   }), /unique valid key/i);
 });
 
-test('current deal editor produces only fixed component groups with one linked option each', () => {
+test('fixed deal editor supports multiple INCLUDED burger choices while preserving fixed quantity and repeat policy', () => {
   const result = admin.buildFixedComponentGroups([
-    { display_name: 'Burger', product_variant_id: '20000000-0000-4000-8000-000000000001', quantity: 2 },
-    { display_name: 'Quarter Broast', product_variant_id: '20000000-0000-4000-8000-000000000002', quantity: 1 }
+    { display_name: 'Burger', quantity: 2, allow_repeat_option: true, max_units_per_option: 2, options: [
+      { product_variant_id: '20000000-0000-4000-8000-000000000001' },
+      { product_variant_id: '20000000-0000-4000-8000-000000000002' },
+      { product_variant_id: '20000000-0000-4000-8000-000000000003' }
+    ] },
+    { display_name: 'Quarter Broast', quantity: 1, allow_repeat_option: false, options: [
+      { product_variant_id: '20000000-0000-4000-8000-000000000004' }
+    ] }
   ]);
   assert.deepEqual(result.groups.map(group => ({
-    name: group.name_en,
-    min: group.min_units,
-    max: group.max_units,
-    repeat: group.allow_repeat_option,
-    maxPerOption: group.max_units_per_option,
-    optionCount: group.options.length,
-    active: group.is_active
+    name: group.name_en, min: group.min_units, max: group.max_units, repeat: group.allow_repeat_option,
+    maxPerOption: group.max_units_per_option, optionCount: group.options.filter(x => x.is_active).length, active: group.is_active
   })), [
-    { name: 'Burger', min: 2, max: 2, repeat: true, maxPerOption: 2, optionCount: 1, active: true },
+    { name: 'Burger', min: 2, max: 2, repeat: true, maxPerOption: 2, optionCount: 3, active: true },
     { name: 'Quarter Broast', min: 1, max: 1, repeat: false, maxPerOption: null, optionCount: 1, active: true }
   ]);
+  assert.throws(() => admin.buildFixedComponentGroups([{display_name:'Cold Drink',quantity:1,options:[
+    {product_variant_id:'20000000-0000-4000-8000-000000000005'},
+    {product_variant_id:'20000000-0000-4000-8000-000000000006'}
+  ]}]),/Only Burger groups/);
 });
 
-test('fixed deal mapping builder enforces INCLUDED treatment and zero surcharge only', () => {
+test('fixed deal mapping builder creates one INCLUDED zero-surcharge mapping per burger choice', () => {
+  const burgerOne = { id:'30000000-0000-4000-8000-000000000001',product_variant_id:'20000000-0000-4000-8000-000000000001',is_active:true };
+  const burgerTwo = { id:'30000000-0000-4000-8000-000000000002',product_variant_id:'20000000-0000-4000-8000-000000000002',is_active:true };
+  const drink = { id:'30000000-0000-4000-8000-000000000003',product_variant_id:'20000000-0000-4000-8000-000000000003',is_active:true };
   const detail = {
     component_groups: [
-      { group: { name_en: 'Burger', min_units: 2, max_units: 2, is_active: true }, options: [{ id: '30000000-0000-4000-8000-000000000001', is_active: true }] },
-      { group: { name_en: 'Cold Drink', min_units: 2, max_units: 2, is_active: true }, options: [{ id: '30000000-0000-4000-8000-000000000002', is_active: true }] }
+      { group:{name_en:'Burger',min_units:2,max_units:2,allow_repeat_option:true,max_units_per_option:2,is_active:true},options:[burgerOne,burgerTwo] },
+      { group:{name_en:'Cold Drink',min_units:2,max_units:2,allow_repeat_option:true,max_units_per_option:2,is_active:true},options:[drink] }
     ],
-    variants: [{ variant: { id: '40000000-0000-4000-8000-000000000001', pricing_mode: 'FIXED_BUNDLE' } }]
+    variants:[{variant:{id:'40000000-0000-4000-8000-000000000001',pricing_mode:'FIXED_BUNDLE'}}]
   };
-  const mapping = admin.buildIncludedMappings(detail);
-  assert.equal(mapping.options.length, 2);
-  assert.ok(mapping.options.every(option =>
-    option.pricing_treatment === 'INCLUDED' &&
-    option.unit_surcharge === 0 &&
-    option.is_active === true
-  ));
-  assert.deepEqual(mapping.options.map(option => option.max_quantity_per_deal), [2, 2]);
+  const mapping=admin.buildIncludedMappings(detail);
+  assert.equal(mapping.options.length,3);
+  assert.ok(mapping.options.every(option=>option.pricing_treatment==='INCLUDED'&&option.unit_surcharge===0&&option.is_active===true));
+  assert.deepEqual(mapping.options.map(option=>option.max_quantity_per_deal),[2,2,2]);
 });
 
 test('mapping builder fails closed for missing component options or non-fixed deal variants', () => {
   assert.throws(() => admin.buildIncludedMappings({
     component_groups: [{ group: { min_units: 1, max_units: 1, is_active: true }, options: [] }],
     variants: [{ variant: { id: '40000000-0000-4000-8000-000000000001', pricing_mode: 'FIXED_BUNDLE' } }]
-  }), /exactly one linked product variant/i);
+  }), /at least one linked choice/i);
 
   assert.throws(() => admin.buildIncludedMappings({
     component_groups: [],
@@ -157,45 +161,34 @@ test('deal inspection renders the exact product-name field returned by the datab
 });
 
 
-test('deal read-back verifier requires exact fixed contents and INCLUDED mappings before and after activation', () => {
-  const optionA = {
-    id: '30000000-0000-4000-8000-000000000001',
-    product_variant_id: '20000000-0000-4000-8000-000000000001',
-    is_active: true
-  };
-  const optionB = {
-    id: '30000000-0000-4000-8000-000000000002',
-    product_variant_id: '20000000-0000-4000-8000-000000000002',
-    is_active: true
-  };
-  const detail = active => ({
-    deal: { is_active: active },
-    component_groups: [
-      { group: { name_en: 'Burger', min_units: 2, max_units: 2, is_active: true }, options: [optionA] },
-      { group: { name_en: 'Quarter Broast', min_units: 1, max_units: 1, is_active: true }, options: [optionB] }
+test('deal read-back verifier checks every burger choice and INCLUDED mapping before and after activation', () => {
+  const optionA={id:'30000000-0000-4000-8000-000000000001',product_variant_id:'20000000-0000-4000-8000-000000000001',is_active:true};
+  const optionC={id:'30000000-0000-4000-8000-000000000003',product_variant_id:'20000000-0000-4000-8000-000000000003',is_active:true};
+  const optionB={id:'30000000-0000-4000-8000-000000000002',product_variant_id:'20000000-0000-4000-8000-000000000002',is_active:true};
+  const detail=active=>({
+    deal:{is_active:active},
+    component_groups:[
+      {group:{name_en:'Burger',min_units:2,max_units:2,allow_repeat_option:true,max_units_per_option:2,is_active:true},options:[optionA,optionC]},
+      {group:{name_en:'Quarter Broast',min_units:1,max_units:1,allow_repeat_option:false,max_units_per_option:null,is_active:true},options:[optionB]}
     ],
-    variants: [{
-      variant: { id: '40000000-0000-4000-8000-000000000001', pricing_mode: 'FIXED_BUNDLE', base_price: 2099, is_active: active },
-      allowed_options: [
-        { component_option_id: optionA.id, product_variant_id: optionA.product_variant_id, is_active: true, pricing_treatment: 'INCLUDED', unit_surcharge: 0, max_quantity_per_deal: 2 },
-        { component_option_id: optionB.id, product_variant_id: optionB.product_variant_id, is_active: true, pricing_treatment: 'INCLUDED', unit_surcharge: 0, max_quantity_per_deal: 1 }
-      ]
-    }],
-    schedule_assignments: [{
-      branch_id: null, schedule_set_id: '50000000-0000-4000-8000-000000000001', is_active: true
-    }]
+    variants:[{variant:{id:'40000000-0000-4000-8000-000000000001',pricing_mode:'FIXED_BUNDLE',base_price:2099,is_active:active},
+      allowed_options:[
+        {component_option_id:optionA.id,product_variant_id:optionA.product_variant_id,is_active:true,pricing_treatment:'INCLUDED',unit_surcharge:0,max_quantity_per_deal:2},
+        {component_option_id:optionC.id,product_variant_id:optionC.product_variant_id,is_active:true,pricing_treatment:'INCLUDED',unit_surcharge:0,max_quantity_per_deal:2},
+        {component_option_id:optionB.id,product_variant_id:optionB.product_variant_id,is_active:true,pricing_treatment:'INCLUDED',unit_surcharge:0,max_quantity_per_deal:1}
+      ]}],
+    schedule_assignments:[{branch_id:null,schedule_set_id:'50000000-0000-4000-8000-000000000001',is_active:true}]
   });
-  const expected = {
-    basePrice: 2099,
-    components: [
-      { display_name: 'Burger', product_variant_id: optionA.product_variant_id, quantity: 2 },
-      { display_name: 'Quarter Broast', product_variant_id: optionB.product_variant_id, quantity: 1 }
+  const expected={
+    basePrice:2099,
+    components:[
+      {display_name:'Burger',quantity:2,allow_repeat_option:true,max_units_per_option:2,options:[{product_variant_id:optionA.product_variant_id},{product_variant_id:optionC.product_variant_id}]},
+      {display_name:'Quarter Broast',quantity:1,allow_repeat_option:false,max_units_per_option:null,options:[{product_variant_id:optionB.product_variant_id}]}
     ],
-    flameHour: true,
-    scheduleId: '50000000-0000-4000-8000-000000000001'
+    flameHour:true,scheduleId:'50000000-0000-4000-8000-000000000001'
   };
-  assert.equal(admin.verifyFixedDealDetail(detail(false), { ...expected, active: false }), true);
-  assert.equal(admin.verifyFixedDealDetail(detail(true), { ...expected, active: true }), true);
+  assert.equal(admin.verifyFixedDealDetail(detail(false),{...expected,active:false}),true);
+  assert.equal(admin.verifyFixedDealDetail(detail(true),{...expected,active:true}),true);
 });
 
 test('deal read-back verifier rejects altered prices, components, surcharge mappings and missing Flame Hour schedule', () => {
@@ -293,7 +286,7 @@ test('fixed-deal edit mapping builder keeps active INCLUDED maps and deactivates
     product_variant_id: '63000000-0000-4000-8000-000000000002', is_active: false };
   const detail = {
     component_groups: [
-      { group: { id: '61000000-0000-4000-8000-000000000001', is_active: true, min_units: 3, max_units: 3 },
+      { group: { id: '61000000-0000-4000-8000-000000000001', is_active: true, min_units: 3, max_units: 3, allow_repeat_option: true, max_units_per_option: 3 },
         options: [optionOne] },
       { group: { id: '61000000-0000-4000-8000-000000000002', is_active: false, min_units: 1, max_units: 1 },
         options: [optionTwo] }
@@ -357,10 +350,24 @@ test('fixed-deal editor loads only single-option INCLUDED bundles and preserves 
   assert.equal(result.dealDraft.scheduleId,scheduleId);
   assert.deepEqual(result.components,[{
     group_id:'61000000-0000-4000-8000-000000000001',
-    option_id:optionId,display_name:'Burger',
-    product_id:'69000000-0000-4000-8000-000000000001',
-    product_variant_id:productVariantId,quantity:1
+    display_name:'Burger',quantity:1,allow_repeat_option:false,max_units_per_option:null,
+    options:[{option_id:optionId,product_id:'69000000-0000-4000-8000-000000000001',product_variant_id:productVariantId}]
   }]);
+});
+test('fixed-deal editor loads multiple included Burger choices', () => {
+  const optionA={id:'62000000-0000-4000-8000-000000000001',product_id:'69000000-0000-4000-8000-000000000001',product_variant_id:'63000000-0000-4000-8000-000000000001',is_active:true};
+  const optionB={id:'62000000-0000-4000-8000-000000000002',product_id:'69000000-0000-4000-8000-000000000002',product_variant_id:'63000000-0000-4000-8000-000000000002',is_active:true};
+  const detail={
+    deal:{id:'66000000-0000-4000-8000-000000000002',collection_id:'68000000-0000-4000-8000-000000000001',title:'Flame Duo',is_active:true,is_available:true},
+    component_groups:[{group:{id:'61000000-0000-4000-8000-000000000002',name_en:'Burger',min_units:2,max_units:2,allow_repeat_option:true,max_units_per_option:2,is_active:true},options:[optionA,optionB]}],
+    variants:[{variant:{id:'64000000-0000-4000-8000-000000000002',pricing_mode:'FIXED_BUNDLE',base_price:2099,is_active:true},
+      allowed_options:[optionA,optionB].map((option,index)=>({id:'65000000-0000-4000-8000-00000000000'+(index+1),component_option_id:option.id,product_variant_id:option.product_variant_id,pricing_treatment:'INCLUDED',unit_surcharge:0,max_quantity_per_deal:2,is_active:true}))}],
+    schedule_assignments:[]
+  };
+  const result=admin.buildFixedDealEditDraft(detail);
+  assert.equal(result.components[0].options.length,2);
+  assert.equal(result.components[0].allow_repeat_option,true);
+  assert.deepEqual(result.components[0].options.map(option=>option.product_variant_id),[optionA.product_variant_id,optionB.product_variant_id]);
 });
 
 test('fixed-deal editor refuses variable, selectable, surcharge or branch-specific deal configurations', () => {
@@ -379,7 +386,7 @@ test('fixed-deal editor refuses variable, selectable, surcharge or branch-specif
   };
   assert.throws(()=>admin.buildFixedDealEditDraft({
     ...deal,component_groups:[{...deal.component_groups[0],group:{...deal.component_groups[0].group,max_units:2}}]
-  }),/variable component structure/i);
+  }),/variable component quantity/i);
   assert.throws(()=>admin.buildFixedDealEditDraft({
     ...deal,variants:[{...deal.variants[0],allowed_options:[{...deal.variants[0].allowed_options[0],
       pricing_treatment:'SURCHARGE',unit_surcharge:50}]}]
