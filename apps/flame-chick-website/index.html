@@ -332,7 +332,7 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
         <a href="#how" data-act="go" data-target="#how">How to order</a>
         <a href="#menu" class="nav-order-online" data-act="go" data-target="#menu">Order Online</a>
       </nav>
-      <button class="btn btn-cart" id="headCart" type="button" data-act="go" data-target="#fc-cart-panel" aria-label="Go to your cart">
+      <button class="btn btn-cart" id="headCart" type="button" aria-label="Open your cart" aria-controls="fc-v3-cart-drawer" aria-expanded="false">
         <svg class="ic" aria-hidden="true"><use href="#i-bag"/></svg><span>Cart</span><b class="badge" id="badge">0</b>
       </button>
     </div>
@@ -375,11 +375,6 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
         <p id="connection-message" class="fc-home-status-message" role="status" aria-live="polite">Verifying the published menu and order availability…</p>
         <div id="publication-meta" class="fc-home-publication" hidden></div><button id="reload-catalog" class="fc-home-secondary" type="button">Reload menu</button>
       </section>
-      <section class="fc-home-context wrap" aria-labelledby="context-heading">
-        <p class="fc-home-kicker">Choose your order</p><h3 id="context-heading">Branch and fulfilment</h3>
-        <div id="branch-selector" class="branch-selector"></div>
-        <p id="catalog-context-label" class="fc-home-context-label" role="status" aria-live="polite">Choose a branch and delivery or pickup to see the current menu.</p>
-      </section>
       <section id="catalog-section" class="fc-home-catalog" hidden>
         <div class="cats" id="cats" hidden><div class="wrap cats-in" id="catsIn" aria-label="Menu categories"></div></div>
         <div class="wrap" id="menuRoot"></div>
@@ -388,32 +383,6 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
           <div class="cat-head"><h3 class="cat-pill" id="deals-heading">Deals</h3><span class="cat-line" aria-hidden="true"></span></div>
           <div id="deal-catalog"></div><p id="deals-empty" class="fc-home-empty" hidden>No deals are currently published for this branch.</p>
         </section>
-        <section id="details-section" class="fc-home-details wrap" hidden aria-labelledby="details-heading">
-          <p class="fc-home-kicker">Checkout details</p><h3 id="details-heading">Your details</h3>
-          <div class="fc-home-fields">
-            <div class="fc-home-field"><label for="customer-name">Full name</label><input id="customer-name" maxlength="160" autocomplete="name" required></div>
-            <div class="fc-home-field"><label for="customer-phone">Phone number</label><input id="customer-phone" type="tel" maxlength="32" autocomplete="tel" placeholder="03xx xxxxxxx" required></div>
-            <div class="fc-home-field fc-home-full"><label for="customer-email">Email (optional)</label><input id="customer-email" type="email" maxlength="254" autocomplete="email"></div>
-            <div id="delivery-fields" class="fc-home-fields fc-home-full" hidden>
-              <div class="fc-home-field"><label for="delivery-area">Delivery area</label><select id="delivery-area"><option value="">Choose your area</option></select></div>
-              <div id="other-locality-field" class="fc-home-field" hidden><label for="other-locality">Your locality</label><input id="other-locality" maxlength="120" placeholder="Enter locality"></div>
-              <div class="fc-home-field fc-home-full"><label for="delivery-address">Complete delivery address</label><textarea id="delivery-address" maxlength="1000" autocomplete="street-address" placeholder="House, street, building and nearby landmark"></textarea></div>
-              <div class="fc-home-field fc-home-full"><label for="delivery-instructions">Delivery instructions (optional)</label><input id="delivery-instructions" maxlength="500"></div>
-              <label id="not-listed-confirm-row" class="fc-home-confirm fc-home-full" hidden><input id="not-listed-confirm" type="checkbox"><span id="not-listed-confirm-text">I understand the temporary delivery fee for an area not listed.</span></label>
-            </div>
-            <div class="fc-home-field fc-home-full"><label for="order-notes">Order notes (optional)</label><textarea id="order-notes" maxlength="1000" placeholder="Additional instructions"></textarea></div>
-          </div>
-        </section>
-      </section>
-      <section id="fc-cart-panel" class="fc-home-cart wrap" aria-labelledby="cart-heading">
-        <div class="fc-home-cart-inner">
-          <div class="fc-home-cart-heading"><div><p class="fc-home-kicker">Your order</p><h3 id="cart-heading">Cart <span id="cart-count">(0)</span></h3></div><span id="cart-empty" class="fc-home-cart-empty">Your cart is empty.</span></div>
-          <div id="cart-lines" class="fc-home-cart-lines"></div>
-          <div id="cart-summary" class="fc-home-cart-summary" hidden><div class="fc-home-total"><span>Verified total</span><strong id="cart-total">—</strong></div><p id="cart-quote-detail" class="fc-home-cart-detail"></p></div>
-          <div class="fc-home-cart-actions"><button id="request-quote" class="btn btn-gold" type="button" disabled>Get verified total</button><button id="place-order" class="btn btn-gold" type="button" disabled hidden>Place order</button><button id="retry-order" class="btn btn-gold" type="button" disabled hidden>Retry order confirmation</button></div>
-          <p id="order-status" class="fc-home-order-status" role="status" aria-live="polite">No order has been submitted.</p>
-          <div id="order-success" class="fc-home-order-success" hidden><p class="fc-home-kicker">Order received</p><h3>Your order is confirmed.</h3><p>Order reference</p><strong id="success-order-number"></strong><p id="success-order-message"></p><button id="continue-ordering" class="btn btn-ghost" type="button">Continue browsing</button></div>
-        </div>
       </section>
       <dialog id="product-dialog" class="fc-home-product-dialog" aria-label="Product options"><div class="fc-home-dialog-head"><span class="fc-home-kicker">Customize product</span><button id="close-product-dialog" class="fc-home-close" type="button">Close</button></div><div id="product-dialog-content" class="fc-home-dialog-content"></div></dialog>
       <section id="deal-config-section" class="fc-home-deal-config wrap" hidden aria-labelledby="deal-config-heading"><div class="fc-home-panel-head"><div><p class="fc-home-kicker">Customize deal</p><h3 id="deal-config-heading">Deal choices</h3></div><button id="close-deal-config" class="fc-home-close" type="button">Close</button></div><div id="deal-configurator"></div></section>
@@ -494,6 +463,51 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
       </div>
     </div>
   </footer>
+</div>
+
+
+<div class="scrim fc-v3-cart-scrim" id="fc-v3-cart-scrim" aria-hidden="true"></div>
+<aside class="drawer fc-v3-cart-drawer" id="fc-v3-cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-heading" aria-hidden="true" inert>
+  <section id="fc-cart-panel" class="fc-home-cart" aria-labelledby="cart-heading">
+    <div class="fc-home-cart-inner">
+      <div class="fc-v3-cart-heading">
+        <div><p class="fc-home-kicker">Your order</p><h3 id="cart-heading">Cart <span id="cart-count">(0)</span></h3></div>
+        <button class="fc-v3-cart-close" id="close-fc-v3-cart" type="button" aria-label="Close cart">&times;</button>
+      </div>
+      <fieldset class="seg fc-v3-fulfilment" id="fc-v3-fulfilment">
+        <legend class="lbl">How do you want it?</legend>
+        <label><input id="fulfilment-delivery" type="radio" name="fc-v3-fulfilment" value="delivery" checked><span>Delivery</span></label>
+        <label><input id="fulfilment-pickup" type="radio" name="fc-v3-fulfilment" value="pickup"><span>Takeaway</span></label>
+      </fieldset>
+      <p id="cart-empty" class="fc-home-cart-empty">Your cart is empty. Add your favourites from the menu.</p>
+      <div id="cart-lines" class="fc-home-cart-lines"></div>
+        <section id="details-section" class="fc-home-details wrap" hidden aria-labelledby="details-heading">
+          <p class="fc-home-kicker">Checkout details</p><h3 id="details-heading">Your details</h3>
+          <div class="fc-home-fields">
+            <div class="fc-home-field"><label for="customer-name">Full name</label><input id="customer-name" maxlength="160" autocomplete="name" required></div>
+            <div class="fc-home-field"><label for="customer-phone">Phone number</label><input id="customer-phone" type="tel" maxlength="32" autocomplete="tel" placeholder="03xx xxxxxxx" required></div>
+            <div class="fc-home-field fc-home-full"><label for="customer-email">Email (optional)</label><input id="customer-email" type="email" maxlength="254" autocomplete="email"></div>
+            <div id="delivery-fields" class="fc-home-fields fc-home-full" hidden>
+              <div class="fc-home-field"><label for="delivery-area">Delivery area</label><select id="delivery-area"><option value="">Choose your area</option></select></div>
+              <div id="other-locality-field" class="fc-home-field" hidden><label for="other-locality">Your locality</label><input id="other-locality" maxlength="120" placeholder="Enter locality"></div>
+              <div class="fc-home-field fc-home-full"><label for="delivery-address">Complete delivery address</label><textarea id="delivery-address" maxlength="1000" autocomplete="street-address" placeholder="House, street, building and nearby landmark"></textarea></div>
+              <div class="fc-home-field fc-home-full"><label for="delivery-instructions">Delivery instructions (optional)</label><input id="delivery-instructions" maxlength="500"></div>
+              <label id="not-listed-confirm-row" class="fc-home-confirm fc-home-full" hidden><input id="not-listed-confirm" type="checkbox"><span id="not-listed-confirm-text">I understand the temporary delivery fee for an area not listed.</span></label>
+            </div>
+            <div class="fc-home-field fc-home-full"><label for="order-notes">Order notes (optional)</label><textarea id="order-notes" maxlength="1000" placeholder="Additional instructions"></textarea></div>
+          </div>
+        </section>
+
+      <div id="cart-summary" class="fc-home-cart-summary" hidden><div class="fc-home-total"><span>Verified total</span><strong id="cart-total">—</strong></div><p id="cart-quote-detail" class="fc-home-cart-detail"></p></div>
+      <div class="fc-home-cart-actions"><button id="request-quote" class="btn btn-gold" type="button" disabled>Get verified total</button><button id="place-order" class="btn btn-gold" type="button" disabled hidden>Place order</button><button id="retry-order" class="btn btn-gold" type="button" disabled hidden>Retry order confirmation</button></div>
+      <p id="order-status" class="fc-home-order-status" role="status" aria-live="polite">No order has been submitted.</p>
+      <div id="order-success" class="fc-home-order-success" hidden><p class="fc-home-kicker">Order received</p><h3>Your order is confirmed.</h3><p>Order reference</p><strong id="success-order-number"></strong><p id="success-order-message"></p><button id="continue-ordering" class="btn btn-ghost" type="button">Continue browsing</button></div>
+    </div>
+  </section>
+</aside>
+<div class="fc-v3-cartbar" id="fc-v3-cartbar" hidden>
+  <div class="fc-v3-cartbar-copy"><strong id="fc-v3-cartbar-count">0 items</strong><small>Your order is ready to review</small></div>
+  <button id="fc-v3-cartbar-open" type="button">View cart</button>
 </div>
 
 <div class="cartbar" id="cartbar">
@@ -2063,6 +2077,40 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
 }
 /* Legacy V2 cart UI is dormant; all ordering uses the V3 homepage checkout. */
 .cartbar{display:none!important}
+
+/* V3 cart drawer — reuses the established V2 drawer and segmented fulfilment visuals. */
+.fc-v3-cart-drawer{overflow-x:hidden;overflow-y:auto;align-items:stretch}
+.fc-v3-cart-drawer .fc-home-cart{width:100%;max-width:none;margin:0;padding:18px 16px 24px;border:0;border-radius:0;background:var(--cream);color:var(--ink);box-shadow:none}
+.fc-v3-cart-drawer .fc-home-cart-inner{max-width:none}
+.fc-v3-cart-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--rule)}
+.fc-v3-cart-drawer .fc-home-cart-heading{align-items:center}
+.fc-v3-cart-drawer .fc-home-kicker{color:var(--red)}
+.fc-v3-cart-drawer .fc-home-cart h3,.fc-v3-cart-drawer .fc-home-details h3{color:var(--ink)}
+.fc-v3-cart-close{width:40px;height:40px;flex:0 0 auto;border-radius:50%;background:#fff;color:var(--ink);font:700 24px/1 var(--f-ui);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.fc-v3-fulfilment{margin:14px 0 16px}
+.fc-v3-fulfilment label{min-width:0}
+.fc-v3-fulfilment label:has(input:disabled){opacity:.48;cursor:not-allowed}
+.fc-v3-cart-drawer .fc-home-cart-empty{display:block;padding:18px 8px;border:1px dashed var(--rule);border-radius:12px;text-align:center}
+.fc-v3-cart-drawer .fc-home-details{width:100%;margin:18px 0 0;padding:16px 0 0;border:0;border-top:1px solid var(--rule);border-radius:0;background:transparent;color:var(--ink);box-shadow:none}
+.fc-v3-cart-drawer .fc-home-details .fc-home-kicker{color:var(--red)}
+.fc-v3-cart-drawer .fc-home-field{color:var(--ink)}
+.fc-v3-cart-drawer .fc-home-cart-actions{display:grid;grid-template-columns:1fr}
+.fc-v3-cart-drawer .fc-home-cart-actions .btn{width:100%;justify-content:center}
+.fc-v3-cart-drawer .fc-home-cart-actions .btn:disabled{opacity:.5;cursor:not-allowed}
+.fc-v3-cartbar{display:none}
+.fc-v3-cart-scrim{z-index:79}
+.fc-v3-cart-drawer{z-index:80}
+@media(max-width:699px){
+  .fc-v3-cartbar{position:fixed;z-index:60;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:14px;background:var(--ink);color:#fff;box-shadow:0 8px 28px rgba(0,0,0,.3)}
+  .fc-v3-cartbar-copy{display:grid;gap:2px;min-width:0;line-height:1.2}
+  .fc-v3-cartbar-copy strong{font:700 15px var(--f-ui)}
+  .fc-v3-cartbar-copy small{color:rgba(255,255,255,.75);font:500 11px var(--f-body)}
+  .fc-v3-cartbar button{min-height:42px;padding:9px 16px;border-radius:10px;background:var(--gold);color:var(--ink);font:700 15px var(--f-ui);text-transform:uppercase}
+  .fc-v3-cart-drawer .fc-home-cart{padding:15px 14px 24px}
+  .fc-v3-cart-drawer .fc-home-fields{grid-template-columns:1fr}
+  .fc-v3-cart-drawer .fc-home-full{grid-column:auto}
+}
+
 </style>
 <script src="js/catalog-v3.js"></script>
 <script src="js/catalog-v3-client.js"></script>
