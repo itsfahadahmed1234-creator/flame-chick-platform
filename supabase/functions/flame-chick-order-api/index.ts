@@ -671,7 +671,7 @@ async function callRpc(name: "flame_chick_create_order" | "flame_chick_create_we
   return { ok: true as const, data };
 }
 
-async function readOrderBoard(board: string, limit: number, branchId: string, filters: { orderId?: string; source?: string } = {}) {
+async function readOrderBoard(board: string, limit: number, branchId: string, filters: { orderId?: string; source?: string; fulfillmentType?: string } = {}) {
   const allowedBoards: Record<string, string[]> = {
     orders: ["new", "accepted"],
     preparing: ["preparing", "ready"],
@@ -699,6 +699,9 @@ async function readOrderBoard(board: string, limit: number, branchId: string, fi
   }
   if (filters.source && ["website","pos","whatsapp","phone","third_party","manual","other"].includes(filters.source)) {
     query.set("source", "eq." + filters.source);
+  }
+  if (filters.fulfillmentType && ["delivery","pickup","dine_in"].includes(filters.fulfillmentType)) {
+    query.set("fulfillment_type", "eq." + filters.fulfillmentType);
   }
   query.set("order", "created_at.desc");
   query.set("limit", String(Math.max(1, Math.min(limit, 100))));
@@ -968,9 +971,11 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
     const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(Math.trunc(requestedLimit), 100)) : 50;
     const orderId = (url.searchParams.get("order_id") ?? "").trim();
     const source = (url.searchParams.get("source") ?? "").trim().toLowerCase();
+    const fulfillmentType = (url.searchParams.get("fulfillment_type") ?? "").trim().toLowerCase();
     const result = await readOrderBoard(board, limit, context.branch_id, {
       ...(orderId ? {orderId} : {}),
-      ...(source ? {source} : {})
+      ...(source ? {source} : {}),
+      ...(fulfillmentType ? {fulfillmentType} : {})
     });
     if (!result.ok) return response(result.body, result.status);
     return response({ ok: true, data: result.data });

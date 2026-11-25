@@ -23,3 +23,13 @@ test('Order API uses only self-contained local imports for deployment',()=>{
   assert.match(source,/from "\.\/website-order-quote-token\.mjs"/);
   assert.doesNotMatch(source,/\.\.\/_shared|\.\.\.\/apps\/flame-chick-website/);
 });
+
+
+test('Order API supports a server-side fulfillment_type filter for the shared POS Online Orders board',()=>{
+  const source=readFileSync('supabase/functions/flame-chick-order-api/index.ts','utf8');
+  assert.match(source,/fulfillmentType\?: string/);
+  assert.match(source,/filters\.fulfillmentType && \["delivery","pickup","dine_in"\]\.includes\(filters\.fulfillmentType\)/);
+  assert.match(source,/query\.set\("fulfillment_type", "eq\." \+ filters\.fulfillmentType\)/);
+  assert.match(source,/url\.searchParams\.get\("fulfillment_type"\)/);
+  assert.match(source,/\.\.\.\(fulfillmentType \? \{fulfillmentType\} : \{\}\)/);
+});

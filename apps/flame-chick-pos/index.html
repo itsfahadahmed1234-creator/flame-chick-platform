@@ -1092,6 +1092,19 @@ html,body{background:var(--bg);overflow:hidden}
   .order-page-grid{height:auto;min-height:0;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
 }
 </style>
+<style id="pos-history-page-layout">
+.history-page{max-width:1500px;width:100%;padding:12px 18px 18px}
+.history-page .history-workspace{width:100%;max-width:1500px;height:calc(100vh - 112px);max-height:none;min-height:420px;margin:0 auto;padding:0;overflow:hidden;display:flex;flex-direction:column}
+.history-page .history-head{flex:0 0 auto}
+.history-page .history-scroll{flex:1 1 auto;min-height:0;overflow:auto}
+.history-back-btn{white-space:nowrap;min-height:38px}
+@media(max-width:600px){
+  .history-page{padding:8px}
+  .history-page .history-workspace{height:calc(100vh - 92px);min-height:360px}
+  .history-page .history-head{padding:12px;align-items:center}
+  .history-page .history-head h3{font-size:16px}
+}
+</style>
 <style>
 /* Deal configurator: fixed bundle quantities and visual burger choice cards */
 .deal-choice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
@@ -1228,7 +1241,9 @@ html,body{background:var(--bg);overflow:hidden}
   <div class="brand"><img class="brand-logo" src="assets/flame-chick-brand.svg" alt="Flame Chick"><small class="brand-subtitle">POS · Fast local-first cashier</small></div>
   <nav class="top-nav" aria-label="Main navigation">
     <button class="nav-btn active" id="navNewOrder" type="button">POS Orders</button>
-    <button class="nav-btn" id="navOrders" type="button">Online Orders <span id="onlineNavBadge" class="nav-badge">0</span></button><button class="nav-btn" id="navTables" type="button" hidden>Open Tables</button>
+    <button class="nav-btn" id="navOrders" type="button">Online Orders <span id="onlineNavBadge" class="nav-badge">0</span></button>
+    <button class="nav-btn" id="navHistory" type="button">History</button>
+    <button class="nav-btn" id="navTables" type="button" hidden>Open Tables</button>
   </nav>
   <div class="status"><button class="btn staff-auth-btn" id="staffLoginBtn" type="button">Sign in</button><button class="btn" id="systemOpenBtn" type="button">⚙ System</button><span id="statusDot" class="dot"></span><span id="statusText">Starting…</span></div>
 </header>
@@ -1316,26 +1331,28 @@ html,body{background:var(--bg);overflow:hidden}
     </div>
   </div>
 </aside></div></section>
-<section id="ordersPage" class="page orders-page"><div class="orders-header"><div><h2>Online Orders</h2><p id="ordersMeta">Flame Chick website orders · awaiting Flame Chick order API</p></div><div class="orders-tools"><span class="inbox-live"><span class="mini-dot"></span><span id="inboxLiveText">Live</span></span><button class="btn" id="refreshInboxBtn" type="button">Refresh</button></div></div><div id="kanban" class="kanban"></div></section>
+<section id="ordersPage" class="page orders-page"><div class="orders-header"><div><h2>Online Orders</h2><p id="ordersMeta">Delivery orders only · Website and POS</p></div><div class="orders-tools"><span class="inbox-live"><span class="mini-dot"></span><span id="inboxLiveText">Live</span></span><button class="btn" id="refreshInboxBtn" type="button">Refresh</button></div></div><div id="kanban" class="kanban"></div></section>
+<section id="historyPage" class="page history-page">
+  <div class="history-modal history-workspace">
+    <div class="history-head"><div><h3>Order History</h3><p>POS sales and website orders in one searchable history.</p></div><button class="btn history-back-btn" id="historyBackBtn" type="button">Back to POS</button></div>
+    <div class="history-tabs" id="historyTabs">
+      <button type="button" class="history-tab active" data-history-tab="pos">POS Orders</button>
+      <button type="button" class="history-tab" data-history-tab="online">Online Orders</button>
+      <button type="button" class="history-tab" data-history-tab="all">All Orders</button>
+      <button type="button" class="history-tab" data-history-tab="cancelled">Cancelled Orders</button>
+    </div>
+    <div class="history-tools">
+      <input id="historySearch" class="history-search" type="search" placeholder="Search order ID, customer, phone, area or table…" autocomplete="off">
+      <button id="historyRefreshBtn" class="btn" type="button">Refresh</button>
+    </div>
+    <div id="historySummary" class="history-summary"></div>
+    <div id="historyBody" class="history-scroll"></div>
+  </div>
+</section>
 </div>
 <div id="toast" class="toast"></div>
 <div id="queueModal" class="modal-wrap"><div class="modal"><h3>Local POS Orders</h3><p>Delivery, Takeaway and Dine-in orders are saved in IndexedDB first, then synchronized to the Production database when internet and staff access are available. Orders needing review stay in this queue until corrected. Use Backup in System &amp; Data to export local records.</p><div id="queueBody"></div><div class="modal-actions"><button class="btn" onclick="closeModal('queueModal')">Close</button></div></div></div>
-<div id="historyModal" class="modal-wrap"><div class="modal history-modal">
-  <div class="history-head"><div><h3>Order History</h3><p>POS sales and website orders in one searchable history.</p></div><button class="close-btn" type="button" onclick="closeModal('historyModal')" aria-label="Close order history">×</button></div>
-  <div class="history-tabs" id="historyTabs">
-    <button type="button" class="history-tab active" data-history-tab="pos">POS Orders</button>
-    <button type="button" class="history-tab" data-history-tab="online">Online Orders</button>
-    <button type="button" class="history-tab" data-history-tab="all">All Orders</button>
-    <button type="button" class="history-tab" data-history-tab="cancelled">Cancelled Orders</button>
-  </div>
-  <div class="history-tools">
-    <input id="historySearch" class="history-search" type="search" placeholder="Search order ID, customer, phone, area or table…" autocomplete="off">
-    <button id="historyRefreshBtn" class="btn" type="button">Refresh</button>
-  </div>
-  <div id="historySummary" class="history-summary"></div>
-  <div id="historyBody" class="history-scroll"></div>
-</div></div>
-<div id="choiceModal" class="modal-wrap"><div class="modal pizza-choice"><h3 id="choiceTitle"></h3><div id="choiceBody"></div><div class="modal-actions"><button class="btn" onclick="closeModal('choiceModal')">Cancel</button></div></div></div>
+remove old History modal<div id="choiceModal" class="modal-wrap"><div class="modal pizza-choice"><h3 id="choiceTitle"></h3><div id="choiceBody"></div><div class="modal-actions"><button class="btn" onclick="closeModal('choiceModal')">Cancel</button></div></div></div>
 <div id="orderDetailModal" class="modal-wrap">
   <div class="modal order-detail-modal">
     <div class="order-detail-head">
@@ -1895,10 +1912,14 @@ const SYNC_BATCH_SIZE=20;
 const SYNC_RETRY_MAX_MS=120000;
 let syncRetryTimer=null;
 function localDayStart(date){const d=new Date(date);return new Date(d.getFullYear(),d.getMonth(),d.getDate())}
-function isRecentWebsiteOrder(o){if(!isWebsiteOrder(o))return false;const ms=Date.parse(String(o.DateTime??o.CreatedAt??''));return !Number.isFinite(ms)||((Date.now()-ms)<=30*86400000);}
+function isRecentWebsiteOrder(o){if(!isOnlineDeliveryOrder(o))return false;const ms=Date.parse(String(o.DateTime??o.CreatedAt??''));return !Number.isFinite(ms)||((Date.now()-ms)<=30*86400000);}
 function getOnlineInboxStartCursor(){const d=new Date();d.setDate(d.getDate()-ONLINE_ORDER_MAX_AGE_DAYS);d.setHours(0,0,0,0);return d.toISOString()}
 function pruneInboxOrders(){for(const [key,o] of inboxOrders){if(!isRecentWebsiteOrder(o))inboxOrders.delete(key)}}
 function isWebsiteOrder(o){return !!o&&typeof o==='object'&&!!(o.OrderID||o.orderId);}
+function isOnlineDeliveryOrder(o){
+  const fulfillment=String(o?.FulfillmentType??o?.fulfillmentType??o?.fulfillment_type??'').trim().toLowerCase();
+  return isWebsiteOrder(o)&&fulfillment==='delivery';
+}
 
 function orderChangeTime(o){
   const raw=o?.UpdatedAt ?? o?.updatedAt ?? o?.DateTime ?? o?.CreatedAt ?? '';
@@ -1986,7 +2007,7 @@ function normalizeNewOrdersResponse(res){
 
 async function fetchWebsiteOrders(cursor,limit=100){
   if(!flameChickStaffProfile?.branch_id)throw new Error('Your Flame Chick staff account is not assigned to a branch.');
-  const response=await flameChickOrderRequest('GET',{board:'active',limit:String(Math.max(1,Math.min(limit,100)))});
+  const response=await flameChickOrderRequest('GET',{board:'active',fulfillment_type:'delivery',limit:String(Math.max(1,Math.min(limit,100)))});
   const rows=Array.isArray(response.data)?response.data:[];
   return {orders:rows.map(flameChickNormalizeOrder),nextCursor:'',hasMore:false,signalVersion:String(Date.now()),success:true};
 }
@@ -2272,13 +2293,15 @@ async function syncStatusUpdates(){
 }
 
 function showPage(which){
-  const isOrders=which==='orders';
-  $('newOrderPage').classList.toggle('active',!isOrders);
+  const isOrders=which==='orders',isHistory=which==='history';
+  $('newOrderPage').classList.toggle('active',!isOrders&&!isHistory);
   $('ordersPage').classList.toggle('active',isOrders);
-  $('navNewOrder').classList.toggle('active',!isOrders);
+  $('historyPage').classList.toggle('active',isHistory);
+  $('navNewOrder').classList.toggle('active',!isOrders&&!isHistory);
   $('navOrders').classList.toggle('active',isOrders);
+  $('navHistory').classList.toggle('active',isHistory);
   const tablesTab=$('navTables');
-  if(tablesTab){tablesTab.hidden=isOrders;tablesTab.setAttribute('aria-hidden',isOrders?'true':'false');}
+  if(tablesTab){tablesTab.hidden=isOrders||isHistory;tablesTab.setAttribute('aria-hidden',(isOrders||isHistory)?'true':'false');}
   if(isOrders){ renderKanban(); if(!inboxOrders.size && navigator.onLine) loadInitialOnlineInbox(); }
 }
 function resetNewOrderMode(){activeDineCheckId='';selectedTableId='';window.editingLocalOrderId='';receiptEditContext=null;cart=[];['customerName','phone','address','area','notes'].forEach(id=>{const el=$(id);if(el)el.value='';});if($('orderType'))$('orderType').value='Delivery';$('orderTypeButtons')?.querySelectorAll('.type-btn').forEach(b=>b.classList.toggle('active',b.dataset.type==='Delivery'));if($('paymentMethod'))$('paymentMethod').value='COD';$('paymentButtons')?.querySelectorAll('.pay-btn').forEach(b=>b.classList.toggle('active',b.dataset.pay==='COD'));if($('selectedTableBadge'))$('selectedTableBadge').textContent='No table';if($('selectTableBtn'))$('selectTableBtn').textContent='Select table';if($('placeBtn'))$('placeBtn').textContent='PLACE ORDER';if($('payCloseBtn'))$('payCloseBtn').style.display='none';resetPreorderState();updateOrderFieldsByType();renderCart();resetMenuToStart()}
@@ -4801,10 +4824,11 @@ function openRichHistoryDetails(o){
   openModal('orderDetailModal');
 }
 async function showHistory(){
+  closeModal('systemModal');
   historyActiveTab='pos';
   document.querySelectorAll('.history-tab').forEach(b=>b.classList.toggle('active',b.dataset.historyTab==='pos'));
   $('historySearch').value='';
-  openModal('historyModal');
+  showPage('history');
   await refreshHistoryData();
 }
 function bindHistoryControls(){
@@ -4828,7 +4852,9 @@ function bindStaticControls(){
   $('backupBtn')?.addEventListener('click',exportBackup);
   $('restoreBtn')?.addEventListener('click',importBackup);
   $('queueBtn')?.addEventListener('click',showQueue);
-  $('historyBtn')?.addEventListener('click',()=>{closeModal('systemModal');showHistory();});
+  $('historyBtn')?.addEventListener('click',()=>showHistory());
+  $('navHistory')?.addEventListener('click',()=>showHistory());
+  $('historyBackBtn')?.addEventListener('click',()=>showPage('new'));
   bindHistoryControls();
   $('queueSyncBtn')?.addEventListener('click',async()=>{await syncPending();await syncStatusUpdates();await showQueue()});
 }

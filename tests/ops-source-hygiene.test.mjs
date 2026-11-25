@@ -306,3 +306,28 @@ test("Website deal configurator uses a compact expandable Burger picker with slo
   assert.match(page,/\.fc-deal-burger-picker\[open\]/);
   assert.match(page,/@media\(max-width:520px\)\{\.fc-deal-burger-slots\{grid-template-columns:1fr\}/);
 });
+
+
+test("POS Online Orders is strictly Delivery-only at API request and display layers",()=>{
+  const html=source[0].html;
+  assert.match(html,/fulfillment_type:'delivery'/);
+  assert.match(html,/function isOnlineDeliveryOrder\(o\)/);
+  assert.match(html,/fulfillment==='delivery'/);
+  assert.match(html,/function isRecentWebsiteOrder\(o\)\{if\(!isOnlineDeliveryOrder\(o\)\)return false/);
+  assert.match(html,/const orders=\[\.\.\.inboxOrders\.values\(\)\]\.filter\(isRecentWebsiteOrder\)/);
+  assert.match(html,/<h2>Online Orders<\\/h2><p id="ordersMeta">Delivery orders only · Website and POS<\\/p>/);
+});
+
+test("POS History is a primary page and not a modal that falls back to POS",()=>{
+  const html=source[0].html;
+  assert.match(html,/id="navHistory"/);
+  assert.match(html,/id="historyPage" class="page history-page"/);
+  assert.match(html,/const isOrders=which==='orders',isHistory=which==='history'/);
+  assert.match(html,/\$\('historyPage'\)\.classList\.toggle\('active',isHistory\)/);
+  assert.match(html,/\$\('navHistory'\)\.classList\.toggle\('active',isHistory\)/);
+  assert.match(html,/async function showHistory\(\)\{[\s\S]*showPage\('history'\);[\s\S]*await refreshHistoryData\(\);/);
+  assert.match(html,/\$\('navHistory'\)\?\.addEventListener\('click',\(\)=>showHistory\(\)\)/);
+  assert.match(html,/\$\('historyBtn'\)\?\.addEventListener\('click',\(\)=>showHistory\(\)\)/);
+  assert.match(html,/historyBackBtn/);
+  assert.doesNotMatch(html,/id="historyModal"/);
+});
