@@ -690,11 +690,28 @@
         var label = document.createElement('span'); label.className = 'fc-deal-label';
         label.textContent = deal.available ? 'Published deal' : 'Unavailable';
         var button = document.createElement('button'); button.type = 'button';
-        button.className = 'add'; button.textContent = deal.available ? 'Configure deal' : 'Unavailable';
+        button.className = 'add'; button.textContent = deal.available ? 'Choose deal' : 'Unavailable';
         button.disabled = !deal.available || !canEdit();
-        button.addEventListener('click', function () { if (canEdit()) openDealConfigurator(deal); });
+        button.addEventListener('click', function (event) {
+          event.stopPropagation();
+          if (canEdit()) openDealConfigurator(deal);
+        });
         foot.append(label, button);
         body.append(name, info, foot);
+        card.setAttribute('role', 'group');
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('aria-label', deal.title + '. Open deal choices.');
+        card.setAttribute('aria-haspopup', 'dialog');
+        card.addEventListener('click', function (event) {
+          if (event.target && event.target.closest && event.target.closest('button,a,input,select')) return;
+          if (deal.available && canEdit()) openDealConfigurator(deal);
+        });
+        card.addEventListener('keydown', function (event) {
+          if ((event.key === 'Enter' || event.key === ' ') && event.target === card) {
+            event.preventDefault();
+            if (deal.available && canEdit()) openDealConfigurator(deal);
+          }
+        });
         card.append(art, body); grid.appendChild(card);
       });
       section.appendChild(grid); rootNode.appendChild(section);
@@ -710,6 +727,10 @@
       status(configurator?.message || 'This deal could not be configured.', 'error'); return;
     }
     state.dealConfigurator = configurator;
+    var availableVariants = (deal.variants || []).filter(function (variant) {
+      return variant.branchSatisfiable === true;
+    });
+    if (availableVariants.length === 1) configurator.selectVariant(availableVariants[0].id);
     $('deal-configurator').replaceChildren();
     configurator.render($('deal-configurator'), {
       formatMoney: function (minor) { return cardPrice(minor); },
