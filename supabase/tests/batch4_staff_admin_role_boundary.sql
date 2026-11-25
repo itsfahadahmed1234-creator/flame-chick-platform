@@ -195,6 +195,8 @@ SELECT pg_catalog.set_config('request.jwt.claim.sub','a1111111-1111-4111-8111-11
 DO $positive$
 DECLARE
   v_result jsonb;
+  v_topic text;
+  v_visible integer;
 BEGIN
   PERFORM pg_catalog.set_config('request.jwt.claim.sub','a1111111-1111-4111-8111-111111111111',true);
   v_result:=public.flame_chick_staff_admin_command('list','{}'::jsonb);
@@ -206,6 +208,65 @@ BEGIN
   v_result:=public.flame_chick_staff_admin_command('list','{}'::jsonb);
   IF v_result->>'ok' IS DISTINCT FROM 'true' OR v_result->>'actor_role' IS DISTINCT FROM 'owner' THEN
     RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_OWNER_ACCESS_FAILED';
+  END IF;
+
+  v_topic:='fc:branch:'||pg_catalog.current_setting('test.staff_branch_id')||':pos';
+  PERFORM pg_catalog.set_config('realtime.topic',v_topic,true);
+  IF app_private.flame_chick_realtime_can_receive(v_topic) IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_OWNER_REALTIME_ACCESS_FAILED';
+  END IF;
+  SELECT count(*) INTO v_visible FROM realtime.messages WHERE topic=v_topic;
+  IF v_visible<1 THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_POS_BRANCH_BROADCAST_NOT_VISIBLE';
+  END IF;
+
+  -- Manager and Cashier see the same branch POS topic; Rider cannot see it.
+  PERFORM pg_catalog.set_config('request.jwt.claim.sub','a3333333-3333-4333-8333-333333333333',true);
+  IF app_private.flame_chick_realtime_can_receive(v_topic) IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_MANAGER_REALTIME_ACCESS_FAILED';
+  END IF;
+  PERFORM pg_catalog.set_config('request.jwt.claim.sub','a4444444-4444-4444-8444-444444444444',true);
+  IF app_private.flame_chick_realtime_can_receive(v_topic) IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_CASHIER_REALTIME_ACCESS_FAILED';
+  END IF;
+
+  PERFORM pg_catalog.set_config('request.jwt.claim.sub','a5555555-5555-4555-8555-555555555555',true);
+  IF app_private.flame_chick_realtime_can_receive(v_topic) IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_RECEIVED_POS_TOPIC';
+  END IF;
+  SELECT count(*) INTO v_visible FROM realtime.messages WHERE topic=v_topic;
+  IF v_visible<>0 THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_READ_POS_BROADCAST';
+  END IF;
+
+  -- A rider can receive only the private topic bound to auth.uid().
+  v_topic:='fc:rider:a5555555-5555-4555-8555-555555555555:ops';
+  PERFORM pg_catalog.set_config('realtime.topic',v_topic,true);
+  IF app_private.flame_chick_realtime_can_receive(v_topic) IS DISTINCT FROM true THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_OWN_TOPIC_DENIED';
+  END IF;
+  SELECT count(*) INTO v_visible FROM realtime.messages WHERE topic=v_topic;
+  IF v_visible<1 THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_BROADCAST_NOT_VISIBLE';
+  END IF;
+
+  v_topic:='fc:rider:a6666666-6666-4666-8666-666666666666:ops';
+  PERFORM pg_catalog.set_config('realtime.topic',v_topic,true);
+  IF app_private.flame_chick_realtime_can_receive(v_topic) IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_CROSSTALK_ALLOWED';
+  END IF;
+  SELECT count(*) INTO v_visible FROM realtime.messages WHERE topic=v_topic;
+  IF v_visible<>0 THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_RIDER_READ_OTHER_RIDER_BROADCAST';
+  END IF;
+
+  PERFORM pg_catalog.set_config('realtime.topic',v_topic,true);
+  IF EXISTS (
+    SELECT 1 FROM realtime.messages
+    WHERE topic LIKE 'fc:%'
+      AND (payload::text ILIKE '%QA Staff Rider%' OR payload::text ILIKE '%qa-staff-admin-%')
+  ) THEN
+    RAISE EXCEPTION 'STAFF_ROLE_BOUNDARY_REALTIME_PAYLOAD_CONTAINS_PRIVATE_PROFILE_DATA';
   END IF;
 END
 $positive$;
