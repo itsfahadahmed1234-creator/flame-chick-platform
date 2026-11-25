@@ -391,3 +391,69 @@ The browser rendered the page and initialized the V3 catalogue, but stopped whil
 - No Production database/catalogue/order/payment data was modified.
 - No POS, Admin, Rider, backend API, migrations or shared server pricing code was changed.
 - All changes remain on `work/website-parallel-development`.
+
+
+---
+
+## 2026-11-25 — Product popups, direct add, and unified deal popup
+
+### User-requested customer flow
+
+- Clicking any product card opens its product popup.
+- Each product card retains a separate direct Add button.
+- Simple single-variant products with no required modifiers can be added directly from the card without opening the popup.
+- Products requiring a choice (multiple variants or required modifiers) route the Add action into the same product popup; invalid selections cannot be added.
+- Product popup presents the product image/artwork, name, description, published variant/size and price, modifier choices, quantity and a final Add to cart action.
+- The standalone homepage deal-configurator section is removed. Deal cards stay in the published Deals list; clicking a deal card or its Choose deal button opens a modal dialog containing the configurator.
+- A deal with exactly one branch-satisfiable published variant is preselected; otherwise customers choose a variant in the popup.
+
+### POS-style burger choices in the deal popup
+
+- The Website continues to use its existing V3 `FlameChickCatalogV3DealConfigurator` and `FlameChickCatalogV3DealView`; neither shared module nor POS code was modified.
+- Category-driven Burger choices appear as compact expandable choice groups inside the deal popup.
+- The configurator creates separate Burger 1, Burger 2, etc. selectors based on the published deal component group's required/maximum units.
+- Available Burger choices come dynamically from the published Chicken Burgers category and selected branch/fulfilment context. No product IDs, product names, deal contents or prices are hardcoded.
+- Existing rules for duplicate/repeated choices, per-option maximum quantity, branch availability, included/surcharge pricing treatment and per-component modifier selection are preserved by the V3 configurator.
+- Deal completion stays disabled until all required groups and per-burger customizations pass the configurator's validation. The resulting identifier-only payload is added to the Website cart and is revalidated/priced by the existing Order API at quote time.
+- This is the same published V3 category-driven selection model the POS uses; Website presentation is styled as a compact modal consistent with the POS Burger 1/Burger 2 interaction. POS source files were inspected read-only and not changed.
+
+### Website files changed in this stage
+
+1. `apps/flame-chick-website/js/website-order-v3.js` — card click/keyboard popup, direct simple-product add, shared product variant/modifier/quantity dialog, deal cards open the deal dialog, one available variant auto-selected, and deal completion returns to cart.
+2. `apps/flame-chick-website/index.html` — replaced the separate deal configurator section with a `<dialog id="deal-dialog">`, added compact product/deal popup styling, responsive burger slots and option-group styling.
+3. `tests/website-source-hygiene.test.mjs` — coverage for direct add, product popup, single popup deal selection host and preserved category-driven Burger slot/repeat/modifier rules.
+
+### CI
+
+- Website Static Checks run: `45579510172`
+- Exact source commit tested: `cfa6590a7339599d18b0e6da9b60062b9d26e322`
+- Result: **SUCCESS**
+- Verified: active JavaScript syntax checks; checkout preview guard; core catalogue, deal, modifier, branch fulfilment and regression tests; the new Website product/deal popup assertions; preview regression fixtures; inline HTML script parsing.
+- Two intermediate runs failed because of over-escaped test-only regular-expression assertions. The test assertions were simplified to match the source payload and the final run above passed. Application syntax and core V3 catalogue/deal tests passed during those intermediate runs.
+
+### Preview deployment
+
+- Existing Vercel project: `flame-chick-website-production`
+- Deployment ID: `dpl_mPYuZhZ87CezfHGjWvb26ZcjJtVJ`
+- Preview URL: https://flame-chick-website-production-rib26i772-fahad-7455.vercel.app
+- State: **READY**
+- Target: Preview (`null` at deployment API level)
+- Source branch: `work/website-parallel-development`
+- Deployed source commit: `cfa6590a7339599d18b0e6da9b60062b9d26e322`
+- Homepage returned HTTP 200 and title `Flame Chick | Order Online`.
+- Deployed homepage contains `product-dialog`, `deal-dialog`, V3 menu root and Preview notice; does not contain the mockup's sample content.
+- Deployed Website order script, V3 deal configurator and Preview checkout guard each returned HTTP 200. The V3 deal configurator source contains the compact Burger picker/slot selection logic.
+- The previous Production aliases were not promoted, moved or reassigned. This is a branch Preview only.
+- Preview checkout remains disabled for all non-Production hosts. Do not test quote/place/retry or create any real order from this Preview.
+
+### Remaining manual review
+
+- Automated checks and deployed asset/source responses are verified.
+- Interactive clicks/keyboard and desktop/mobile layout should still be reviewed by the user in the new Preview, particularly:
+  - simple product direct Add;
+  - product card click and a multi-variant product popup;
+  - modifier-required product popup and quantity validation;
+  - deal popup with multiple included burgers;
+  - repeat-choice limit and a deal with more than one variant;
+  - mobile dialog scrolling and sticky/visible Add action.
+- No full interactive browser rehearsal was completed automatically in this stage.
