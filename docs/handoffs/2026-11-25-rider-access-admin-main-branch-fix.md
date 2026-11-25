@@ -157,3 +157,40 @@ The user did not remember the order number but supplied the event window of appr
 - Do not create further production test orders or payments merely to repeat the already-observed Realtime round trip.
 - GST remains deferred; Free plan and single Main branch remain unchanged.
 
+## QZ Tray / iTech 80mm printer preparation — 2026-11-25
+
+**Status: certificate material generated; POS integration is NOT complete or deployed. Do not treat printing as production-ready yet.**
+
+### Hardware and existing POS print path
+- User's printer: iTech 900UL, 80 mm.
+- The current POS source uses browser `window.print()`; QZ Tray was not integrated in the deployed release.
+- A public retail listing suggests the iTech IT900UL is USB + LAN, but the exact unit's ESC/POS compatibility, USB driver, LAN port and cutter behavior have not been confirmed from a manufacturer manual or physical self-test.
+- Do not switch the restaurant's active Windows printer driver or enable kitchen printing until the device is physically verified.
+
+### Certificate material
+- A custom Flame Chick QZ root certificate and a leaf signing certificate were generated and cryptographically checked. The leaf certificate verifies against the root; its public key matches the generated private signing key.
+- Root public certificate SHA-256 fingerprint: `53:6C:B0:B1:09:D3:F0:EE:3D:66:FB:DD:0D:A0:FE:00:84:09:A6:B0:63:6B:1B:C2:65:87:3A:00:26:38:27:28`.
+- Root expiry: 22 November 2036. Leaf signing certificate expiry: 24 November 2028.
+- User-facing package: `Flame-Chick-QZ-Tray-Certificate.zip` contains only `override.crt`, `digital-certificate.txt`, and README. No private key is included.
+- Package README explicitly says do not install yet as a completed setup; wait for QZ POS Preview integration.
+- Private root and leaf keys were generated outside the repository. They must never be committed or copied to the restaurant PC. The leaf signing private key must be transferred only into a Vercel Sensitive production/preview environment variable once the signer endpoint is reviewed and ready. Root CA private key requires separate secure offline retention if future leaf renewal is intended.
+
+### Working-branch source preparation
+On `work/production-source-audit`, source preparation files were added:
+- `apps/flame-chick-pos/qz-printing.js` — QZ Tray client helper (not yet loaded or wired to the existing print actions).
+- `apps/flame-chick-pos/api/qz/sign.js` — Node server-side signer skeleton. It requires a Sensitive `QZ_SIGNING_PRIVATE_KEY` Vercel env var, checks the POS origin, validates the Supabase user and active staff context, and signs SHA-512 requests. It is not yet deployed and has not been integration-tested.
+- `apps/flame-chick-pos/qz/digital-certificate.txt` — public signing certificate chain.
+
+The current production deployment remains unchanged at release commit `6cff4a250abb1bdeb59fb4bedd90f28e6915210d`. No Vercel environment variable, deployment, domain alias, Supabase schema/function or production printer setting was changed.
+
+### Required next steps before any Production deployment
+1. Review QZ Tray version and documented APIs against official QZ documentation; pin the correct client library version.
+2. Correctly wire the QZ helper into the existing receipt and online-order print flows, preserving browser print fallback.
+3. Add printer selection/status/test controls to the existing POS Printing settings, persist the selected local Windows printer name locally, and default to Counter Receipt only. Kitchen remains disabled.
+4. Verify that 80mm ESC/POS output supports the iTech model's actual code page, line width, feed and cutter. Start with safe text-only test output; no cutter command until confirmed.
+5. Review signer security, request limits, allowed origins and Supabase staff role checks. Ensure only authenticated active Admin/Owner/Manager/Cashier sessions can request signatures. Keep signing key in Vercel Sensitive env only.
+6. Add QZ script/certificate paths to the POS Vercel app root configuration and deploy a Preview from `work/production-source-audit`; do not alter the Production alias.
+7. Test QZ Tray installation and public trust certificate on a restaurant PC, printer discovery, test print, full receipt formatting and browser fallback. User must confirm physical output.
+8. Only after Preview passes, request explicit approval before any Production release and then update this handoff.
+
+Do not claim QZ Tray is installed, trusted, connected, or printing until the user confirms the restaurant-PC test. Keep Flame Chick pre-launch.
