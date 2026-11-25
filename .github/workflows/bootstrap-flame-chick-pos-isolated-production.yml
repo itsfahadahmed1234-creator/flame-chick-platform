@@ -1,0 +1,90 @@
+name: Bootstrap Temporary Isolated Flame Chick POS Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type BOOTSTRAP-ISOLATED-PRODUCTION to authorize the one-time isolated bootstrap.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flame-chick-pos-isolated-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    # One-time, explicit, isolated bootstrap only. Never runs on push.
+    if: >-
+      github.ref == 'refs/heads/work/production-source-audit' &&
+      inputs.confirmation == 'BOOTSTRAP-ISOLATED-PRODUCTION'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      VERCEL_ORG_ID: team_lrFy9ILYEz9umsBy98GCyQjI
+      VERCEL_PROJECT_ID: prj_Ce8GbSsG5VZApCyEVCh9zC0qfeRv
+      VERCEL_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Check out the reviewed POS source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Install pinned Vercel CLI
+        run: |
+          set -euo pipefail
+          npm install --global "vercel@65.17.0"
+          vercel --version
+
+      - name: Verify isolated Production bootstrap target
+        run: |
+          set -euo pipefail
+          test "$VERCEL_ORG_ID" = "team_lrFy9ILYEz9umsBy98GCyQjI"
+          test "$VERCEL_PROJECT_ID" = "prj_Ce8GbSsG5VZApCyEVCh9zC0qfeRv"
+          test -n "${VERCEL_TOKEN:-}"
+          echo "Confirmed isolated team/project and token presence."
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Link exact isolated project
+        run: |
+          set -euo pipefail
+          mkdir -p .vercel
+          cat > .vercel/project.json <<'EOF'
+          {
+            "orgId": "team_lrFy9ILYEz9umsBy98GCyQjI",
+            "projectId": "prj_Ce8GbSsG5VZApCyEVCh9zC0qfeRv"
+          }
+          EOF
+
+      - name: Create one-time isolated Production bootstrap
+        run: |
+          set -euo pipefail
+          set +e
+          deploy_output="$(vercel deploy --yes --prod --token="$VERCEL_TOKEN" 2>&1)"
+          deploy_status=$?
+          set -e
+          printf '%s\\n' "$deploy_output"
+          if [ "$deploy_status" -ne 0 ]; then
+            echo "Vercel CLI exited with status $deploy_status." >&2
+            exit "$deploy_status"
+          fi
+          {
+            echo "### Temporary isolated Flame Chick POS bootstrap"
+            echo "- Vercel project: ${VERCEL_PROJECT_ID}"
+            echo "- Vercel team: ${VERCEL_ORG_ID}"
+            echo "- Source commit: ${GITHUB_SHA}"
+            echo "- Target: Production on isolated project only"
+            echo "- No live Flame Chick POS production project or domain was targeted"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
