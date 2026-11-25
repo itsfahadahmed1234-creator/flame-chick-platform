@@ -387,8 +387,9 @@ try{
   const originalVariant=originalDetail.variants[0].variant;
   const originalGroups=originalDetail.component_groups.filter(doc=>doc.group.is_active===true);
   const form={
-    dataset:{form:'deal'},
+    dataset:{form:'deal',dealId:flameDuoId.id},
     values:{
+      deal_id:flameDuoId.id,
       title:editorState.dealDraft.title,
       description_en:editorState.dealDraft.description_en,
       base_price:editorState.dealDraft.base_price,
@@ -396,20 +397,41 @@ try{
       deal_available:editorState.dealDraft.is_available
     },
     querySelectorAll(selector){
-      assert.equal(selector,'[data-component-row]');
-      return editorState.components.map(component=>({
-        querySelector(field){
-          const values={
-            '[data-field="group_id"]':component.group_id,
-            '[data-field="option_id"]':component.option_id,
-            '[data-field="display_name"]':component.display_name,
-            '[data-field="product_id"]':component.product_id,
-            '[data-field="product_variant_id"]':component.product_variant_id,
-            '[data-field="quantity"]':String(component.quantity)
-          };
-          return Object.hasOwn(values,field)?{value:values[field]}:null;
-        }
-      }));
+      assert.equal(selector,'[data-component-group]');
+      return editorState.components.map(component=>{
+        const isBurger=/burger/i.test(String(component.display_name||''));
+        const savedOptions=Array.isArray(component.options)?component.options:[];
+        return {
+          querySelector(field){
+            const values={
+              '[data-field="group_id"]':{value:component.group_id||''},
+              '[data-field="display_name"]':{value:component.display_name||''},
+              '[data-field="quantity"]':{value:String(component.quantity)},
+              '[data-field="allow_repeat_option"]':{checked:component.allow_repeat_option===true},
+              '[data-field="max_units_per_option"]':{value:component.max_units_per_option==null?'':String(component.max_units_per_option)},
+              '[data-field="burger-anchor-option-id"]':{value:savedOptions.find(option=>option&&option.option_id)?.option_id||''}
+            };
+            return values[field]||null;
+          },
+          querySelectorAll(rowSelector){
+            assert.equal(rowSelector,'[data-choice-row]');
+            // The category-backed Burger editor has no manually configured
+            // customer-choice rows. Non-Burger components retain their one
+            // or more explicit saved product rows.
+            if(isBurger)return [];
+            return savedOptions.map(option=>({
+              querySelector(field){
+                const values={
+                  '[data-field="option_id"]':{value:option.option_id||''},
+                  '[data-field="product_id"]':{value:option.product_id||''},
+                  '[data-field="product_variant_id"]':{value:option.product_variant_id||''}
+                };
+                return values[field]||null;
+              }
+            }));
+          }
+        };
+      });
     }
   };
   await root.onsubmit({
