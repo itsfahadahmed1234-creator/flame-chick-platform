@@ -612,12 +612,33 @@
         content.appendChild(fieldset);
       });
 
-      var quantityField = document.createElement('div'); quantityField.className = 'fc-product-popup-field fc-product-popup-quantity';
-      var quantityLabel = document.createElement('label'); quantityLabel.textContent = 'Quantity';
-      var quantity = document.createElement('input');
-      quantity.type = 'number'; quantity.min = '1'; quantity.max = '99'; quantity.value = '1';
-      quantity.setAttribute('aria-label', 'Product quantity');
-      quantityField.append(quantityLabel, quantity); content.appendChild(quantityField);
+      var quantityField = document.createElement('div'); quantityField.className = 'fc-product-popup-quantity-row';
+      var quantityLabel = document.createElement('span'); quantityLabel.className = 'fc-product-popup-quantity-label';
+      quantityLabel.textContent = 'Quantity';
+      var quantity = 1;
+      var quantityControl = document.createElement('div'); quantityControl.className = 'fc-product-popup-stepper';
+      var quantityMinus = document.createElement('button'); quantityMinus.type = 'button';
+      quantityMinus.className = 'fc-product-popup-step'; quantityMinus.textContent = '−';
+      quantityMinus.setAttribute('aria-label', 'Decrease quantity'); quantityMinus.disabled = true;
+      var quantityValue = document.createElement('output'); quantityValue.className = 'fc-product-popup-quantity-value';
+      quantityValue.textContent = '1';
+      var quantityPlus = document.createElement('button'); quantityPlus.type = 'button';
+      quantityPlus.className = 'fc-product-popup-step'; quantityPlus.textContent = '+';
+      quantityPlus.setAttribute('aria-label', 'Increase quantity');
+      quantityMinus.addEventListener('click', function () {
+        quantity = Math.max(1, quantity - 1);
+        quantityValue.textContent = String(quantity);
+        quantityMinus.disabled = quantity <= 1;
+      });
+      quantityPlus.addEventListener('click', function () {
+        quantity = Math.min(99, quantity + 1);
+        quantityValue.textContent = String(quantity);
+        quantityMinus.disabled = quantity <= 1;
+        quantityPlus.disabled = quantity >= 99;
+      });
+      quantityControl.append(quantityMinus, quantityValue, quantityPlus);
+      quantityField.append(quantityLabel, quantityControl);
+      content.appendChild(quantityField);
       var validationMessage = document.createElement('p'); validationMessage.className = 'fc-product-popup-prompt';
       validationMessage.setAttribute('role', 'status'); validationMessage.setAttribute('aria-live', 'polite');
       var add = document.createElement('button'); add.type = 'button';
@@ -741,12 +762,13 @@
           return;
         }
         var item = payload;
+        var chosenDealQuantity = configurator.getState().dealQuantity || 1;
         item.kind = 'deal';
-        item.quantity = 1;
+        item.quantity = chosenDealQuantity;
         state.cart.push({
           kind: 'deal',
           label: deal.title,
-          quantity: 1,
+          quantity: chosenDealQuantity,
           payload: item
         });
         $('deal-dialog').close();
