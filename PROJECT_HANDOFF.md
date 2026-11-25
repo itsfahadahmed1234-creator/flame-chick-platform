@@ -5130,3 +5130,10 @@ Canonical continuation: `docs/handoffs/2026-11-25-burger-choice-editor-save-chec
 - Immediate next task: investigate/fix Admin editor's deal identity/Edit handler, burger product filtering, `max_units_per_option` form value collection/submission, per-option mapping max quantities and strict read-back verification. Do not ask the user to save again until these are corrected and tested. Then deploy Preview only and perform one controlled correction, verifying read-only DB state after save.
 - Detailed exact product IDs, variant IDs, deal IDs, target constraints for Flame Feast/Flame Duo/Flame Hour, audit revisions, safety boundaries and step-by-step next actions are in the dated handoff file linked above. Do not edit the separate `Flame Hour — The Injector + Cold Drink` deal.
 - Continue all existing project boundaries: Free Supabase plan, no GST/tax, no direct catalog table writes or service-role bypass, no publication or production alias promotion without explicit user approval, preserve existing apps, and keep handoffs current.
+
+
+---
+
+## 2026-11-25 — Admin deal editor correction Preview
+
+Canonical continuation: `docs/handoffs/2026-11-25-admin-deal-editor-correction-preview.md`. The source fix is committed at `dd6151e3bd86d9abd67cfce24b221dd4b5af3f8e`; Admin static checks run `45534384936` SUCCESS; Preview deployment `dpl_7kEfiQME3TzbV69QnA6Pj61nVKAt` is READY. No catalog data was written, and no catalog publication or production alias promotion occurred. See the dated handoff for findings, exact test status, preview URLs and the single controlled Flame Feast correction steps.
