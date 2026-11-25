@@ -65,7 +65,7 @@ BEGIN
     RAISE EXCEPTION 'RIDER_HAS_ACTIVE_DELIVERY' USING ERRCODE='23514';
   END IF;
 
-  INSERT INTO public.rider_profiles(
+  INSERT INTO public.rider_profiles AS rp(
     restaurant_id,branch_id,user_id,rider_code,display_name,phone,
     availability_status,accepting_jobs,is_active
   ) VALUES (
@@ -77,16 +77,16 @@ BEGIN
     display_name=EXCLUDED.display_name,
     phone=EXCLUDED.phone,
     availability_status=CASE
-      WHEN NOT public.rider_profiles.is_active THEN 'offline'
-      ELSE public.rider_profiles.availability_status
+      WHEN NOT rp.is_active THEN 'offline'
+      ELSE rp.availability_status
     END,
     accepting_jobs=CASE
-      WHEN NOT public.rider_profiles.is_active THEN true
-      ELSE public.rider_profiles.accepting_jobs
+      WHEN NOT rp.is_active THEN true
+      ELSE rp.accepting_jobs
     END,
     last_seen_at=CASE
-      WHEN NOT public.rider_profiles.is_active THEN NULL
-      ELSE public.rider_profiles.last_seen_at
+      WHEN NOT rp.is_active THEN NULL
+      ELSE rp.last_seen_at
     END,
     is_active=true,
     updated_at=pg_catalog.clock_timestamp();
