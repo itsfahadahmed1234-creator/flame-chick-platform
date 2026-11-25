@@ -2212,6 +2212,120 @@ body.fc-website-preview-readonly .fc-home-cart-actions button{opacity:.48;cursor
   .fc-home-deal-dialog .fc-deal-burger-summary-copy small{max-width:58vw}
 }
 
+
+/* Mobile-first compact ordering controls: keep the choice, quantity and action visible together. */
+.fc-home-product-dialog,.fc-home-deal-dialog{
+  width:min(520px,calc(100vw - 14px));
+  max-width:520px;
+  max-height:calc(100dvh - 16px);
+  height:auto;
+  margin:auto;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  border-radius:18px;
+}
+.fc-home-dialog-head{flex:0 0 auto;padding:8px 12px;min-height:44px}
+.fc-home-dialog-head .fc-home-close{min-height:32px;padding:4px 11px}
+.fc-home-dialog-content{min-height:0;overflow:hidden;padding:9px 12px}
+.fc-home-dialog-content h2{font-size:20px}
+.fc-product-popup-top{grid-template-columns:64px minmax(0,1fr);gap:9px}
+.fc-product-popup-art{width:64px;height:64px;border-radius:12px}
+.fc-product-popup-intro{gap:3px}
+.fc-product-popup-description{font-size:11px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.fc-product-popup-field{gap:4px;margin-top:8px}
+.fc-product-popup-field>label,.fc-product-popup-quantity-label{font-size:12px}
+.fc-product-popup-field select{min-height:36px;padding:7px 9px;font-size:12px}
+.fc-product-popup-price{margin-top:7px;padding:7px 10px}
+.fc-product-popup-price span{font-size:11px}
+.fc-product-popup-price strong{font-size:17px}
+.fc-product-popup-group{margin:6px 0;padding:7px 9px;border-radius:9px}
+.fc-product-popup-group legend{font-size:12px}
+.fc-product-popup-group .order-modifier-option{min-height:30px;padding:3px 0;font-size:12px}
+.fc-product-popup-prompt{margin-top:5px;font-size:10px}
+.fc-product-popup-add{min-height:40px;margin-top:7px;padding:8px 12px;font-size:14px}
+.fc-product-popup-quantity-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding:6px 9px;border:1px solid var(--rule);border-radius:10px;background:#fff}
+.fc-product-popup-quantity-label{font:700 12px var(--f-ui);text-transform:uppercase;color:var(--muted)}
+.fc-product-popup-stepper,.fc-deal-quantity-stepper{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.fc-product-popup-step,.fc-deal-quantity-button{display:grid;place-items:center;width:34px;height:32px;border:1px solid #ead5ce;border-radius:9px;background:#fff0ec;color:var(--red);font:800 19px/1 var(--f-ui)}
+.fc-product-popup-step:disabled,.fc-deal-quantity-button:disabled{opacity:.35;cursor:not-allowed}
+.fc-product-popup-quantity-value,.fc-deal-quantity-value{min-width:20px;text-align:center;color:var(--ink);font:800 15px var(--f-ui);font-variant-numeric:tabular-nums}
+
+/* The deal configurator is a short modal, not a long vertical list of cards. */
+.fc-home-deal-dialog .fc-home-dialog-content{display:flex;flex-direction:column;gap:6px;min-height:0;overflow:hidden;padding:8px 11px}
+.fc-home-deal-dialog .fc-deal-config-title{font-size:18px;line-height:1.05}
+.fc-home-deal-dialog .fc-deal-config-description{font-size:10px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.fc-home-deal-dialog fieldset{padding:7px 8px;border-radius:9px}
+.fc-home-deal-dialog legend{font-size:11px}
+.fc-home-deal-dialog .fc-deal-variants{grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:5px}
+.fc-home-deal-dialog .fc-deal-variant{min-height:32px;padding:5px 7px;gap:5px;font-size:10px;border-radius:8px}
+.fc-home-deal-dialog .fc-deal-component-group{gap:6px;padding:7px 8px}
+.fc-home-deal-dialog .fc-deal-burger-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.fc-home-deal-dialog .fc-deal-burger-head strong{min-width:0;font:800 12px var(--f-ui);color:var(--ink)}
+.fc-home-deal-dialog .fc-deal-burger-head small{flex:0 0 auto;color:var(--muted);font:600 10px var(--f-body)}
+.fc-home-deal-dialog .fc-deal-burger-tabs{display:flex;flex-wrap:nowrap;gap:5px;width:100%}
+.fc-home-deal-dialog .fc-deal-burger-tab{flex:1 1 0;min-width:0;min-height:32px;padding:4px 5px;border:1px solid var(--rule);border-radius:8px;background:#fff;color:var(--ink);font:800 12px var(--f-ui)}
+.fc-home-deal-dialog .fc-deal-burger-tab.is-active{border-color:var(--red);background:#fff0ef;color:var(--red);box-shadow:inset 0 0 0 1px var(--red)}
+.fc-home-deal-dialog .fc-deal-burger-tab.is-filled:not(.is-active){border-color:#c7dfce;background:#eff8f1;color:#17683b}
+.fc-home-deal-dialog .fc-deal-burger-select-label{display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:7px;color:var(--muted);font:800 11px var(--f-ui);text-transform:uppercase}
+.fc-home-deal-dialog .fc-deal-burger-select{width:100%;min-width:0;min-height:36px;padding:6px 8px;border:1px solid var(--rule);border-radius:8px;background:#fff;color:var(--ink);font:600 12px var(--f-body)}
+.fc-home-deal-dialog .fc-deal-burger-hint{margin:0;color:var(--muted);font:500 10px var(--f-body)}
+.fc-home-deal-dialog .fc-deal-component-customization{margin:4px 0 0;padding:0;border:0}
+.fc-home-deal-dialog .fc-deal-component-customization>summary{padding:5px 0;color:var(--red);font:800 10px var(--f-ui);cursor:pointer}
+.fc-home-deal-dialog .fc-deal-modifier-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;margin:4px 0;padding:5px;border-radius:7px}
+.fc-home-deal-dialog .fc-deal-modifier-group legend{grid-column:1/-1;font-size:10px}
+.fc-home-deal-dialog .fc-deal-modifier{display:flex;align-items:center;gap:4px;min-height:25px;color:var(--ink);font:500 10px/1.2 var(--f-body)}
+.fc-home-deal-dialog .fc-deal-modifier input{width:13px;height:13px;margin:0;flex:0 0 auto}
+.fc-home-deal-dialog .fc-deal-component-option{gap:6px;padding:4px 0;font-size:10px}
+.fc-home-deal-dialog .fc-deal-component-label{min-width:0;line-height:1.2}
+.fc-home-deal-dialog .fc-deal-option-stepper{display:inline-flex;align-items:center;gap:5px;flex:0 0 auto}
+.fc-home-deal-dialog .fc-deal-option-step{width:26px;height:25px;padding:0;border:1px solid var(--rule);border-radius:7px;background:#fff0ed;color:var(--red);font:800 15px var(--f-ui)}
+.fc-home-deal-dialog .fc-deal-option-step:disabled{opacity:.3}
+.fc-home-deal-dialog .fc-deal-option-quantity{min-width:14px;text-align:center;font:800 12px var(--f-ui)}
+.fc-home-deal-dialog .fc-deal-quantity-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 8px;border:1px solid var(--rule);border-radius:9px;background:#fff}
+.fc-home-deal-dialog .fc-deal-quantity-label{font:800 11px var(--f-ui);color:var(--muted);text-transform:uppercase}
+.fc-home-deal-dialog .fc-deal-config-status{margin:0;padding:5px 7px;font-size:9px;line-height:1.2}
+.fc-home-deal-dialog .fc-deal-config-continue{flex:0 0 auto;min-height:40px;padding:7px 12px;font-size:14px;border-radius:10px}
+.fc-home-deal-dialog .fc-deal-unavailable{font-size:9px}
+.order-cart-controls{gap:5px;flex-wrap:nowrap}
+.order-cart-controls button{min-width:30px;min-height:30px;padding:3px 8px}
+.order-cart-quantity{min-width:18px;text-align:center;font:800 14px var(--f-ui);font-variant-numeric:tabular-nums}
+.order-cart-row{gap:5px;padding:9px}
+.order-cart-row strong{font-size:14px}
+.fc-v3-cart-drawer .fc-home-details{margin:8px 0 0;padding:8px 0 0}
+.fc-v3-cart-drawer .fc-home-fields{gap:8px;margin-top:8px}
+.fc-v3-cart-drawer .fc-home-field{gap:4px;font-size:12px}
+.fc-v3-cart-drawer .fc-home-field input,.fc-v3-cart-drawer .fc-home-field select,.fc-v3-cart-drawer .fc-home-field textarea{min-height:36px;padding:7px 9px;font-size:12px}
+.fc-v3-cart-drawer .fc-home-field textarea{min-height:52px}
+.fc-v3-cart-drawer .fc-v3-fulfilment{margin:8px 0}
+.fc-v3-cart-drawer .fc-v3-fulfilment span{padding:9px 7px;font-size:14px}
+.fc-v3-cart-drawer .fc-home-cart-lines{margin:8px 0;gap:6px}
+@media(max-width:520px){
+  .fc-home-product-dialog,.fc-home-deal-dialog{width:calc(100vw - 10px);max-height:calc(100dvh - 12px);border-radius:14px}
+  .fc-home-dialog-head{min-height:40px;padding:6px 10px}
+  .fc-home-dialog-content,.fc-home-deal-dialog .fc-home-dialog-content{padding:7px 9px;gap:5px}
+  .fc-product-popup-top{grid-template-columns:54px minmax(0,1fr);gap:7px}
+  .fc-product-popup-art{width:54px;height:54px;border-radius:9px}
+  .fc-home-dialog-content h2{font-size:17px}
+  .fc-product-popup-description{font-size:10px}
+  .fc-product-popup-group{padding:5px 7px;margin:4px 0}
+  .fc-product-popup-group .order-modifier-option{min-height:27px;font-size:11px}
+  .fc-home-deal-dialog .fc-deal-config-title{font-size:16px}
+  .fc-home-deal-dialog .fc-deal-burger-tabs{gap:4px}
+  .fc-home-deal-dialog .fc-deal-burger-tab{min-height:30px;font-size:11px}
+  .fc-home-deal-dialog .fc-deal-burger-select-label{grid-template-columns:62px minmax(0,1fr);font-size:10px}
+  .fc-home-deal-dialog .fc-deal-burger-select{min-height:33px;font-size:11px}
+  .fc-home-deal-dialog .fc-deal-modifier-group{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-height:620px){
+  .fc-home-product-dialog,.fc-home-deal-dialog{max-height:calc(100dvh - 8px)}
+  .fc-home-dialog-head{min-height:34px;padding:4px 9px}
+  .fc-home-deal-dialog .fc-deal-config-description{display:none}
+  .fc-home-deal-dialog .fc-deal-component-group{padding:5px 6px;gap:4px}
+  .fc-home-deal-dialog .fc-deal-burger-select{min-height:30px}
+  .fc-home-deal-dialog .fc-deal-config-continue{min-height:35px}
+}
+
 </style>
 <script src="js/catalog-v3.js"></script>
 <script src="js/catalog-v3-client.js"></script>
