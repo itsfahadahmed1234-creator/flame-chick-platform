@@ -214,7 +214,6 @@
     if (!footer) return;
     footer.classList.remove('is-checking', 'is-ready', 'is-ordering', 'is-confirmed', 'has-error');
     if (stage) footer.classList.add(stage);
-    if ($('request-quote')) $('request-quote').classList.toggle('is-ready', stage === 'is-ready');
     if ($('place-order')) $('place-order').classList.toggle('is-ready', stage === 'is-ready');
     if ($('retry-order')) $('retry-order').classList.toggle('is-ordering', stage === 'is-ordering');
   }
