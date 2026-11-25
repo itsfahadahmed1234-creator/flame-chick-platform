@@ -51,10 +51,8 @@
     node.className = 'order-status' + (kind ? ' ' + kind : '');
   }
 
-  function pageStatus(message, kind) {
-    $('connection-message').textContent = message;
-    $('connection-pill').textContent = kind === 'ready' ? 'Ready' : kind === 'loading' ? 'Loading' : 'Unavailable';
-    $('connection-pill').className = 'status-pill status-' + (kind === 'ready' ? 'ready' : kind === 'loading' ? 'loading' : 'error');
+  function pageStatus() {
+    /* Catalog status UI intentionally removed; failures remain visible in the menu/cart context. */
   }
 
   function orderWritesAllowed() {
@@ -336,6 +334,40 @@
     }
     state.dealModel = deals;
     renderDeals(deals);
+  }
+
+  function appendProductArtwork(container, product, categoryName) {
+    var imagePath = typeof product.imagePath === 'string' ? product.imagePath.trim() : '';
+    if (imagePath) {
+      var config = root.FLAME_CHICK_CONFIG || {};
+      var base = typeof config.imagesBaseUrl === 'string' ? config.imagesBaseUrl.replace(/\/+$/, '') : '';
+      if (base && /^https:\/\//i.test(base)) {
+        var safePath = imagePath.split('/').filter(Boolean).map(function (part) {
+          return encodeURIComponent(part);
+        }).join('/');
+        var img = document.createElement('img');
+        img.alt = product.name || '';
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.src = base + '/' + safePath;
+        img.onerror = function () {
+          img.remove();
+          container.textContent = '🍗';
+          container.setAttribute('aria-label', product.name || categoryName || 'Flame Chick menu item');
+        };
+        container.appendChild(img);
+        return;
+      }
+    }
+    var label = String(product.name || categoryName || '').toLowerCase();
+    var icon = /drink|juice|water|soda/.test(label) ? '🥤' :
+      /pizza/.test(label) ? '🍕' : /burger|sandwich/.test(label) ? '🍔' :
+      /nugget|wing|broast|chicken/.test(label) ? '🍗' : '🍟';
+    container.textContent = icon;
+    container.style.display = 'grid';
+    container.style.placeItems = 'center';
+    container.style.fontSize = 'clamp(42px, 10vw, 72px)';
+    container.setAttribute('aria-label', product.name || categoryName || 'Flame Chick menu item');
   }
 
   function renderProducts(model) {
@@ -790,9 +822,7 @@
   }
 
   function bindEvents() {
-    $('reload-catalog').addEventListener('click', function () {
-      location.reload();
-    });
+
     $('close-product-dialog').addEventListener('click', function () { $('product-dialog').close(); });
     $('close-deal-config').addEventListener('click', function () { $('deal-config-section').hidden = true; });
     $('request-quote').addEventListener('click', requestQuote);
@@ -888,7 +918,7 @@
         throw new Error('Neither Delivery nor Takeaway is currently enabled for the single Flame Chick branch.');
       }
       state.loaded = true;
-      $('publication-meta').hidden = true;
+      if ($('publication-meta')) $('publication-meta').hidden = true;
       var previewReadOnly = applyPreviewReadOnlyMode();
       pageStatus(previewReadOnly ? 'Published menu verified · Preview only · checkout disabled.' : 'Published menu verified.', 'ready');
       renderCatalog();
