@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.5/qz-tray.js"></script>
+<script src="/qz-printing.js" defer></script>
 <title>Flame Chick POS — Local First · Cashier</title>
 <!-- Flame Chick POS staging v12: includes manual POS delivery orders in the shared Online Orders kanban; v11 cashier UX retained -->
 <!-- Flame Chick POS V26: duplicate order repair + sync reconciliation + status queue repair, based on working V25 -->
@@ -1282,7 +1284,18 @@ html,body{background:var(--bg);overflow:hidden}
           <button class="btn" id="savePrintingBtn" type="button" style="min-height:30px;font-size:11px;padding:4px 10px">Save Printing Settings</button>
           <span id="printingSavedText" style="font-size:11px;color:var(--ok);display:none">Saved</span>
         </div>
-        <div class="sub" style="margin-top:8px">Counter Receipt = customer copy. Kitchen KOT = future kitchen printer (not yet installed).</div>
+        <div class="sub" style="margin-top:8px">Counter Receipt = customer copy. Kitchen KOT remains disabled until a separate kitchen printer is installed.</div>
+         <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+           <div class="print-section-title">QZ Tray · 80 mm thermal printer</div>
+           <div class="sub" id="qzStatusText">Direct printing is not connected. Browser printing remains available.</div>
+           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">
+             <button class="btn" id="qzScanPrintersBtn" type="button">Find Windows Printers</button>
+             <button class="btn" id="qzTestPrintBtn" type="button">Print Test Receipt</button>
+           </div>
+           <div class="field" style="margin-top:9px"><label for="qzPrinterSelect">Windows printer queue</label><select id="qzPrinterSelect"><option value="">Use browser print (default)</option></select></div>
+           <label style="display:flex;gap:8px;align-items:center;margin-top:9px;font-size:12px;font-weight:700"><input id="qzDirectEnabled" type="checkbox"> Use QZ Tray direct printing when connected</label>
+           <div class="sub" style="margin-top:6px">Choose the existing “Generic / Text Only” queue after discovery. Direct printing is opt-in; if QZ Tray is unavailable, the POS falls back to the browser print dialog.</div>
+         </div>
       </div>
     </div>
   </div>
@@ -1824,7 +1837,7 @@ let arrivalOffsetMin=0;
 let customArrivalISO=null;
 let kitchenTiming='now';
 let defaultPrepMinutes=30;
-let printSettings={counterEnabled:true,kitchenEnabled:false,counterLabel:'Counter Receipt',kitchenLabel:'Kitchen KOT'};
+let printSettings={counterEnabled:true,kitchenEnabled:false,counterLabel:'Counter Receipt',kitchenLabel:'Kitchen KOT',qzPrinterName:'',qzDirectEnabled:false};
 let scheduledCheckTimer=null;
 function closeModal(id){$(id)?.classList.remove('open');if(id==='choiceModal'){posPizzaChoice=null;posModifierChoice=null;posDealChoice=null}}
 function openModal(id){$(id)?.classList.add('open')}
