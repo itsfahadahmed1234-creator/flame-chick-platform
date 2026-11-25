@@ -1,12 +1,11 @@
 name: Bootstrap Temporary Isolated Flame Chick POS Deployment
 
 on:
-  workflow_dispatch:
-    inputs:
-      confirmation:
-        description: Type BOOTSTRAP-ISOLATED-PRODUCTION to authorize the one-time isolated bootstrap.
-        required: true
-        type: string
+  push:
+    branches:
+      - work/production-source-audit
+    paths:
+      - ".github/workflows/bootstrap-flame-chick-pos-isolated-production.yml"
 
 permissions:
   contents: read
@@ -17,10 +16,10 @@ concurrency:
 
 jobs:
   bootstrap:
-    # One-time, explicit, isolated bootstrap only. Never runs on push.
+    # One-time, explicit, isolated bootstrap only. Runs only after the repository gate is enabled.
     if: >-
       github.ref == 'refs/heads/work/production-source-audit' &&
-      inputs.confirmation == 'BOOTSTRAP-ISOLATED-PRODUCTION'
+      vars.FLAME_CHICK_POS_TEMP_BOOTSTRAP_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
