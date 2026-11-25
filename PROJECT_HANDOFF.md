@@ -5177,3 +5177,12 @@ Latest Admin source commit: `70d018de8483949d40c1951809696a231a1f873b`. The user
   - Flame Hour — The Injector + Cold Drink remains its separate named-product group and must remain untouched.
 - User's clarification: they do not want fixed product alternatives configured per deal. Every Burger slot must allow the customer to select any eligible burger from Chicken Burgers; required burger count + repeat/max cap are configured per deal. Do not instruct user to create OG Crunch / Injector / Nashville Fire option rows in each deal.
 - Next step: user opens latest stable Admin Preview and edits Flame Feast. Verify the UI shows the `Customer burger choices` source panel for Chicken Burgers, Burger quantity 3, repeat enabled, max 3, price Rs. 3,599 and unchanged Half Broast / 1L Drink. Because Flame Feast's saved data still has three explicit rows, perform only one controlled save via authenticated Admin/Owner Catalog V3 command flow after these are visually confirmed, then verify read-only DB: one Burger anchor row, mapping INCLUDED/0 surcharge, quantity 3/repeat/cap 3, price 3599, and unrelated component rows unchanged. No publish.
+
+
+## 2026-11-25 — Website and POS category-Burger previews deployed
+
+- Website Preview: `dpl_41n22sQCEHKtRQ2KR1Rez4bR1kqf`, READY, target Preview; exact source commit `71e1de4dad57b09b3609437acc59634508aa22a4`. Existing branch Preview alias `https://flame-chick-website-production-git-work-produ-f251d5-fahad-7455.vercel.app/` verified mapped to this deployment.
+- POS Preview: `dpl_8kVsz7UYvWbXZ1GfSVcASu4Z7mKR`, READY, target Preview; exact same source commit. Existing branch Preview alias `https://flame-chick-pos-production-git-work-productio-675169-fahad-7455.vercel.app/` verified mapped to this deployment.
+- Admin Preview remains READY: `dpl_7kJeNYEsvX9xxgkp6xnzZZ2h5kAY`; stable alias maps to it.
+- All three builds are Preview target (`target:null`); no production target, alias promotion, or catalog publication. Use team SSO when opening protected previews.
+- User testing order: open latest Admin Preview and inspect Flame Feast's `Customer burger choices` category-source panel; then test Website deal slots show `Select a burger` and the Chicken Burgers list; test POS deal slots use the same category-backed choices. Actual customer selections/quotes/orders need end-to-end test orders only in a controlled rehearsal; do not create live restaurant orders.
