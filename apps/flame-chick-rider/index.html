@@ -206,7 +206,7 @@ const AUTH_URL=SUPABASE_URL+'/auth/v1';
 const SESSION_KEY='flame_chick_rider_session_v1';
 let session=null,user=null,rider=null,jobs=[],offers=[],busy=false,pendingAuthSession=null,pendingAuthType='invite',riderPresenceTimer=null,riderPresenceSending=false,riderWantsOnline=true,offerExpiryTimer=null;
 let deferredInstallPrompt=null;
-let riderRealtimeClient=null,riderRealtimeChannel=null,riderRealtimeConnected=false,riderRealtimeRefreshTimer=null,riderRealtimeRefreshDebounce=null;
+let riderRealtimeClient=null,riderRealtimeChannel=null,riderRealtimeConnected=false,riderRealtimeRefreshTimer=null,riderRealtimeRefreshDebounce=null,riderRealtimeFallbackTimer=null;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>(Number(n)||0).toLocaleString('en-PK',{maximumFractionDigits:0});
@@ -332,7 +332,8 @@ function markRiderOfflineBestEffort(){
 function stopRiderRealtime(){
   clearTimeout(riderRealtimeRefreshTimer);
   clearTimeout(riderRealtimeRefreshDebounce);
-  riderRealtimeRefreshTimer=null;riderRealtimeRefreshDebounce=null;
+  clearInterval(riderRealtimeFallbackTimer);
+  riderRealtimeRefreshTimer=null;riderRealtimeRefreshDebounce=null;riderRealtimeFallbackTimer=null;
   const client=riderRealtimeClient,channel=riderRealtimeChannel;
   riderRealtimeClient=null;riderRealtimeChannel=null;riderRealtimeConnected=false;
   if(client){
@@ -383,14 +384,22 @@ function scheduleRiderJobsRefresh(){
     loadJobs(false);
   },350);
 }
+function startRiderRealtimeFallback(label="Realtime unavailable · automatic refresh fallback"){
+  riderRealtimeConnected=false;
+  setConnection(navigator.onLine,label);
+  clearInterval(riderRealtimeFallbackTimer);
+  if(!navigator.onLine||!session?.access_token||!riderWantsOnline)return;
+  riderRealtimeFallbackTimer=setInterval(()=>{
+    if(navigator.onLine&&session?.access_token&&riderWantsOnline)scheduleRiderJobsRefresh();
+  },30000);
+}
 async function startRiderRealtime(){
   stopRiderRealtime();
-  // Hold one Realtime socket only while the signed-in rider is accepting jobs.
+  // Realtime is optional; initial jobs loading and periodic refresh remain available.
   if(!session?.access_token||!user?.id||!rider?.branch_id||!riderWantsOnline)return;
   if(!window.supabase?.createClient){
-    setConnection(true,"Realtime unavailable · use Refresh jobs");
-    ;
-    return;
+    startRiderRealtimeFallback();
+    return false;
   }
   try{
     const client=window.supabase.createClient(SUPABASE_URL,PUBLISHABLE_KEY,{
@@ -400,32 +409,30 @@ async function startRiderRealtime(){
     riderRealtimeClient=client;
     await client.realtime.setAuth(session.access_token);
     const riderId=String(user.id);
-    const channel=client.channel("flame-chick-rider-ops-"+riderId);
-    // Rider-specific subscriptions only: branch-wide task subscriptions multiply
-    // every delivery update by every connected rider in the branch.
-    channel
-      .on("postgres_changes",{event:"*",schema:"public",table:"delivery_task_offers",filter:"rider_user_id=eq."+riderId},scheduleRiderJobsRefresh)
-      .on("postgres_changes",{event:"*",schema:"public",table:"delivery_assignments",filter:"rider_user_id=eq."+riderId},scheduleRiderJobsRefresh);
+    const topic="fc:rider:"+riderId+":ops";
+    const channel=client.channel(topic,{config:{private:true}});
+    channel.on("broadcast",{event:"delivery_changed"},scheduleRiderJobsRefresh);
     riderRealtimeChannel=channel;
     channel.subscribe(status=>{
       if(client!==riderRealtimeClient)return;
       if(status==="SUBSCRIBED"){
         riderRealtimeConnected=true;
-        
         setConnection(true,"Live updates");
+        clearInterval(riderRealtimeFallbackTimer);
+        riderRealtimeFallbackTimer=setInterval(()=>{
+          if(navigator.onLine&&session?.access_token&&riderWantsOnline)scheduleRiderJobsRefresh();
+        },120000);
         scheduleRiderJobsRefresh();
       }else if(["CHANNEL_ERROR","TIMED_OUT","CLOSED"].includes(status)){
-        riderRealtimeConnected=false;
-        setConnection(true,"Realtime disconnected · use Refresh jobs");
-        ;
+        startRiderRealtimeFallback("Realtime reconnecting · automatic refresh fallback");
       }
     });
     scheduleRiderRealtimeTokenRefresh();
+    return true;
   }catch(e){
-    console.warn("Flame Chick rider Realtime could not start; direct database recovery remains active.",e);
-    riderRealtimeConnected=false;
-    setConnection(true,"Realtime unavailable · direct refresh backup");
-    ;
+    console.warn("Flame Chick Rider Realtime could not start; direct refresh fallback remains active.",e);
+    startRiderRealtimeFallback();
+    return false;
   }
 }
 
