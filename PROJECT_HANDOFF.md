@@ -5305,3 +5305,17 @@ The leaf certificate key pair and root chain were verified. Sensitive `QZ_SIGNIN
 - Current status: workflow remains fail-closed because repository variable has not yet been enabled. No GitHub Actions run was triggered; no Vercel deployment, domain assignment, production alias change, production migration, Supabase mutation or real order occurred in this setup stage.
 - Next step: in repository Settings → Secrets and variables → Actions → Variables, create repository variable `FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED` with value `true`. Then use Actions → Deploy Flame Chick POS Preview → Run workflow, selecting `work/production-source-audit`. Verify the job's Vercel target is Preview and record the generated Preview URL/commit. If the run fails, inspect build logs before any retries.
 - Preserve all production boundaries: no main/master merge; no production target or alias; no custom domain change; no service-role secrets in client; no Production Supabase writes/test orders; GST deferred; Free plans only unless explicitly approved.
+
+
+---
+
+## 2026-11-25 — Vercel isolated Preview bootstrap blocker
+
+- The new `flamechickpos` project in the current Hobby team is isolated, with no deployments and no custom domains. SSO protection is enabled. Vercel API read confirms no deployment records for this project.
+- GitHub Actions can access the private repository and the Vercel CLI token is accepted through the workflow's non-secret-presence check. Both runs reached the Vercel CLI deployment command; there are no successful deployments.
+- Run `45659445956` exposed and fixed the monorepo path issue: the Vercel project root is `apps/flame-chick-pos`, so CLI now runs from the repository root, with `.vercel/project.json` pinned to the isolated project.
+- Corrected run `45659658008` then reached Vercel and returned: `Can't create a Preview deployment. This project has no deployments yet, and a project's first deployment is assigned to Production. To deploy to Production, retry with --prod. Later deployments can use --environment preview.`
+- Do NOT change the command to `--prod` without explicit user approval. User's current request is Preview only; a Production-targeted bootstrap would exceed that scope, even though this is an isolated project with no custom domain.
+- Workflow `.github/workflows/deploy-flame-chick-pos-preview.yml` was therefore changed to manual dispatch only and now also requires repository variable `FLAME_CHICK_POS_PREVIEW_PROJECT_READY=true` in addition to existing `FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED=true`. This prevents routine POS pushes and manual runs from repeatedly attempting a Preview that Vercel refuses.
+- Existing user-created repository secret `VERCEL_TOKEN` and deploy-enable variable are preserved. Do not expose, rotate or re-create token without reason. No Vercel deployment, domain assignment, production alias, Supabase mutation or test order was created.
+- Current safe paths: continue coding/committing and run GitHub static/test workflows; once the old Vercel team's daily quota is restored, use its already-established Flame Chick project for Preview; or ask the user to explicitly authorize a single isolated Production bootstrap deployment (SSO-protected, no custom domain, no production alias), after explaining it is technically Production. Alternative hosting requires a separate provider account/credentials and explicit preview URL decision.
