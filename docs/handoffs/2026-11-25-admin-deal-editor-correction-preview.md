@@ -126,3 +126,16 @@ Do not save until those fields are visually confirmed. After the controlled save
 ### Boundaries unchanged
 
 No catalog rows were written for this selector fix. No publication, production alias promotion, production app deployment, paid upgrade, GST/tax implementation, or unrelated deal edits. Continue using the authenticated Admin/Owner Catalog V3 commands for all catalog modifications.
+
+
+---
+
+## 2026-11-25 — Preview access troubleshooting
+
+- The latest one-off Vercel deployment `dpl_EJwtuE7r5XruzyjcXCCbEWJovm9m` is READY at commit `3b1475a4879931ecb51618a90b8a57d18259a7f5`.
+- Vercel project SSO protection is enabled for deployment URLs. Password protection and Trusted IP protection are disabled. Do not disable or bypass Vercel SSO as a workaround.
+- The new one-off URL `https://flame-chick-admin-production-k6edsdg4y-fahad-7455.vercel.app/` loads the app shell but its Admin page shows `Failed to fetch`. Root cause confirmed in current source: `supabase/functions/flame-chick-staff-admin/origin-policy.mjs` uses an exact-origin allowlist. It includes the prior approved one-off preview and the stable branch Preview alias, but does not include the just-created one-off host. The Staff Admin edge function returns HTTP 403 without CORS allow headers to a non-allowlisted origin, which the browser presents as a generic fetch failure.
+- The stable branch Preview alias `https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app/` is already in the exact Staff Admin CORS allowlist, and Vercel confirms this alias currently points to the latest READY deployment `dpl_EJwtuE7r5XruzyjcXCCbEWJovm9m` and exact commit `3b1475a4879931ecb51618a90b8a57d18259a7f5`.
+- User should use the stable branch Preview alias only, not the one-off `k6edsdg4y` URL. This avoids any origin policy or CORS change. Do not add a wildcard or relax CORS. If Vercel SSO blocks the stable alias in the user's browser, resolve the user's existing team access through normal Vercel SSO; do not create anonymous/shareable bypasses or weaken protection.
+- The connected browser's existing stable-alias tab showed the Admin application and an authenticated Admin account, while the latest unique-URL tab showed `Failed to fetch`. No catalog write/save was made during troubleshooting.
+- After access is restored, resume the visual Flame Feast pre-save inspection. Do not save until deal ID/title, three burger alternatives, repeat and caps, fixed price and unrelated groups are confirmed.
