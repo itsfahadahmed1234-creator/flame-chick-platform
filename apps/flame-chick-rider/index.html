@@ -283,13 +283,13 @@ function renderRiderAvailability(){
   if(!rider)return;
   const status=String(rider.availability_status||'offline').toLowerCase();
   const effectiveStatus=status;
-  const label=pending?'Assignment pending':effectiveStatus==='busy'?'On active delivery':effectiveStatus==='available'?'Available for delivery':effectiveStatus==='suspended'?'Suspended':'Offline';
+  const label=effectiveStatus==='busy'?'On active delivery':effectiveStatus==='available'?'Available for delivery':effectiveStatus==='suspended'?'Suspended':'Offline';
   $('riderMeta').textContent=(rider.rider_code?rider.rider_code+' · ':'')+label;
   const btn=$('availabilityBtn');
   if(!btn)return;
   btn.hidden=false;
   btn.disabled=effectiveStatus==='busy'||effectiveStatus==='suspended';
-  btn.textContent=pending?'Assignment pending':effectiveStatus==='busy'?'On active delivery':effectiveStatus==='suspended'?'Account suspended':effectiveStatus==='available'?'Go offline':'Go available';
+  btn.textContent=effectiveStatus==='busy'?'On active delivery':effectiveStatus==='suspended'?'Account suspended':effectiveStatus==='available'?'Go offline':'Go available';
   btn.classList.toggle('danger',effectiveStatus==='available');
 }
 async function updateRiderPresence(online=true,keepalive=false,updatePreference=false){
