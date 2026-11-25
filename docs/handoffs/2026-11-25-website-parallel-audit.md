@@ -197,3 +197,43 @@ The standard Website config still points to the Production Catalogue and Product
 ### Next step
 
 Review the redesigned homepage and cart drawer in a safe visual-only Preview or local static test environment once the Production write path is isolated. Then test desktop/mobile interactions, including fulfilment toggling, field visibility, cart preservation, quote invalidation and server validation. Do not enable checkout Preview or change Production configuration as a side effect.
+
+
+---
+
+## 2026-11-25 — Safe visual review Preview deployment
+
+### Preview deployment (verified READY)
+
+- Dedicated Vercel team: `team_Rpf9jeGg9r3cmMguFXHtziqz` (`fahad-7455`, Hobby)
+- Separate Vercel project: `flame-chick-website-visual-review`
+- Project ID: `prj_7C1gVdgIUx3IOtzix60atkllkNRJ`
+- Root directory: `apps/flame-chick-website/visual-review`
+- Project SSO protection: enabled for all deployments
+- Git source: `itsfahadahmed1234-creator/flame-chick-platform`
+- Git branch: `work/website-parallel-development`
+- Deployed commit: `f27da4daf4872eb15d371f8c599e9bfa96621edc`
+- Preview deployment ID: `dpl_C9xMZGNBEpPp4rz1gvfNj8wSkoFa`
+- Preview URL: https://flame-chick-website-visual-review-l7zuhblsr-fahad-7455.vercel.app
+- Vercel status: `READY`
+- Vercel target: `null`, verified by the deployment API as a Preview deployment
+- Build log confirms GitHub cloned `work/website-parallel-development` at commit `f27da4d`, build completed, and deployment completed.
+- This is an isolated, standalone visual-review page. It uses sample visual content, no live catalogue, no Supabase configuration, no Order API, no external scripts and no order submission. The checkout control is disabled. It does not test real product/deal data or real checkout.
+- Vercel SSO protection means the preview requires access through the team's Vercel authentication.
+
+### Deployment provisioning correction / audit note
+
+The first create-deployment request placed `target: "preview"` in the request body. Vercel did not apply that value; the response created a Production-class deployment `dpl_BWwnUS9LwfGhTPAuLsbUCzLuMCWQ` inside the newly created **separate visual-review project**, not in the existing `flame-chick-website-production` project. Its content is the same static, inert visual-review page with no catalogue/API/checkout connection; it did not touch the real production Website project, its domains, catalogue, Order API, database or orders. The cancellation request was rejected because the deployment was already READY. The corrected request omitted the target field; Vercel then created the above deployment with `target: null`, and the deployment card/API both verified it as `preview`.
+- Do not use the first deployment URL or the separate review project's automatically generated root alias for further work; use the explicit Preview URL above.
+- Existing Vercel project `flame-chick-website-production` (ID `prj_izBWyrFmPZIm63FHAT4jaLHUTLzu`) was only inspected; it was not redeployed, reconfigured, aliased, promoted or changed.
+
+### Deployment safety and testing limitations
+
+- This preview is intentionally visual-only; sample cards/labels are not live catalogue data and sample names/prices must not be treated as business data.
+- The deployed page has no calls to Supabase, catalogue endpoints, order API, payments or customer-data collection. The disabled checkout is not a production checkout implementation.
+- No production alias was assigned to the existing Website project. No existing custom domain was changed.
+- Deployment is suitable for reviewing the design direction (hero, category pills, sample cards, sample deals, cart drawer, Delivery/Takeaway segmented control and responsive layout); it is not a final functional Website deployment or an operational checkout test.
+
+### Next step
+
+Use the explicit Preview URL above to review desktop and mobile visuals. Gather visual feedback, then port approved styling/layout refinements back into `index.html` and `website-order-v3.js` while retaining V3 catalogue/checkout integration and continuing to block Production checkout from Preview.
