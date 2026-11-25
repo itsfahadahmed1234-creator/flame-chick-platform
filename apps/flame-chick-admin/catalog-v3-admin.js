@@ -38,110 +38,108 @@
       is_active:form.is_active!==false,is_available:form.is_available!==false,variants:rows};
   }
   function buildFixedComponentGroups(components,existingGroups=[]){
-    if(!Array.isArray(components)||components.length<1||components.length>40)throw Error('A fixed deal needs 1–40 components.');
+    if(!Array.isArray(components)||components.length<1||components.length>40)throw Error('A fixed deal needs 1–40 component groups.');
     const retainedGroupIds=new Set();
     const groups=components.map((c,i)=>{
-      const label=text(c.display_name,120,'Component label',true),variant=text(c.product_variant_id,64,'Product variant',true);
-      const q=Number(c.quantity);
+      const label=text(c.display_name,120,'Component label',true),q=Number(c.quantity);
       if(!Number.isSafeInteger(q)||q<1||q>100)throw Error('Component quantity must be a whole number from 1 to 100.');
+      const burger=/burger/i.test(label),submitted=Array.isArray(c.options)?c.options:[{option_id:c.option_id,product_variant_id:c.product_variant_id}];
+      if(!submitted.length||submitted.length>40)throw Error(label+' needs between 1 and 40 active choices.');
+      if(submitted.length>1&&!burger)throw Error('Only Burger groups may contain multiple included choices.');
+      const repeat=c.allow_repeat_option===undefined?q>1:c.allow_repeat_option===true,maxPer=repeat?Number(c.max_units_per_option??q):null;
+      if(repeat&&(!Number.isSafeInteger(maxPer)||maxPer<1||maxPer>q))throw Error(label+' has an invalid per-choice repeat limit.');
+      if(!repeat&&q>submitted.length)throw Error(label+' needs at least '+q+' distinct choices because repeats are disabled.');
       if(c.group_id)retainedGroupIds.add(c.group_id);
-      return {...(c.group_id?{id:c.group_id}:{}),name_en:label,name_ur:null,min_units:q,max_units:q,allow_repeat_option:q>1,
-        max_units_per_option:q>1?q:null,sort_order:i+1,is_active:true,
-        options:[{...(c.option_id?{id:c.option_id}:{}),product_variant_id:variant,sort_order:1,is_active:true}]};
+      const priorGroup=existingGroups.find(doc=>doc&&doc.group&&doc.group.id===c.group_id),priorOptions=priorGroup&&Array.isArray(priorGroup.options)?priorGroup.options:[];
+      const seen=new Set(),representedIds=new Set(),representedVariants=new Set();
+      const options=submitted.map((option,optionIndex)=>{
+        const variant=text(option.product_variant_id,64,'Product variant',true);
+        if(seen.has(variant))throw Error(label+' contains the same product variant more than once.');
+        seen.add(variant);
+        const old=priorOptions.find(row=>(option.option_id&&row.id===option.option_id)||row.product_variant_id===variant),id=option.option_id||(old&&old.id)||null;
+        if(id)representedIds.add(id);representedVariants.add(variant);
+        return {...(id?{id}:{}),product_variant_id:variant,sort_order:optionIndex+1,is_active:true};
+      });
+      priorOptions.forEach(old=>{
+        if(!old||!old.id||representedIds.has(old.id)||representedVariants.has(old.product_variant_id))return;
+        options.push({id:old.id,product_variant_id:old.product_variant_id,sort_order:Number(old.sort_order)||options.length+1,is_active:false});
+      });
+      return {...(c.group_id?{id:c.group_id}:{}),name_en:label,name_ur:null,min_units:q,max_units:q,
+        allow_repeat_option:repeat,max_units_per_option:maxPer,sort_order:i+1,is_active:true,options};
     });
-    // Existing groups omitted from the edit are retained as inactive audit rows,
-    // never deleted. Their options are also disabled so no stale content remains orderable.
     for(const doc of existingGroups){
       const group=doc&&doc.group,rows=doc&&doc.options;
       if(!group||!group.id||retainedGroupIds.has(group.id))continue;
       if(!Array.isArray(rows))throw Error('Existing deal component options could not be read safely.');
-      groups.push({
-        id:group.id,name_en:group.name_en,name_ur:group.name_ur??null,
-        min_units:Number(group.min_units),max_units:Number(group.max_units),
-        allow_repeat_option:group.allow_repeat_option===true,
-        max_units_per_option:group.max_units_per_option??null,
+      groups.push({id:group.id,name_en:group.name_en,name_ur:group.name_ur??null,min_units:Number(group.min_units),max_units:Number(group.max_units),
+        allow_repeat_option:group.allow_repeat_option===true,max_units_per_option:group.max_units_per_option??null,
         sort_order:Number(group.sort_order)||0,is_active:false,
-        options:rows.map(option=>({
-          id:option.id,product_variant_id:option.product_variant_id,
-          sort_order:Number(option.sort_order)||0,is_active:false
-        }))
-      });
+        options:rows.map(option=>({id:option.id,product_variant_id:option.product_variant_id,sort_order:Number(option.sort_order)||0,is_active:false}))});
     }
     return {groups};
   }
+  function optionQuantityCap(group){return group.allow_repeat_option===true?Number(group.max_units_per_option??group.max_units??group.min_units??1):1;}
   function buildIncludedMappings(detail){
     if(!isObj(detail)||!Array.isArray(detail.component_groups)||!Array.isArray(detail.variants)||detail.variants.length!==1)throw Error('Saved deal structure could not be verified.');
     const variantDoc=detail.variants[0],variant=variantDoc&&variantDoc.variant;
     if(!variant||!variant.id||variant.pricing_mode!=='FIXED_BUNDLE')throw Error('Deal must have one fixed-price variant.');
-    const prior=Array.isArray(variantDoc.allowed_options)?variantDoc.allowed_options:[];
-    const options=[];
-    detail.component_groups.forEach((doc,index)=>{
+    const prior=Array.isArray(variantDoc.allowed_options)?variantDoc.allowed_options:[],options=[];let activeCount=0;
+    detail.component_groups.forEach(doc=>{
       const group=doc&&doc.group,rows=doc&&doc.options;
       if(!group||!Array.isArray(rows))throw Error('A saved deal component could not be read.');
+      const active=rows.filter(row=>row&&row.is_active===true);
       if(group.is_active===true){
-        const active=rows.filter(row=>row&&row.is_active===true);
-        const q=Number(group.min_units);
-        if(rows.length!==1||active.length!==1||!rows[0].id||!Number.isSafeInteger(q)||q<1||Number(group.max_units)!==q)
-          throw Error('Each active fixed component must have exactly one linked product variant and fixed quantity.');
+        const q=Number(group.min_units),max=Number(group.max_units);
+        if(!Number.isSafeInteger(q)||q<1||max!==q||!active.length)throw Error('Each active component group must have a fixed quantity and at least one linked choice.');
+        if(active.length>1&&!/burger/i.test(String(group.name_en||'')))throw Error('Only Burger groups may contain multiple included choices.');
+        if(group.allow_repeat_option!==true&&q>active.length)throw Error('A non-repeat group needs enough distinct choices to satisfy its quantity.');
+        const cap=optionQuantityCap(group);if(!Number.isSafeInteger(cap)||cap<1||cap>q)throw Error('A component group has an invalid per-choice quantity limit.');
+        activeCount+=active.length;
       }
       for(const row of rows){
         if(!row||!row.id)throw Error('A saved deal component option has no identity.');
         const previous=prior.find(item=>item.component_option_id===row.id);
         if(group.is_active!==true&&row.is_active!==true&&!previous)continue;
-        options.push({
-          ...(previous&&previous.id?{id:previous.id}:{}),
-          component_option_id:row.id,pricing_treatment:'INCLUDED',unit_surcharge:0,
-          max_quantity_per_deal:Number(group.max_units||group.min_units||1),
-          sort_order:options.length+1,
-          is_active:group.is_active===true&&row.is_active===true
-        });
+        options.push({...(previous&&previous.id?{id:previous.id}:{}),component_option_id:row.id,pricing_treatment:'INCLUDED',unit_surcharge:0,
+          max_quantity_per_deal:group.is_active===true?optionQuantityCap(group):(previous&&previous.max_quantity_per_deal!=null?Number(previous.max_quantity_per_deal):optionQuantityCap(group)),
+          sort_order:options.length+1,is_active:group.is_active===true&&row.is_active===true});
       }
     });
-    if(!options.some(item=>item.is_active))throw Error('Deal has no active fixed components.');
+    if(!activeCount)throw Error('Deal has no active included components.');
+    if(options.filter(item=>item.is_active).length!==activeCount)throw Error('Every active component choice must have exactly one INCLUDED mapping.');
     return {deal_variant_id:variant.id,options};
   }
   function buildFixedDealEditDraft(detail,schedules=[],scheduleDetail=null){
-    if(!isObj(detail)||!isObj(detail.deal)||!Array.isArray(detail.component_groups)||
-       !Array.isArray(detail.variants)||detail.variants.length!==1)throw Error('The saved deal is not a supported single-variant fixed bundle.');
+    if(!isObj(detail)||!isObj(detail.deal)||!Array.isArray(detail.component_groups)||!Array.isArray(detail.variants)||detail.variants.length!==1)throw Error('The saved deal is not a supported single-variant fixed bundle.');
     const variantDoc=detail.variants[0],variant=variantDoc&&variantDoc.variant,deal=detail.deal;
-    if(!variant||!variant.id||variant.pricing_mode!=='FIXED_BUNDLE'||deal.is_active!==variant.is_active||
-       !moneyMatches(variant.base_price,variant.base_price))throw Error('Only consistent fixed-price deal records can be edited here.');
+    if(!variant||!variant.id||variant.pricing_mode!=='FIXED_BUNDLE'||deal.is_active!==variant.is_active||!moneyMatches(variant.base_price,variant.base_price))throw Error('Only consistent fixed-price deal records can be edited here.');
     const groups=detail.component_groups.filter(doc=>doc&&doc.group&&doc.group.is_active===true);
     const mappings=Array.isArray(variantDoc.allowed_options)?variantDoc.allowed_options.filter(item=>item.is_active===true):[];
-    const activeOptionCount=groups.reduce((count,doc)=>count+(doc.options||[]).filter(option=>option&&option.is_active===true).length,0);
-    if(!groups.length||activeOptionCount!==mappings.length)throw Error('The active deal contents or choice mappings are incomplete; inspect before editing.');
+    const activeCount=groups.reduce((n,doc)=>n+(doc.options||[]).filter(option=>option&&option.is_active===true).length,0);
+    if(!groups.length||activeCount!==mappings.length)throw Error('The active deal contents or choice mappings are incomplete; inspect before editing.');
     const components=groups.map(doc=>{
-      const group=doc.group,rows=doc.options||[],active=rows.filter(row=>row&&row.is_active===true);
-      const q=Number(group.min_units);
-      if(rows.length!==1||active.length!==1||!Number.isSafeInteger(q)||q<1||Number(group.max_units)!==q)
-        throw Error('This deal uses a selectable or variable component structure that is not enabled in the current editor.');
-      const option=active[0],mapping=mappings.find(item=>item.component_option_id===option.id);
-      if(!mapping||mapping.pricing_treatment!=='INCLUDED'||Number(mapping.unit_surcharge)!==0||
-         Number(mapping.max_quantity_per_deal)!==q||mapping.product_variant_id!==option.product_variant_id)
-        throw Error('This deal has a non-INCLUDED or inconsistent mapping and cannot be edited in the fixed-deal editor.');
-      return {group_id:group.id,option_id:option.id,display_name:group.name_en,
-        product_id:option.product_id,product_variant_id:option.product_variant_id,quantity:q};
+      const group=doc.group,active=(doc.options||[]).filter(row=>row&&row.is_active===true),q=Number(group.min_units);
+      if(!Number.isSafeInteger(q)||q<1||Number(group.max_units)!==q||!active.length)throw Error('This deal uses a variable component quantity that is not enabled in the fixed-price editor.');
+      if(active.length>1&&!/burger/i.test(String(group.name_en||'')))throw Error('Only Burger groups may contain multiple included choices in this editor.');
+      if(group.allow_repeat_option!==true&&q>active.length)throw Error('A non-repeat component group does not have enough distinct choices to satisfy its quantity.');
+      const cap=optionQuantityCap(group);if(!Number.isSafeInteger(cap)||cap<1||cap>q)throw Error('A component group has an invalid per-choice quantity limit.');
+      const options=active.map(option=>{
+        const mapping=mappings.find(item=>item.component_option_id===option.id);
+        if(!mapping||mapping.pricing_treatment!=='INCLUDED'||Number(mapping.unit_surcharge)!==0||Number(mapping.max_quantity_per_deal)!==cap||mapping.product_variant_id!==option.product_variant_id)throw Error('This deal has a non-INCLUDED or inconsistent choice mapping and cannot be edited safely.');
+        return {option_id:option.id,product_id:option.product_id,product_variant_id:option.product_variant_id};
+      });
+      return {group_id:group.id,display_name:group.name_en,quantity:q,allow_repeat_option:group.allow_repeat_option===true,max_units_per_option:group.max_units_per_option??null,options};
     });
     const activeAssignments=(detail.schedule_assignments||[]).filter(item=>item.is_active===true);
-    if(activeAssignments.length>1||activeAssignments.some(item=>item.branch_id!==null))
-      throw Error('This deal has multiple or branch-specific schedules. The current editor will not overwrite them.');
+    if(activeAssignments.length>1||activeAssignments.some(item=>item.branch_id!==null))throw Error('This deal has multiple or branch-specific schedules. The current editor will not overwrite them.');
     const assignment=activeAssignments[0]||null;
     if(assignment){
       const schedule=schedules.find(item=>item.id===assignment.schedule_set_id);
-      if(!schedule||schedule.name!=='Flame Hour daily'||schedule.timezone!=='Asia/Karachi')
-        throw Error('This deal uses a schedule other than the supported Flame Hour daily schedule.');
-      if(!isObj(scheduleDetail)||!isObj(scheduleDetail.schedule_set)||scheduleDetail.schedule_set.id!==schedule.id||
-         !Array.isArray(scheduleDetail.windows)||scheduleDetail.windows.length!==7||
-         !scheduleDetail.windows.every((w,index)=>w.window_kind==='WEEKLY'&&Number(w.weekday_iso)===index+1&&
-           w.local_start==='15:00:00'&&w.local_end==='17:00:00'&&!w.is_all_day))
-        throw Error('The Flame Hour schedule does not match the approved daily 3 PM–5 PM definition.');
+      if(!schedule||schedule.name!=='Flame Hour daily'||schedule.timezone!=='Asia/Karachi')throw Error('This deal uses a schedule other than the supported Flame Hour daily schedule.');
+      if(!isObj(scheduleDetail)||!isObj(scheduleDetail.schedule_set)||scheduleDetail.schedule_set.id!==schedule.id||!Array.isArray(scheduleDetail.windows)||scheduleDetail.windows.length!==7||
+         !scheduleDetail.windows.every((w,index)=>w.window_kind==='WEEKLY'&&Number(w.weekday_iso)===index+1&&w.local_start==='15:00:00'&&w.local_end==='17:00:00'&&!w.is_all_day))throw Error('The Flame Hour schedule does not match the approved daily 3 PM–5 PM definition.');
     }
-    return {
-      dealDraft:{id:deal.id,collection_id:deal.collection_id,title:deal.title,description_en:deal.description_en||'',
-        base_price:String(variant.base_price),is_active:deal.is_active===true,is_available:deal.is_available!==false,
-        flame_hour:!!assignment,scheduleId:assignment?assignment.schedule_set_id:null},
-      components
-    };
+    return {dealDraft:{id:deal.id,collection_id:deal.collection_id,title:deal.title,description_en:deal.description_en||'',base_price:String(variant.base_price),is_active:deal.is_active===true,is_available:deal.is_available!==false,flame_hour:!!assignment,scheduleId:assignment?assignment.schedule_set_id:null},components};
   }
   function isApprovedFlameHourSchedule(item,detail){
     if(!isObj(item)||item.name!=='Flame Hour daily'||item.is_active!==true||item.timezone!=='Asia/Karachi'||
@@ -157,46 +155,36 @@
     return Number.isFinite(a) && Number.isFinite(b) && Math.round(a * 100) === Math.round(b * 100);
   }
   function verifyFixedDealDetail(detail, expected) {
-    if (!isObj(detail) || !isObj(detail.deal) ||
-        !Array.isArray(detail.component_groups) || !Array.isArray(detail.variants) ||
-        detail.variants.length !== 1) {
-      throw Error('The saved deal did not return a complete, single-variant detail record.');
-    }
-    const deal=detail.deal,variantDoc=detail.variants[0],variant=variantDoc&&variantDoc.variant;
-    const expectedActive=expected&&expected.active===true;
-    if(!variant||variant.pricing_mode!=='FIXED_BUNDLE'||deal.is_active!==expectedActive||
-       variant.is_active!==expectedActive||!moneyMatches(variant.base_price,expected.basePrice)||
-       (typeof expected.isAvailable==='boolean'&&deal.is_available!==expected.isAvailable)){
+    if(!isObj(detail)||!isObj(detail.deal)||!Array.isArray(detail.component_groups)||!Array.isArray(detail.variants)||detail.variants.length!==1)throw Error('The saved deal did not return a complete, single-variant detail record.');
+    const deal=detail.deal,variantDoc=detail.variants[0],variant=variantDoc&&variantDoc.variant,expectedActive=expected&&expected.active===true;
+    if(!variant||variant.pricing_mode!=='FIXED_BUNDLE'||deal.is_active!==expectedActive||variant.is_active!==expectedActive||!moneyMatches(variant.base_price,expected.basePrice)||(typeof expected.isAvailable==='boolean'&&deal.is_available!==expected.isAvailable))
       throw Error('The deal activation state, availability or fixed base price did not match the saved draft.');
-    }
+    const wanted=(expected.components||[]).map(item=>item.options?item:{...item,options:[{product_variant_id:item.product_variant_id}]});
     const activeGroups=detail.component_groups.filter(doc=>doc&&doc.group&&doc.group.is_active===true);
-    if(!Array.isArray(expected.components)||activeGroups.length!==expected.components.length)
-      throw Error('The saved deal component count did not match the fixed deal draft.');
-    const optionById=new Map();
+    if(activeGroups.length!==wanted.length)throw Error('The saved deal component group count did not match the fixed deal draft.');
+    const expectedById=new Map();let expectedCount=0;
     activeGroups.forEach((doc,index)=>{
-      const group=doc.group,rows=doc.options,wanted=expected.components[index];
-      if(!wanted||group.name_en!==wanted.display_name||Number(group.min_units)!==Number(wanted.quantity)||
-         Number(group.max_units)!==Number(wanted.quantity)||!Array.isArray(rows)||rows.length!==1||
-         rows[0].is_active!==true||rows[0].product_variant_id!==wanted.product_variant_id)
-        throw Error('A fixed deal component failed read-back verification: '+(wanted&&wanted.display_name||index+1));
-      optionById.set(rows[0].id,{option:rows[0],quantity:Number(wanted.quantity)});
+      const group=doc.group,rows=doc.options,wantedGroup=wanted[index],activeRows=Array.isArray(rows)?rows.filter(row=>row&&row.is_active===true):[];
+      if(!wantedGroup||group.name_en!==wantedGroup.display_name||Number(group.min_units)!==Number(wantedGroup.quantity)||Number(group.max_units)!==Number(wantedGroup.quantity)||!Array.isArray(rows)||activeRows.length!==wantedGroup.options.length||
+         (typeof wantedGroup.allow_repeat_option==='boolean'&&group.allow_repeat_option!==wantedGroup.allow_repeat_option)||
+         (wantedGroup.max_units_per_option!==undefined&&(group.max_units_per_option??null)!==(wantedGroup.max_units_per_option??null)))throw Error('A fixed deal component group failed read-back verification: '+(wantedGroup&&wantedGroup.display_name||index+1));
+      const seen=new Set();
+      wantedGroup.options.forEach(expectedOption=>{
+        const row=activeRows.find(option=>option.product_variant_id===expectedOption.product_variant_id);
+        if(!row||seen.has(row.product_variant_id))throw Error('A burger choice failed read-back verification: '+(wantedGroup.display_name||index+1));
+        seen.add(row.product_variant_id);expectedById.set(row.id,{row,cap:optionQuantityCap(group)});expectedCount++;
+      });
     });
     const mappings=Array.isArray(variantDoc.allowed_options)?variantDoc.allowed_options.filter(item=>item.is_active===true):[];
-    if(mappings.length!==expected.components.length)throw Error('The saved deal did not return the complete active INCLUDED mapping set.');
+    if(mappings.length!==expectedCount)throw Error('The saved deal did not return the complete active INCLUDED mapping set.');
     for(const mapping of mappings){
-      const linked=optionById.get(mapping.component_option_id);
-      if(!linked||mapping.product_variant_id!==linked.option.product_variant_id||
-         mapping.pricing_treatment!=='INCLUDED'||Number(mapping.unit_surcharge)!==0||
-         Number(mapping.max_quantity_per_deal)!==linked.quantity)
-        throw Error('A saved deal component mapping is not active, fixed and INCLUDED.');
+      const linked=expectedById.get(mapping.component_option_id);
+      if(!linked||mapping.product_variant_id!==linked.row.product_variant_id||mapping.pricing_treatment!=='INCLUDED'||Number(mapping.unit_surcharge)!==0||Number(mapping.max_quantity_per_deal)!==linked.cap)
+        throw Error('A saved deal component choice mapping is not active, included and within its repeat limit.');
     }
     const assignments=(detail.schedule_assignments||[]).filter(item=>item.is_active===true&&item.branch_id===null);
-    if(expected.flameHour===true){
-      if(!assignments.some(item=>item.schedule_set_id===expected.scheduleId))
-        throw Error('The Flame Hour daily schedule assignment could not be verified.');
-    }else if(assignments.length){
-      throw Error('An unexpected active global schedule assignment remains on this deal.');
-    }
+    if(expected.flameHour===true){if(!assignments.some(item=>item.schedule_set_id===expected.scheduleId))throw Error('The Flame Hour daily schedule assignment could not be verified.');}
+    else if(assignments.length)throw Error('An unexpected active global schedule assignment remains on this deal.');
     return true;
   }
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -258,32 +246,50 @@
         (editing?'<label class="fcv3-check"><input type="checkbox" name="is_active"'+(category.is_active?' checked':'')+'> Active</label>':'')+'</div>'+
         '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save category changes':'Save category')+'</button></div></form>';
     }
-    function componentForm(c){
-      const product=s.products.find(p=>p.id===c.product_id)||s.products.find(p=>p.is_active!==false);
-      const productId=c.product_id||(product&&product.id)||'';
-      const variants=product&&product.variants?product.variants.filter(v=>v.is_active!==false):[];
-      const variantId=c.product_variant_id||(variants[0]&&variants[0].id)||'';
-      return '<article class="fcv3-component-row" data-component-row>'+
-        (c.group_id?'<input type="hidden" data-field="group_id" value="'+esc(c.group_id)+'">':'')+
-        (c.option_id?'<input type="hidden" data-field="option_id" value="'+esc(c.option_id)+'">':'')+
-        '<div class="fcv3-component-grid">'+
-        '<label>Displayed component name<input data-field="display_name" maxlength="120" required value="'+esc(c.display_name||(product&&product.name_en))+'"></label>'+
-        '<label>Linked product<select data-field="product_id" data-component-product>'+s.products.filter(p=>p.is_active!==false).map(p=>'<option value="'+esc(p.id)+'"'+(p.id===productId?' selected':'')+'>'+esc(p.name_en)+'</option>').join('')+'</select></label>'+
-        '<label>Variant<select data-field="product_variant_id" data-component-variant>'+variants.map(v=>'<option value="'+esc(v.id)+'"'+(v.id===variantId?' selected':'')+'>'+esc(v.size_label)+(v.is_standalone_sellable===false?' · Deal-only':'')+'</option>').join('')+'</select></label>'+
-        '<label>Quantity<input data-field="quantity" type="number" min="1" max="100" step="1" required value="'+esc(c.quantity||1)+'"></label></div>'+
-        '<button type="button" class="fcv3-button fcv3-danger" data-action="component-remove">Remove component</button></article>';
+    function componentChoiceForm(option,group){
+      const products=s.products.filter(p=>p.is_active!==false&&p.variants.some(v=>v.is_active!==false));
+      const used=new Set((group.options||[]).filter(x=>x!==option&&x.product_variant_id).map(x=>x.product_variant_id));
+      let product=products.find(p=>p.id===option.product_id)||null,variants=product?product.variants.filter(v=>v.is_active!==false):[];
+      let variant=variants.find(v=>v.id===option.product_variant_id)||variants.find(v=>!used.has(v.id))||variants[0]||null;
+      if(!product&&products.length){product=products[0];variants=product.variants.filter(v=>v.is_active!==false);variant=variants.find(v=>!used.has(v.id))||variants[0]||null;}
+      return '<article class="fcv3-choice-row" data-choice-row>'+(option.option_id?'<input type="hidden" data-field="option_id" value="'+esc(option.option_id)+'">':'')+
+        '<label>Choice product<select data-field="product_id" data-choice-product>'+products.map(p=>'<option value="'+esc(p.id)+'"'+(product&&p.id===product.id?' selected':'')+'>'+esc(p.name_en)+'</option>').join('')+'</select></label>'+
+        '<label>Product variant<select data-field="product_variant_id" data-choice-variant>'+variants.map(v=>'<option value="'+esc(v.id)+'"'+(variant&&v.id===variant.id?' selected':'')+'>'+esc(v.size_label)+(v.is_standalone_sellable===false?' · Deal-only':'')+'</option>').join('')+'</select></label>'+
+        '<button type="button" class="fcv3-button fcv3-danger" data-action="component-choice-remove">Remove choice</button></article>';
+    }
+    function componentForm(c,index){
+      const group={...c,options:Array.isArray(c.options)&&c.options.length?c.options:[{}]},repeat=group.allow_repeat_option===true;
+      return '<article class="fcv3-component-row" data-component-group data-group-index="'+index+'">'+(group.group_id?'<input type="hidden" data-field="group_id" value="'+esc(group.group_id)+'">':'')+
+        '<div class="fcv3-component-grid"><label>Component group<input data-field="display_name" maxlength="120" required value="'+esc(group.display_name)+'"></label>'+
+        '<label>Required quantity<input data-field="quantity" type="number" min="1" max="100" step="1" required value="'+esc(group.quantity||1)+'"></label>'+
+        '<label class="fcv3-check"><input type="checkbox" data-field="allow_repeat_option"'+(repeat?' checked':'')+'> Allow the same choice more than once</label>'+
+        '<label>Maximum quantity per choice<input data-field="max_units_per_option" type="number" min="1" max="'+esc(group.quantity||1)+'" step="1" value="'+(repeat?esc(group.max_units_per_option??group.quantity??1):'')+'" '+(repeat?'':'disabled')+'></label></div>'+
+        '<div class="fcv3-choice-list">'+group.options.map(option=>componentChoiceForm(option,group)).join('')+'</div>'+
+        '<div class="fcv3-choice-actions"><button type="button" class="fcv3-button" data-action="component-choice-add">+ Add choice</button><small>Only Burger groups may contain multiple included choices.</small></div>'+
+        '<button type="button" class="fcv3-button fcv3-danger" data-action="component-remove">Remove component group</button></article>';
+    }
+    function readComponentGroups(form){
+      return Array.from(form.querySelectorAll('[data-component-group]')).map(group=>({
+        group_id:group.querySelector('[data-field="group_id"]')?.value||null,
+        display_name:group.querySelector('[data-field="display_name"]').value,
+        quantity:Number(group.querySelector('[data-field="quantity"]').value),
+        allow_repeat_option:group.querySelector('[data-field="allow_repeat_option"]').checked,
+        max_units_per_option:group.querySelector('[data-field="allow_repeat_option"]').checked?Number(group.querySelector('[data-field="max_units_per_option"]').value):null,
+        options:Array.from(group.querySelectorAll('[data-choice-row]')).map(row=>({option_id:row.querySelector('[data-field="option_id"]')?.value||null,
+          product_id:row.querySelector('[data-field="product_id"]').value,product_variant_id:row.querySelector('[data-field="product_variant_id"]').value}))
+      }));
     }
     function dealForm(){
       const editing=!!(s.dealDraft&&s.dealDraft.id);
-      return '<form class="fcv3-editor" data-form="deal"><div class="fcv3-warning">Fixed-price deal only. Every component is locked and INCLUDED. No selectable upgrades or +price options are created. Removed components are retained inactive for audit.</div>'+
+      return '<form class="fcv3-editor" data-form="deal"><div class="fcv3-warning">Fixed-price bundle. Burger groups can contain multiple included choices; customers choose each burger in a compact dropdown. Every choice is INCLUDED with zero surcharge. The deal price stays fixed.</div>'+
         '<div class="fcv3-form-grid"><label>Deal title<input name="title" maxlength="160" required value="'+esc(s.dealDraft&&s.dealDraft.title)+'"></label>'+
         '<label>Deal price (PKR)<input name="base_price" type="number" min="0" step="0.01" required value="'+esc(s.dealDraft&&s.dealDraft.base_price)+'"></label>'+
         '<label class="fcv3-wide">Description<textarea name="description_en" maxlength="3000" rows="2">'+esc(s.dealDraft&&s.dealDraft.description_en)+'</textarea></label>'+
         '<label class="fcv3-check"><input type="checkbox" name="flame_hour"'+(s.dealDraft&&s.dealDraft.flame_hour?' checked':'')+'> Flame Hour daily 3–5 PM (Asia/Karachi)</label>'+
         (editing?'<label class="fcv3-check"><input type="checkbox" name="deal_available"'+(s.dealDraft.is_available?' checked':'')+'> Available to order</label><p class="fcv3-wide">Active status is preserved automatically. The deal is temporarily disabled while its contents are being verified.</p>':'')+'</div>'+
-        '<div class="fcv3-subhead"><div><h4>Fixed components</h4><p>Each component links to one exact product variant.</p></div><button type="button" class="fcv3-button" data-action="component-add">+ Add component</button></div>'+
+        '<div class="fcv3-subhead"><div><h4>Component groups</h4><p>Set each group quantity. Only Burger groups may contain multiple included choices.</p></div><button type="button" class="fcv3-button" data-action="component-add">+ Add component group</button></div>'+
         '<div class="fcv3-components">'+s.components.map(componentForm).join('')+'</div>'+
-        '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save fixed deal changes':'Create fixed deal')+'</button></div></form>';
+        '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save deal changes':'Create fixed deal')+'</button></div></form>';
     }
     function render(){
       if(!el)return;
@@ -314,7 +320,7 @@
         '<div class="fcv3-table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Standalone prices</th><th>Status</th><th></th></tr></thead><tbody>'+(productRows||'<tr><td colspan="5">No products in draft.</td></tr>')+'</tbody></table></div>'+
         '<div class="fcv3-toolbar"><div><h3>Categories</h3><p>Menu and deal categories are distinct.</p></div><button class="fcv3-button" data-action="category-add">+ Add category</button></div>'+
         '<div class="fcv3-category-grid">'+s.categories.map(c=>'<article><strong>'+esc(c.name_en)+'</strong><small>'+esc(c.category_kind)+' · '+(c.is_active?'Active':'Inactive')+'</small><button class="fcv3-button" data-action="category-edit" data-id="'+esc(c.id)+'">Edit</button></article>').join('')+'</div>'+
-        '<div class="fcv3-toolbar"><div><h3>Deals and offers</h3><p>Each deal has its own fixed price and fixed INCLUDED component list. No selectable upgrades are enabled.</p></div><button class="fcv3-button fcv3-primary" data-action="deal-add">+ Create fixed deal</button></div>'+
+        '<div class="fcv3-toolbar"><div><h3>Deals and offers</h3><p>Fixed prices with INCLUDED component choices. Burger groups support per-burger dropdown selections.</p></div><button class="fcv3-button fcv3-primary" data-action="deal-add">+ Create fixed deal</button></div>'+
         (collectionHtml||'<p class="fcv3-empty">No deal collection yet. The first deal creates the Deals category and collection.</p>')+
         (s.editor?'<div class="fcv3-editor-shell"><div class="fcv3-editor-head"><div><span class="fcv3-kicker">DRAFT EDITOR</span><h3>'+
           (s.editor.type==='product'?(s.editor.product?'Edit product':'Add product'):s.editor.type==='category'?(s.editor.category?'Edit category':'Add category'):(s.dealDraft&&s.dealDraft.id?'Edit fixed deal':'Create fixed deal'))+'</h3></div><button class="fcv3-button fcv3-muted" data-action="editor-cancel">Close</button></div>'+
@@ -326,7 +332,7 @@
     function openProduct(p){s.editor={type:'product',product:p?JSON.parse(JSON.stringify(p)):null};s.notice=null;s.error=null;render();}
     function openDeal(){
       if(!s.products.some(p=>p.is_active!==false&&p.variants.some(v=>v.is_active!==false))){s.error='Add active products and variants before creating a deal.';render();return;}
-      s.editor={type:'deal'};s.editorRevision=s.revision;s.components=[{display_name:'',product_id:'',product_variant_id:'',quantity:1}];s.dealDraft={title:'',description_en:'',base_price:'',flame_hour:false,is_available:true};s.notice=null;s.error=null;s.partial=null;render();
+      s.editor={type:'deal'};s.editorRevision=s.revision;s.components=[{display_name:'Burger',quantity:1,allow_repeat_option:false,max_units_per_option:null,options:[{}]}];s.dealDraft={title:'',description_en:'',base_price:'',flame_hour:false,is_available:true};s.notice=null;s.error=null;s.partial=null;render();
     }
     async function openDealEdit(dealId){
       const detail=await read(READ.dealDetail,{deal_id:dealId});
@@ -512,14 +518,7 @@
         await write(WRITE.product,payload);s.editor=null;s.notice='Product and variants saved to catalog draft.';await refresh();return;
       }
       if(type==='deal'){
-        s.components=Array.from(form.querySelectorAll('[data-component-row]')).map(row=>({
-          group_id:row.querySelector('[data-field="group_id"]')?.value||null,
-          option_id:row.querySelector('[data-field="option_id"]')?.value||null,
-          display_name:row.querySelector('[data-field="display_name"]').value,
-          product_id:row.querySelector('[data-field="product_id"]').value,
-          product_variant_id:row.querySelector('[data-field="product_variant_id"]').value,
-          quantity:Number(row.querySelector('[data-field="quantity"]').value)
-        }));
+        s.components=readComponentGroups(form);
         const existing=s.dealDraft&&s.dealDraft.id?s.dealDraft:null;
         s.dealDraft={
           ...(existing?existing:{}),title:fd.get('title'),description_en:fd.get('description_en'),
@@ -544,7 +543,7 @@
         summary.deals+' fixed deals / '+summary.offers+' fixed-price offers',
         summary.components+' fixed INCLUDED components',
         '',
-        'This will write catalog draft records only. It will NOT publish the catalog, deploy an app, enable checkout, or create selectable +price upgrades.',
+        'This writes catalog draft records only. Burger choices remain INCLUDED at zero surcharge. It will NOT publish the catalog, deploy an app, or enable checkout.',
         '',
         'If interrupted, the import can be resumed using stable identities. Conflicting or unexpected existing records will stop the process for inspection.',
         '',
@@ -582,18 +581,45 @@
           else if(a==='deal-add')openDeal();
           else if(a==='variant-add'){if(!s.editor.product)s.editor.product={variants:[]};s.editor.product.variants=s.editor.product.variants||[];s.editor.product.variants.push({size_key:'OPTION_'+(s.editor.product.variants.length+1),size_label:'Option '+(s.editor.product.variants.length+1),price:'',variant_kind:'standard',is_standalone_sellable:true,is_active:true,is_available:true});render();}
           else if(a==='variant-remove'){b.closest('[data-variant-row]')?.remove();}
-          else if(a==='component-add'){s.components.push({display_name:'',product_id:'',product_variant_id:'',quantity:1});render();}
-          else if(a==='component-remove'){b.closest('[data-component-row]')?.remove();}
-          else if(a==='editor-cancel'){s.editor=null;render();}
+          else if(a==='component-add'){
+             const form=el.querySelector('form[data-form="deal"]');if(form)s.components=readComponentGroups(form);
+             s.components.push({display_name:'',quantity:1,allow_repeat_option:false,max_units_per_option:null,options:[{}]});render();
+           }
+           else if(a==='component-choice-add'){
+             const form=el.querySelector('form[data-form="deal"]');if(form)s.components=readComponentGroups(form);
+             const index=Number(b.closest('[data-component-group]')?.dataset.groupIndex),group=s.components[index];
+             if(!group||!/burger/i.test(group.display_name))throw Error('Only Burger groups support multiple choices.');
+             if(group.options.length>=12)throw Error('A Burger group can contain at most 12 choices.');
+             group.options.push({});render();
+           }
+           else if(a==='component-choice-remove'){
+             const form=el.querySelector('form[data-form="deal"]');if(form)s.components=readComponentGroups(form);
+             const groupEl=b.closest('[data-component-group]'),index=Number(groupEl?.dataset.groupIndex);
+             const choiceIndex=Array.from(groupEl.querySelectorAll('[data-choice-row]')).indexOf(b.closest('[data-choice-row]'));
+             if(s.components[index])s.components[index].options.splice(choiceIndex,1);render();
+           }
+           else if(a==='component-remove'){
+             const form=el.querySelector('form[data-form="deal"]');if(form)s.components=readComponentGroups(form);
+             const index=Number(b.closest('[data-component-group]')?.dataset.groupIndex);s.components.splice(index,1);render();
+           }
+           else if(a==='editor-cancel'){s.editor=null;render();}
           else if(a==='deal-detail'){s.detail=await read(READ.dealDetail,{deal_id:b.dataset.id});render();}
           else if(a==='deal-edit'){await openDealEdit(b.dataset.id);}
           else if(a==='detail-close'){s.detail=null;render();}
         }catch(e){s.error=e.message||'Catalog action failed.';render();}
       };
       el.onchange=event=>{
-        if(event.target.matches('[data-component-product]')){
-          const row=event.target.closest('[data-component-row]'),p=s.products.find(x=>x.id===event.target.value),select=row.querySelector('[data-component-variant]');
+        if(event.target.matches('[data-choice-product]')){
+          const row=event.target.closest('[data-choice-row]'),p=s.products.find(x=>x.id===event.target.value),select=row.querySelector('[data-choice-variant]');
           select.innerHTML=(p?p.variants.filter(v=>v.is_active!==false):[]).map(v=>'<option value="'+esc(v.id)+'">'+esc(v.size_label)+(v.is_standalone_sellable===false?' · Deal-only':'')+'</option>').join('');
+        }
+        if(event.target.matches('[data-field="allow_repeat_option"]')){
+          const group=event.target.closest('[data-component-group]'),input=group.querySelector('[data-field="max_units_per_option"]');
+          input.disabled=!event.target.checked;if(event.target.checked&&!input.value)input.value=group.querySelector('[data-field="quantity"]').value||1;
+        }
+        if(event.target.matches('[data-field="quantity"]')){
+          const group=event.target.closest('[data-component-group]'),input=group.querySelector('[data-field="max_units_per_option"]');
+          input.max=event.target.value;if(Number(input.value)>Number(event.target.value))input.value=event.target.value;
         }
         if(event.target.matches('[data-field="variant_kind"]')){const row=event.target.closest('[data-variant-row]'),pack=event.target.value==='pack';row.querySelector('[data-field="pack_quantity"]').disabled=!pack;row.querySelector('[data-field="pack_unit"]').disabled=!pack;}
       };
