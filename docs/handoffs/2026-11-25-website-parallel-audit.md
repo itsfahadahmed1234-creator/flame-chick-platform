@@ -134,3 +134,66 @@ No application-code change is approved by this audit. Continue in the following 
 - Preview deployed during this audit: none.
 - Production changes during this audit: none.
 - Shared-backend dependencies: Order API, pricing/quote token, shared V3 catalogue/deal-view contract, delivery configuration and atomic order-rate-limit RPC; coordinate all changes with the Production/POS chat.
+
+
+---
+
+## 2026-11-25 — Homepage cart and fulfilment visual redesign
+
+**Latest Website branch checkpoint:** `5cbcb7136c6369a62dd97053a60fb1a7ed669503`  
+**Branch:** `work/website-parallel-development`
+
+### User-requested visual changes implemented
+
+- Removed the large homepage branch/fulfilment selection panel. The homepage no longer displays a branch selector or the separate "choose delivery/pickup before menu" gate.
+- The Website context now requires exactly one currently enabled website-ordering branch. The single branch is selected internally from the server context and the matching published V3 branch snapshot. If the API ever reports zero or multiple enabled branches, the page fails closed with an explanatory error rather than silently selecting one.
+- The published V3 catalogue can render immediately after its normal secure catalogue/context load; Delivery is selected by default when available.
+- Moved the active V3 cart and customer details into a responsive slide-in cart drawer.
+- Added Delivery and Takeaway fulfilment controls inside the cart. Takeaway maps to the existing backend `pickup` fulfilment value.
+- Added a mobile bottom cart bar that appears when the cart contains items. The homepage header cart button and mobile cart bar both open the same V3 cart drawer.
+- Reused the V2-style segmented radio control, slide-in drawer, red/cream/gold palette and existing V2 responsive interaction styling already contained in the Flame Chick homepage. No design assets, data, catalogue content or code were fetched from another website.
+- Kept the V3 published catalogue client, product/deal renderers, deal configurator, product modifiers, quote endpoint, order submission, signed quote token, idempotency and server-side pricing/availability validation.
+
+### Fulfilment interaction
+
+- Delivery is the initial method when the single branch's current server context supports Delivery.
+- Takeaway is available only when the same current server context supports Pickup.
+- Unsupported fulfilment options are disabled in the cart UI.
+- Changing fulfilment preserves the cart contents but invalidates any prior quote and requires a fresh server-verified quote. The server still validates the chosen fulfilment and the selected product/deal availability.
+- Delivery area/address fields are shown only when Delivery is selected. Area IDs, locality and address are submitted as customer selections; no client fee calculation was added.
+- Dine-in remains a POS/staff fulfilment type and was not added to the customer Website.
+
+### Source files changed on the Website branch
+
+1. `apps/flame-chick-website/index.html` — removed homepage branch/fulfilment gate and inline cart; added responsive V3 cart drawer, in-cart Delivery/Takeaway controls, mobile cart bar and V2-style visual rules.
+2. `apps/flame-chick-website/js/website-order-v3.js` — single-enabled-branch internal context, automatic Delivery default, drawer open/close handling, mobile cart count, fulfilment switching and quote invalidation.
+3. `tests/website-source-hygiene.test.mjs` — asserts no visible branch selector, Delivery default, Takeaway option, V2-style cart drawer and V3 fulfilment/quote wiring; updated the existing product-artwork assertion to match the current V3 renderer helper.
+4. `.github/workflows/ci-website-static.yml` — enabled the Website-only CI workflow on `work/website-parallel-development`, retaining the existing production-source branch trigger and all existing checks.
+
+### CI verification
+
+- GitHub Actions run: `45571519719`
+- Workflow: **Flame Chick Website Static Checks**
+- Exact tested commit: `5cbcb7136c6369a62dd97053a60fb1a7ed669503`
+- Result: **SUCCESS**
+- Verified steps: JavaScript syntax checks; core Website/catalogue/deal/fulfilment regression tests; preview fixture tests; Website and preview inline-script parsing.
+- An earlier run `45571426142` failed on a stale existing `product.imagePath` assertion. The source currently invokes `appendProductArtwork(art, product, category.name)`; the test was aligned with that renderer and the full rerun passed. This was a test expectation correction, not a catalogue, pricing or order API change.
+- No interactive browser layout test or end-to-end checkout was performed.
+
+### Preview restriction remains
+
+The standard Website config still points to the Production Catalogue and Production Order API. A Vercel Preview using that config could potentially create a live order. Therefore:
+- No Vercel Preview was deployed for this visual checkpoint.
+- Do not test quote/place-order/retry against the normal Production-backed Preview.
+- The Website preview workflow's existing fail-closed deployment gate remains unchanged and disabled on the parallel branch.
+- Before enabling an interactive Preview, create and verify a genuinely isolated mock/staging order path with no Production write route. A UI-only disabled button is not an adequate isolation boundary.
+
+### Shared/backend and Production impact
+
+- No shared catalogue or deal validator modules changed.
+- No Order API, pricing module, quote-token module, Edge Function, database RPC, migration, database schema, Production setting, catalogue publication, order, payment, staff account, Rider setting, Realtime setting, Vercel alias or production deployment changed.
+- No commit was made to `work/production-source-audit`. All code and test changes remain on `work/website-parallel-development`.
+
+### Next step
+
+Review the redesigned homepage and cart drawer in a safe visual-only Preview or local static test environment once the Production write path is isolated. Then test desktop/mobile interactions, including fulfilment toggling, field visibility, cart preservation, quote invalidation and server validation. Do not enable checkout Preview or change Production configuration as a side effect.
