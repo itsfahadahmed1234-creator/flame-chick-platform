@@ -114,14 +114,24 @@ test("checkout uses server quote tokens, idempotency and safe uncertain-response
   assert.doesNotMatch(order, /localStorage|indexedDB/);
 });
 
-test("cart badge, delivery and pickup controls are wired to the V3 order experience", () => {
+test("single-branch storefront skips the branch gate and opens fulfilment from the V2-style cart drawer", () => {
   assert.match(html, /id="badge"/);
   assert.match(order, /if \(\$\('badge'\)\)/);
-  assert.match(html, /id="branch-selector"/);
+  assert.doesNotMatch(html, /id="branch-selector"|id="catalog-context-label"|Choose your branch/);
+  assert.match(html, /id="fc-v3-cart-drawer"[^>]*class="drawer fc-v3-cart-drawer"/);
+  assert.match(html, /class="seg fc-v3-fulfilment"/);
+  assert.match(html, /id="fulfilment-delivery"[^>]*value="delivery" checked/);
+  assert.match(html, /id="fulfilment-pickup"[^>]*value="pickup"/);
   assert.match(html, /id="delivery-area"/);
   assert.match(html, /id="request-quote"/);
   assert.match(html, /id="place-order"/);
   assert.match(html, /id="order-success"/);
+  assert.match(order, /context\.branches\.length !== 1/);
+  assert.match(order, /availableTypes\.indexOf\('delivery'\) >= 0 \? 'delivery'/);
+  assert.match(order, /function changeFulfilment\(type\)/);
+  assert.match(order, /selectFulfilment\(type\)/);
+  assert.match(order, /function openCartDrawer\(\)/);
+  assert.match(order, /function closeCartDrawer\(\)/);
   assert.match(order, /websiteDeliveryEnabled/);
   assert.match(order, /websitePickupEnabled/);
   assert.match(order, /fulfillment_type: context\.fulfilmentType/);
