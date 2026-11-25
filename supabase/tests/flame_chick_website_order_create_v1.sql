@@ -29,7 +29,7 @@ BEGIN
     id,restaurant_id,branch_code,name,is_active,
     website_ordering_enabled,website_delivery_enabled,website_pickup_enabled
   ) VALUES(
-    v_branch,v_restaurant,'qa-web','QA Website Branch',true,true,true,true
+    v_branch,v_restaurant,'main','Main',true,true,true,true
   );
 
   INSERT INTO auth.users(
