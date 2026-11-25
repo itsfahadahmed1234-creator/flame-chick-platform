@@ -5144,3 +5144,8 @@ Canonical continuation: `docs/handoffs/2026-11-25-admin-deal-editor-correction-p
 ## 2026-11-25 — Burger selector clarification / placeholder exclusion
 
 Latest source commit `3b1475a4879931ecb51618a90b8a57d18259a7f5`; Admin static checks SUCCESS (run `45534964386`); Website static checks SUCCESS (run `45534888577`). Latest Admin Preview is READY at https://flame-chick-admin-production-k6edsdg4y-fahad-7455.vercel.app/ (deployment `dpl_EJwtuE7r5XruzyjcXCCbEWJovm9m`). Burger slot dropdowns already each offer the full configured burger alternatives; repeat is controlled by the group/option caps. Admin now excludes the exact placeholder product name `Burger` from Burger group selectors without deleting or editing the underlying catalog product. See `docs/handoffs/2026-11-25-admin-deal-editor-correction-preview.md` for the precise inspection and controlled-save procedure. No catalog changes or publication performed.
+
+
+## 2026-11-25 — Preview access troubleshooting
+
+The one-off Preview host `flame-chick-admin-production-k6edsdg4y-fahad-7455.vercel.app` is not included in the Staff Admin function's exact CORS origin list, causing `Failed to fetch`. Vercel confirms the stable branch Preview alias `flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app` points to the latest READY deployment commit `3b1475a4879931ecb51618a90b8a57d18259a7f5` and is already CORS-allowlisted. Use the stable alias only. Keep Vercel SSO and exact-origin CORS protection enabled. Detailed diagnosis and next step are in `docs/handoffs/2026-11-25-admin-deal-editor-correction-preview.md`.
