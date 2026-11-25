@@ -96,7 +96,7 @@ async function bootstrap(){
  S.staffMembers=Array.isArray(context.staff)?context.staff:[];
  S.staffInvitations=Array.isArray(context.invitations)?context.invitations:[];
  S.staffAudit=Array.isArray(context.audit)?context.audit:[];
- S.branch=S.staffBranches.find(x=>x.is_active)||null;
+ S.branch=S.staffBranches.find(x=>x.is_active&&String(x.branch_code||"").toLowerCase()==="main")||S.staffBranches.find(x=>x.is_active)||null;
  $("userName").textContent=(S.staffMembers.find(m=>m.user_id===u.id)?.display_name)||u.email||"Signed-in user";
  $("userRole").textContent=staffRoleLabel(S.role);
  $("userAvatar").textContent=(u.email||"FC").slice(0,2).toUpperCase();
@@ -164,11 +164,16 @@ async function openCatalogV3(){
 }
 function staffRoleLabel(role){return ({owner:"Owner",admin:"Admin",manager:"Manager",cashier:"Cashier",rider:"Rider"})[role]||role;}
 function staffRequestId(){return crypto.randomUUID?crypto.randomUUID():"b4-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2);}
-function selectedStaffBranches(){return Array.from($("staffBranch").selectedOptions).map(o=>o.value).filter(Boolean);}
+function staffBranchIds(roleKey){
+ if(["admin","owner"].includes(roleKey))return [];
+ const main=S.staffBranches.filter(b=>b.is_active&&String(b.branch_code||"").toLowerCase()==="main");
+ if(main.length!==1||!main[0].id)throw Error("The active Main branch is not configured exactly once. Ask an administrator to check branch setup.");
+ return [main[0].id];
+}
 function syncStaffBranchControl(){
  const global=["admin","owner"].includes($("staffRoleSelect").value);
- $("staffBranchField").hidden=global;$("staffBranch").required=!global;
- $("staffBranchHint").textContent=global?"Admin and Owner access applies across the restaurant.":"Select every active branch this person should access.";
+ $("staffBranchHint").textContent=global?"Admin and Owner access applies across the whole restaurant.":"Main branch is assigned automatically. No branch selection is needed.";
+ $("staffBranchLabel").textContent=global?"Branch scope: Restaurant-wide":"Branch scope: Main (automatic)";
 }
 function renderStaff(){
  const body=$("staffTable"),branches=new Map(S.staffBranches.map(b=>[b.id,b.name+(b.branch_code?" · "+b.branch_code:"")]));
@@ -176,7 +181,7 @@ function renderStaff(){
  body.innerHTML=S.staffMembers.length?S.staffMembers.map(m=>{
   const global=["admin","owner"].includes(m.role_key),self=m.user_id===S.user.id;
   const scope=global?"All branches":branches.get(m.branch_id)||"Branch unavailable";
-  const actions=m.is_active&&!self?'<button class="action-link danger-link" data-staff-deactivate="'+esc(m.role_id)+'">Deactivate</button>'+(!global?'<button class="action-link" data-staff-scope="'+esc(m.role_id)+'">Add branch access</button>':""):self?'<span class="muted">Your own role</span>':'<span class="muted">Inactive</span>';
+  const actions=m.is_active&&!self?'<button class="action-link danger-link" data-staff-deactivate="'+esc(m.role_id)+'">Deactivate</button>':self?'<span class="muted">Your own role</span>':'<span class="muted">Inactive</span>';
   return '<tr><td><div class="order-code">'+esc(m.display_name||"Team member")+'</div><div class="order-name">'+esc(m.email||"No email")+'</div>'+(m.phone?'<small class="subtle-line">'+esc(m.phone)+'</small>':"")+'</td><td><span class="role-pill role-'+esc(m.role_key)+'">'+esc(staffRoleLabel(m.role_key))+'</span></td><td>'+esc(scope)+'</td><td><span class="state-text '+(m.is_active?"good":"bad")+'">'+(m.is_active?"Active":"Inactive")+'</span><small class="subtle-line">'+(m.email_confirmed?"Email confirmed":"Email not confirmed")+(m.last_sign_in_at?" · Last sign-in "+esc(time(new Date(m.last_sign_in_at))):"")+'</small></td><td class="right staff-actions">'+actions+'</td></tr>';
  }).join(""):'<tr><td colspan="5" class="empty-cell">No staff roles are assigned yet.</td></tr>';
  body.querySelectorAll("[data-staff-deactivate]").forEach(button=>button.onclick=async()=>{
@@ -188,7 +193,6 @@ function renderStaff(){
   try{await staffApi("POST",null,{action:"deactivate_role",role_id:m.role_id,reason:reason.trim(),request_id:staffRequestId()});toast("Role deactivated and audited.");await loadStaff();}
   catch(e){toast(e.message,true);button.disabled=false;}
  });
- body.querySelectorAll("[data-staff-scope]").forEach(button=>{button.onclick=()=>{const m=S.staffMembers.find(x=>x.role_id===button.dataset.staffScope);if(m)openStaffDialog(m,"scope");};});
  const inv=$("staffInvitations");
  if(inv){
   inv.innerHTML=S.staffInvitations.length?S.staffInvitations.map(i=>{
@@ -213,37 +217,47 @@ async function loadStaff(){
  S.staffInvitations=Array.isArray(data.invitations)?data.invitations:[];
  S.staffAudit=Array.isArray(data.audit)?data.audit:[];
  S.staffBranches=Array.isArray(data.branches)?data.branches:[];
- $("staffBranch").innerHTML=S.staffBranches.filter(b=>b.is_active).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.name)+(b.branch_code?" · "+esc(b.branch_code):"")+'</option>').join("");
+ syncStaffBranchControl();
  renderStaff();
 }
-function openStaffDialog(member,mode){
+function openStaffDialog(){
  const dlg=$("staffDialog"),form=$("staffForm");if(!dlg||!form)return;
- form.reset();const scope=mode==="scope";
- $("staffDialogTitle").textContent=scope?"Add branch access":"Invite team member";
- $("staffFullName").value=member?member.display_name||"":"";
- $("staffEmail").value=member?member.email||"":"";
- $("staffPhone").value=member?member.phone||"":"";
- $("staffRoleSelect").value=member?member.role_key:"cashier";
- $("staffRoleSelect").disabled=scope;$("staffEmail").readOnly=!!member;$("staffFullName").readOnly=!!member;$("staffPhone").readOnly=!!member;
- $("staffReason").value=scope?"Additional branch access":"Staff access requested";
- $("staffDialogSave").textContent=scope?"Add access":"Send invitation";$("staffFormError").textContent="";
- dlg.dataset.mode=scope?"scope":"invite";dlg.dataset.targetUserId=member?member.user_id:"";
- Array.from($("staffBranch").options).forEach(o=>o.selected=scope?false:o.value===(S.branch?.id||""));
- syncStaffBranchControl();if(scope){$("staffBranchField").hidden=false;$("staffBranch").required=true;}dlg.showModal();
+ form.reset();
+ $("staffDialogTitle").textContent="Invite team member";
+ $("staffFullName").value="";
+ $("staffEmail").value="";
+ $("staffPhone").value="";
+ $("staffRoleSelect").value="cashier";
+ $("staffRoleSelect").disabled=false;
+ $("staffEmail").readOnly=false;
+ $("staffFullName").readOnly=false;
+ $("staffPhone").readOnly=false;
+ $("staffDialogSave").textContent="Send invitation";
+ $("staffFormError").textContent="";
+ dlg.dataset.mode="invite";
+ syncStaffBranchControl();
+ dlg.showModal();
 }
 async function saveStaffForm(e){
- e.preventDefault();const btn=$("staffDialogSave"),mode=$("staffDialog").dataset.mode;
- const display_name=$("staffFullName").value.trim(),email=$("staffEmail").value.trim().toLowerCase(),phone=$("staffPhone").value.trim(),role_key=$("staffRoleSelect").value;
- const branch_ids=["admin","owner"].includes(role_key)?[]:selectedStaffBranches(),reason=$("staffReason").value.trim();
- if(!reason){$("staffFormError").textContent="A reason is required.";return;}
- if(!["admin","owner"].includes(role_key)&&!branch_ids.length){$("staffFormError").textContent="Select at least one active branch.";return;}
- if(mode==="invite"&&(!display_name||!email)){$("staffFormError").textContent="Enter a name and valid email.";return;}
- btn.disabled=true;btn.textContent="Saving…";$("staffFormError").textContent="";
+ e.preventDefault();
+ const btn=$("staffDialogSave");
+ const display_name=$("staffFullName").value.trim();
+ const email=$("staffEmail").value.trim().toLowerCase();
+ const phone=$("staffPhone").value.trim();
+ const role_key=$("staffRoleSelect").value;
+ const reason="Invited via Admin panel";
+ let branch_ids;
+ try{branch_ids=staffBranchIds(role_key);}
+ catch(error){$("staffFormError").textContent=error.message;return;}
+ if(!display_name||!email){$("staffFormError").textContent="Enter a name and valid email.";return;}
+ btn.disabled=true;btn.textContent="Sending invitation…";$("staffFormError").textContent="";
  try{
-  const result=mode==="scope"?await staffApi("POST",null,{action:"assign_role",target_user_id:$("staffDialog").dataset.targetUserId,role_key,branch_ids,reason,request_id:staffRequestId()}):await staffApi("POST",null,{action:"invite",display_name,email,phone:phone||null,role_key,branch_ids,reason,request_id:staffRequestId()});
-  $("staffDialog").close();toast(result.existing_account?"Invitation recorded. Ask the existing user to open the acceptance link on Admin sign-in and sign in with the exact confirmed email.":mode==="scope"?"Branch access added.":"Invitation request submitted.");await loadStaff();
+  const result=await staffApi("POST",null,{action:"invite",display_name,email,phone:phone||null,role_key,branch_ids,reason,request_id:staffRequestId()});
+  $("staffDialog").close();
+  toast(result.existing_account?"Invitation recorded. Ask the existing user to open the invitation acceptance page and sign in with the exact confirmed email.":"Invitation email sent. The user must accept it and set a password.");
+  await loadStaff();
  }catch(error){$("staffFormError").textContent=error.message;toast(error.message,true);}
- finally{btn.disabled=false;btn.textContent=$("staffDialog").dataset.mode==="scope"?"Add access":"Send invitation";}
+ finally{btn.disabled=false;btn.textContent="Send invitation";}
 }
 
 function nav(p){document.querySelectorAll(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===p));document.querySelectorAll(".page").forEach(x=>x.hidden=x.id!=="page-"+p);$("pageTitle").textContent=({dashboard:"Dashboard",orders:"Orders",menu:"Menu & products",categories:"Categories",deals:"Deals & offers",delivery:"Delivery areas",staff:"Staff & riders","catalog-v3":"Catalog V3 draft",media:"Website images",settings:"Website settings"})[p]||"Dashboard";$("crumb").textContent=p.toUpperCase();if(p==="staff")loadStaff().catch(e=>toast(e.message,true));if(p==="catalog-v3")openCatalogV3().catch(e=>toast(e.message,true));if(p==="media")renderSiteMedia();if(p==="delivery")loadDeliveryConfig().catch(e=>toast(e.message,true));if(p==="dashboard")loadDashboard().catch(()=>{});}
@@ -779,7 +793,7 @@ function wire(){
  $("orderSearch").oninput=renderOrders;$("orderStatusFilter").onchange=renderOrders;$("productSearch").oninput=renderProducts;$("productCategoryFilter").onchange=renderProducts;$("productStateFilter").onchange=renderProducts;
  $("addProductButton").onclick=()=>editProduct(null);$("addCategoryButton").onclick=()=>editCategory(null);$("addSubcategoryButton").onclick=()=>editSubcategory(null);$("addDealButton").onclick=()=>editDeal(null);$("addAreaButton").onclick=()=>editArea(null);
  $("saveDefaultDeliveryFeeButton").onclick=()=>saveDefaultDeliveryFee().catch(err=>toast(err.message,true));
- $("inviteStaffButton").onclick=()=>openStaffDialog(null);
+ $("inviteStaffButton").onclick=()=>openStaffDialog();
  $("staffForm").onsubmit=e=>saveStaffForm(e);$("staffRoleSelect").onchange=syncStaffBranchControl;
  $("staffDialogClose").onclick=()=>$("staffDialog").close();
  $("staffDialogCancel").onclick=()=>$("staffDialog").close();
