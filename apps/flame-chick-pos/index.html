@@ -1581,7 +1581,9 @@ function startFlameChickRealtimeFallback(){
 async function stopFlameChickRealtime(){
   if(flameChickRealtimeRefreshTimer){clearInterval(flameChickRealtimeRefreshTimer);flameChickRealtimeRefreshTimer=null;}
   if(flameChickRealtimeRefreshDebounce){clearTimeout(flameChickRealtimeRefreshDebounce);flameChickRealtimeRefreshDebounce=null;}
-  try{if(flameChickRealtimeClient&&flameChickRealtimeChannel)await flameChickRealtimeClient.removeChannel(flameChickRealtimeChannel);}catch(error){console.debug('POS Realtime channel cleanup',error?.message||error);}
+  const client=flameChickRealtimeClient,channel=flameChickRealtimeChannel;
+  try{if(client&&channel)await client.removeChannel(channel);}catch(error){console.debug('POS Realtime channel cleanup',error?.message||error);}
+  try{if(client)client.realtime.disconnect();}catch(error){console.debug('POS Realtime socket cleanup',error?.message||error);}
   flameChickRealtimeChannel=null;flameChickRealtimeClient=null;flameChickRealtimeState='off';
 }
 async function startFlameChickRealtime(){
@@ -1607,7 +1609,9 @@ async function startFlameChickRealtime(){
         flameChickRealtimeState='connected';
         if($('inboxLiveText'))$('inboxLiveText').textContent='Realtime connected';
         if(flameChickRealtimeRefreshTimer)clearInterval(flameChickRealtimeRefreshTimer);
-        // A slower fallback still reconciles a missed Broadcast after reconnects.
+        // Reconcile immediately on first subscription/reconnection, then use a
+        // slower safety refresh to recover any event missed during disconnect.
+        scheduleFlameChickRealtimeRefresh();
         flameChickRealtimeRefreshTimer=setInterval(()=>{
           if(navigator.onLine&&flameChickStaffSession?.access_token)scheduleFlameChickRealtimeRefresh();
         },120000);
