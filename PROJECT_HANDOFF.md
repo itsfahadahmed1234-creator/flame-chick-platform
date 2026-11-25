@@ -5204,3 +5204,17 @@ Latest Admin source commit: `70d018de8483949d40c1951809696a231a1f873b`. The user
 - Immediate user action: in the existing POS session open System & Data → Local POS Orders and use `Retry Production sync` once for `LOCAL-20261125062605-53b1248b`. Expected result is a single server order and appearance in the shared Online Orders board with POS source badge. Do not create a replacement order. After the user reports the outcome, verify the order and its delivery task using read-only queries.
 - POS readiness is **not yet approved for live operations**. Remaining gate: user-confirmed single retry; verify the resulting POS delivery order appears in Online Orders, then controlled rehearsal of accept → preparing → ready → rider offer/accept → pickup/out-for-delivery → delivered → cashier collects outstanding balance, including cancellation/rejection restrictions and audit actor. Do not record real payments or invite staff without user authorization. Only Admin is active at present; future Owner, Manager and Cashier roles must be assigned through Staff Admin authenticated workflow.
 - Vercel POS Preview from prior stage remains `dpl_8kVsz7UYvWbXZ1GfSVcASu4Z7mKR` (READY, Preview target, commit `71e1de4dad57b09b3609437acc59634508aa22a4`) at existing branch Preview alias `https://flame-chick-pos-production-git-work-productio-675169-fahad-7455.vercel.app/`. No new POS app build or production alias promotion was performed in this hotfix. Keep the Preview alias and existing production aliases unchanged.
+
+
+## 2026-11-25 — POS History, Delivery-only Online Orders, and Payment Collection checkpoint
+
+Detailed latest checkpoint: `docs/handoffs/2026-11-25-pos-history-delivery-payment-checkpoint.md`.
+
+- Current source commit before this handoff pointer: `1528dc38f3c9acc80285b9430cea51a44ba87241` on `work/production-source-audit`.
+- Fixed the strict-mode History `ReferenceError` by declaring `historyActiveTab`, `historyLoading`, and `historyServerRows`; regression assertions were added. Fix commit `91f34d362661733f141a44128b46fc1e63a9a05c`; test commit `1528dc38f3c9acc80285b9430cea51a44ba87241`.
+- Aligned the live Order API with the POS Delivery-only filter. API v5 is ACTIVE; all five deployed function files are byte-for-byte identical to the source files at the test commit. It now parses and applies the `fulfillment_type` query filter server-side.
+- Existing POS Preview deployment `dpl_EUrXHvN1y5dHr9sfodsA9LQk4Keo` is READY (Preview target `null`) at `https://flame-chick-pos-production-k6odt27ve-fahad-7455.vercel.app/`, built from exact commit `1528dc38f3c9acc80285b9430cea51a44ba87241`. Preview HTML returned HTTP 200 and contains the fixed History page/state and Delivery-only filter.
+- Payment UI offers COD, Card and Online/bank transfer for full-balance staff collection after Delivery status Delivered. This is manual/staff-recorded collection, not a card gateway or automated bank verification.
+- No GitHub Actions success status was returned for this new checkpoint; the new regression test is committed but not claimed as run. Signed-in interactive click verification remains with the user.
+- No Production aliases, catalogue publication, database/schema/order/payment records, staff, delivery settings or Realtime changes occurred. The only live change was Order API function deployment v5. Production remains pre-launch; see detailed handoff for next verification and release gates.
+
