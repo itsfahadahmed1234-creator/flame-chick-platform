@@ -16,8 +16,10 @@ function allowedOrigin(value) {
   if (ALLOWED_ORIGINS.has(value)) return true;
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' &&
-      /^flame-chick-pos-production-[a-z0-9-]+-fahad-7455\.vercel\.app$/i.test(url.hostname);
+    return url.protocol === 'https:' && (
+      /^flamechickpos-[a-z0-9-]+-befahad1234-7050\.vercel\.app$/i.test(url.hostname) ||
+      /^flame-chick-pos-production-[a-z0-9-]+-fahad-7455\.vercel\.app$/i.test(url.hostname)
+    );
   } catch {
     return false;
   }
