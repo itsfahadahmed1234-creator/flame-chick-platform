@@ -139,3 +139,47 @@ No catalog rows were written for this selector fix. No publication, production a
 - User should use the stable branch Preview alias only, not the one-off `k6edsdg4y` URL. This avoids any origin policy or CORS change. Do not add a wildcard or relax CORS. If Vercel SSO blocks the stable alias in the user's browser, resolve the user's existing team access through normal Vercel SSO; do not create anonymous/shareable bypasses or weaken protection.
 - The connected browser's existing stable-alias tab showed the Admin application and an authenticated Admin account, while the latest unique-URL tab showed `Failed to fetch`. No catalog write/save was made during troubleshooting.
 - After access is restored, resume the visual Flame Feast pre-save inspection. Do not save until deal ID/title, three burger alternatives, repeat and caps, fixed price and unrelated groups are confirmed.
+
+
+---
+
+## 2026-11-25 — Flame Duo placeholder option / selectable Burger UX correction
+
+### Database finding (read-only inspection only)
+
+- Flame Duo deal ID: `c2829d2f-f677-4e4f-8975-1d5bec15ecc8`.
+- Burger group ID: `cb28b616-e003-4778-b748-79e52850b70b`.
+- Burger group quantity 2, repeat enabled, group max-per-choice 2.
+- Its only active Burger choice is option ID `c4e1b69a-1e34-467a-99e1-660dfb30a658`, pointing to product ID `5efc245f-66e6-4ae4-913e-fcbe40f1fc50`, product name `Burger`, in active `Chicken Burgers` menu category `0179435d-8f39-4503-904e-091efb5a512c`. This product has an active variant label `Included`; it is the deal-only placeholder, not a selectable burger.
+- Read-only SQL confirmed real active Chicken Burgers and regular variants:
+  - OG Crunch product `1b68da9e-cccb-45da-9807-7e62c1d8b47d`, Regular variant `ad3af56e-4233-4574-abee-fa560a0ce6e7`.
+  - The Injector product `abad7e2a-8e25-4512-8714-6bfb2c4cf966`, Regular variant `15245c40-963c-4c1f-a6a6-f2a0962cc0c2`.
+  - Nashville Fire product `d2a34e43-f7f4-417a-a5bd-7fbd298fd398`, Regular variant `7ed57037-98fb-4a54-8b2b-bbb7b428dad6`.
+- No INSERT/UPDATE/DELETE or catalog command was run. Flame Duo is unchanged; no save occurred.
+
+### Editor source correction
+
+- Source commit: `e7f3e2bdb50e122371df743218446f099494ea51`.
+- The previous invalid-product helper text was generic and misleading. The editor now detects a saved product with exact name `Burger` and explains: “Saved product ‘Burger’ is a placeholder — choose a real burger”.
+- Burger product and variant selectors are required and have disabled prompt options rather than a confusing selected prompt that resembles a real choice.
+- After a real product is chosen, its active variants populate and the first active variant is selected automatically (user can change it).
+- Added inline instructions that "+ Add choice" adds another eligible burger alternative.
+- Regression tests added for explicit placeholder guidance, required product/variant controls and variant population.
+- Admin static workflow run `45536317355`: SUCCESS on exact source SHA `e7f3e2bdb50e122371df743218446f099494ea51`.
+
+### Latest Preview
+
+- Vercel deployment `dpl_Bnph8psJFixeapqHjiEzXXtmMDLt`: READY, target Preview (`target: null`), exact source commit `e7f3e2bdb50e122371df743218446f099494ea51`.
+- Stable branch Preview alias: https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app/
+- One-off URL `https://flame-chick-admin-production-m5kmabi6z-fahad-7455.vercel.app/` is not on the exact Staff Admin origin allowlist. Do not use it. The stable branch alias is allowlisted and Vercel maps it to the latest Preview deployment.
+- User should perform a hard refresh (`Ctrl+Shift+R`) on the stable alias before testing, because their existing tab showed the old copy of the helper text.
+- The automatic Preview workflow was skipped by the existing readiness gate; it was not altered. Direct Vercel Preview deployment was used with exact commit and the existing Admin project/root only.
+
+### Controlled next steps — do not save until the user verifies all fields
+
+1. In the latest stable Preview, open Catalog V3 draft and edit Flame Duo (the editor should show the exact deal ID).
+2. In Burger component group, find the current row whose saved product is the “Burger” placeholder. In its Choice product selector, select `OG Crunch`; product variant should populate with `Regular`.
+3. Click `+ Add choice` twice. In the second row select `The Injector` — `Regular`; in the third select `Nashville Fire` — `Regular`. Each row must show one real active Chicken Burger and correct Regular variant. Do not add the placeholder or Whole Chicken Broast product “Nashville”.
+4. Keep group quantity 2, repeat enabled, max-per-choice 2. All three choices are INCLUDED, zero surcharge (the secure command builder supplies these mappings). Keep Quarter Broast and 2 Cold Drink groups untouched. Keep price and availability unchanged.
+5. Do not save until the user sees and confirms all three alternatives. After one controlled save through the authenticated Catalog V3 Admin command workflow, verify read-only database state and audit log before moving to the next deal. Do not publish.
+
