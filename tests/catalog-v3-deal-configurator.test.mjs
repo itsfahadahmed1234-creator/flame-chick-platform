@@ -172,8 +172,12 @@ test('refuses to render without a DOM target and an explicit completion handler'
 test('fixed single-option deal groups are preselected and locked', async () => {
   const source = await readFile(new URL('../apps/flame-chick-website/js/catalog-v3-deal-configurator.js', import.meta.url), 'utf8');
   assert.match(source, /group\.options\.length === 1\s*\?\s*group\.name/);
-  assert.match(source, /minus\.disabled = readOnly \|\| fixedGroup/);
-  assert.match(source, /plus\.disabled = readOnly \|\| fixedGroup/);
+  assert.match(source, /if \(fixedGroup\)/);
+  assert.match(source, /fc-deal-fixed-value/);
+  assert.doesNotMatch(source, /minus\.disabled = readOnly \|\| fixedGroup/);
+  assert.doesNotMatch(source, /plus\.disabled = readOnly \|\| fixedGroup/);
+  assert.match(source, /if \(orderableVariants\.length !== 1\)/);
+  assert.match(source, /orderableVariants\.length === 1 && selectedVariantId !== orderableVariants\[0\]\.id/);
   const ui = create();
   ui.selectVariant(IDS.dealVariant);
   const state = ui.getState();
