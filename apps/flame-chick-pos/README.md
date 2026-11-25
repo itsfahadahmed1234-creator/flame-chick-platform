@@ -24,3 +24,8 @@ Static cashier/POS application.
 - The workflow is restricted to `work/production-source-audit`, requires repository variables `FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED=true` and `FLAME_CHICK_POS_PREVIEW_PROJECT_READY=true`, and uses repository secret `VERCEL_TOKEN`.
 - It is pinned to the isolated Vercel Preview project `flamechickpos` in the current Hobby team. The Vercel project root directory is `apps/flame-chick-pos`; therefore the CLI must run from the monorepo root (not from this folder) to avoid duplicating the root-directory path.
 - Deploy command is explicit Preview environment only. No production alias or custom domain is assigned by the workflow.
+
+
+## Temporary isolated bootstrap
+
+A one-time Production bootstrap is manually gated in `.github/workflows/bootstrap-flame-chick-pos-isolated-production.yml`. It targets only the isolated Vercel project `flamechickpos` in the temporary Hobby team, with SSO protection enabled and no live restaurant POS alias. The first deployment must be Production because Vercel will not accept Preview as the first deployment for a new project. QZ signing CORS now includes `https://flamechickpos.vercel.app`, but QZ signing remains unavailable until a matching private key is securely configured in this new Vercel project. Follow `PROJECT_HANDOFF.md` for exact scope and post-bootstrap steps.
