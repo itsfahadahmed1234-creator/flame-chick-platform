@@ -61,10 +61,16 @@
       guard.canSubmitOrders(root.location && root.location.hostname);
   }
 
+  function syncCatalogDialogState() {
+    var productDialog = $('product-dialog');
+    var dealDialog = $('deal-dialog');
+    document.body.classList.toggle('fc-catalog-dialog-open',
+      !!((productDialog && productDialog.open) || (dealDialog && dealDialog.open)));
+  }
+
   function applyPreviewReadOnlyMode() {
     var preview = !orderWritesAllowed();
     document.body.classList.toggle('fc-website-preview-readonly', preview);
-    $('fc-preview-readonly-banner').hidden = !preview;
     $('fc-preview-checkout-notice').hidden = !preview;
     if (preview) {
       $('request-quote').disabled = true;
@@ -466,11 +472,12 @@
         }
 
         var firstVariant = product.variants[0] || null;
-        var variantMeta = document.createElement('span');
-        variantMeta.className = 'fc-home-single-variant';
-        variantMeta.textContent = product.variants.length === 1
-          ? firstVariant.label
-          : (product.variants.length > 1 ? 'Multiple options' : 'Unavailable');
+        if (product.variants.length > 1 || !firstVariant) {
+          var variantMeta = document.createElement('span');
+          variantMeta.className = 'fc-home-single-variant';
+          variantMeta.textContent = product.variants.length > 1 ? 'Multiple options' : 'Unavailable';
+          body.appendChild(variantMeta);
+        }
 
         var foot = document.createElement('div'); foot.className = 'foot';
         var price = document.createElement('span'); price.className = 'price';
@@ -496,7 +503,7 @@
         });
 
         foot.append(price, add);
-        body.append(variantMeta, foot);
+        body.appendChild(foot);
         card.append(art, body);
         function openDetails() { openProductCustomizer(product, null); }
         card.addEventListener('click', function (event) {
@@ -722,6 +729,7 @@
     renderVariant();
     if (!dialog.open && typeof dialog.showModal === 'function') dialog.showModal();
     else if (!dialog.open) dialog.setAttribute('open', '');
+    syncCatalogDialogState();
   }
 
   function renderDeals(model) {
@@ -822,6 +830,7 @@
     var dialog = $('deal-dialog');
     if (!dialog.open && typeof dialog.showModal === 'function') dialog.showModal();
     else if (!dialog.open) dialog.setAttribute('open', '');
+    syncCatalogDialogState();
   }
 
   function renderDeliveryAreaResults(query) {
@@ -1104,6 +1113,8 @@
 
   function bindEvents() {
 
+    $('product-dialog').addEventListener('close', syncCatalogDialogState);
+    $('deal-dialog').addEventListener('close', syncCatalogDialogState);
     $('close-product-dialog').addEventListener('click', function () { $('product-dialog').close(); });
     $('close-deal-dialog').addEventListener('click', function () { $('deal-dialog').close(); });
     $('request-quote').addEventListener('click', requestQuote);

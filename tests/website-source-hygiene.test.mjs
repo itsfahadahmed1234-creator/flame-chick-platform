@@ -261,3 +261,31 @@ test("homepage footer copy does not claim that online checkout is disabled", () 
   assert.match(html, /Browse the current published menu and discover your favourites\./);
   assert.doesNotMatch(html, /Online checkout is not enabled yet\./);
 });
+
+
+test("mobile product-card actions stay inside cards and single-variant products have no redundant size tag", () => {
+  assert.match(order, /if \(product\.variants\.length > 1 \|\| !firstVariant\)/);
+  assert.match(order, /product\.variants\.length > 1 \? 'Multiple options' : 'Unavailable'/);
+  assert.doesNotMatch(order, /firstVariant\.label/);
+  assert.match(html, /\.fc-home-product-card \.foot\{[\s\S]*?flex-wrap:wrap/);
+  assert.match(html, /\.fc-home-product-card \.add\{[\s\S]*?max-width:100%/);
+});
+
+test("Preview header banner is removed while checkout remains read-only outside verified Production hosts", () => {
+  assert.doesNotMatch(html, /fc-preview-readonly-banner|Preview mode — live Flame Chick catalogue/);
+  assert.doesNotMatch(order, /fc-preview-readonly-banner/);
+  assert.match(html, /id="fc-preview-checkout-notice"/);
+  assert.match(order, /orderWritesAllowed\(\)/);
+  assert.match(order, /Checkout is disabled on this Website Preview/);
+  assert.match(order, /String\(method \|\| ''\)\.toUpperCase\(\) !== 'GET'/);
+});
+
+test("product and deal dialogs are centered, bounded, scrollable and closed dialogs stay hidden", () => {
+  assert.doesNotMatch(html, /Build your deal/);
+  assert.match(html, /\.fc-home-product-dialog:not\(\[open\]\)/);
+  assert.match(html, /\.fc-home-deal-dialog:not\(\[open\]\)/);
+  assert.match(html, /max-height:min\(74dvh,620px\)/);
+  assert.match(html, /overflow-y:auto/);
+  assert.match(order, /function syncCatalogDialogState\(\)/);
+  assert.match(html, /body\.fc-catalog-dialog-open \.ana-sticky/);
+});

@@ -2,7 +2,6 @@
 <meta name="description" content="Order Flame Chick favourites online. Choose delivery or takeaway and place your order directly from the website.">
 <link rel="icon" href="assets/flame-chick-logo.svg">
 </head><body>
-<div id="fc-preview-readonly-banner" class="fc-preview-readonly-banner" hidden role="status">Preview mode — live Flame Chick catalogue · checkout disabled · no orders will be sent</div>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&family=Titan+One&display=swap">
@@ -383,7 +382,7 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
       </section>
       <dialog id="product-dialog" class="fc-home-product-dialog" aria-label="Product options"><div class="fc-home-dialog-head"><span class="fc-home-kicker">Customize product</span><button id="close-product-dialog" class="fc-home-close" type="button">Close</button></div><div id="product-dialog-content" class="fc-home-dialog-content"></div></dialog>
       <dialog id="deal-dialog" class="fc-home-deal-dialog" aria-label="Choose deal options">
-        <div class="fc-home-dialog-head"><span class="fc-home-kicker">Build your deal</span><button id="close-deal-dialog" class="fc-home-close" type="button">Close</button></div>
+        <div class="fc-home-dialog-head"><button id="close-deal-dialog" class="fc-home-close" type="button">Close</button></div>
         <div id="deal-configurator" class="fc-home-dialog-content"></div>
       </dialog>
     </section>
@@ -2126,7 +2125,6 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
 
 
 /* Visible read-only state for Vercel branch Preview deployments. */
-.fc-preview-readonly-banner{position:relative;z-index:120;padding:9px 14px;background:#2b0006;color:#fff;text-align:center;font:700 13px/1.3 var(--f-ui);letter-spacing:.06em;text-transform:uppercase}
 .fc-preview-checkout-notice{margin:12px 0;padding:12px 14px;border:1px solid #e6c977;border-radius:11px;background:#fff8e5;color:#684d0c;font:600 14px/1.45 var(--f-body)}
 body.fc-website-preview-readonly .fc-home-cart-actions button{opacity:.48;cursor:not-allowed;filter:saturate(.4)}
 
@@ -2425,6 +2423,93 @@ body.fc-website-preview-readonly .fc-home-cart-actions button{opacity:.48;cursor
   .fc-v3-cart-drawer #order-success.is-confirmed{animation:none!important}
   .fc-v3-cart-footer.is-checking #request-quote::after,
   .fc-v3-cart-footer.is-ordering #retry-order::after{animation:none!important;border-right-color:currentColor}
+}
+
+
+/* Screenshot-driven mobile catalogue and dialog corrections. */
+.fc-home-product-card .body{min-width:0}
+.fc-home-product-card .foot{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:7px;
+  min-width:0;
+}
+.fc-home-product-card .price{
+  flex:1 1 84px;
+  min-width:0;
+  max-width:100%;
+  font-size:clamp(15px,3.8vw,22px);
+  white-space:nowrap;
+}
+.fc-home-product-card .add{
+  flex:0 1 auto;
+  min-width:0;
+  max-width:100%;
+  min-height:36px;
+  padding:0 10px;
+  font-size:clamp(11px,3.1vw,14px);
+  line-height:1.05;
+  white-space:normal;
+  text-align:center;
+}
+
+/* Closed dialogs must stay out of document flow; open dialogs sit centered
+   with visible space around them and scroll their own content. */
+.fc-home-product-dialog:not([open]),
+.fc-home-deal-dialog:not([open]){display:none!important}
+.fc-home-product-dialog[open],
+.fc-home-deal-dialog[open]{
+  position:fixed;
+  inset:0;
+  width:min(480px,88vw);
+  max-width:calc(100vw - 32px);
+  max-height:min(76vh,650px);
+  max-height:min(76dvh,650px);
+  height:auto;
+  margin:auto;
+  padding:0;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  border-radius:18px;
+}
+.fc-home-product-dialog::backdrop,
+.fc-home-deal-dialog::backdrop{
+  background:rgba(24,0,10,.56);
+  backdrop-filter:blur(4px);
+}
+.fc-home-dialog-head{flex:0 0 auto}
+.fc-home-product-dialog .fc-home-dialog-content,
+.fc-home-deal-dialog .fc-home-dialog-content{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+}
+.fc-home-deal-dialog .fc-home-dialog-content{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:8px;
+}
+.fc-home-deal-dialog .fc-deal-config-title{font-size:18px;line-height:1.08}
+body.fc-catalog-dialog-open .ana-sticky{
+  visibility:hidden;
+  pointer-events:none;
+}
+@media(max-width:520px){
+  .fc-home-product-dialog[open],
+  .fc-home-deal-dialog[open]{
+    width:min(460px,88vw);
+    max-height:min(74vh,620px);
+    max-height:min(74dvh,620px);
+    border-radius:18px;
+  }
+  .fc-home-dialog-head{padding:8px 12px}
+  .fc-home-deal-dialog .fc-home-dialog-content{padding:9px 11px;gap:7px}
 }
 
 </style>

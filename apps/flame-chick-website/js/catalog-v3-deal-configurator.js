@@ -130,6 +130,15 @@
       return null;
     }
 
+    function productOptionLabel(group, option) {
+      var productVariants = group.options.filter(function (candidate) {
+        return candidate.productId === option.productId;
+      });
+      var variantSuffix = productVariants.length > 1 && option.variantLabel
+        ? ' — ' + option.variantLabel : '';
+      return option.productName + variantSuffix;
+    }
+
     function groupQuantity(group) {
       return group.options.reduce(function (sum, option) {
         return sum + (quantities[key(group.id, option.id)] || 0);
@@ -500,7 +509,7 @@
                 (!group.allowRepeatOption && alreadyUsed) ||
                 (selectedQuantity >= optionCap && slots[activeSlot] !== option.id);
               var optionEl = makeElement(doc, 'option', '',
-                option.productName + (option.variantLabel ? ' — ' + option.variantLabel : ''));
+                productOptionLabel(group, option));
               optionEl.value = option.id;
               optionEl.disabled = disabled;
               select.appendChild(optionEl);
@@ -557,7 +566,7 @@
               group.minUnits + '–' + group.maxUnits));
             group.options.forEach(function (option) {
               var optionLabel = group.options.length === 1
-                ? group.name : option.productName + ' — ' + option.variantLabel;
+                ? group.name : productOptionLabel(group, option);
               var fixedGroup = isFixedGroup(group);
               var priceLabel = option.pricingTreatment === 'INCLUDED'
                 ? 'Included'

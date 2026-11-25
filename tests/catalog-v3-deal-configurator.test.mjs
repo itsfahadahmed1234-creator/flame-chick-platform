@@ -252,3 +252,12 @@ test('renders a compact one-row burger-slot picker and visible deal quantity ste
   assert.match(source, /fc-deal-quantity-button/);
   assert.match(source, /setDealQuantity: setDealQuantity/);
 });
+
+
+test('deal choice labels hide Regular when a product has only one available option', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-website/js/catalog-v3-deal-configurator.js', import.meta.url), 'utf8');
+  assert.match(source, /function productOptionLabel\(group, option\)/);
+  assert.match(source, /var productVariants = group\.options\.filter\(function \(candidate\)/);
+  assert.match(source, /productVariants\.length > 1 && option\.variantLabel/);
+  assert.match(source, /productOptionLabel\(group, option\)/);
+});
