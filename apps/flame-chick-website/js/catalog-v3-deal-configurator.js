@@ -572,7 +572,7 @@
               var current = selectedCount(group, option);
               if (fixedGroup) {
                 var fixedValue = makeElement(doc, 'span', 'fc-deal-fixed-value',
-                  'Included' + (current > 1 ? ' × ' + current : ''));
+                  'Fixed' + (current > 1 ? ' × ' + current : ''));
                 optionRow.classList.add('is-fixed');
                 optionRow.appendChild(fixedValue);
               } else {
