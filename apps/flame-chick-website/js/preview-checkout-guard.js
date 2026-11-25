@@ -18,10 +18,28 @@
     'flame-chick-website-production-wnkr3bp6s-fahad-7455.vercel.app'
   ]);
 
+  // Exactly one SSO-protected Website branch Preview may submit QA records.
+  // Do not add deployment-random URLs or broad *.vercel.app matching.
+  var TEST_CHECKOUT_PREVIEW_HOSTS = Object.freeze([
+    'flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455.vercel.app'
+  ]);
+
+  function normalizedHost(hostname) {
+    if (typeof hostname !== 'string') return '';
+    return hostname.trim().toLowerCase().replace(/\\.$/, '');
+  }
+
+  function isTestCheckoutPreview(hostname) {
+    var host = normalizedHost(hostname);
+    return !!host && TEST_CHECKOUT_PREVIEW_HOSTS.indexOf(host) !== -1;
+  }
+
   function canSubmitOrders(hostname) {
-    if (typeof hostname !== 'string') return false;
-    var host = hostname.trim().toLowerCase().replace(/\.$/, '');
-    return PRODUCTION_ORDER_HOSTS.indexOf(host) !== -1;
+    var host = normalizedHost(hostname);
+    return !!host && (
+      PRODUCTION_ORDER_HOSTS.indexOf(host) !== -1 ||
+      TEST_CHECKOUT_PREVIEW_HOSTS.indexOf(host) !== -1
+    );
   }
 
   function shouldBlockOrderApiWrite(method, hostname) {
@@ -32,6 +50,8 @@
   return Object.freeze({
     canSubmitOrders: canSubmitOrders,
     shouldBlockOrderApiWrite: shouldBlockOrderApiWrite,
-    productionHosts: PRODUCTION_ORDER_HOSTS
+    productionHosts: PRODUCTION_ORDER_HOSTS,
+    testCheckoutPreviewHosts: TEST_CHECKOUT_PREVIEW_HOSTS,
+    isTestCheckoutPreview: isTestCheckoutPreview
   });
 });

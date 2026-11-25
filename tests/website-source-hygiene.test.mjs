@@ -289,3 +289,16 @@ test("product and deal dialogs are centered, bounded, scrollable and closed dial
   assert.match(order, /function syncCatalogDialogState\(\)/);
   assert.match(html, /body\.fc-catalog-dialog-open \.ana-sticky/);
 });
+
+
+test("the controlled Website Preview submits visibly marked QA orders while other Previews remain blocked", () => {
+  const guardSource = readFileSync(join(root, "js/preview-checkout-guard.js"), "utf8");
+  assert.match(guardSource, /TEST_CHECKOUT_PREVIEW_HOSTS/);
+  assert.match(guardSource, /isTestCheckoutPreview/);
+  assert.match(order, /function isTestCheckoutPreview\(\)/);
+  assert.match(order, /\[WEBSITE QA TEST\]/);
+  assert.match(order, /WEBSITE PREVIEW QA TEST — DO NOT PREPARE \/ DISPATCH \/ COLLECT PAYMENT/);
+  assert.match(order, /TEST ORDER SENT TO FLAME CHICK POS/);
+  assert.match(html, /id="fc-preview-checkout-notice"/);
+  assert.match(order, /if \(String\(method \|\| ''\)\.toUpperCase\(\) !== 'GET' && !orderWritesAllowed\(\)\)/);
+});

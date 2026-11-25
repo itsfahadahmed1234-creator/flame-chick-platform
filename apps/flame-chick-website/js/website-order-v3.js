@@ -61,6 +61,12 @@
       guard.canSubmitOrders(root.location && root.location.hostname);
   }
 
+  function isTestCheckoutPreview() {
+    var guard = root.FlameChickWebsitePreviewGuard;
+    return !!guard && typeof guard.isTestCheckoutPreview === 'function' &&
+      guard.isTestCheckoutPreview(root.location && root.location.hostname);
+  }
+
   function syncCatalogDialogState() {
     var productDialog = $('product-dialog');
     var dealDialog = $('deal-dialog');
@@ -69,10 +75,17 @@
   }
 
   function applyPreviewReadOnlyMode() {
+    var testPreview = isTestCheckoutPreview();
     var preview = !orderWritesAllowed();
     document.body.classList.toggle('fc-website-preview-readonly', preview);
-    $('fc-preview-checkout-notice').hidden = !preview;
-    if (preview) {
+    document.body.classList.toggle('fc-website-preview-test-checkout', testPreview);
+    $('fc-preview-checkout-notice').hidden = !(preview || testPreview);
+    if (testPreview) {
+      $('fc-preview-checkout-notice').textContent =
+        'TEST CHECKOUT PREVIEW: a successful submission creates a clearly marked test order in the Flame Chick database and POS. Do not prepare, dispatch or collect payment.';
+    } else if (preview) {
+      $('fc-preview-checkout-notice').textContent =
+        'Preview mode is read-only here. Cart and catalogue review are available, but checkout writes are disabled.';
       $('request-quote').disabled = true;
       $('place-order').disabled = true;
       $('retry-order').disabled = true;
@@ -949,8 +962,15 @@
       version_id: context.versionId,
       branch_id: context.branchId,
       fulfillment_type: context.fulfilmentType,
-      customer: { name: name, phone: phone, email: email || null },
-      notes: $('order-notes').value.trim() || null,
+      customer: {
+        name: isTestCheckoutPreview() ? ('[WEBSITE QA TEST] ' + name).slice(0, 160) : name,
+        phone: phone,
+        email: email || null
+      },
+      notes: isTestCheckoutPreview()
+        ? ('[WEBSITE PREVIEW QA TEST — DO NOT PREPARE / DISPATCH / COLLECT PAYMENT] ' +
+            $('order-notes').value.trim()).slice(0, 500)
+        : ($('order-notes').value.trim() || null),
       delivery: delivery,
       items: state.cart.map(function (row) {
         var item = clone(row.payload);
@@ -1001,13 +1021,16 @@
       state.checkoutBody = null;
       $('cart-summary').hidden = false;
       $('cart-total').textContent = money(result.quote.total);
-      $('cart-quote-detail').textContent = 'Items ' + money(result.quote.subtotal) +
+      $('cart-quote-detail').textContent = (isTestCheckoutPreview() ? 'TEST ONLY · ' : '') +
+        'Items ' + money(result.quote.subtotal) +
         (result.quote.fulfillmentType === 'delivery' ? ' · Delivery ' + money(result.quote.deliveryFee) : ' · Pickup');
       $('request-quote').hidden = true;
       $('place-order').hidden = false;
       $('place-order').disabled = false;
       $('retry-order').hidden = true;
-      status('Your server-verified total is ready. Review your details and place the order.', 'success');
+      status(isTestCheckoutPreview()
+        ? 'Test quote verified by the Flame Chick Order API. Review the amount before creating the QA test order.'
+        : 'Your server-verified total is ready. Review your details and place the order.', 'success');
       checkoutMotion('is-ready');
     } catch (error) {
       checkoutMotion('has-error');
@@ -1072,9 +1095,13 @@
       $('order-success').classList.add('is-confirmed');
       checkoutMotion('is-confirmed');
       $('success-order-number').textContent = result.order_number;
-      $('success-order-message').textContent = 'Your order is with Flame Chick POS. Payment is due ' +
-        (result.fulfillment_type === 'delivery' ? 'in cash on delivery.' : 'when you collect your pickup.');
-      status('Order confirmed.', 'success');
+      $('success-order-message').textContent = isTestCheckoutPreview()
+        ? 'TEST ORDER SENT TO FLAME CHICK POS. No payment was collected. Do not prepare, dispatch or collect payment for this QA record.'
+        : 'Your order is with Flame Chick POS. Payment is due ' +
+          (result.fulfillment_type === 'delivery' ? 'in cash on delivery.' : 'when you collect your pickup.');
+      status(isTestCheckoutPreview()
+        ? 'QA test order committed to the database and sent to the POS. No payment was collected.'
+        : 'Order confirmed.', 'success');
       $('order-success').scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (error) {
       checkoutMotion('has-error');
@@ -1232,7 +1259,9 @@
       state.loaded = true;
       if ($('publication-meta')) $('publication-meta').hidden = true;
       var previewReadOnly = applyPreviewReadOnlyMode();
-      pageStatus(previewReadOnly ? 'Published menu verified · Preview only · checkout disabled.' : 'Published menu verified.', 'ready');
+      pageStatus(isTestCheckoutPreview()
+        ? 'Published menu verified · controlled QA checkout enabled.'
+        : (previewReadOnly ? 'Published menu verified · Preview only · checkout disabled.' : 'Published menu verified.'), 'ready');
       renderCatalog();
       renderCart();
       syncFulfilmentControls();
