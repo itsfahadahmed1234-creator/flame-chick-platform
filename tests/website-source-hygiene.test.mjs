@@ -181,8 +181,8 @@ test("deal choice configurator is hosted inside a modal, not as a separate homep
 test("deal popup preserves POS-style category-driven burger slots, repeat limits and per-item customization", () => {
   const configurator = readFileSync(join(root, "js/catalog-v3-deal-configurator.js"), "utf8");
   assert.match(configurator, /group\.categoryDriven === true/);
-  assert.match(configurator, /fc-deal-burger-picker/);
-  assert.match(configurator, /Burger ' \+ \(slot \+ 1\)/);
+  assert.match(configurator, /fc-deal-burger-tabs/);
+  assert.match(configurator, /Burger ' \+ \(activeSlot \+ 1\)/);
   assert.match(configurator, /group\.allowRepeatOption/);
   assert.match(configurator, /option\.maxQuantity/);
   assert.match(configurator, /burgerSlotValues\[group\.id\]/);
