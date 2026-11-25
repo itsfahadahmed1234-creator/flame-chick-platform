@@ -604,6 +604,42 @@
           fragment.appendChild(groupSet);
         });
       }
+      var dealQuantityRow = makeElement(doc, 'div', 'fc-deal-quantity-row');
+      dealQuantityRow.appendChild(makeElement(doc, 'span', 'fc-deal-quantity-label', 'Deal quantity'));
+      var dealQuantityStepper = makeElement(doc, 'div', 'fc-deal-quantity-stepper');
+      var dealMinusKey = 'deal-quantity-minus';
+      var dealMinus = makeElement(doc, 'button', 'fc-deal-quantity-button', '−');
+      dealMinus.type = 'button';
+      dealMinus.disabled = readOnly || dealQuantity <= 1;
+      dealMinus.setAttribute('aria-label', 'Decrease deal quantity');
+      dealMinus.setAttribute('data-control-key', dealMinusKey);
+      controls[dealMinusKey] = dealMinus;
+      dealMinus.addEventListener('click', function () {
+        setDealQuantity(Math.max(1, dealQuantity - 1));
+        render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: dealMinusKey,
+          formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel,
+          showVariantBasePrice: options.showVariantBasePrice });
+      });
+      var dealQuantityValue = makeElement(doc, 'output', 'fc-deal-quantity-value', String(dealQuantity));
+      dealQuantityStepper.appendChild(dealMinus);
+      dealQuantityStepper.appendChild(dealQuantityValue);
+      var dealPlusKey = 'deal-quantity-plus';
+      var dealPlus = makeElement(doc, 'button', 'fc-deal-quantity-button', '+');
+      dealPlus.type = 'button';
+      dealPlus.disabled = readOnly || dealQuantity >= 99;
+      dealPlus.setAttribute('aria-label', 'Increase deal quantity');
+      dealPlus.setAttribute('data-control-key', dealPlusKey);
+      controls[dealPlusKey] = dealPlus;
+      dealPlus.addEventListener('click', function () {
+        setDealQuantity(Math.min(99, dealQuantity + 1));
+        render(container, { document: doc, onComplete: options.onComplete, restoreFocusKey: dealPlusKey,
+          formatMoney: options.formatMoney, completeButtonLabel: options.completeButtonLabel,
+          showVariantBasePrice: options.showVariantBasePrice });
+      });
+      dealQuantityStepper.appendChild(dealPlus);
+      dealQuantityRow.appendChild(dealQuantityStepper);
+      fragment.appendChild(dealQuantityRow);
+
       validation = validate();
       var status = makeElement(doc, 'p', 'fc-deal-config-status', lastError
         ? lastError.message
@@ -639,6 +675,7 @@
       ok: true,
       dealId: deal.id,
       selectVariant: selectVariant,
+      setDealQuantity: setDealQuantity,
       setOptionQuantity: setOptionQuantity,
       setModifierSelection: setModifierSelection,
       validate: validate,
