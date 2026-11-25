@@ -71,3 +71,58 @@ Before user saves, ensure the editor visibly identifies Flame Feast and the exac
 - No catalog publication, production alias promotion, production deployment, paid upgrade, GST/tax implementation or unrelated deal edits.
 - Preserve Website, POS, Admin and Rider apps.
 - Free Supabase plan only.
+
+
+---
+
+## 2026-11-25 — Burger selector clarification and placeholder exclusion
+
+This is the latest continuation state and supersedes the preview URL/commit referenced in earlier parts of this handoff.
+
+- Latest source branch: `work/production-source-audit`
+- Latest commit: `3b1475a4879931ecb51618a90b8a57d18259a7f5`
+- Admin Preview deployment: `dpl_EJwtuE7r5XruzyjcXCCbEWJovm9m`, READY.
+- Exact built commit: `3b1475a4879931ecb51618a90b8a57d18259a7f5`.
+- Latest unique Preview URL: https://flame-chick-admin-production-k6edsdg4y-fahad-7455.vercel.app/
+- The existing branch Preview alias is still the stable URL: https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app/
+- Vercel reports `target: null` (Preview) and no production target/alias change.
+
+### Customer dropdown behavior confirmed from source
+
+The shared Website configurator already creates one independent dropdown for each required Burger slot. Every slot enumerates the entire configured `group.options` collection. When repeat is enabled, the same configured choice remains selectable in additional slots up to its per-choice max; when repeat is disabled, a choice already used in another slot is disabled. Thus the choices configured in Admin are the alternative burger list shared by Burger 1, Burger 2, and Burger 3—not preassigned slot-to-product mappings.
+
+The same shared deal-view validation code is used by Website and POS. A regression test was added to assert that each slot renders the full configured option list and that repeat and per-choice caps are honoured.
+
+### Placeholder product cleanup
+
+- The product whose exact English name is `Burger` is a placeholder, not a genuine menu burger.
+- Admin's eligible Burger choice list now excludes an active product named exactly `Burger`, even if it belongs to Chicken Burgers.
+- The existing product record is not deleted or edited; it remains unchanged and may still exist for other system references. Only the Burger-group choice dropdown omits it.
+- The filter applies only to Burger component groups; non-Burger groups' product lists are not affected.
+- Existing saved option rows that point to this placeholder are not silently replaced during loading. They show as an invalid saved choice and the editor requires the Admin to choose a real burger before saving.
+
+### CI and Preview status
+
+- Admin static check run `45534964386`: SUCCESS on commit `3b1475a4879931ecb51618a90b8a57d18259a7f5`.
+- Website static check run `45534888577`: SUCCESS on the prior app/test implementation commit `12b272cc4f84bd3e06bc2e7ce6af5e4bbdeb3245`; the final `3b1475a` commit only corrected a test expectation.
+- The first Admin CI run for `12b272c` failed because the non-Burger test expected the Burger-only placeholder filter to apply to all component groups. That expectation was corrected; the corrected run for `3b1475a` passed.
+- Latest Preview deployment `dpl_EJwtuE7r5XruzyjcXCCbEWJovm9m` verified READY.
+- The existing automatic Preview workflow remained skipped by its fail-closed readiness gate; it was not modified. The unique Preview was created with Vercel's direct Git-source Preview deployment for the exact branch and commit.
+- The separate local importer QA workflow on earlier commits is not used as the acceptance signal for this UI change; it is unrelated to customer slot rendering and does not authorize or perform production catalog changes.
+
+### User's next step
+
+Open the latest Admin Preview and inspect Flame Feast. Confirm:
+
+1. The editor header identifies Flame Feast and its exact deal ID `90899197-8bf3-4b1e-af73-9c358b678def`.
+2. Burger required quantity is 3 and repeat is enabled.
+3. Maximum per choice is 3.
+4. The selector contains only the three real Chicken Burgers: OG Crunch — Regular, The Injector — Regular, Nashville Fire — Regular. No plain `Burger` placeholder and no Whole Chicken Broast `Nashville`.
+5. Half Broast and 1L Drink are unchanged.
+6. Price remains Rs. 3,599.
+
+Do not save until those fields are visually confirmed. After the controlled save, verify via read-only Production SQL/audit log. No direct writes, no publication. Once Flame Feast is verified, continue Flame Duo and then Flame Hour with the approved quantities and limits; keep Flame Hour — The Injector + Cold Drink untouched.
+
+### Boundaries unchanged
+
+No catalog rows were written for this selector fix. No publication, production alias promotion, production app deployment, paid upgrade, GST/tax implementation, or unrelated deal edits. Continue using the authenticated Admin/Owner Catalog V3 commands for all catalog modifications.
