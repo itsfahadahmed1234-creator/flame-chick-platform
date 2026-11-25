@@ -51,27 +51,49 @@ test("POS delivery dispatch uses the targeted offer state, not a second acceptan
 
 test("Rider Realtime uses a private own-user Broadcast topic with automatic recovery", () => {
   const html=source[1].html;
-  assert.match(html, /fc:rider:\\?"+riderId/);
-  assert.match(html, /config:\\?\{private:true\}/);
-  assert.match(html, /\.on\("broadcast",\{event:"delivery_changed"\},scheduleRiderJobsRefresh\)/);
+  assert.ok(html.includes('const topic="fc:rider:"+riderId+":ops"'));
+  assert.ok(html.includes('client.channel(topic,{config:{private:true}})'));
+  assert.ok(html.includes('.on("broadcast",{event:"delivery_changed"},scheduleRiderJobsRefresh)'));
   assert.doesNotMatch(html, /\.on\("postgres_changes"/);
   assert.match(html, /function startRiderRealtimeFallback/);
-  assert.match(html, /setInterval\(\(\)=>\{/);
   assert.match(html, /riderRealtimeFallbackTimer/);
   assert.match(html, /scheduleRiderJobsRefresh\(\)/);
 });
 
 test("POS listens to private branch Broadcast events and refreshes after reconnect", () => {
   const html=source[0].html;
-  assert.match(html, /fc:branch:\x27\+branch\+\x27:pos/);
-  assert.match(html, /config:\{private:true\}/);
-  assert.match(html, /event:\x27orders_changed\x27/);
-  assert.match(html, /event:\x27delivery_changed\x27/);
+  assert.ok(html.includes("client.channel('fc:branch:'+branch+':pos',{config:{private:true}})"));
+  assert.ok(html.includes("channel.on('broadcast',{event:'orders_changed'},scheduleFlameChickRealtimeRefresh)"));
+  assert.ok(html.includes("channel.on('broadcast',{event:'delivery_changed'},scheduleFlameChickRealtimeRefresh)"));
   assert.match(html, /scheduleFlameChickRealtimeRefresh\(\);\s*flameChickRealtimeRefreshTimer=setInterval/);
 });
 
-test("rider Realtime channel uses the Flame Chick namespace", () => {
-  assert.match(source[1].html, /fc:rider:/);
+test("Realtime migration limits broadcasts to active POS staff and each rider's own topic", () => {
+  const migration=readFileSync(
+    "supabase/migrations/20261125090531_flame_chick_private_ops_realtime_broadcasts.sql",
+    "utf8"
+  );
+  assert.match(migration, /CREATE POLICY flame_chick_private_ops_broadcast_select/);
+  assert.match(migration, /realtime\.topic\(\)/);
+  assert.match(migration, /ur\.role_key IN \('admin','owner'\)/);
+  assert.match(migration, /ur\.role_key IN \('manager','cashier'\)/);
+  assert.match(migration, /p_topic = 'fc:rider:'\|\|v_user_id::text\|\|':ops'/);
+  assert.match(migration, /PERFORM realtime\.send\(v_payload,v_event,v_topic,true\)/);
+  assert.match(migration, /delivery_task_offers/);
+  assert.match(migration, /delivery_assignments/);
+  assert.match(migration, /availability_status/);
+  assert.doesNotMatch(migration, /CREATE PUBLICATION|ALTER PUBLICATION|ALTER TABLE .*REPLICA IDENTITY/);
+});
+
+test("Realtime trigger payload contains record identifiers, not customer or rider PII", () => {
+  const migration=readFileSync(
+    "supabase/migrations/20261125090531_flame_chick_private_ops_realtime_broadcasts.sql",
+    "utf8"
+  );
+  assert.match(migration, /'record_id',v_record_id/);
+  assert.match(migration, /'branch_id',v_branch_id::text/);
+  assert.match(migration, /'delivery_task_id',v_delivery_task_id/);
+  assert.doesNotMatch(migration, /recipient_name_snapshot|recipient_phone_snapshot|address_snapshot|customer_phone|customer_name/);
 });
 
 
