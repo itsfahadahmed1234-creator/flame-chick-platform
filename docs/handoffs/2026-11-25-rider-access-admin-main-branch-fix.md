@@ -116,3 +116,44 @@ The Vercel promote endpoint returned 422 for these manually created deployments.
 - Do not re-enable Realtime as a prerequisite for Rider login; the page must still load jobs when Realtime is unavailable.
 - Preserve existing role separation: Admin/Owner full authority, Manager POS + return confirmation but no admin panel/delete, Cashier POS/rider assignment/cancel audit no delete, Rider only own delivery offers.
 - GST stays deferred. No real customer orders/payments and no production promotion.
+
+## Manual browser verification and controlled Realtime rehearsal — 2026-11-25
+
+**Status:** User-confirmed browser checks and a controlled Production rehearsal completed. Flame Chick remains **pre-launch**; this is not launch authorization.
+
+### Browser verification
+- Admin: user confirmed sign-in succeeds and the Staff & Riders page is reachable.
+- POS: user confirmed sign-in, Online Orders board and delivery dispatch section load. POS status displayed **“Realtime active · event-driven updates”**. A Rider appeared online.
+- Rider: user confirmed the existing Fahad Rider account signs in and the dashboard loads. Profile shown as `fahad`, Rider code `R-BC80D848`, availability “Available for delivery”, status **“Live updates”**, with no active delivery before the rehearsal.
+- During the controlled delivery flow, the user confirmed that Realtime updates were happening between the POS and Rider screens. This is a user-observed Production browser round trip, not merely a static/CI test.
+
+### Identified Production rehearsal record
+The user did not remember the order number but supplied the event window of approximately **15:20–15:30 Asia/Karachi**. A narrow read-only audit of that time window identified the matching order:
+
+- Order: `FC-261125-0003`
+- Source / fulfilment: `pos` / `delivery`
+- Rider: existing Fahad account, `R-BC80D848`
+- Delivery event times (Asia/Karachi):
+  - 15:26:43 — dispatch offer created
+  - 15:26:50 — Fahad accepted
+  - 15:26:56 — Fahad picked up; task moved to `out_for_delivery`
+  - 15:27:08 — Fahad marked delivered
+- Final order/task: `completed` / `delivered`
+- Payment audit: one successful `collection` entry, method `cash`, amount **PKR 599.00**, recorded at 15:27:32; balance due `0.00`; order payment state `paid`.
+- The collection entry is attributed in the database to the signed-in Admin actor. This verifies what the application recorded; it does not independently verify physical cash movement.
+- The assignment is terminal (`delivered`, `is_current=false`), so it no longer appears as an active Rider delivery. This is expected after completion.
+- The task had an earlier offer/decline attempt at approximately 14:07 PKT before the later offer accepted by Fahad. No additional staff identity details are stored here.
+
+### Evidence handling and safeguards
+- Evidence came from read-only queries against `delivery_task_events`, `delivery_assignments`, `delivery_tasks`, `orders`, and `payments`; no production rows were modified.
+- Only the narrow user-supplied 15:20–15:30 PKT window and the matched order's audit rows were inspected. No broad log ingestion/export was run.
+- This handoff preserves the sanitized operational timeline so the event evidence is not repeatedly queried. Customer name, phone, delivery address, auth tokens, and staff UUIDs are intentionally omitted.
+- Do not delete, refund, edit, or reclassify the rehearsal order without a separate approved accounting decision. It is a completed paid test record in Production and may appear in sales/payment reports.
+- No new Auth user, role, branch, migration, deployment, alias, or schema change was made.
+
+### Remaining pre-launch gates
+- The observed POS↔Fahad Realtime round trip is confirmed by the user's browser report. Cross-Rider isolation has been verified in disposable QA and is enforced by the private user-bound topic policy; a second live Rider account was not created for manual testing.
+- Keep Production marked **pre-launch** until the complete remaining manual rehearsal covers the required operational permissions and edge cases, with an explicit test plan and accounting treatment for future test transactions.
+- Do not create further production test orders or payments merely to repeat the already-observed Realtime round trip.
+- GST remains deferred; Free plan and single Main branch remain unchanged.
+
