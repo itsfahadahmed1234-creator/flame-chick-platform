@@ -13,6 +13,7 @@ The Rider portal was still inaccessible. The user asked to simplify Admin role c
 - Backend validation, not just the browser, must reject any operational branch other than Main.
 
 ## Production facts before this code change
+- Current Production snapshot (read-only, 2026-11-25): 11 orders, 3 delivery tasks, and 0 delivery tasks in accepted/out_for_delivery/failed state. Do not describe the Production database as empty; preserve all current data.
 - Production currently has exactly one active branch: Main (`branch_code='main'`, id `84b1b6dc-4fd1-45fa-8d9b-23d203b36cfd`).
 - Fahad's Rider account is `bc80d848-382b-4a2e-a325-70d2e60e5d03` with an active Rider role on Main.
 - A previous one-time production data repair created the missing Rider profile `R-BC80D848` for that same account. It is active, initially Offline, accepts jobs, and matches the Main branch. No Auth user or role was created by that repair.
@@ -39,16 +40,19 @@ The Rider portal was still inaccessible. The user asked to simplify Admin role c
 5. Disposable QA fixtures were aligned to the canonical `main` branch where they represent the single-branch Flame Chick tenant. Delivery QA now uses Rider profiles created by `assign_role` and only changes their disposable availability state, rather than inserting duplicate profiles.
 6. `tests/staff-main-branch-rider-provisioning.test.mjs` and CI workflow checks cover the UI, Main enforcement, provisioning and deactivation source contract. `supabase/tests/batch4_staff_admin_role_boundary.sql` covers direct role assignment, non-Main rejection, automatic branchless Rider invitation, acceptance/profile creation, role access boundaries and deactivation.
 
-## QA status at checkpoint
-- Admin static checks: passed.
-- The revised migration successfully replayed in disposable local Supabase.
-- The Staff Admin ACL/RLS and Admin/Owner/Manager/Cashier/Rider role-boundary test passed in disposable local Supabase, including direct Rider profile creation and deactivation behaviour.
-- The broader delivery test originally failed because its old fixture branch code was `qa-main`, which correctly failed the new Main-only backend guard. It was changed to `main`.
-- A subsequent run passed migration replay and staff-role QA but found the delivery test still manually inserting Rider profiles after the new role command had already created them. That duplicate insert was replaced by an update/verification of the auto-created profiles.
-- Final full QA is rerunning on the latest branch commit. Do not consider the broader suite passed until the run on the latest head completes successfully. Inspect and record that run before applying Production changes.
+## QA status — complete
+- **Full disposable Supabase QA passed** on commit `f8fb97df51464cc122ad56aa10d9e22a6f61632b`, GitHub Actions run `45575145392` (completed successfully).
+- Complete migration replay passed.
+- Staff Admin ACL/RLS, Admin/Owner/operational role boundaries, branchless Main invitation creation, invitation acceptance, direct Rider assignment/profile provisioning, non-Main rejection, and Rider deactivation lifecycle passed.
+- Delivery offer, pickup, delivery and return commands passed.
+- Unified POS sync for Dine-in, Takeaway, Delivery and payment idempotency passed.
+- Website order/idempotency/phone-quota checks and the local Website Order API/PostgREST integration passed.
+- Rider Web Push fail-closed check passed.
+- All six concurrency races passed: four delivery accept/decline/expiry scenarios and two payment collection retry/over-collection scenarios.
+- Admin static checks run `45573782354` also passed on commit `d7cf4800f9e1350bacdc51c09428d4a0f9df3de9`; that commit included the new `tests/staff-main-branch-rider-provisioning.test.mjs` source-contract tests and app/browser script parse checks.
 
 ## Production / deployment status
-- The new migration has **not** been applied to Production.
+- The new migration has **not** been applied to Production. The full disposable QA suite passed; do not apply it until the user explicitly approves this new Production migration.
 - No current task changes have been deployed to the Rider or Admin Vercel production aliases.
 - No Production branch data, staff roles, Auth accounts, orders, payments, or delivery records were altered by this source work. The earlier one-off Rider profile repair remains the only Production data change related to this issue.
 - Admin project: `prj_kPEqsepRzivOJhNeA32Io3netjav`.
