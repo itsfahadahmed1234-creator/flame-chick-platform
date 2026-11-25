@@ -1870,17 +1870,17 @@ function showPrintPreview(o){
   if(printSettings.counterEnabled)dests.push(printSettings.counterLabel);
   if(printSettings.kitchenEnabled)dests.push(printSettings.kitchenLabel);
   $('printPreviewSub').textContent=dests.length?`Printing to: ${dests.join(' + ')}`:'No destinations enabled';
-  $('printPreviewConfirmBtn').onclick=()=>{closeModal('printPreviewModal');doPrintOrder(_pendingPrintOrder);_pendingPrintOrder=null;};
+  $('printPreviewConfirmBtn').onclick=async()=>{closeModal('printPreviewModal');await doPrintOrder(_pendingPrintOrder);_pendingPrintOrder=null;};
   openModal('printPreviewModal');
 }
-function doPrintOrder(o){
+async function doPrintOrder(o){
   if(!o)return;
   let printed=false;
-  if(printSettings.counterEnabled){printed=printReceiptWithLabel(o,printSettings.counterLabel)||printed;}
-  if(printSettings.kitchenEnabled){printed=printReceiptWithLabel(o,printSettings.kitchenLabel)||printed;}
+  if(printSettings.counterEnabled){printed=await printReceiptWithLabel(o,printSettings.counterLabel)||printed;}
+  if(printSettings.kitchenEnabled){printed=await printReceiptWithLabel(o,printSettings.kitchenLabel)||printed;}
   return printed;
 }
-function printReceiptWithLabel(o,label){
+async function printReceiptWithLabel(o,label){
   const receiptHtml=`<div style="font-family:Arial,Segoe UI,sans-serif;font-size:11px;color:#111;width:72mm;padding:5mm 4mm;box-sizing:border-box">
     <div style="text-align:center;font-size:19px;font-weight:900">Flame Chick</div>
     <div style="text-align:center;font-size:9px;color:#444;margin-top:2px">${esc(label||'Receipt')}</div>
@@ -1908,6 +1908,15 @@ function printReceiptWithLabel(o,label){
     ${o.notes?`<div style="margin-top:8px;border:1px solid #bbb;padding:5px;font-size:11px"><strong>Note:</strong> ${esc(o.notes)}</div>`:''}
     <div style="text-align:center;font-size:9px;color:#555;margin-top:10px;line-height:1.35">Thank you for ordering from Flame Chick</div>
   </div>`;
+  if(label===printSettings.counterLabel&&printSettings.qzDirectEnabled&&printSettings.qzPrinterName&&window.FlameChickQZ){
+    try{
+      if(!flameChickStaffSession?.access_token)throw new Error('Sign in to the POS before direct printing.');
+      window.FlameChickQZ.setTokenProvider(()=>flameChickStaffSession?.access_token||'');
+      await window.FlameChickQZ.printReceipt(o,label,printSettings.qzPrinterName);
+      showToast('Receipt sent to '+printSettings.qzPrinterName);
+      return true;
+    }catch(error){showToast('Direct print unavailable · opening browser print. '+(error?.message||''));}
+  }
   const area=$('printArea');
   area.innerHTML=receiptHtml;
   window.print();
