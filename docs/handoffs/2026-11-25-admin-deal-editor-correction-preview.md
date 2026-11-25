@@ -229,3 +229,10 @@ No catalog rows were written for this selector fix. No publication, production a
 - User should open the latest stable Admin Preview and hard-refresh.
 - Edit Flame Feast and visually check the `Customer burger choices` panel says Chicken Burgers; quantity 3, repeat enabled, max 3; price Rs. 3,599; Half Broast and 1L Drink unchanged.
 - Do not add three product choices. Do not look for a Burger `Remove choice` button; category-driven Burger groups don't show product rows. After visually confirming, do one save through authenticated Catalog V3 commands (not direct SQL), then verify DB read-only. No publication.
+
+
+### Website and POS Preview deployments — added 2026-11-25
+- Website Preview deployment `dpl_41n22sQCEHKtRQ2KR1Rez4bR1kqf`, READY from commit `71e1de4dad57b09b3609437acc59634508aa22a4`, target Preview. Stable branch alias: https://flame-chick-website-production-git-work-produ-f251d5-fahad-7455.vercel.app/
+- POS Preview deployment `dpl_8kVsz7UYvWbXZ1GfSVcASu4Z7mKR`, READY from same commit, target Preview. Stable branch alias: https://flame-chick-pos-production-git-work-productio-675169-fahad-7455.vercel.app/
+- Both existing stable branch aliases were verified mapped to their new Preview deployments. Use Vercel team SSO if asked. No production aliases or deployments changed.
+- For end-to-end visual verification, confirm the Website and POS show `Select a burger` in each required burger slot and load the active/available variants of Chicken Burgers; verify repeat and max-per-choice behavior (1 no-repeat; 2/3 repeat). Do not place live orders or publish the catalog as part of this UI check.
