@@ -57,6 +57,7 @@ test("Rider Realtime uses a private own-user Broadcast topic with automatic reco
   assert.doesNotMatch(html, /\.on\("postgres_changes"/);
   assert.match(html, /function startRiderRealtimeFallback/);
   assert.match(html, /riderRealtimeFallbackTimer/);
+  assert.doesNotMatch(html, /if\(!session\?\.access_token\|\|!user\?\.id\|\|!rider\?\.branch_id\|\|!riderWantsOnline\)return/);
   assert.match(html, /scheduleRiderJobsRefresh\(\)/);
 });
 
