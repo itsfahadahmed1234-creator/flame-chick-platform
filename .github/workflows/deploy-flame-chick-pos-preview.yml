@@ -75,8 +75,15 @@ jobs:
         working-directory: apps/flame-chick-pos
         run: |
           set -euo pipefail
+          set +e
           deploy_output="$(vercel deploy --yes --target=preview --token="$VERCEL_TOKEN" 2>&1)"
+          deploy_status=$?
+          set -e
           printf '%s\n' "$deploy_output"
+          if [ "$deploy_status" -ne 0 ]; then
+            echo "Vercel CLI exited with status $deploy_status." >&2
+            exit "$deploy_status"
+          fi
           deployment_url="$(printf '%s\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\.vercel\.app' | tail -n 1 || true)"
           if [ -z "$deployment_url" ]; then
             echo "Could not extract a Vercel Preview URL from the CLI output." >&2
