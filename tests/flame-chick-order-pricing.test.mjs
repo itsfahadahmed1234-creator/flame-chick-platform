@@ -5,7 +5,7 @@ import dealView from "../apps/flame-chick-website/js/catalog-v3-deal-view.js";
 import fixture from "./fixtures/catalog-v3-fixture.cjs";
 import { calculateWebsiteOrder } from "../supabase/functions/_shared/flame-chick-order-pricing.mjs";
 
-const { IDS, createSnapshot } = fixture;
+const { IDS, createSnapshot, createCategoryBurgerSnapshot } = fixture;
 const databaseNow = "2026-11-23T12:00:00.000Z";
 
 function snapshot() {
@@ -262,4 +262,35 @@ test("rejects malformed quantities, missing DB time and oversized order lines", 
     productVariantId: IDS.variant, quantity: 1, modifiers: []
   })));
   assert.equal(price(tooMany).error.code, "ORDER_ITEMS_INVALID");
+});
+
+
+test('prices category-selected burger variants from the published Chicken Burgers category at zero deal surcharge', () => {
+  const source = createCategoryBurgerSnapshot({ quantity: 2, allowRepeat: true });
+  const result = price(request([{
+    kind: 'deal',
+    dealId: IDS.deal,
+    dealVariantId: IDS.dealVariant,
+    quantity: 1,
+    componentGroups: [
+      {
+        componentGroupId: IDS.componentGroup,
+        components: [
+          { componentOptionId: IDS.ogCrunchVariant, productId: IDS.ogCrunchProduct, productVariantId: IDS.ogCrunchVariant, modifiers: [] },
+          { componentOptionId: IDS.ogCrunchVariant, productId: IDS.ogCrunchProduct, productVariantId: IDS.ogCrunchVariant, modifiers: [] }
+        ]
+      },
+      {
+        componentGroupId: IDS.drinkComponentGroup,
+        components: [{ componentOptionId: IDS.drinkComponentOption, productId: IDS.drinkProduct, productVariantId: IDS.drinkVariant, modifiers: [] }]
+      }
+    ]
+  }]), source);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.data.subtotal, 750);
+  assert.equal(result.data.items[0].components.length, 3);
+  assert.equal(result.data.items[0].components[0].selected_product_id, IDS.ogCrunchProduct);
+  assert.equal(result.data.items[0].components[0].selected_variant_id, IDS.ogCrunchVariant);
+  assert.equal(result.data.items[0].components[0].unit_price_snapshot, 0);
+  assert.equal(result.data.items[0].line_total, 750);
 });

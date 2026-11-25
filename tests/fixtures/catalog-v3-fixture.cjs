@@ -6,6 +6,12 @@ const IDS = Object.freeze({
   dealCategory: '20000000-0000-4000-8000-000000000002',
   drinkCategory: '20000000-0000-4000-8000-000000000003',
   product: '30000000-0000-4000-8000-000000000001',
+  ogCrunchProduct: '31000000-0000-4000-8000-000000000001',
+  injectorProduct: '31000000-0000-4000-8000-000000000002',
+  nashvilleFireProduct: '31000000-0000-4000-8000-000000000003',
+  ogCrunchVariant: '41000000-0000-4000-8000-000000000001',
+  injectorVariant: '41000000-0000-4000-8000-000000000002',
+  nashvilleFireVariant: '41000000-0000-4000-8000-000000000003',
   drinkProduct: '30000000-0000-4000-8000-000000000002',
   variant: '40000000-0000-4000-8000-000000000001',
   drinkVariant: '40000000-0000-4000-8000-000000000002',
@@ -187,4 +193,49 @@ function createSnapshot() {
   };
 }
 
-module.exports = { IDS, createSnapshot };
+
+function createCategoryBurgerSnapshot({ quantity = 1, allowRepeat = false, maxPerChoice = null } = {}) {
+  const snapshot = createSnapshot();
+  const category = snapshot.categories.find(row => row.categoryId === IDS.menuCategory);
+  category.nameEn = 'Chicken Burgers';
+
+  const placeholder = snapshot.products.find(row => row.productId === IDS.product);
+  placeholder.nameEn = 'Burger';
+  const placeholderVariant = snapshot.productVariants.find(row => row.variantId === IDS.variant);
+  placeholderVariant.sizeKey = 'INCLUDED';
+  placeholderVariant.sizeLabel = 'Included';
+  placeholderVariant.price = null;
+  placeholderVariant.standaloneSellable = false;
+
+  const products = [
+    { productId: IDS.ogCrunchProduct, nameEn: 'OG Crunch', sortOrder: 1, variantId: IDS.ogCrunchVariant, price: 599 },
+    { productId: IDS.injectorProduct, nameEn: 'The Injector', sortOrder: 2, variantId: IDS.injectorVariant, price: 649 },
+    { productId: IDS.nashvilleFireProduct, nameEn: 'Nashville Fire', sortOrder: 3, variantId: IDS.nashvilleFireVariant, price: 699 }
+  ];
+  for (const item of products) {
+    snapshot.products.push({
+      productId: item.productId, categoryId: IDS.menuCategory, subcategoryId: null,
+      legacyId: null, nameEn: item.nameEn, nameUr: null, descriptionEn: null, descriptionUr: null,
+      imageFolderKey: null, imageGroupId: null, imagePublished: false, imageExtension: null,
+      imageCurrentPath: null, imagePreviousPath: null, imagePreviousExtension: null,
+      featured: false, sortOrder: item.sortOrder, available: true
+    });
+    snapshot.productVariants.push({
+      variantId: item.variantId, productId: item.productId, legacyId: null,
+      sizeKey: 'REGULAR', sizeLabel: 'Regular', variantKind: 'standard',
+      price: item.price, packQuantity: null, packUnit: null, standaloneSellable: true,
+      sortOrder: 1, available: true
+    });
+  }
+
+  const burgerGroup = snapshot.dealComponentGroups.find(row => row.componentGroupId === IDS.componentGroup);
+  burgerGroup.minUnits = quantity;
+  burgerGroup.maxUnits = quantity;
+  burgerGroup.allowRepeatOption = allowRepeat;
+  burgerGroup.maxUnitsPerOption = allowRepeat ? (maxPerChoice ?? quantity) : null;
+  const burgerMapping = snapshot.dealVariantComponentOptions.find(row => row.componentOptionId === IDS.componentOption);
+  burgerMapping.maxQuantityPerDeal = allowRepeat ? (maxPerChoice ?? quantity) : 1;
+  return snapshot;
+}
+
+module.exports = { IDS, createSnapshot, createCategoryBurgerSnapshot };

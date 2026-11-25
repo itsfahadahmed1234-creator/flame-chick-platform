@@ -221,6 +221,7 @@ test('each customer-facing Burger slot offers every configured choice and respec
     'A choice is only blocked in another slot when repeats are disabled.');
   assert.match(slotRenderer, /selectedQuantity\s*>=\s*optionCap/,
     'The per-choice quantity cap must be respected.');
+  assert.match(source, /group\.categoryDriven === true/, 'A category-backed Burger group must render the customer slot picker even when only one variant is currently available.');
   assert.match(slotRenderer, /optionCap\s*=\s*Number\(option\.maxQuantity\)/,
     'Each configured choice must use its own saved maximum-per-choice limit.');
 });

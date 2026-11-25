@@ -5,7 +5,7 @@ import contract from '../apps/flame-chick-website/js/catalog-v3.js';
 import dealView from '../apps/flame-chick-website/js/catalog-v3-deal-view.js';
 import fixture from './fixtures/catalog-v3-fixture.cjs';
 
-const { IDS, createSnapshot } = fixture;
+const { IDS, createSnapshot, createCategoryBurgerSnapshot } = fixture;
 const ORDER = '99000000-0000-4000-8000-000000000001';
 const PAYMENT = 'aa000000-0000-4000-8000-000000000001';
 function snapshot() {
@@ -111,4 +111,30 @@ test('lost-response retries are safe and acknowledgement must match identity plu
   assert.equal(sync.acknowledgementMatches(payload,{ok:true,local_order_id:ORDER,local_revision:1,order_id:'99000000-0000-4000-8000-000000000002'}),true);
   assert.equal(sync.isRecoverableHttpStatus(503),true);
   assert.equal(sync.isRecoverableHttpStatus(409),false);
+});
+
+
+test('POS synchronizes customer-selected Chicken Burgers variants with repeat caps and zero surcharge', () => {
+  const s = createCategoryBurgerSnapshot({ quantity: 2, allowRepeat: true });
+  const order = baseOrder({
+    catalogPublicationId: s.publicationId,
+    catalogVersion: s.publicationNumber,
+    items: [{
+      dealId: IDS.deal, dealVariantId: IDS.dealVariant, quantity: 1,
+      componentGroups: [
+        { componentGroupId: IDS.componentGroup, components: [{
+          componentOptionId: IDS.injectorVariant, productId: IDS.injectorProduct,
+          productVariantId: IDS.injectorVariant, quantity: 2, modifiers: []
+        }] }
+      ]
+    }]
+  });
+  const payload = sync.buildSyncPayload(order, s, IDS.branch, { contract, dealView });
+  const burger = payload.items[0].component_groups.find(group => group.component_group_id === IDS.componentGroup);
+  assert.equal(burger.components.length, 2);
+  assert.ok(burger.components.every(item =>
+    item.component_option_id === IDS.injectorVariant &&
+    item.product_id === IDS.injectorProduct &&
+    item.product_variant_id === IDS.injectorVariant));
+  assert.equal(payload.items[0].component_groups.find(group => group.component_group_id === IDS.drinkComponentGroup).components.length, 1);
 });

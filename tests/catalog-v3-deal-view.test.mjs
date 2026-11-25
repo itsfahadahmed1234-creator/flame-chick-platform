@@ -4,7 +4,7 @@ import contract from '../apps/flame-chick-website/js/catalog-v3.js';
 import deals from '../apps/flame-chick-website/js/catalog-v3-deal-view.js';
 import fixture from './fixtures/catalog-v3-fixture.cjs';
 
-const { IDS, createSnapshot } = fixture;
+const { IDS, createSnapshot, createCategoryBurgerSnapshot } = fixture;
 const monday = '2026-11-23T12:00:00.000Z'; // Monday 17:00 in Asia/Karachi
 const sunday = '2026-11-22T12:00:00.000Z'; // Sunday 17:00 in Asia/Karachi
 
@@ -290,4 +290,22 @@ test('does not calculate or expose a browser-side deal total', () => {
   assert.equal(Object.hasOwn(deal, 'total'), false);
   assert.equal(Object.hasOwn(deal.variants[0], 'total'), false);
   assert.equal(Object.hasOwn(result, 'grandTotal'), false);
+});
+
+
+test('expands a sole Burger/Included category reference into real available Chicken Burgers variants', () => {
+  const snapshot = createCategoryBurgerSnapshot({ quantity: 2, allowRepeat: true });
+  const result = build(snapshot);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const group = result.collections[0].deals[0].variants[0].groups[0];
+  assert.equal(group.categoryDriven, true);
+  assert.equal(group.categoryId, IDS.menuCategory);
+  assert.equal(group.branchSatisfiable, true);
+  assert.deepEqual(group.options.map(option => option.productName), [
+    'OG Crunch', 'The Injector', 'Nashville Fire'
+  ]);
+  assert.equal(group.options.some(option => option.productName === 'Burger'), false);
+  assert.ok(group.options.every(option => option.pricingTreatment === 'INCLUDED' &&
+    option.surchargeMinor === 0 && option.maxQuantity === 2));
+  assert.equal(result.collections[0].deals[0].variants[0].basePriceMinor, 75000);
 });

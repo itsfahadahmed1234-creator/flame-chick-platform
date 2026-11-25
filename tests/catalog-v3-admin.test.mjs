@@ -575,3 +575,15 @@ test('Burger editor CSS keeps the two choice selectors wide and moves help text 
   assert.match(css, /\.fcv3-choice-row>\.fcv3-button\s*\{[^}]*grid-column:\s*1\/-1/s);
   assert.match(css, /@media\(max-width:800px\)\s*\{[^}]*\.fcv3-choice-row\s*\{grid-template-columns:minmax\(0,1fr\)\}/s);
 });
+
+
+test('Burger groups use a Chicken Burgers category source and Remove choice bypasses unrelated incomplete-row validation', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-admin/catalog-v3-admin.js', import.meta.url), 'utf8');
+  assert.match(source, /function burgerCategoryAnchor\(\)/);
+  assert.match(source, /Customer burger choices/);
+  assert.match(source, /options:burger\?\(anchor\?/);
+  assert.match(source, /readComponentGroups\(form,\{validate:false\}\)/);
+  assert.match(source, /s\.components\[index\]\.options\.splice\(choiceIndex,1\)/);
+  assert.match(source, /choiceIndex<0\|\|!s\.components\[index\]/);
+  assert.match(source, /if\(!group\|\/burger\/i\.test\(group\.display_name\)\)/);
+});
