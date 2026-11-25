@@ -596,3 +596,41 @@ The browser rendered the page and initialized the V3 catalogue, but stopped whil
 - This was CI plus deployed HTML/script response verification. A full live interactive browser session across small mobile viewports was not performed; the user should review actual device sizing and test area filtering, quote display placement and the animations visually.
 - Preview checkout write protection remains in place. Do not submit a quote/order from the Preview.
 - No Production deployment, custom alias, catalogue publication, order/payment record, migration, Supabase configuration, Edge Function, POS/Admin/Rider code or shared backend was changed.
+
+
+---
+
+## 2026-11-25 — Resume verification and stale footer copy correction
+
+### Exact resume verification
+- Website context index was read first, followed by the Website parallel audit handoff.
+- Dedicated branch `work/website-parallel-development` exists.
+- Resume HEAD before this change: `a6de5a8155a880576a85ddda37acde713d5b03d2`.
+- Compared implementation checkpoint `df04dc6f02014145edfee29ca10d3923de18f923` to the resume HEAD: exactly three commits ahead, all documentation-only. Changed files were `docs/handoffs/2026-11-25-website-parallel-audit.md` and `docs/handoffs/WEBSITE_PARALLEL_CONTEXT_INDEX.md`; no Website application files changed in those three commits.
+- Current Website application source was inspected read-only. Product/deal dialogs, cart details ordering, searchable delivery area, sticky cart footer, reduced-motion CSS, category-driven Burger slots, fixed deal rows and conditional deal-variant selector are present.
+- The real Website Preview was inspected through the connected browser tab. The published catalogue rendered product cards and deal cards; the Preview-only checkout notice was visible. This was a browser text/accessibility inspection, not a full visual screenshot or interactive click rehearsal.
+
+### CI and Preview verification at resume
+- Website Static Checks run `45586562155`, workflow run #224, completed successfully on `df04dc6f02014145edfee29ca10d3923de18f923`. All job steps succeeded: active JS syntax, core catalogue/deal/fulfilment tests, Preview regression tests and inline script parsing.
+- The real Website Preview deployment `dpl_6QNcMv8HWpLrY34rgo2phRpwU3ia` was independently checked as READY, branch `work/website-parallel-development`, source SHA `df04dc6f02014145edfee29ca10d3923de18f923`, URL https://flame-chick-website-production-10vo2ei33-fahad-7455.vercel.app.
+- Its deployment target is Preview (`target: null` in Vercel API). Its only alias is the unique deployment alias; no Production alias was reassigned.
+- Separate project `flame-chick-website-visual-review` has a blocked Vercel deployment on the newer docs HEAD due to team collaboration configuration. This is not the real Website Preview and does not invalidate the READY real Website deployment.
+
+### Website-only correction
+- Found stale footer copy in `apps/flame-chick-website/index.html`: “Browse the current published menu. Online checkout is not enabled yet.” This contradicted the existing V3 ordering flow and the separate Preview-only checkout notice.
+- Replaced it with neutral copy: “Browse the current published menu and discover your favourites.”
+- Added a source-hygiene regression test in `tests/website-source-hygiene.test.mjs` that requires the new copy and rejects the stale statement.
+- Implementation commits: `cebcbe35c80fe9c61580b4730e0709e1af510dea` (initial correction) and `3e031bfaa33d7fd0e83f60139b2f1ce59b3d5a1f` (corrected regex escaping in the added test).
+- Final verified branch HEAD at time of handoff update: `3e031bfaa33d7fd0e83f60139b2f1ce59b3d5a1f`.
+- Exact files changed by the correction: `apps/flame-chick-website/index.html` and `tests/website-source-hygiene.test.mjs` only.
+
+### Verification still pending
+- The new correction commit has not yet produced a confirmed GitHub Actions CI result.
+- No new real Website Preview deployment exists yet for `3e031bfaa33d7fd0e83f60139b2f1ce59b3d5a1f`; the latest verified real Website Preview remains the earlier READY `df04dc6` deployment.
+- Do not claim the new regression test passed until the matching Website Static Checks run is completed successfully.
+- Full visual/interactive desktop and mobile rehearsal remains outstanding. Do not submit Get verified total, Place order or Retry on any Production-backed Preview.
+
+### Safety / scope
+- No changes to POS, Admin, Rider, shared backend APIs, pricing, catalogue contract, Supabase schema, migrations, Edge Functions, Production aliases, catalogue data, orders or payments.
+- No checkout, quote or order request was submitted. No live business data was changed.
+- GST remains deferred.
