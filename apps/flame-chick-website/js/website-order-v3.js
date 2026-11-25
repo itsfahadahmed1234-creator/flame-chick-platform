@@ -175,6 +175,35 @@
     return count + (count === 1 ? ' item' : ' items');
   }
 
+  function replayAnimation(node, className) {
+    if (!node) return;
+    node.classList.remove(className);
+    void node.offsetWidth;
+    node.classList.add(className);
+  }
+
+  function animateCartAdded() {
+    var rows = $('cart-lines');
+    replayAnimation(rows && rows.lastElementChild, 'is-added');
+    ['cart-count', 'badge', 'fc-v3-cartbar'].forEach(function (id) {
+      replayAnimation($(id), 'is-bumped');
+    });
+  }
+
+  function checkoutMotion(stage) {
+    var footer = document.querySelector('.fc-v3-cart-footer');
+    if (!footer) return;
+    footer.classList.remove('is-checking', 'is-ready', 'is-ordering', 'is-confirmed', 'has-error');
+    if (stage) footer.classList.add(stage);
+    if ($('request-quote')) $('request-quote').classList.toggle('is-ready', stage === 'is-ready');
+    if ($('place-order')) $('place-order').classList.toggle('is-ready', stage === 'is-ready');
+    if ($('retry-order')) $('retry-order').classList.toggle('is-ordering', stage === 'is-ordering');
+  }
+
+  function clearCheckoutMotionLater() {
+    window.setTimeout(function () { checkoutMotion(null); }, 1800);
+  }
+
   function openCartDrawer() {
     if (state.busy || state.checkoutUncertain) return;
     var drawer = $('fc-v3-cart-drawer');
@@ -512,6 +541,7 @@
       }
     });
     invalidateQuote();
+    animateCartAdded();
     status(product.name + ' added to your cart.');
   }
 
@@ -663,11 +693,7 @@
           validationMessage.textContent = validation?.message || 'Complete the required options.';
           return;
         }
-        var qty = Number(quantity.value);
-        if (!Number.isSafeInteger(qty) || qty < 1 || qty > 99) {
-          validationMessage.textContent = 'Choose a quantity from 1 to 99.';
-          return;
-        }
+        var qty = quantity;
         state.cart.push({
           kind: 'product', label: product.name + ' · ' + variant.label,
           quantity: qty,
@@ -678,6 +704,7 @@
         });
         dialog.close();
         invalidateQuote();
+        animateCartAdded();
         status(product.name + ' added to your cart.');
       });
       content.append(validationMessage, add);
@@ -787,6 +814,7 @@
         });
         $('deal-dialog').close();
         invalidateQuote();
+        animateCartAdded();
         status('Deal added to your cart.');
       }
     });
@@ -944,7 +972,9 @@
     if (state.busy || state.checkoutUncertain) return;
     try {
       var body = buildRequestBody();
-      setBusy(true); status('Checking the current menu, availability and delivery fee…');
+      setBusy(true);
+      checkoutMotion('is-checking');
+      status('Checking the current menu, availability and delivery fee…');
       var result = await orderApi('POST', '', body);
       if (!result.quote || result.quote.publicationId !== state.snapshot.publicationId) {
         throw new Error('The published menu changed. Refresh and review your cart before ordering.');
@@ -968,12 +998,17 @@
       $('place-order').disabled = false;
       $('retry-order').hidden = true;
       status('Your server-verified total is ready. Review your details and place the order.', 'success');
+      checkoutMotion('is-ready');
     } catch (error) {
+      checkoutMotion('has-error');
       state.quote = null; state.quoteBody = null; state.quoteToken = null;
       status(error.message || 'Could not verify your order total.', 'error');
       $('cart-summary').hidden = true;
       $('request-quote').hidden = false;
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+      clearCheckoutMotionLater();
+    }
   }
 
   async function submitOrder(retry) {
@@ -1003,6 +1038,7 @@
     }
     state.checkoutUncertain = true;
     setBusy(true);
+    checkoutMotion('is-ordering');
     $('place-order').hidden = true;
     $('retry-order').hidden = false;
     status('Submitting your order securely…');
@@ -1023,12 +1059,15 @@
       $('request-quote').hidden = true;
       $('place-order').hidden = true;
       $('order-success').hidden = false;
+      $('order-success').classList.add('is-confirmed');
+      checkoutMotion('is-confirmed');
       $('success-order-number').textContent = result.order_number;
       $('success-order-message').textContent = 'Your order is with Flame Chick POS. Payment is due ' +
         (result.fulfillment_type === 'delivery' ? 'in cash on delivery.' : 'when you collect your pickup.');
       status('Order confirmed.', 'success');
       $('order-success').scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (error) {
+      checkoutMotion('has-error');
       var uncertain = !error.status || error.status >= 500;
       state.checkoutUncertain = uncertain;
       if (uncertain) {
@@ -1054,6 +1093,7 @@
       }
     } finally {
       setBusy(false);
+      clearCheckoutMotionLater();
       if (state.checkoutUncertain) {
         $('retry-order').hidden = false;
         $('retry-order').disabled = false;
