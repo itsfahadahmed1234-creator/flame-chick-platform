@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - work/production-source-audit
+      - work/website-parallel-development
     paths:
       - "apps/flame-chick-website/**"
       - "tests/website-source-hygiene.test.mjs"
