@@ -197,3 +197,35 @@ No catalog rows were written for this selector fix. No publication, production a
 - Stable branch Preview URL: https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app/
 - Next user action: hard-refresh with Ctrl+Shift+R, reopen Flame Duo, visually verify the product and variant selectors are usable at sensible width. They should occupy equal columns at wider widths and stack vertically on narrower widths. Don't save yet. Continue the controlled Flame Duo option selection only after the user confirms the visible layout is fixed.
 - No catalog writes, saves, publication, production alias promotion, or production deployment occurred.
+
+
+---
+
+## 2026-11-25 — Category-driven Burger selector replaces per-deal product rows
+
+### Latest Preview/source
+- Branch `work/production-source-audit`; latest commit `71e1de4dad57b09b3609437acc59634508aa22a4`.
+- Admin Preview deployment `dpl_7kJeNYEsvX9xxgkp6xnzZZ2h5kAY`: READY; target Preview (`null`); exact commit verified.
+- Stable branch Preview alias `https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app/` verified mapped to that deployment. No production alias changed.
+
+### Intended category-driven behavior now in source
+- Website and POS deal view builders recognize a single `Burger / Included` deal-only source anchor whose product belongs to the active menu category `Chicken Burgers`.
+- The anchor expands at runtime into every active, available, branch-available standalone product variant in that category, excluding the placeholder product named exactly `Burger`.
+- Every customer slot is a dropdown initially labelled `Select a burger`. Slots have the same complete menu list; duplicates are enabled/disabled according to group repeat and maximum-per-choice limits.
+- Generated options carry actual product and variant IDs. Server-side quote/pricing validates them against the published catalogue snapshot and stores actual selected product/variant snapshots. Burger choice contribution is zero; the deal's fixed base price remains unchanged.
+- Admin Burger editor replaces manual product rows with a source panel naming Chicken Burgers; it writes the existing single internal source anchor and preserves required quantity/repeat/max fields. No product list is manually configured per deal.
+- A Burger group therefore intentionally has no per-row `Remove choice` button. Remove a burger globally by deactivating the product/variant in Chicken Burgers. Non-Burger manual choices retain individual Remove choice controls; handler reads with `validate:false` before removing, avoiding unrelated validation blocking the click.
+- Latest relevant CI: Admin static success (run `45539849543`, commit `3ed78d6`); POS/Rider static success (run `45539849664`, same commit); Website static success (run `45539528562`, commit `8e41d33`); Edge static success (run `45538933371`, commit `e6ed5ce`); importer QA success (run `45540314861`, latest HEAD). Automatic Preview workflows remained skipped by their existing fail-closed gates; direct Vercel Preview was used.
+
+### Current read-only production state — 25 Nov 2026
+- Current draft revision `108`; current publication number `2` still references draft revision `92`. This session made no catalog writes and did not publish.
+- Audit log shows revisions `97–108` are catalog actions by Admin role on Flame Feast only.
+- Flame Duo Burger group: required quantity 2; repeat true; max per choice 2; exactly one active `Burger / Included` placeholder anchor; INCLUDED, zero surcharge. Already category-driven.
+- Flame Hour — Quarter Broast + Burger + Cold Drink: required quantity 1; repeat false; exactly one active `Burger / Included` anchor; INCLUDED, zero surcharge. Already category-driven.
+- Flame Feast: active, available, price Rs. 3,599; Burger group quantity 3, repeat true, max 3; three current explicit rows (OG Crunch Regular, The Injector Regular, Nashville Fire Regular), all INCLUDED and zero surcharge. These are real product rows but still need one controlled Admin save converting the group to the single category-source anchor. Keep Half Broast and 1L Drink unchanged.
+- Flame Hour — The Injector + Cold Drink is separate; do not modify.
+
+### User-visible next step
+- User should open the latest stable Admin Preview and hard-refresh.
+- Edit Flame Feast and visually check the `Customer burger choices` panel says Chicken Burgers; quantity 3, repeat enabled, max 3; price Rs. 3,599; Half Broast and 1L Drink unchanged.
+- Do not add three product choices. Do not look for a Burger `Remove choice` button; category-driven Burger groups don't show product rows. After visually confirming, do one save through authenticated Catalog V3 commands (not direct SQL), then verify DB read-only. No publication.
