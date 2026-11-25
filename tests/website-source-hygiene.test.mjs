@@ -118,7 +118,7 @@ test("single-branch storefront skips the branch gate and opens fulfilment from t
   assert.match(html, /id="badge"/);
   assert.match(order, /if \(\$\('badge'\)\)/);
   assert.doesNotMatch(html, /id="branch-selector"|id="catalog-context-label"|Choose your branch/);
-  assert.match(html, /id="fc-v3-cart-drawer"[^>]*class="drawer fc-v3-cart-drawer"/);
+  assert.match(html, /class="drawer fc-v3-cart-drawer"[^>]*id="fc-v3-cart-drawer"/);
   assert.match(html, /class="seg fc-v3-fulfilment"/);
   assert.match(html, /id="fulfilment-delivery"[^>]*value="delivery" checked/);
   assert.match(html, /id="fulfilment-pickup"[^>]*value="pickup"/);
