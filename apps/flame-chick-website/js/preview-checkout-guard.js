@@ -26,7 +26,7 @@
 
   function normalizedHost(hostname) {
     if (typeof hostname !== 'string') return '';
-    return hostname.trim().toLowerCase().replace(/\\.$/, '');
+    return hostname.trim().toLowerCase().replace(/\.$/, '');
   }
 
   function isTestCheckoutPreview(hostname) {
