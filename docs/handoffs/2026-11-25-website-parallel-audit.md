@@ -308,3 +308,39 @@ The previous standalone mockup at `flame-chick-website-visual-review-*.vercel.ap
 ### Remaining verification
 
 The deployment and source response were verified, but a full interactive browser rehearsal (actual catalogue hydration, product/deal modals, cart drawer behavior, responsive screenshots) was not performed. The user should review the real Preview on desktop/mobile. Do not test Get Verified Total, Place Order or Retry on Preview.
+
+
+---
+
+## 2026-11-25 — Catalogue render fix + status panel removal
+
+### User feedback
+- The visual design was approved, but the live catalogue did not render.
+- User requested removal of the catalogue status section.
+
+### Root cause verified in browser preview
+- The page was failing during catalogue rendering because `appendProductArtwork(art, product, category.name)` was called by the V3 product renderer but the helper was not defined in the deployed Website script.
+- This exception occurred during product card creation and caused the Website's initialization catch to mark online ordering unavailable and hide the rendered menu.
+
+### Fixes on Website branch only
+- Added a local `appendProductArtwork` helper to the existing V3 Website script:
+  - Uses the published catalogue's `imagePath` only when present.
+  - Builds a path against the existing public Flame Chick media bucket URL from the Website config.
+  - Uses lazy loading and a safe fallback icon if the image cannot load.
+  - Does not hardcode catalogue product IDs, prices, or published availability.
+- Removed the entire Catalogue Status panel from the homepage markup.
+- Removed its reload button event handler and changed the status setter to a no-op; catalogue/checkout failures still appear in the existing order-status context.
+- No API/backend/schema/POS/Admin/Rider or Production settings were changed.
+
+### CI and deployment
+- Static Website checks run: `45577025295` — **SUCCESS** for commit `6d909c672c6216995734bc951d3253760f6575b9`.
+- Deployment: `dpl_9uAiY4diDwZfheGkSjcvDvUa99cK`
+- Status: **READY**, target **Preview**
+- Branch: `work/website-parallel-development`
+- Commit: `6d909c672c6216995734bc951d3253760f6575b9`
+- URL: https://flame-chick-website-production-pmnve3cvo-fahad-7455.vercel.app
+- Deployed page verified HTTP 200, correct Flame Chick title, preview banner present, catalogue status panel removed, menu root markup present, helper script served HTTP 200.
+- Production aliases remain attached to their prior Production deployment.
+
+### Remaining browser verification
+- Automated source checks passed and deployment is READY. A full live interactive catalogue hydration, image loading, and mobile/desktop cart rehearsal still needs to be performed by reviewing this updated Preview.
