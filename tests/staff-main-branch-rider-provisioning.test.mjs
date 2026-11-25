@@ -17,7 +17,7 @@ test("Admin staff invitation no longer requires a branch selector or manual reas
   assert.match(adminApp, /function staffBranchIds\(roleKey\)/);
   assert.match(adminApp, /branch_code\|\|""\)\.toLowerCase\(\)==="main"/);
   assert.doesNotMatch(adminApp, /selectedStaffBranches|data-staff-scope/);
-  assert.match(adminApp, /reason="Invited via Admin panel"/);
+  assert.match(adminApp, /const reason="Invited via Admin panel"/);
 });
 
 test("Rider job loading does not wait for Realtime to initialize", () => {
