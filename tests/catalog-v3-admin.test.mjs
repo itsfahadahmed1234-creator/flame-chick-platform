@@ -566,3 +566,12 @@ test('Burger selector form requires maximum-per-choice and validates selected Ch
   assert.match(source, /if\(variants\.length\)select\.value=variants\[0\]\.id/);
   assert.match(source, /const groups=buildFixedComponentGroups\(s\.components,latest\.component_groups\)/);
 });
+
+
+test('Burger editor CSS keeps the two choice selectors wide and moves help text out of the auto grid column', async () => {
+  const css = await readFile(new URL('../apps/flame-chick-admin/catalog-v3-admin.css', import.meta.url), 'utf8');
+  assert.match(css, /\.fcv3-choice-row\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(220px,1fr\)\)/s);
+  assert.match(css, /\.fcv3-choice-row>\.fcv3-choice-help\s*\{[^}]*grid-column:\s*1\/-1/s);
+  assert.match(css, /\.fcv3-choice-row>\.fcv3-button\s*\{[^}]*grid-column:\s*1\/-1/s);
+  assert.match(css, /@media\(max-width:800px\)\s*\{[^}]*\.fcv3-choice-row\s*\{grid-template-columns:minmax\(0,1fr\)\}/s);
+});
