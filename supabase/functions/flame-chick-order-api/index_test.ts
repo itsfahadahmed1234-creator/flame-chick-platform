@@ -158,7 +158,7 @@ async function invoke(body: Record<string, unknown>) {
   return { status: response.status, body: await response.json() as Record<string, any> };
 }
 
-Deno.test("actual Website Order API issues, validates and replays signed quotes", async () => {
+Deno.test("Website Order API validates legacy quotes and commits single-request checkout idempotently", async () => {
   try {
     const staleId = "a1000000-0000-4000-8000-000000000001";
     const issued = await invoke(quoteBody(staleId));
@@ -214,6 +214,20 @@ Deno.test("actual Website Order API issues, validates and replays signed quotes"
     if (conflict.status !== 409 || conflict.body.error?.code !== "WEBSITE_ORDER_IDEMPOTENCY_CONFLICT" || readCommitCount() !== 1) {
       throw new Error("Changed facts under a reused request ID were not rejected.");
     }
+    const oneStepId = "a1000000-0000-4000-8000-000000000005";
+    const oneStepBody = { ...quoteBody(oneStepId), action: "place_website_order" };
+    const oneStepCreated = await invoke(oneStepBody);
+    if (oneStepCreated.status !== 201 || oneStepCreated.body.ok !== true ||
+        oneStepCreated.body.payment_status !== "unpaid" || oneStepCreated.body.fulfillment_type !== "delivery" ||
+        !oneStepCreated.body.order_id || readCommitCount() !== 2) {
+      throw new Error("Single-request Website checkout did not commit one unpaid order: " + JSON.stringify(oneStepCreated));
+    }
+    const oneStepReplay = await invoke(oneStepBody);
+    if (oneStepReplay.status !== 200 || oneStepReplay.body.already_processed !== true ||
+        oneStepReplay.body.order_id !== oneStepCreated.body.order_id || readCommitCount() !== 2) {
+      throw new Error("Single-request checkout retry created a duplicate or failed to return the original order.");
+    }
+
     console.log("Website Order API route integration: quote, stale-fee/tamper/expiry rejection, commit and idempotent replay passed.");
   } finally {
     globalThis.fetch = originalFetch;
