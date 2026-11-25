@@ -3,6 +3,12 @@ name: Deploy Flame Chick POS Preview
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - work/production-source-audit
+    paths:
+      - "apps/flame-chick-pos/**"
+      - ".github/workflows/deploy-flame-chick-pos-preview.yml"
 
 permissions:
   contents: read
