@@ -4606,6 +4606,11 @@ function normalizeHistoryOrder(o){
   const total=Number(o.total??o.Total)||0;
   return {...o,localOrderId,serverOrderId,createdAt,updatedAt:o.updatedAt??o.UpdatedAt??createdAt,total,subtotal:Number(o.subtotal??o.Subtotal)||0,deliveryFee:Number(o.deliveryFee??o.DeliveryFee)||0,discount:Number(o.discount??o.Discount)||0,customerName:o.customerName??o.CustomerName??'',phone:o.phone??o.Phone??'',address:o.address??o.Address??'',area:o.area??o.Area??'',orderSource:source==='online'?'Website':'POS',fulfillmentType:o.fulfillmentType??o.FulfillmentType??'Takeaway',paymentMethod:o.paymentMethod??o.PaymentMethod??'Cash',paymentStatus:o.paymentStatus??o.PaymentStatus??'',status:o.status??o.Status??'',notes:o.notes??o.Notes??'',tableNumber:o.tableNumber??o.TableNumber??''};
 }
+// History workspace state is explicit because this page runs in strict mode.
+let historyActiveTab='pos';
+let historyLoading=false;
+const historyServerRows={pos:[],online:[],all:[],cancelled:[]};
+
 function historySearchMatches(order,query){
   if(!query)return true;
   const q=String(query).trim().toLowerCase();
