@@ -20,6 +20,13 @@ test("Admin staff invitation no longer requires a branch selector or manual reas
   assert.match(adminApp, /const reason="Invited via Admin panel"/);
 });
 
+test("Rider availability renderer does not reference a removed pending variable", () => {
+  assert.doesNotMatch(riderHtml, /\bpending\s*\?/);
+  assert.match(riderHtml, /function renderRiderAvailability\(\)/);
+  assert.match(riderHtml, /const label=effectiveStatus===/);
+  assert.match(riderHtml, /btn\.textContent=effectiveStatus===/);
+});
+
 test("Rider job loading does not wait for Realtime to initialize", () => {
   assert.match(
     riderHtml,
