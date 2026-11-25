@@ -64,8 +64,8 @@ jobs:
         run: |
           set -euo pipefail
           deploy_output="$(vercel deploy --yes --target=preview --token="$VERCEL_TOKEN" 2>&1)"
-          printf '%s\\n' "$deploy_output"
-          deployment_url="$(printf '%s\\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\\.vercel\\.app' | tail -n 1 || true)"
+          printf '%s\n' "$deploy_output"
+          deployment_url="$(printf '%s\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\.vercel\.app' | tail -n 1 || true)"
           if [ -z "$deployment_url" ]; then
             echo "Could not extract a Vercel Preview URL from the CLI output." >&2
             exit 1
@@ -78,7 +78,7 @@ jobs:
             }
             console.log(`Validated Preview URL: ${url.origin}`);
           '
-          printf 'url=%s\\n' "$deployment_url" >> "$GITHUB_OUTPUT"
+          printf 'url=%s\n' "$deployment_url" >> "$GITHUB_OUTPUT"
           {
             echo "### Flame Chick POS Preview deployment"
             echo "- URL: $deployment_url"
