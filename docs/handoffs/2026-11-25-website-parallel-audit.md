@@ -534,3 +534,65 @@ The browser rendered the page and initialized the V3 catalogue, but stopped whil
 - No Production aliases were changed/promoted.
 - No database migration or Edge Function deployment was performed.
 - Preview checkout remains disabled; do not attempt quote/order submission from this Preview.
+
+
+---
+
+## 2026-11-25 — Deal fixed rows, checkout search/footer, and motion feedback
+
+### User-requested cleanup
+
+- Fixed components in deals (for example fixed broast/drink components) no longer show minus/count/plus controls. Their contents stay preselected by the existing fixed-group canonicalization and appear as a compact `Fixed` row; the user changes only configurable components.
+- When exactly one deal variant is branch-satisfiable, it is auto-selected and the "Choose a deal option" selector is not rendered. Multiple available variants still display the option selector.
+- Remaining non-fixed deal components stay in compact inline rows with their own minus/count/plus controls.
+- Delivery area selection is searchable inside one visible field. The popup results are filtered from published branch delivery-area values, while the selected existing `area_id` remains the value used by the order request and server validation. The underlying select is hidden and used only as the canonical selected-ID value; no second visible area field was added.
+- Removed Delivery instructions from the cart form and removed the delivery `instructions` property from the Website request payload. The separate general Order notes field remains optional.
+- Rebuilt the cart drawer markup to remove duplicate checkout-detail fields/IDs. There is exactly one `details-section`, customer name/phone, delivery-fields section and delivery-area selector.
+- Moved the Get verified total / Place order / Retry buttons into the cart drawer's sticky bottom footer, including safe-area padding for mobile, so the current action remains visible at the bottom while cart details/items scroll.
+- Added subtle cart-add animation (new row entrance + cart badge bump) and checkout progress/ready/error/success feedback animations. `prefers-reduced-motion` disables the motion for users who request reduced animation.
+- Corrected the product popup quantity state to use the numeric stepper value when adding; decrementing also re-enables the plus control correctly.
+
+### Source files changed
+
+1. `apps/flame-chick-website/index.html` — single clean cart drawer structure; searchable area picker markup; sticky checkout footer; mobile sizing and safe-area; add-to-cart and checkout animation CSS; reduced-motion override.
+2. `apps/flame-chick-website/js/website-order-v3.js` — area filtering/selection wiring, request body has selected area ID and no delivery-instructions field, direct/popup/deal add animations, numeric product quantity state, quote/submit motion states.
+3. `apps/flame-chick-website/js/catalog-v3-deal-configurator.js` — fixed groups display a non-interactive Fixed label rather than a quantity stepper; single orderable deal variant is auto-selected and the variant selector is hidden; existing canonical selection and V3 validation/payload rules are retained.
+4. `tests/catalog-v3-deal-configurator.test.mjs` — fixed row/no-stepper and single orderable variant assertions.
+5. `tests/website-source-hygiene.test.mjs` — area search/selected ID, no delivery instructions, unique IDs, sticky footer and animation coverage.
+
+### Automated CI
+
+- Workflow: Website Static Checks
+- Run ID: `45586562155`
+- Exact source commit tested and deployed: `df04dc6f02014145edfee29ca10d3923de18f923`
+- Result: **SUCCESS**
+- Covered active JavaScript syntax, core catalogue/deal/fulfilment regression tests, preview fixtures, checkout Preview write-guard and new Website source/UI regression checks, and inline homepage script parsing.
+
+### Preview deployment
+
+- Vercel project: `flame-chick-website-production`
+- Project ID: `prj_izBWyrFmPZIm63FHAT4jaLHUTLzu`
+- Deployment ID: `dpl_6QNcMv8HWpLrY34rgo2phRpwU3ia`
+- Preview URL: https://flame-chick-website-production-10vo2ei33-fahad-7455.vercel.app
+- State: **READY**
+- Target: Preview (`null` at Vercel API level)
+- Branch: `work/website-parallel-development`
+- Commit: `df04dc6f02014145edfee29ca10d3923de18f923`
+
+### Deployed-page checks
+
+- Homepage returned HTTP 200 and title `Flame Chick | Order Online`.
+- Preview read-only notice present.
+- Product and Deal dialog markup present.
+- Searchable delivery area field and sticky checkout footer present.
+- Place order button exists inside the sticky footer.
+- Delivery-instructions field absent.
+- Website order script returned HTTP 200 and contains area-search filtering, no delivery-instructions reference, cart-add animation, checkout state animations, product quantity state.
+- Deal configurator returned HTTP 200 and contains fixed component rows without quantity steppers, conditional single-variant selector, and Burger-slot selection logic.
+- The existing Production alias `flamechic.vercel.app` still maps to its prior deployment `dpl_J5y1tZeoBZfRAfxVkmjLTZ72jq6i`; no Production alias was changed.
+
+### Testing limitation and safety
+
+- This was CI plus deployed HTML/script response verification. A full live interactive browser session across small mobile viewports was not performed; the user should review actual device sizing and test area filtering, quote display placement and the animations visually.
+- Preview checkout write protection remains in place. Do not submit a quote/order from the Preview.
+- No Production deployment, custom alias, catalogue publication, order/payment record, migration, Supabase configuration, Edge Function, POS/Admin/Rider code or shared backend was changed.
