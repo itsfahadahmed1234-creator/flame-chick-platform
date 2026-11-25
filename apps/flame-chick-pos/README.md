@@ -21,6 +21,6 @@ Static cashier/POS application.
 ## Temporary POS Preview deployment via GitHub Actions
 
 - Use `.github/workflows/deploy-flame-chick-pos-preview.yml` while the original Vercel team's daily deployment quota is exhausted.
-- The workflow is restricted to `work/production-source-audit`, requires repository variable `FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED=true`, and uses repository secret `VERCEL_TOKEN`.
+- The workflow is restricted to `work/production-source-audit`, requires repository variables `FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED=true` and `FLAME_CHICK_POS_PREVIEW_PROJECT_READY=true`, and uses repository secret `VERCEL_TOKEN`.
 - It is pinned to the isolated Vercel Preview project `flamechickpos` in the current Hobby team. The Vercel project root directory is `apps/flame-chick-pos`; therefore the CLI must run from the monorepo root (not from this folder) to avoid duplicating the root-directory path.
 - Deploy command is explicit Preview environment only. No production alias or custom domain is assigned by the workflow.
