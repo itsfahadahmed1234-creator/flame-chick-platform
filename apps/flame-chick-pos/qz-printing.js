@@ -262,7 +262,7 @@
     configureSecurity();
   }
 
-  return {
+  window.FlameChickQZ = {
     setTokenProvider: setTokenProvider,
     connect: connect,
     scanPrinters: scanPrinters,
