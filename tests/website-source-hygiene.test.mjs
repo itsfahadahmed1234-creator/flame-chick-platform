@@ -191,3 +191,31 @@ test("deal popup preserves POS-style category-driven burger slots, repeat limits
   assert.match(configurator, /toPayload\(\)/);
   assert.match(order, /FlameChickCatalogV3DealConfigurator\.createDealConfigurator/);
 });
+
+
+test("product and deal popups use compact quantity steppers and one focused burger slot", () => {
+  assert.match(order, /fc-product-popup-stepper/);
+  assert.match(order, /fc-product-popup-quantity-value/);
+  assert.match(order, /quantity = Math\.min\(99, quantity \+ 1\)/);
+  assert.match(order, /chosenDealQuantity = configurator\.getState\(\)\.dealQuantity/);
+  const configurator = readFileSync(join(root, "js/catalog-v3-deal-configurator.js"), "utf8");
+  assert.match(configurator, /fc-deal-burger-tabs/);
+  assert.match(configurator, /fc-deal-burger-tab/);
+  assert.match(configurator, /activeBurgerSlotByGroup/);
+  assert.match(configurator, /slots\[activeSlot\]/);
+  assert.match(configurator, /fc-deal-quantity-row/);
+  assert.match(configurator, /setDealQuantity: setDealQuantity/);
+});
+
+test("sticky category navigation includes a Deals shortcut when published deals are rendered", () => {
+  assert.match(order, /fc-deals-category-chip/);
+  assert.match(order, /dealsJump\.textContent = 'Deals'/);
+  assert.match(order, /target\.scrollIntoView\(\{ behavior: 'smooth', block: 'start' \}\)/);
+});
+
+test("cart checkout details appear before the cart item list", () => {
+  const details = html.indexOf('id="details-section"');
+  const items = html.indexOf('id="cart-lines"');
+  assert.ok(details >= 0 && items > details, "Checkout details must precede cart lines in the drawer.");
+  assert.match(order, /className = 'order-cart-quantity'/);
+});
