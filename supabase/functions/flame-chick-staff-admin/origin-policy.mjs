@@ -16,6 +16,7 @@ export const PRODUCTION_STAFF_ADMIN_ORIGIN = "https://flamechicadmin.vercel.app"
  */
 export const PREVIEW_STAFF_ADMIN_ORIGINS = Object.freeze([
   "https://flame-chick-admin-production-fxdrq9od9-fahad-7455.vercel.app",
+  "https://flame-chick-admin-production-q58bg0vac-fahad-7455.vercel.app",
   "https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app"
 ]);
 
