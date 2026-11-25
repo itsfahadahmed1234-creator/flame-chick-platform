@@ -100,43 +100,25 @@ REVOKE ALL ON FUNCTION app_private.flame_chick_ensure_rider_profile(uuid,uuid,uu
 DO $patch$
 DECLARE
   v_def text;
-  v_old text;
-  v_new text;
-  v_count integer;
+  v_action_pos integer;
+  v_start integer;
+  v_end integer;
+  v_marker text;
+  v_replacement text;
 BEGIN
   v_def:=pg_catalog.pg_get_functiondef(
     'app_private.flame_chick_staff_admin_command_internal(text,jsonb)'::regprocedure
   );
 
-  -- For every branch-scoped role, derive the one active Main branch on the
-  -- server. Accept [] or the same one-element Main ID for older clients only.
-  v_old:=$old_assign$
-    IF v_role IN ('admin','owner') THEN
-      IF coalesce(v_payload->'branch_ids','[]'::jsonb)<>'[]'::jsonb THEN
-        RAISE EXCEPTION 'STAFF_ADMIN_GLOBAL_ROLE_MUST_NOT_HAVE_BRANCHES' USING ERRCODE='22023';
-      END IF;
-      v_branch_ids:=ARRAY[NULL::uuid];
-    ELSE
-      IF pg_catalog.jsonb_typeof(coalesce(v_payload->'branch_ids','[]'::jsonb))<>'array' THEN
-        RAISE EXCEPTION 'STAFF_ADMIN_BRANCH_IDS_REQUIRED' USING ERRCODE='22023';
-      END IF;
-      IF pg_catalog.jsonb_array_length(coalesce(v_payload->'branch_ids','[]'::jsonb)) NOT BETWEEN 1 AND 50 THEN
-        RAISE EXCEPTION 'STAFF_ADMIN_BRANCH_IDS_REQUIRED' USING ERRCODE='22023';
-      END IF;
-      SELECT coalesce(pg_catalog.array_agg(DISTINCT x.value::uuid ORDER BY x.value::uuid),ARRAY[]::uuid[])
-      INTO v_branch_ids
-      FROM pg_catalog.jsonb_array_elements_text(v_payload->'branch_ids') x(value);
-      IF pg_catalog.cardinality(v_branch_ids)<>pg_catalog.jsonb_array_length(v_payload->'branch_ids') THEN
-        RAISE EXCEPTION 'STAFF_ADMIN_BRANCH_IDS_DUPLICATED' USING ERRCODE='22023';
-      END IF;
-      SELECT count(*) INTO v_branch_count FROM public.branches b
-      WHERE b.restaurant_id=v_restaurant_id AND b.is_active AND b.id=ANY(v_branch_ids);
-      IF v_branch_count<>pg_catalog.cardinality(v_branch_ids) THEN
-        RAISE EXCEPTION 'STAFF_ADMIN_BRANCH_INVALID_OR_INACTIVE' USING ERRCODE='22023';
-      END IF;
-    END IF;
-  $old_assign$;
-  v_new:=$new_assign$
+  -- Main is resolved by the database, not supplied as a trusted branch choice.
+  v_action_pos:=pg_catalog.strpos(v_def,'IF v_action=''assign_role'' THEN');
+  IF v_action_pos=0 THEN RAISE EXCEPTION 'STAFF_MAIN_PATCH_ASSIGN_ACTION_NOT_FOUND'; END IF;
+  v_start:=v_action_pos+pg_catalog.strpos(pg_catalog.substr(v_def,v_action_pos),'    IF v_role IN (''admin'',''owner'') THEN')-1;
+  v_end:=v_start+pg_catalog.strpos(pg_catalog.substr(v_def,v_start),'    SELECT count(*) INTO v_existing_count')-1;
+  IF v_start<v_action_pos OR v_end<=v_start THEN
+    RAISE EXCEPTION 'STAFF_MAIN_PATCH_ASSIGN_BRANCH_SECTION_NOT_FOUND';
+  END IF;
+  v_replacement:=$assign_branch$
     IF v_role IN ('admin','owner') THEN
       IF coalesce(v_payload->'branch_ids','[]'::jsonb)<>'[]'::jsonb THEN
         RAISE EXCEPTION 'STAFF_ADMIN_GLOBAL_ROLE_MUST_NOT_HAVE_BRANCHES' USING ERRCODE='22023';
@@ -162,37 +144,18 @@ BEGIN
       END IF;
       v_branch_ids:=ARRAY[v_branch_id];
     END IF;
-  $new_assign$;
+  $assign_branch$;
+  v_def:=pg_catalog.substr(v_def,1,v_start-1)||v_replacement||pg_catalog.substr(v_def,v_end);
 
-  v_count:=(pg_catalog.length(v_def)-pg_catalog.length(pg_catalog.replace(v_def,v_old,'')))/pg_catalog.length(v_old);
-  IF v_count<>1 THEN RAISE EXCEPTION 'STAFF_MAIN_PATCH_ASSIGN_BRANCH_BLOCK_COUNT_%',v_count; END IF;
-  v_def:=pg_catalog.replace(v_def,v_old,v_new);
-
-  v_old:=$old_invite$
-    IF v_role IN ('admin','owner') THEN
-      IF coalesce(v_payload->'branch_ids','[]'::jsonb)<>'[]'::jsonb THEN
-        RAISE EXCEPTION 'STAFF_ADMIN_GLOBAL_ROLE_MUST_NOT_HAVE_BRANCHES' USING ERRCODE='22023';
-      END IF;
-      v_branch_ids:=ARRAY[]::uuid[];
-    ELSE
-      IF pg_catalog.jsonb_typeof(coalesce(v_payload->'branch_ids','[]'::jsonb))<>'array'
-         OR pg_catalog.jsonb_array_length(coalesce(v_payload->'branch_ids','[]'::jsonb)) NOT BETWEEN 1 AND 50 THEN
-        RAISE EXCEPTION 'STAFF_ADMIN_BRANCH_IDS_REQUIRED' USING ERRCODE='22023';
-      END IF;
-      SELECT coalesce(pg_catalog.array_agg(DISTINCT x.value::uuid ORDER BY x.value::uuid),ARRAY[]::uuid[])
-        INTO v_branch_ids
-      FROM pg_catalog.jsonb_array_elements_text(v_payload->'branch_ids') x(value);
-      IF pg_catalog.cardinality(v_branch_ids)<>pg_catalog.jsonb_array_length(v_payload->'branch_ids') THEN
-        RAISE EXCEPTION 'STAFF_ADMIN_BRANCH_IDS_DUPLICATED' USING ERRCODE='22023';
-      END IF;
-      SELECT count(*) INTO v_branch_count FROM public.branches b
-      WHERE b.restaurant_id=v_restaurant_id AND b.is_active AND b.id=ANY(v_branch_ids);
-      IF v_branch_count<>pg_catalog.cardinality(v_branch_ids) THEN
-        RAISE EXCEPTION 'STAFF_ADMIN_BRANCH_INVALID_OR_INACTIVE' USING ERRCODE='22023';
-      END IF;
-    END IF;
-  $old_invite$;
-  v_new:=$new_invite$
+  -- Invitation creation uses the same fixed Main branch resolution.
+  v_action_pos:=pg_catalog.strpos(v_def,'IF v_action=''begin_invitation'' THEN');
+  IF v_action_pos=0 THEN RAISE EXCEPTION 'STAFF_MAIN_PATCH_INVITE_ACTION_NOT_FOUND'; END IF;
+  v_start:=v_action_pos+pg_catalog.strpos(pg_catalog.substr(v_def,v_action_pos),'    IF v_role IN (''admin'',''owner'') THEN')-1;
+  v_end:=v_start+pg_catalog.strpos(pg_catalog.substr(v_def,v_start),'    SELECT * INTO v_invite FROM app_private.staff_invitation_requests')-1;
+  IF v_start<v_action_pos OR v_end<=v_start THEN
+    RAISE EXCEPTION 'STAFF_MAIN_PATCH_INVITE_BRANCH_SECTION_NOT_FOUND';
+  END IF;
+  v_replacement:=$invite_branch$
     IF v_role IN ('admin','owner') THEN
       IF coalesce(v_payload->'branch_ids','[]'::jsonb)<>'[]'::jsonb THEN
         RAISE EXCEPTION 'STAFF_ADMIN_GLOBAL_ROLE_MUST_NOT_HAVE_BRANCHES' USING ERRCODE='22023';
@@ -218,26 +181,18 @@ BEGIN
       END IF;
       v_branch_ids:=ARRAY[v_branch_id];
     END IF;
-  $new_invite$;
+  $invite_branch$;
+  v_def:=pg_catalog.substr(v_def,1,v_start-1)||v_replacement||pg_catalog.substr(v_def,v_end);
 
-  v_count:=(pg_catalog.length(v_def)-pg_catalog.length(pg_catalog.replace(v_def,v_old,'')))/pg_catalog.length(v_old);
-  IF v_count<>1 THEN RAISE EXCEPTION 'STAFF_MAIN_PATCH_INVITE_BRANCH_BLOCK_COUNT_%',v_count; END IF;
-  v_def:=pg_catalog.replace(v_def,v_old,v_new);
-
-  -- Invitation acceptance must refuse stale invitations that target another
-  -- branch or more than one branch.
-  v_old:=$old_accept_branch$
-    IF v_invite.role_key IN ('manager','cashier','rider') THEN
-      SELECT count(*) INTO v_branch_count
-      FROM app_private.staff_invitation_branch_targets t
-      JOIN public.branches b ON b.id=t.branch_id AND b.restaurant_id=t.restaurant_id AND b.is_active
-      WHERE t.invitation_id=v_invite.id AND t.restaurant_id=v_restaurant_id;
-      IF v_branch_count=0 OR v_branch_count<>(SELECT count(*) FROM app_private.staff_invitation_branch_targets t WHERE t.invitation_id=v_invite.id AND t.restaurant_id=v_restaurant_id) THEN
-        RAISE EXCEPTION 'STAFF_INVITATION_BRANCH_UNAVAILABLE' USING ERRCODE='23514';
-      END IF;
-    END IF;
-  $old_accept_branch$;
-  v_new:=$new_accept_branch$
+  -- Reject any previously-created invitation that is not exactly one active Main target.
+  v_action_pos:=pg_catalog.strpos(v_def,'IF v_action=''accept_invitation'' THEN');
+  IF v_action_pos=0 THEN RAISE EXCEPTION 'STAFF_MAIN_PATCH_ACCEPT_ACTION_NOT_FOUND'; END IF;
+  v_start:=v_action_pos+pg_catalog.strpos(pg_catalog.substr(v_def,v_action_pos),'    IF v_invite.role_key IN (''manager'',''cashier'',''rider'') THEN')-1;
+  v_end:=v_start+pg_catalog.strpos(pg_catalog.substr(v_def,v_start),'    INSERT INTO public.user_profiles(user_id,display_name,phone,is_active)')-1;
+  IF v_start<v_action_pos OR v_end<=v_start THEN
+    RAISE EXCEPTION 'STAFF_MAIN_PATCH_ACCEPT_BRANCH_SECTION_NOT_FOUND';
+  END IF;
+  v_replacement:=$accept_branch$
     IF v_invite.role_key IN ('manager','cashier','rider') THEN
       SELECT count(*)
         INTO v_branch_count
@@ -253,38 +208,35 @@ BEGIN
         RAISE EXCEPTION 'STAFF_MAIN_BRANCH_FIXED' USING ERRCODE='23514';
       END IF;
     END IF;
-  $new_accept_branch$;
+  $accept_branch$;
+  v_def:=pg_catalog.substr(v_def,1,v_start-1)||v_replacement||pg_catalog.substr(v_def,v_end);
 
-  v_count:=(pg_catalog.length(v_def)-pg_catalog.length(pg_catalog.replace(v_def,v_old,'')))/pg_catalog.length(v_old);
-  IF v_count<>1 THEN RAISE EXCEPTION 'STAFF_MAIN_PATCH_ACCEPT_BRANCH_BLOCK_COUNT_%',v_count; END IF;
-  v_def:=pg_catalog.replace(v_def,v_old,v_new);
-
-  -- Role-based Rider creation and reactivation are atomic with the role row.
-  v_old:=$old_assign_end$
-    END LOOP;
+  -- The direct role-assignment action and accepted invitation action both
+  -- provision Rider profiles atomically with their role row.
+  v_marker:=$assign_return$
     RETURN pg_catalog.jsonb_build_object('ok',true,'idempotent',false,'request_id',v_request_id,'role_key',v_role,'branch_ids',to_jsonb(v_branch_ids));
-  $old_assign_end$;
-  v_new:=$new_assign_end$
-    END LOOP;
+  $assign_return$;
+  v_start:=pg_catalog.strpos(v_def,v_marker);
+  IF v_start=0 THEN RAISE EXCEPTION 'STAFF_MAIN_PATCH_ASSIGN_RETURN_NOT_FOUND'; END IF;
+  v_replacement:=$assign_profile$
     IF v_role='rider' THEN
       PERFORM app_private.flame_chick_ensure_rider_profile(v_restaurant_id,v_branch_ids[1],v_target);
     END IF;
-    RETURN pg_catalog.jsonb_build_object('ok',true,'idempotent',false,'request_id',v_request_id,'role_key',v_role,'branch_ids',to_jsonb(v_branch_ids));
-  $new_assign_end$;
+  $assign_profile$;
+  v_def:=pg_catalog.substr(v_def,1,v_start-1)||v_replacement||v_marker||pg_catalog.substr(v_def,v_start+pg_catalog.length(v_marker));
 
-  v_count:=(pg_catalog.length(v_def)-pg_catalog.length(pg_catalog.replace(v_def,v_old,'')))/pg_catalog.length(v_old);
-  IF v_count<>1 THEN RAISE EXCEPTION 'STAFF_MAIN_PATCH_ASSIGN_PROFILE_COUNT_%',v_count; END IF;
-  v_def:=pg_catalog.replace(v_def,v_old,v_new);
-
-  -- Deactivate a Rider only after all in-progress/failed-return deliveries are
-  -- resolved; then stop new offers immediately.
-  v_old:=$old_deactivate$
-    UPDATE public.user_roles
-    SET is_active=false,disabled_by=v_actor,disabled_reason=v_reason,disabled_request_id=v_request_id
-    WHERE id=v_role_row.id;
+  -- Do not remove a Rider while a delivery or physical return is unresolved.
+  v_action_pos:=pg_catalog.strpos(v_def,'IF v_action=''deactivate_role'' THEN');
+  IF v_action_pos=0 THEN RAISE EXCEPTION 'STAFF_MAIN_PATCH_DEACTIVATE_ACTION_NOT_FOUND'; END IF;
+  v_start:=v_action_pos+pg_catalog.strpos(pg_catalog.substr(v_def,v_action_pos),'    UPDATE public.user_roles')-1;
+  v_marker:=$deactivate_return$
     RETURN pg_catalog.jsonb_build_object('ok',true,'idempotent',false,'role_id',v_role_row.id,'is_active',false);
-  $old_deactivate$;
-  v_new:=$new_deactivate$
+  $deactivate_return$;
+  v_end:=v_start+pg_catalog.strpos(pg_catalog.substr(v_def,v_start),v_marker)+pg_catalog.length(v_marker)-2;
+  IF v_start<v_action_pos OR v_end<=v_start THEN
+    RAISE EXCEPTION 'STAFF_MAIN_PATCH_DEACTIVATE_SECTION_NOT_FOUND';
+  END IF;
+  v_replacement:=$deactivate_block$
     IF v_role_row.role_key='rider' AND EXISTS (
       SELECT 1
       FROM public.delivery_assignments da
@@ -313,23 +265,16 @@ BEGIN
         AND branch_id=v_role_row.branch_id
         AND user_id=v_role_row.user_id;
     END IF;
-    RETURN pg_catalog.jsonb_build_object('ok',true,'idempotent',false,'role_id',v_role_row.id,'is_active',false);
-  $new_deactivate$;
+  $deactivate_block$;
+  v_def:=pg_catalog.substr(v_def,1,v_start-1)||v_replacement||v_marker||pg_catalog.substr(v_def,v_end+1);
 
-  v_count:=(pg_catalog.length(v_def)-pg_catalog.length(pg_catalog.replace(v_def,v_old,'')))/pg_catalog.length(v_old);
-  IF v_count<>1 THEN RAISE EXCEPTION 'STAFF_MAIN_PATCH_DEACTIVATE_COUNT_%',v_count; END IF;
-  v_def:=pg_catalog.replace(v_def,v_old,v_new);
-
-  -- The only branch in an operational invitation is now the Main branch;
-  -- after acceptance the Rider row is provisioned inside the same transaction.
-  v_old:=$old_accept_end$
-      END LOOP;
-    END IF;
+  -- Profile creation belongs inside accept_invitation, after the role rows exist.
+  v_marker:=$accept_return$
     RETURN pg_catalog.jsonb_build_object('ok',true,'invitation_id',v_invite.id,'status','accepted','role_key',v_invite.role_key);
-  $old_accept_end$;
-  v_new:=$new_accept_end$
-      END LOOP;
-    END IF;
+  $accept_return$;
+  v_start:=pg_catalog.strpos(v_def,v_marker);
+  IF v_start=0 THEN RAISE EXCEPTION 'STAFF_MAIN_PATCH_ACCEPT_RETURN_NOT_FOUND'; END IF;
+  v_replacement:=$accept_profile$
     IF v_invite.role_key='rider' THEN
       SELECT t.branch_id INTO v_branch_id
       FROM app_private.staff_invitation_branch_targets t
@@ -343,12 +288,8 @@ BEGIN
       END IF;
       PERFORM app_private.flame_chick_ensure_rider_profile(v_restaurant_id,v_branch_id,v_actor);
     END IF;
-    RETURN pg_catalog.jsonb_build_object('ok',true,'invitation_id',v_invite.id,'status','accepted','role_key',v_invite.role_key);
-  $new_accept_end$;
-
-  v_count:=(pg_catalog.length(v_def)-pg_catalog.length(pg_catalog.replace(v_def,v_old,'')))/pg_catalog.length(v_old);
-  IF v_count<>1 THEN RAISE EXCEPTION 'STAFF_MAIN_PATCH_ACCEPT_PROFILE_COUNT_%',v_count; END IF;
-  v_def:=pg_catalog.replace(v_def,v_old,v_new);
+  $accept_profile$;
+  v_def:=pg_catalog.substr(v_def,1,v_start-1)||v_replacement||v_marker||pg_catalog.substr(v_def,v_start+pg_catalog.length(v_marker));
 
   EXECUTE v_def;
 END
