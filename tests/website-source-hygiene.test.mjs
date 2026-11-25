@@ -219,3 +219,39 @@ test("cart checkout details appear before the cart item list", () => {
   assert.ok(details >= 0 && items > details, "Checkout details must precede cart lines in the drawer.");
   assert.match(order, /className = 'order-cart-quantity'/);
 });
+
+
+test("delivery area search uses one visible field and retains the selected area ID for validation", () => {
+  assert.match(html, /id="delivery-area-search" type="search"/);
+  assert.match(html, /id="delivery-area-results"/);
+  assert.match(html, /id="delivery-area"[^>]*hidden/);
+  assert.match(order, /function renderDeliveryAreaResults\(query\)/);
+  assert.match(order, /select\.value = option\.value/);
+  assert.match(order, /area_id: selection/);
+  assert.doesNotMatch(html, /id="delivery-instructions"/);
+  assert.doesNotMatch(order, /delivery-instructions/);
+  assert.doesNotMatch(order, /instructions:.*delivery/);
+});
+
+test("cart checkout details are unique and the checkout actions stay in a sticky bottom footer", () => {
+  for (const id of ["details-section","customer-name","customer-phone","delivery-fields","delivery-area-search","delivery-address","place-order","request-quote"]) {
+    assert.equal((html.match(new RegExp('id="' + id + '"', "g")) || []).length, 1, id + " must appear exactly once");
+  }
+  assert.doesNotMatch(html, /delivery-instructions/);
+  assert.match(html, /<footer class="fc-v3-cart-footer">/);
+  assert.match(html, /id="place-order"/);
+  assert.match(html, /\.fc-v3-cart-drawer \.fc-v3-cart-footer\{position:sticky;bottom:0/);
+});
+
+test("cart additions and checkout stages provide motion feedback with reduced-motion support", () => {
+  assert.match(order, /function animateCartAdded\(\)/);
+  assert.match(order, /replayAnimation\(rows && rows\.lastElementChild, 'is-added'\)/);
+  assert.match(order, /animateCartAdded\(\)/);
+  assert.match(order, /checkoutMotion\('is-checking'\)/);
+  assert.match(order, /checkoutMotion\('is-ready'\)/);
+  assert.match(order, /checkoutMotion\('is-ordering'\)/);
+  assert.match(order, /checkoutMotion\('is-confirmed'\)/);
+  assert.match(html, /@keyframes fcCartRowAdded/);
+  assert.match(html, /@keyframes fcCheckoutReady/);
+  assert.match(html, /prefers-reduced-motion:reduce/);
+});
