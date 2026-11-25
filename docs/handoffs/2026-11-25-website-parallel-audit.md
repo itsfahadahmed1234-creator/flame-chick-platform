@@ -344,3 +344,50 @@ The deployment and source response were verified, but a full interactive browser
 
 ### Remaining browser verification
 - Automated source checks passed and deployment is READY. A full live interactive catalogue hydration, image loading, and mobile/desktop cart rehearsal still needs to be performed by reviewing this updated Preview.
+
+
+---
+
+## 2026-11-25 — Follow-up product card renderer fix
+
+### User observation
+The real Website Preview displayed the category heading `Starters` and the `Deals` heading, but no product cards. The previous Preview was not yet functional enough; the category heading alone did not mean the catalogue had rendered.
+
+### Second root cause
+The browser rendered the page and initialized the V3 catalogue, but stopped while creating the first product card because `cardPrice(firstVariant.priceMinor)` and variant-option price labels called a missing `cardPrice` helper. The browser exposed the runtime error `cardPrice is not defined`. This was in addition to the earlier missing `appendProductArtwork` helper, which has already been restored.
+
+### Fix
+- Added `cardPrice(priceMinor)` to `apps/flame-chick-website/js/website-order-v3.js`.
+- The helper delegates to `FlameChickCatalogV3View.formatMoney`, passing the current server Website context currency code (fallback PKR) and `en-PK` locale.
+- No prices or catalogue values were hardcoded; product prices still come from the published V3 catalogue.
+- Kept the existing artwork helper and complete removal of the Catalogue Status panel.
+
+### Automated checks
+- Website Static Checks: `45577611373`
+- Commit: `84f9ccf9d0f158b3ade70b4b03ac9a8373e77c86`
+- Result: **SUCCESS**
+- JavaScript syntax, core catalogue/deal/fulfilment regressions, preview write-guard tests and inline script parsing passed.
+
+### New Preview deployment
+- Project: `flame-chick-website-production`
+- Deployment ID: `dpl_A2N1kM7cB2UBz8LCYALFH2m5RD5u`
+- URL: https://flame-chick-website-production-oc7wbv9ff-fahad-7455.vercel.app
+- State: **READY**
+- Target: Preview (`null` at API level)
+- Branch: `work/website-parallel-development`
+- Exact commit: `84f9ccf9d0f158b3ade70b4b03ac9a8373e77c86`
+
+### Deployment response checks
+- Homepage returned HTTP 200 with title `Flame Chick | Order Online`.
+- Homepage has V3 catalogue client scripts and menu root.
+- Homepage does not contain the removed `connection-panel`.
+- Preview read-only notice remains present.
+- Deployed `website-order-v3.js` returned HTTP 200 and contains both `appendProductArtwork` and `cardPrice` definitions.
+- Deployed `catalog-v3-view.js` returned HTTP 200 and exports `formatMoney`.
+- This was a deployed source/HTTP verification. The remote browser's interactive catalogue hydration and image requests were not directly exercised after this exact deployment; user review is still required to confirm product cards are now visible.
+
+### Production / parallel safety
+- No Production alias was changed.
+- No Production database/catalogue/order/payment data was modified.
+- No POS, Admin, Rider, backend API, migrations or shared server pricing code was changed.
+- All changes remain on `work/website-parallel-development`.
