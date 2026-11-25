@@ -42,7 +42,7 @@ BEGIN
   INSERT INTO public.restaurants(id,name,slug,currency_code,timezone,is_active)
   VALUES(r,'QA Flame Chick POS Sync','flame-chick','PKR','Asia/Karachi',true);
   INSERT INTO public.branches(id,restaurant_id,branch_code,name,is_active,timezone)
-  VALUES(b,r,'qa-pos','QA POS Branch',true,'Asia/Karachi');
+  VALUES(b,r,'main','Main',true,'Asia/Karachi');
 
   INSERT INTO auth.users(
     id,aud,role,email,encrypted_password,email_confirmed_at,
