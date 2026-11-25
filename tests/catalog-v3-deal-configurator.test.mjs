@@ -205,3 +205,22 @@ test('unavailable or unsatisfiable variants cannot be selected', () => {
   assert.equal(view.collections[0].deals[0].available, false);
   assert.equal(create(view).code, 'DEAL_UNAVAILABLE');
 });
+
+
+test('each customer-facing Burger slot offers every configured choice and respects repeat limits', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-website/js/catalog-v3-deal-configurator.js', import.meta.url), 'utf8');
+  const slotLoop = source.indexOf('for (let slot = 0; slot < slotCount; slot++)');
+  const choiceLoop = source.indexOf('group.options.forEach(function (option) {', slotLoop);
+  const optionValue = source.indexOf('optionEl.value = option.id;', choiceLoop);
+  const loopEnd = source.indexOf('select.value = slots[slot] || \'\';', choiceLoop);
+  assert.ok(slotLoop >= 0, 'A selector must be rendered for every required burger slot.');
+  assert.ok(choiceLoop > slotLoop && choiceLoop < loopEnd, 'Each slot must be populated from the full configured Burger choice list.');
+  assert.ok(optionValue > choiceLoop && optionValue < loopEnd, 'Each configured choice ID must be selectable from every slot.');
+  const slotRenderer = source.slice(slotLoop, loopEnd);
+  assert.match(slotRenderer, /!group\.allowRepeatOption\s*&&\s*alreadyUsed/,
+    'A choice is only blocked in another slot when repeats are disabled.');
+  assert.match(slotRenderer, /selectedQuantity\s*>=\s*optionCap/,
+    'The per-choice quantity cap must be respected.');
+  assert.match(slotRenderer, /optionCap\s*=\s*Number\(option\.maxQuantity\)/,
+    'Each configured choice must use its own saved maximum-per-choice limit.');
+});

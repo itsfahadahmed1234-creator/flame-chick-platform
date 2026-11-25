@@ -444,6 +444,7 @@ test('Burger choice products are restricted to active products in the Chicken Bu
     { id: 'og', category_id: 'cat-burger', is_active: true, variants: [{ id: 'og-r', is_active: true }] },
     { id: 'injector', category_id: 'cat-burger', is_active: true, variants: [{ id: 'injector-r', is_active: true }] },
     { id: 'nashville-fire', category_id: 'cat-burger', is_active: true, variants: [{ id: 'nashville-fire-r', is_active: true }] },
+    { id: 'placeholder-burger', name_en: 'Burger', category_id: 'cat-burger', is_active: true, variants: [{ id: 'placeholder-r', is_active: true }] },
     { id: 'nashville-broast', category_id: 'cat-broast', is_active: true, variants: [{ id: 'nashville-broast-r', is_active: true }] },
     { id: 'inactive-burger', category_id: 'cat-burger', is_active: false, variants: [{ id: 'inactive-r', is_active: true }] }
   ];

@@ -214,7 +214,8 @@
     const isBurger=/burger/i.test(String(groupName||''));
     const chickenBurgerIds=new Set(categoryRows.filter(category=>category&&category.category_kind==='menu'&&category.is_active!==false&&category.name_en==='Chicken Burgers').map(category=>category.id));
     return rows.filter(product=>product&&product.is_active!==false&&Array.isArray(product.variants)&&
-      product.variants.some(variant=>variant&&variant.is_active!==false)&&(!isBurger||chickenBurgerIds.has(product.category_id)));
+      product.variants.some(variant=>variant&&variant.is_active!==false)&&
+      (!isBurger||(chickenBurgerIds.has(product.category_id)&&String(product.name_en||'').trim().toLowerCase()!=='burger')));
   }
   function checkbox(name,label,checked){return '<label class="fcv3-check"><input type="checkbox" name="'+name+'" data-field="'+name+'"'+(checked?' checked':'')+'> '+label+'</label>';}
   function createWorkspace(){
