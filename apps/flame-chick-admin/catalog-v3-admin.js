@@ -48,6 +48,7 @@
       if(submitted.length>1&&!burger)throw Error('Only Burger groups may contain multiple included choices.');
       const repeat=c.allow_repeat_option===undefined?q>1:c.allow_repeat_option===true,maxPer=repeat?Number(c.max_units_per_option??q):null;
       if(repeat&&(!Number.isSafeInteger(maxPer)||maxPer<1||maxPer>q))throw Error(label+' has an invalid per-choice repeat limit.');
+      if(burger&&repeat&&maxPer!==q)throw Error(label+' must allow each burger choice up to the required quantity ('+q+').');
       if(!repeat&&q>submitted.length)throw Error(label+' needs at least '+q+' distinct choices because repeats are disabled.');
       if(c.group_id)retainedGroupIds.add(c.group_id);
       const priorGroup=existingGroups.find(doc=>doc&&doc.group&&doc.group.id===c.group_id),priorOptions=priorGroup&&Array.isArray(priorGroup.options)?priorGroup.options:[];
@@ -94,6 +95,7 @@
         if(active.length>1&&!/burger/i.test(String(group.name_en||'')))throw Error('Only Burger groups may contain multiple included choices.');
         if(group.allow_repeat_option!==true&&q>active.length)throw Error('A non-repeat group needs enough distinct choices to satisfy its quantity.');
         const cap=optionQuantityCap(group);if(!Number.isSafeInteger(cap)||cap<1||cap>q)throw Error('A component group has an invalid per-choice quantity limit.');
+        if(/burger/i.test(String(group.name_en||''))&&group.allow_repeat_option===true&&cap!==q)throw Error('Burger choices must allow each selected burger up to the required group quantity ('+q+').');
         activeCount+=active.length;
       }
       for(const row of rows){
@@ -109,8 +111,9 @@
     if(options.filter(item=>item.is_active).length!==activeCount)throw Error('Every active component choice must have exactly one INCLUDED mapping.');
     return {deal_variant_id:variant.id,options};
   }
-  function buildFixedDealEditDraft(detail,schedules=[],scheduleDetail=null){
+  function buildFixedDealEditDraft(detail,schedules=[],scheduleDetail=null,expectedDealId=null,expectedTitle=null){
     if(!isObj(detail)||!isObj(detail.deal)||!Array.isArray(detail.component_groups)||!Array.isArray(detail.variants)||detail.variants.length!==1)throw Error('The saved deal is not a supported single-variant fixed bundle.');
+    if(expectedDealId)assertDealIdentity(detail,expectedDealId,expectedTitle);
     const variantDoc=detail.variants[0],variant=variantDoc&&variantDoc.variant,deal=detail.deal;
     if(!variant||!variant.id||variant.pricing_mode!=='FIXED_BUNDLE'||deal.is_active!==variant.is_active||!moneyMatches(variant.base_price,variant.base_price))throw Error('Only consistent fixed-price deal records can be edited here.');
     const groups=detail.component_groups.filter(doc=>doc&&doc.group&&doc.group.is_active===true);
@@ -128,7 +131,9 @@
         if(!mapping||mapping.pricing_treatment!=='INCLUDED'||Number(mapping.unit_surcharge)!==0||Number(mapping.max_quantity_per_deal)!==cap||mapping.product_variant_id!==option.product_variant_id)throw Error('This deal has a non-INCLUDED or inconsistent choice mapping and cannot be edited safely.');
         return {option_id:option.id,product_id:option.product_id,product_variant_id:option.product_variant_id};
       });
-      return {group_id:group.id,display_name:group.name_en,quantity:q,allow_repeat_option:group.allow_repeat_option===true,max_units_per_option:group.max_units_per_option??null,options};
+      const repeat=group.allow_repeat_option===true,isBurger=/burger/i.test(String(group.name_en||''));
+      return {group_id:group.id,display_name:group.name_en,quantity:q,allow_repeat_option:repeat,
+        max_units_per_option:repeat&&isBurger?q:(group.max_units_per_option??null),options};
     });
     const activeAssignments=(detail.schedule_assignments||[]).filter(item=>item.is_active===true);
     if(activeAssignments.length>1||activeAssignments.some(item=>item.branch_id!==null))throw Error('This deal has multiple or branch-specific schedules. The current editor will not overwrite them.');
@@ -157,6 +162,8 @@
   function verifyFixedDealDetail(detail, expected) {
     if(!isObj(detail)||!isObj(detail.deal)||!Array.isArray(detail.component_groups)||!Array.isArray(detail.variants)||detail.variants.length!==1)throw Error('The saved deal did not return a complete, single-variant detail record.');
     const deal=detail.deal,variantDoc=detail.variants[0],variant=variantDoc&&variantDoc.variant,expectedActive=expected&&expected.active===true;
+    if(expected.dealId&&deal.id!==expected.dealId)throw Error('The saved deal ID did not match the selected editor deal.');
+    if(expected.title&&deal.title!==expected.title)throw Error('The saved deal title did not match the editor.');
     if(!variant||variant.pricing_mode!=='FIXED_BUNDLE'||deal.is_active!==expectedActive||variant.is_active!==expectedActive||!moneyMatches(variant.base_price,expected.basePrice)||(typeof expected.isAvailable==='boolean'&&deal.is_available!==expected.isAvailable))
       throw Error('The deal activation state, availability or fixed base price did not match the saved draft.');
     const wanted=(expected.components||[]).map(item=>item.options?item:{...item,options:[{product_variant_id:item.product_variant_id}]});
@@ -165,14 +172,21 @@
     const expectedById=new Map();let expectedCount=0;
     activeGroups.forEach((doc,index)=>{
       const group=doc.group,rows=doc.options,wantedGroup=wanted[index],activeRows=Array.isArray(rows)?rows.filter(row=>row&&row.is_active===true):[];
-      if(!wantedGroup||group.name_en!==wantedGroup.display_name||Number(group.min_units)!==Number(wantedGroup.quantity)||Number(group.max_units)!==Number(wantedGroup.quantity)||!Array.isArray(rows)||activeRows.length!==wantedGroup.options.length||
-         (typeof wantedGroup.allow_repeat_option==='boolean'&&group.allow_repeat_option!==wantedGroup.allow_repeat_option)||
-         (wantedGroup.max_units_per_option!==undefined&&(group.max_units_per_option??null)!==(wantedGroup.max_units_per_option??null)))throw Error('A fixed deal component group failed read-back verification: '+(wantedGroup&&wantedGroup.display_name||index+1));
+      const expectedRepeat=typeof (wantedGroup&&wantedGroup.allow_repeat_option)==='boolean'?wantedGroup.allow_repeat_option:undefined;
+      const expectedLimit=wantedGroup&&wantedGroup.max_units_per_option!==undefined?wantedGroup.max_units_per_option:undefined;
+      const actualLimit=group.max_units_per_option==null?null:Number(group.max_units_per_option);
+      const repeatMismatch=expectedRepeat!==undefined&&(group.allow_repeat_option===true)!==expectedRepeat;
+      const limitMismatch=expectedLimit!==undefined&&actualLimit!==(expectedLimit==null?null:Number(expectedLimit));
+      if(!wantedGroup||group.name_en!==wantedGroup.display_name||Number(group.min_units)!==Number(wantedGroup.quantity)||Number(group.max_units)!==Number(wantedGroup.quantity)||!Array.isArray(rows)||activeRows.length!==wantedGroup.options.length||repeatMismatch||limitMismatch)
+        throw Error('A fixed deal component group failed read-back verification: '+(wantedGroup&&wantedGroup.display_name||index+1));
+      const expectedCap=expectedRepeat===undefined?optionQuantityCap(group):(expectedRepeat?Number(expectedLimit):1);
+      if(!Number.isSafeInteger(expectedCap)||expectedCap<1||expectedCap>Number(wantedGroup.quantity))throw Error('The expected per-choice quantity limit is invalid for '+wantedGroup.display_name+'.');
       const seen=new Set();
       wantedGroup.options.forEach(expectedOption=>{
         const row=activeRows.find(option=>option.product_variant_id===expectedOption.product_variant_id);
         if(!row||seen.has(row.product_variant_id))throw Error('A burger choice failed read-back verification: '+(wantedGroup.display_name||index+1));
-        seen.add(row.product_variant_id);expectedById.set(row.id,{row,cap:optionQuantityCap(group)});expectedCount++;
+        if(expectedOption.product_id&&row.product_id!==expectedOption.product_id)throw Error('A burger choice product identity failed read-back verification: '+(wantedGroup.display_name||index+1));
+        seen.add(row.product_variant_id);expectedById.set(row.id,{row,cap:expectedCap});expectedCount++;
       });
     });
     const mappings=Array.isArray(variantDoc.allowed_options)?variantDoc.allowed_options.filter(item=>item.is_active===true):[];
@@ -189,10 +203,23 @@
   }
   const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const cash=v=>v==null?'No standalone price':'Rs. '+Number(v).toLocaleString('en-PK',{maximumFractionDigits:2});
+  function assertDealIdentity(detail,expectedDealId,expectedTitle){
+    const deal=detail&&detail.deal;
+    if(!deal||!deal.id||!expectedDealId||deal.id!==expectedDealId)throw Error('The deal detail response did not match the selected deal ID.');
+    if(expectedTitle&&deal.title!==expectedTitle)throw Error('The selected deal title did not match the deal card.');
+    return true;
+  }
+  function eligibleChoiceProducts(products,categories,groupName){
+    const rows=Array.isArray(products)?products:[],categoryRows=Array.isArray(categories)?categories:[];
+    const isBurger=/burger/i.test(String(groupName||''));
+    const chickenBurgerIds=new Set(categoryRows.filter(category=>category&&category.category_kind==='menu'&&category.is_active!==false&&category.name_en==='Chicken Burgers').map(category=>category.id));
+    return rows.filter(product=>product&&product.is_active!==false&&Array.isArray(product.variants)&&
+      product.variants.some(variant=>variant&&variant.is_active!==false)&&(!isBurger||chickenBurgerIds.has(product.category_id)));
+  }
   function checkbox(name,label,checked){return '<label class="fcv3-check"><input type="checkbox" name="'+name+'" data-field="'+name+'"'+(checked?' checked':'')+'> '+label+'</label>';}
   function createWorkspace(){
     let el=null,request=null;
-    const s={loading:false,saving:false,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,components:[],detail:null,partial:null,importProgress:null};
+    const s={loading:false,saving:false,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,editorLoadingDealId:null,components:[],detail:null,partial:null,importProgress:null};
     async function read(action,args){const r=await request(action,args||{},false);if(!isObj(r)||r.ok===false)throw Error('Catalog read failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
     async function write(action,payload){const r=await request(action,payload,true);if(!isObj(r)||r.ok===false)throw Error('Catalog save failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
     async function refresh(){
@@ -247,14 +274,16 @@
         '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save category changes':'Save category')+'</button></div></form>';
     }
     function componentChoiceForm(option,group){
-      const products=s.products.filter(p=>p.is_active!==false&&p.variants.some(v=>v.is_active!==false));
+      const products=eligibleChoiceProducts(s.products,s.categories,group.display_name);
       const used=new Set((group.options||[]).filter(x=>x!==option&&x.product_variant_id).map(x=>x.product_variant_id));
       let product=products.find(p=>p.id===option.product_id)||null,variants=product?product.variants.filter(v=>v.is_active!==false):[];
       let variant=variants.find(v=>v.id===option.product_variant_id)||variants.find(v=>!used.has(v.id))||variants[0]||null;
-      if(!product&&products.length){product=products[0];variants=product.variants.filter(v=>v.is_active!==false);variant=variants.find(v=>!used.has(v.id))||variants[0]||null;}
+      const invalidSavedProduct=/burger/i.test(String(group.display_name||''))&&!!option.product_id&&!product;
+      const placeholder='<option value="" selected>'+(invalidSavedProduct?'Saved product is outside Chicken Burgers — choose a burger':'Select a product')+'</option>';
+      const variantOptions=variants.length?variants.map(v=>'<option value="'+esc(v.id)+'"'+(variant&&v.id===variant.id?' selected':'')+'>'+esc(v.size_label)+(v.is_standalone_sellable===false?' · Deal-only':'')+'</option>').join(''):'<option value="">Select a product first</option>';
       return '<article class="fcv3-choice-row" data-choice-row>'+(option.option_id?'<input type="hidden" data-field="option_id" value="'+esc(option.option_id)+'">':'')+
-        '<label>Choice product<select data-field="product_id" data-choice-product>'+products.map(p=>'<option value="'+esc(p.id)+'"'+(product&&p.id===product.id?' selected':'')+'>'+esc(p.name_en)+'</option>').join('')+'</select></label>'+
-        '<label>Product variant<select data-field="product_variant_id" data-choice-variant>'+variants.map(v=>'<option value="'+esc(v.id)+'"'+(variant&&v.id===variant.id?' selected':'')+'>'+esc(v.size_label)+(v.is_standalone_sellable===false?' · Deal-only':'')+'</option>').join('')+'</select></label>'+
+        '<label>Choice product<select data-field="product_id" data-choice-product>'+placeholder+products.map(p=>'<option value="'+esc(p.id)+'"'+(product&&p.id===product.id?' selected':'')+'>'+esc(p.name_en)+'</option>').join('')+'</select></label>'+
+        '<label>Product variant<select data-field="product_variant_id" data-choice-variant>'+variantOptions+'</select></label>'+
         '<button type="button" class="fcv3-button fcv3-danger" data-action="component-choice-remove">Remove choice</button></article>';
     }
     function componentForm(c,index){
@@ -263,13 +292,14 @@
         '<div class="fcv3-component-grid"><label>Component group<input data-field="display_name" maxlength="120" required value="'+esc(group.display_name)+'"></label>'+
         '<label>Required quantity<input data-field="quantity" type="number" min="1" max="100" step="1" required value="'+esc(group.quantity||1)+'"></label>'+
         '<label class="fcv3-check"><input type="checkbox" data-field="allow_repeat_option"'+(repeat?' checked':'')+'> Allow the same choice more than once</label>'+
-        '<label>Maximum quantity per choice<input data-field="max_units_per_option" type="number" min="1" max="'+esc(group.quantity||1)+'" step="1" value="'+(repeat?esc(group.max_units_per_option??group.quantity??1):'')+'" '+(repeat?'':'disabled')+'></label></div>'+
+        '<label>Maximum quantity per choice<input data-field="max_units_per_option" type="number" min="1" max="'+esc(group.quantity||1)+'" step="1" value="'+(repeat?esc(group.max_units_per_option??group.quantity??1):'')+'" '+(repeat?'required':'disabled')+'></label></div>'+
+        (repeat&&/burger/i.test(group.display_name)?'<small>For '+esc(group.quantity)+' burgers, set this to '+esc(group.quantity)+' so one burger can fill all required selections.</small>':'')+
         '<div class="fcv3-choice-list">'+group.options.map(option=>componentChoiceForm(option,group)).join('')+'</div>'+
         '<div class="fcv3-choice-actions"><button type="button" class="fcv3-button" data-action="component-choice-add">+ Add choice</button><small>Only Burger groups may contain multiple included choices.</small></div>'+
         '<button type="button" class="fcv3-button fcv3-danger" data-action="component-remove">Remove component group</button></article>';
     }
     function readComponentGroups(form){
-      return Array.from(form.querySelectorAll('[data-component-group]')).map(group=>({
+      const groups=Array.from(form.querySelectorAll('[data-component-group]')).map(group=>({
         group_id:group.querySelector('[data-field="group_id"]')?.value||null,
         display_name:group.querySelector('[data-field="display_name"]').value,
         quantity:Number(group.querySelector('[data-field="quantity"]').value),
@@ -278,10 +308,31 @@
         options:Array.from(group.querySelectorAll('[data-choice-row]')).map(row=>({option_id:row.querySelector('[data-field="option_id"]')?.value||null,
           product_id:row.querySelector('[data-field="product_id"]').value,product_variant_id:row.querySelector('[data-field="product_variant_id"]').value}))
       }));
+      groups.forEach(group=>{
+        if(!Number.isSafeInteger(group.quantity)||group.quantity<1)throw Error(group.display_name+' needs a valid required quantity.');
+        if(group.allow_repeat_option){
+          if(!Number.isSafeInteger(group.max_units_per_option)||group.max_units_per_option<1||group.max_units_per_option>group.quantity)
+            throw Error(group.display_name+' needs a valid maximum quantity per choice.');
+          if(/burger/i.test(group.display_name)&&group.max_units_per_option!==group.quantity)
+            throw Error('Burger groups must set Maximum quantity per choice equal to the required burger quantity ('+group.quantity+').');
+        }
+        if(/burger/i.test(group.display_name)){
+          const eligible=new Map(eligibleChoiceProducts(s.products,s.categories,group.display_name).map(product=>[product.id,product]));
+          group.options.forEach(option=>{
+            const product=eligible.get(option.product_id);
+            if(!product)throw Error('Every Burger choice must use an active product in the Chicken Burgers category. Select a valid burger before saving.');
+            if(!product.variants.some(variant=>variant.id===option.product_variant_id&&variant.is_active!==false))
+              throw Error('A Burger choice must use an active variant belonging to its selected product.');
+          });
+        }
+      });
+      return groups;
     }
     function dealForm(){
-      const editing=!!(s.dealDraft&&s.dealDraft.id);
-      return '<form class="fcv3-editor" data-form="deal"><div class="fcv3-warning">Fixed-price bundle. Burger groups can contain multiple included choices; customers choose each burger in a compact dropdown. Every choice is INCLUDED with zero surcharge. The deal price stays fixed.</div>'+
+      const editing=!!(s.dealDraft&&s.dealDraft.id),dealId=editing?s.dealDraft.id:'';
+      return '<form class="fcv3-editor" data-form="deal" data-deal-id="'+esc(dealId)+'">'+
+        (editing?'<input type="hidden" name="deal_id" value="'+esc(dealId)+'"><div class="fcv3-warning"><strong>Editing: '+esc(s.dealDraft.title)+'</strong><small>Confirm this exact deal before saving. Deal ID: '+esc(dealId)+'</small></div>':'')+
+        '<div class="fcv3-warning">Fixed-price bundle. Burger groups can contain multiple included choices; customers choose each burger in a compact dropdown. Every choice is INCLUDED with zero surcharge. The deal price stays fixed.</div>'+
         '<div class="fcv3-form-grid"><label>Deal title<input name="title" maxlength="160" required value="'+esc(s.dealDraft&&s.dealDraft.title)+'"></label>'+
         '<label>Deal price (PKR)<input name="base_price" type="number" min="0" step="0.01" required value="'+esc(s.dealDraft&&s.dealDraft.base_price)+'"></label>'+
         '<label class="fcv3-wide">Description<textarea name="description_en" maxlength="3000" rows="2">'+esc(s.dealDraft&&s.dealDraft.description_en)+'</textarea></label>'+
@@ -289,7 +340,7 @@
         (editing?'<label class="fcv3-check"><input type="checkbox" name="deal_available"'+(s.dealDraft.is_available?' checked':'')+'> Available to order</label><p class="fcv3-wide">Active status is preserved automatically. The deal is temporarily disabled while its contents are being verified.</p>':'')+'</div>'+
         '<div class="fcv3-subhead"><div><h4>Component groups</h4><p>Set each group quantity. Only Burger groups may contain multiple included choices.</p></div><button type="button" class="fcv3-button" data-action="component-add">+ Add component group</button></div>'+
         '<div class="fcv3-components">'+s.components.map(componentForm).join('')+'</div>'+
-        '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save deal changes':'Create fixed deal')+'</button></div></form>';
+        '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save '+esc(s.dealDraft.title)+' changes':'Create fixed deal')+'</button></div></form>';
     }
     function render(){
       if(!el)return;
@@ -305,13 +356,14 @@
         const deals=s.deals.filter(d=>d.collection_id===c.id);
         return '<section class="fcv3-collection"><h4>'+esc(c.name_en)+'</h4><div class="fcv3-deals">'+
           (deals.length?deals.map(d=>'<article class="fcv3-deal-card"><div><strong>'+esc(d.title)+'</strong><small>'+(d.active_variant_count||0)+' active variant(s) · '+(d.is_active?'Active':'Draft / hidden')+'</small></div>'+
-          '<div class="fcv3-card-actions"><button class="fcv3-button" data-action="deal-detail" data-id="'+esc(d.id)+'">Inspect</button><button class="fcv3-button" data-action="deal-edit" data-id="'+esc(d.id)+'">Edit</button></div></article>').join(''):'<p class="fcv3-empty">No deals in this collection.</p>')+'</div></section>';
+          '<div class="fcv3-card-actions"><button class="fcv3-button" data-action="deal-detail" data-id="'+esc(d.id)+'">Inspect</button><button class="fcv3-button" data-action="deal-edit" data-id="'+esc(d.id)+'" data-title="'+esc(d.title)+'" aria-label="Edit '+esc(d.title)+'"'+(s.editorLoadingDealId?' disabled':'')+'>Edit</button></div></article>').join(''):'<p class="fcv3-empty">No deals in this collection.</p>')+'</div></section>';
       }).join('');
       el.innerHTML='<div class="fcv3-head"><div><span class="fcv3-kicker">AUTHENTICATED COMMAND API</span><h2>Catalog V3 workspace</h2><p>Draft authoring through secured Admin/Owner commands; no direct PostgREST table writes.</p></div>'+
         '<div class="fcv3-head-actions"><span class="fcv3-revision">'+(s.revision==null?'Revision not loaded':'Draft revision '+s.revision)+'</span>'+
         '<button class="fcv3-button" data-action="refresh"'+(s.loading||s.saving?' disabled':'')+'>Refresh</button>'+
         '<button class="fcv3-button fcv3-primary" data-action="import-menu"'+(s.loading||s.saving?' disabled':'')+'>Import published menu draft</button></div></div>'+
         (s.importProgress?'<div class="fcv3-notice" role="status"><strong>'+esc(s.importProgress.phase)+'</strong> · '+esc(s.importProgress.completed)+' / '+esc(s.importProgress.total)+' · '+esc(s.importProgress.message)+'</div>':'')+
+        (s.editorLoadingDealId?'<div class="fcv3-notice" role="status">Loading the selected deal by its exact ID…</div>':'')+
         (s.error?'<div class="fcv3-error" role="alert">'+esc(s.error)+'</div>':'')+(s.notice?'<div class="fcv3-notice" role="status">'+esc(s.notice)+'</div>':'')+
         (s.partial?'<div class="fcv3-warning">A deal operation stopped and the deal may remain inactive. ID: '+esc(s.partial.id)+'. Do not create a duplicate; inspect this draft before continuing.</div>':'')+
         '<div class="fcv3-summary-grid"><article><small>Menu categories</small><strong>'+s.categories.filter(c=>c.category_kind==='menu').length+'</strong></article><article><small>Products</small><strong>'+s.products.length+'</strong></article>'+
@@ -323,7 +375,7 @@
         '<div class="fcv3-toolbar"><div><h3>Deals and offers</h3><p>Fixed prices with INCLUDED component choices. Burger groups support per-burger dropdown selections.</p></div><button class="fcv3-button fcv3-primary" data-action="deal-add">+ Create fixed deal</button></div>'+
         (collectionHtml||'<p class="fcv3-empty">No deal collection yet. The first deal creates the Deals category and collection.</p>')+
         (s.editor?'<div class="fcv3-editor-shell"><div class="fcv3-editor-head"><div><span class="fcv3-kicker">DRAFT EDITOR</span><h3>'+
-          (s.editor.type==='product'?(s.editor.product?'Edit product':'Add product'):s.editor.type==='category'?(s.editor.category?'Edit category':'Add category'):(s.dealDraft&&s.dealDraft.id?'Edit fixed deal':'Create fixed deal'))+'</h3></div><button class="fcv3-button fcv3-muted" data-action="editor-cancel">Close</button></div>'+
+          (s.editor.type==='product'?(s.editor.product?'Edit product':'Add product'):s.editor.type==='category'?(s.editor.category?'Edit category':'Add category'):(s.dealDraft&&s.dealDraft.id?'Edit fixed deal · '+esc(s.dealDraft.title):'Create fixed deal'))+'</h3></div><button class="fcv3-button fcv3-muted" data-action="editor-cancel">Close</button></div>'+
           (s.editor.type==='product'?productForm(s.editor.product):s.editor.type==='category'?categoryForm(s.editor.category):dealForm())+'</div>':'')+
         (s.detail?'<div class="fcv3-detail"><h3>Deal inspection</h3><strong>'+esc(s.detail.deal.title)+'</strong><small>'+esc(s.detail.deal.id)+'</small>'+
           '<div>'+s.detail.component_groups.filter(g=>g.group&&g.group.is_active).map(g=>'<p>'+esc(g.group.name_en)+' × '+g.group.min_units+' — '+(g.options[0]?esc(g.options[0].product_name_en)+' / '+esc(g.options[0].variant_label):'No option')+'</p>').join('')+'</div>'+
@@ -334,13 +386,25 @@
       if(!s.products.some(p=>p.is_active!==false&&p.variants.some(v=>v.is_active!==false))){s.error='Add active products and variants before creating a deal.';render();return;}
       s.editor={type:'deal'};s.editorRevision=s.revision;s.components=[{display_name:'Burger',quantity:1,allow_repeat_option:false,max_units_per_option:null,options:[{}]}];s.dealDraft={title:'',description_en:'',base_price:'',flame_hour:false,is_available:true};s.notice=null;s.error=null;s.partial=null;render();
     }
-    async function openDealEdit(dealId){
-      const detail=await read(READ.dealDetail,{deal_id:dealId});
-      const assignment=(detail.schedule_assignments||[]).find(item=>item.is_active===true&&item.branch_id===null);
-      const scheduleDetail=assignment?await read(READ.scheduleDetail,{schedule_set_id:assignment.schedule_set_id}):null;
-      const draft=buildFixedDealEditDraft(detail,s.schedules,scheduleDetail);
-      s.editor={type:'deal',deal:true};s.editorRevision=s.revision;s.components=draft.components;s.dealDraft=draft.dealDraft;
-      s.detail=null;s.notice=null;s.error=null;s.partial=null;render();
+    async function openDealEdit(dealId,expectedTitle){
+      if(s.editorLoadingDealId)return;
+      const selectedId=String(dealId||'').trim(),card=s.deals.find(item=>item.id===selectedId);
+      if(!selectedId||!card)throw Error('The selected deal card could not be matched to a loaded deal ID.');
+      const title=String(expectedTitle||card.title||'');
+      if(!title||title!==card.title)throw Error('The selected deal title does not match its deal card. Refresh and reopen it.');
+      s.editorLoadingDealId=selectedId;s.editor=null;s.dealDraft=null;s.components=[];s.detail=null;s.notice=null;s.error=null;s.partial=null;render();
+      try{
+        const detail=await read(READ.dealDetail,{deal_id:selectedId});
+        assertDealIdentity(detail,selectedId,title);
+        const assignment=(detail.schedule_assignments||[]).find(item=>item.is_active===true&&item.branch_id===null);
+        const scheduleDetail=assignment?await read(READ.scheduleDetail,{schedule_set_id:assignment.schedule_set_id}):null;
+        const draft=buildFixedDealEditDraft(detail,s.schedules,scheduleDetail,selectedId,title);
+        if(s.editorLoadingDealId!==selectedId)return;
+        s.editor={type:'deal',deal:true};s.editorRevision=s.revision;s.components=draft.components;s.dealDraft=draft.dealDraft;
+      }finally{
+        if(s.editorLoadingDealId===selectedId)s.editorLoadingDealId=null;
+        render();
+      }
     }
     async function ensureDealCollection(){
       let categories=s.categories.filter(c=>c.category_kind==='deal');
@@ -409,23 +473,26 @@
         let scheduleId=null;
         if(form.flame_hour){scheduleId=await ensureFlameHourSchedule();await write(WRITE.assignment,{deal_id:dealId,branch_id:null,schedule_set_id:scheduleId,is_active:true});}
         const beforeActivation=await read(READ.dealDetail,{deal_id:dealId});
-        verifyFixedDealDetail(beforeActivation,{basePrice:base,components:s.components,flameHour:form.flame_hour===true,scheduleId,active:false});
+        verifyFixedDealDetail(beforeActivation,{dealId,title,basePrice:base,components:s.components,flameHour:form.flame_hour===true,scheduleId,active:false});
         await write(WRITE.deal,{id:dealId,title,description_en:desc,is_active:true,is_available:true,
           variants:[{id:dealVariantId,variant_key:'BUNDLE',label_en:title,label_ur:null,pricing_mode:'FIXED_BUNDLE',base_price:base,sort_order:1,is_active:true}]});
         const afterActivation=await read(READ.dealDetail,{deal_id:dealId});
-        verifyFixedDealDetail(afterActivation,{basePrice:base,components:s.components,flameHour:form.flame_hour===true,scheduleId,active:true});
+        verifyFixedDealDetail(afterActivation,{dealId,title,basePrice:base,components:s.components,flameHour:form.flame_hour===true,scheduleId,active:true});
         s.partial=null;s.editor=null;s.notice='Fixed deal saved and read-back verified. Components are locked and use INCLUDED pricing.';await refresh();
       }catch(error){if(dealId)s.partial={id:dealId,variantId:dealVariantId};throw error;}
     }
-    async function editDeal(form){
+    async function editDeal(form,submittedDealId){
       const dealId=s.dealDraft&&s.dealDraft.id;
       if(!dealId)throw Error('The deal ID is missing. Reopen the deal before saving.');
+      if(submittedDealId!==dealId)throw Error('The submitted deal ID does not match the deal currently open in the editor. No changes were made.');
       const latest=await read(READ.dealDetail,{deal_id:dealId});
+      assertDealIdentity(latest,dealId);
       if(Number.isSafeInteger(s.editorRevision)&&s.revision!==s.editorRevision)
         throw Error('This catalog changed while the deal editor was open. Reload the deal before saving; no edit was made.');
       const assignmentBefore=(latest.schedule_assignments||[]).find(item=>item.is_active===true&&item.branch_id===null);
       const scheduleDetailBefore=assignmentBefore?await read(READ.scheduleDetail,{schedule_set_id:assignmentBefore.schedule_set_id}):null;
-      const currentDraft=buildFixedDealEditDraft(latest,s.schedules,scheduleDetailBefore);
+      const currentDraft=buildFixedDealEditDraft(latest,s.schedules,scheduleDetailBefore,dealId);
+      const groups=buildFixedComponentGroups(s.components,latest.component_groups);
       const base=amount(form.base_price,'Deal base price',true);
       const title=text(form.title,160,'Deal title',true);
       const desc=text(form.description_en,3000,'Description',false);
@@ -441,7 +508,6 @@
             sort_order:variant.sort_order,is_active:false}]
         });
         stage='components';
-        const groups=buildFixedComponentGroups(s.components,latest.component_groups);
         await write(WRITE.components,{deal_id:dealId,groups:groups.groups});
         stage='mappings';
         const afterComponents=await read(READ.dealDetail,{deal_id:dealId});
@@ -463,7 +529,7 @@
         const activeSchedule=(beforeActivation.schedule_assignments||[]).find(item=>item.is_active===true&&item.branch_id===null);
         verifyFixedDealDetail(beforeActivation,{
           basePrice:base,components:s.components,flameHour:form.flame_hour===true,
-          scheduleId:activeSchedule?activeSchedule.schedule_set_id:null,active:false,isAvailable
+          dealId,title,scheduleId:activeSchedule?activeSchedule.schedule_set_id:null,active:false,isAvailable
         });
         stage='restore activation state';
         await write(WRITE.deal,{
@@ -476,7 +542,7 @@
         const finalSchedule=(finalDetail.schedule_assignments||[]).find(item=>item.is_active===true&&item.branch_id===null);
         verifyFixedDealDetail(finalDetail,{
           basePrice:base,components:s.components,flameHour:form.flame_hour===true,
-          scheduleId:finalSchedule?finalSchedule.schedule_set_id:null,active:wasActive,isAvailable
+          dealId,title,scheduleId:finalSchedule?finalSchedule.schedule_set_id:null,active:wasActive,isAvailable
         });
         s.partial=null;s.editor=null;s.editorRevision=null;
         s.notice='Fixed deal changes saved, read back and verified. Removed components are inactive; all active components remain INCLUDED with zero surcharge.';
@@ -518,14 +584,16 @@
         await write(WRITE.product,payload);s.editor=null;s.notice='Product and variants saved to catalog draft.';await refresh();return;
       }
       if(type==='deal'){
-        s.components=readComponentGroups(form);
         const existing=s.dealDraft&&s.dealDraft.id?s.dealDraft:null;
+        const submittedDealId=String(fd.get('deal_id')||''),formDealId=String(form.dataset.dealId||'');
+        if(submittedDealId!==formDealId||submittedDealId!==(existing?existing.id:''))throw Error('The deal identity in this form no longer matches the selected deal. Reopen the intended deal; no changes were made.');
+        s.components=readComponentGroups(form);
         s.dealDraft={
           ...(existing?existing:{}),title:fd.get('title'),description_en:fd.get('description_en'),
           base_price:fd.get('base_price'),flame_hour:fd.has('flame_hour'),
           is_available:existing?fd.has('deal_available'):true
         };
-        if(existing)await editDeal(s.dealDraft);
+        if(existing)await editDeal(s.dealDraft,submittedDealId);
         else await createDeal(s.dealDraft);
       }
     }
@@ -570,7 +638,7 @@
 
     function bind(){
       el.onclick=async event=>{
-        const b=event.target.closest('[data-action]');if(!b||b.disabled||s.saving)return;const a=b.dataset.action;
+        const b=event.target.closest('[data-action]');if(!b||b.disabled||s.saving||s.editorLoadingDealId)return;const a=b.dataset.action;
         try{
           if(a==='refresh')await refresh();
           else if(a==='import-menu')await importPublishedMenuDraft();
@@ -604,7 +672,7 @@
            }
            else if(a==='editor-cancel'){s.editor=null;render();}
           else if(a==='deal-detail'){s.detail=await read(READ.dealDetail,{deal_id:b.dataset.id});render();}
-          else if(a==='deal-edit'){await openDealEdit(b.dataset.id);}
+          else if(a==='deal-edit'){await openDealEdit(b.dataset.id,b.dataset.title);}
           else if(a==='detail-close'){s.detail=null;render();}
         }catch(e){s.error=e.message||'Catalog action failed.';render();}
       };
@@ -615,11 +683,18 @@
         }
         if(event.target.matches('[data-field="allow_repeat_option"]')){
           const group=event.target.closest('[data-component-group]'),input=group.querySelector('[data-field="max_units_per_option"]');
-          input.disabled=!event.target.checked;if(event.target.checked&&!input.value)input.value=group.querySelector('[data-field="quantity"]').value||1;
+          input.disabled=!event.target.checked;
+          if(event.target.checked){
+            const quantity=group.querySelector('[data-field="quantity"]').value||1;
+            if(/burger/i.test(group.querySelector('[data-field="display_name"]').value))input.value=quantity;
+            else if(!input.value)input.value=quantity;
+          }
         }
         if(event.target.matches('[data-field="quantity"]')){
           const group=event.target.closest('[data-component-group]'),input=group.querySelector('[data-field="max_units_per_option"]');
-          input.max=event.target.value;if(Number(input.value)>Number(event.target.value))input.value=event.target.value;
+          input.max=event.target.value;
+          if(group.querySelector('[data-field="allow_repeat_option"]').checked&&/burger/i.test(group.querySelector('[data-field="display_name"]').value))input.value=event.target.value;
+          else if(Number(input.value)>Number(event.target.value))input.value=event.target.value;
         }
         if(event.target.matches('[data-field="variant_kind"]')){const row=event.target.closest('[data-variant-row]'),pack=event.target.value==='pack';row.querySelector('[data-field="pack_quantity"]').disabled=!pack;row.querySelector('[data-field="pack_unit"]').disabled=!pack;}
       };
@@ -633,5 +708,5 @@
     }
     return {mount:async(element,requestFn)=>{if(!element||typeof requestFn!=='function')throw Error('Catalog V3 workspace requires a root and authenticated request handler.');el=element;request=requestFn;bind();await refresh();},refresh,getState:()=>JSON.parse(JSON.stringify(s))};
   }
-  return {READ,WRITE,normalizeProductDraft,buildFixedComponentGroups,buildIncludedMappings,buildFixedDealEditDraft,isApprovedFlameHourSchedule,verifyFixedDealDetail,createWorkspace};
+  return {READ,WRITE,normalizeProductDraft,buildFixedComponentGroups,buildIncludedMappings,buildFixedDealEditDraft,isApprovedFlameHourSchedule,assertDealIdentity,eligibleChoiceProducts,verifyFixedDealDetail,createWorkspace};
 });

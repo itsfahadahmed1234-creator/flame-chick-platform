@@ -433,3 +433,130 @@ test('fixed-deal creation preflights duplicate Deals categories, collections and
   assert.match(source,/An existing Flame Hour daily schedule has different settings/);
   assert.match(source,/isApprovedFlameHourSchedule\(found,detail\)/);
 });
+
+
+test('Burger choice products are restricted to active products in the Chicken Burgers category', () => {
+  const categories = [
+    { id: 'cat-burger', category_kind: 'menu', name_en: 'Chicken Burgers', is_active: true },
+    { id: 'cat-broast', category_kind: 'menu', name_en: 'Whole Chicken Broast', is_active: true }
+  ];
+  const products = [
+    { id: 'og', category_id: 'cat-burger', is_active: true, variants: [{ id: 'og-r', is_active: true }] },
+    { id: 'injector', category_id: 'cat-burger', is_active: true, variants: [{ id: 'injector-r', is_active: true }] },
+    { id: 'nashville-fire', category_id: 'cat-burger', is_active: true, variants: [{ id: 'nashville-fire-r', is_active: true }] },
+    { id: 'nashville-broast', category_id: 'cat-broast', is_active: true, variants: [{ id: 'nashville-broast-r', is_active: true }] },
+    { id: 'inactive-burger', category_id: 'cat-burger', is_active: false, variants: [{ id: 'inactive-r', is_active: true }] }
+  ];
+  assert.deepEqual(admin.eligibleChoiceProducts(products, categories, 'Burger').map(product => product.id),
+    ['og', 'injector', 'nashville-fire']);
+  assert.deepEqual(admin.eligibleChoiceProducts(products, categories, 'Half Broast').map(product => product.id),
+    ['og', 'injector', 'nashville-fire', 'nashville-broast']);
+});
+
+test('deal editor identity guard rejects a different deal ID or mismatched card title', () => {
+  const detail = { deal: { id: 'deal-feast', title: 'Flame Feast' } };
+  assert.equal(admin.assertDealIdentity(detail, 'deal-feast', 'Flame Feast'), true);
+  assert.throws(() => admin.assertDealIdentity(detail, 'deal-hour', 'Flame Hour'), /selected deal ID/i);
+  assert.throws(() => admin.assertDealIdentity(detail, 'deal-feast', 'Flame Hour'), /deal title did not match/i);
+});
+
+test('fixed deal Burger repeat maximum must equal the required group quantity', () => {
+  const result = admin.buildFixedComponentGroups([{
+    display_name: 'Burger', quantity: 3, allow_repeat_option: true, max_units_per_option: 3,
+    options: [{ product_variant_id: 'variant-og' }, { product_variant_id: 'variant-injector' },
+      { product_variant_id: 'variant-nashville-fire' }]
+  }]);
+  assert.equal(result.groups[0].max_units_per_option, 3);
+  assert.throws(() => admin.buildFixedComponentGroups([{
+    display_name: 'Burger', quantity: 3, allow_repeat_option: true, max_units_per_option: 1,
+    options: [{ product_variant_id: 'variant-og' }, { product_variant_id: 'variant-injector' },
+      { product_variant_id: 'variant-nashville-fire' }]
+  }]), /required quantity/i);
+});
+
+test('read-back rejects wrong Burger product identity and mismatched group or option mapping limits', () => {
+  const dealId = 'deal-feast';
+  const option = { id: 'option-og', product_id: 'product-og', product_variant_id: 'variant-og', is_active: true };
+  const makeDetail = (groupLimit = 3, mappingLimit = 3, productId = 'product-og') => ({
+    deal: { id: dealId, title: 'Flame Feast', is_active: true, is_available: true },
+    component_groups: [{
+      group: { name_en: 'Burger', min_units: 3, max_units: 3, allow_repeat_option: true,
+        max_units_per_option: groupLimit, is_active: true },
+      options: [{ ...option, product_id: productId }]
+    }],
+    variants: [{
+      variant: { id: 'deal-variant', pricing_mode: 'FIXED_BUNDLE', base_price: 3599, is_active: true },
+      allowed_options: [{
+        id: 'mapping-og', component_option_id: option.id, product_variant_id: option.product_variant_id,
+        is_active: true, pricing_treatment: 'INCLUDED', unit_surcharge: 0, max_quantity_per_deal: mappingLimit
+      }]
+    }],
+    schedule_assignments: []
+  });
+  const expected = {
+    dealId, title: 'Flame Feast', basePrice: 3599, isAvailable: true, active: true,
+    components: [{
+      display_name: 'Burger', quantity: 3, allow_repeat_option: true, max_units_per_option: 3,
+      options: [{ product_id: 'product-og', product_variant_id: 'variant-og' }]
+    }],
+    flameHour: false, scheduleId: null
+  };
+  assert.equal(admin.verifyFixedDealDetail(makeDetail(), expected), true);
+  assert.throws(() => admin.verifyFixedDealDetail(makeDetail(1, 1), expected), /component group failed read-back/i);
+  assert.throws(() => admin.verifyFixedDealDetail(makeDetail(3, 1), expected), /choice mapping/i);
+  assert.throws(() => admin.verifyFixedDealDetail(makeDetail(3, 3, 'product-broast'), expected), /product identity/i);
+  assert.throws(() => admin.verifyFixedDealDetail({ ...makeDetail(), deal: { ...makeDetail().deal, id: 'deal-hour' } }, expected), /deal ID/i);
+});
+
+test('Burger edit draft repairs legacy per-choice default to the required group quantity', () => {
+  const detail = {
+    deal: { id: 'deal-feast', collection_id: 'deals', title: 'Flame Feast', is_active: true, is_available: true },
+    component_groups: [{
+      group: { id: 'burger-group', name_en: 'Burger', min_units: 3, max_units: 3, allow_repeat_option: true,
+        max_units_per_option: 1, is_active: true },
+      options: [{ id: 'option-og', product_id: 'product-og', product_variant_id: 'variant-og', is_active: true }]
+    }],
+    variants: [{
+      variant: { id: 'deal-variant', pricing_mode: 'FIXED_BUNDLE', base_price: 3599, is_active: true },
+      allowed_options: [{ id: 'mapping-og', component_option_id: 'option-og', product_variant_id: 'variant-og',
+        pricing_treatment: 'INCLUDED', unit_surcharge: 0, max_quantity_per_deal: 1, is_active: true }]
+    }],
+    schedule_assignments: []
+  };
+  const draft = admin.buildFixedDealEditDraft(detail, [], null, 'deal-feast', 'Flame Feast');
+  assert.equal(draft.dealDraft.id, 'deal-feast');
+  assert.equal(draft.components[0].max_units_per_option, 3);
+});
+
+test('buildIncludedMappings refuses an incorrectly capped repeating Burger group', () => {
+  const detail = {
+    component_groups: [{
+      group: { name_en: 'Burger', min_units: 3, max_units: 3, allow_repeat_option: true,
+        max_units_per_option: 1, is_active: true },
+      options: [{ id: 'option-og', product_variant_id: 'variant-og', is_active: true }]
+    }],
+    variants: [{ variant: { id: 'variant-bundle', pricing_mode: 'FIXED_BUNDLE' }, allowed_options: [] }]
+  };
+  assert.throws(() => admin.buildIncludedMappings(detail), /Burger choices must allow each selected burger/i);
+});
+
+test('Admin deal edit binds selected card ID/title through form, loader and secured read-back', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-admin/catalog-v3-admin.js', import.meta.url), 'utf8');
+  assert.match(source, /data-action="deal-edit" data-id=/);
+  assert.match(source, /data-title=/);
+  assert.match(source, /aria-label="Edit /);
+  assert.match(source, /async function openDealEdit\(dealId,expectedTitle\)/);
+  assert.match(source, /assertDealIdentity\(detail,selectedId,title\)/);
+  assert.match(source, /data-deal-id=/);
+  assert.match(source, /name="deal_id"/);
+  assert.match(source, /submittedDealId!==formDealId/);
+  assert.match(source, /editorLoadingDealId/);
+});
+
+test('Burger selector form requires maximum-per-choice and validates selected Chicken Burger variants before writing', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-admin/catalog-v3-admin.js', import.meta.url), 'utf8');
+  assert.match(source, /data-field="max_units_per_option" type="number"[^\n]*required/);
+  assert.match(source, /eligibleChoiceProducts\(s\.products,s\.categories,group\.display_name\)/);
+  assert.match(source, /Every Burger choice must use an active product in the Chicken Burgers category/);
+  assert.match(source, /const groups=buildFixedComponentGroups\(s\.components,latest\.component_groups\)/);
+});
