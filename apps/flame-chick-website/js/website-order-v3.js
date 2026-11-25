@@ -57,6 +57,25 @@
     $('connection-pill').className = 'status-pill status-' + (kind === 'ready' ? 'ready' : kind === 'loading' ? 'loading' : 'error');
   }
 
+  function orderWritesAllowed() {
+    var guard = root.FlameChickWebsitePreviewGuard;
+    return !!guard && typeof guard.canSubmitOrders === 'function' &&
+      guard.canSubmitOrders(root.location && root.location.hostname);
+  }
+
+  function applyPreviewReadOnlyMode() {
+    var preview = !orderWritesAllowed();
+    document.body.classList.toggle('fc-website-preview-readonly', preview);
+    $('fc-preview-readonly-banner').hidden = !preview;
+    $('fc-preview-checkout-notice').hidden = !preview;
+    if (preview) {
+      $('request-quote').disabled = true;
+      $('place-order').disabled = true;
+      $('retry-order').disabled = true;
+    }
+    return preview;
+  }
+
   function apiConfig() {
     var config = root.FLAME_CHICK_CONFIG || {};
     if (typeof config.orderApiBase !== 'string' || !/^https:\/\//.test(config.orderApiBase) ||
@@ -67,6 +86,9 @@
   }
 
   async function orderApi(method, query, body) {
+    if (String(method || '').toUpperCase() !== 'GET' && !orderWritesAllowed()) {
+      throw new Error('Checkout is disabled on this Website Preview. Your cart and menu are available for review only.');
+    }
     var config = apiConfig();
     var url = config.orderApiBase + (query ? (config.orderApiBase.indexOf('?') >= 0 ? '&' : '?') + query : '');
     var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -191,7 +213,8 @@
     $('place-order').hidden = true;
     $('retry-order').hidden = true;
     $('request-quote').hidden = false;
-    $('request-quote').disabled = state.cart.length === 0 || !currentContext() || state.busy || state.checkoutUncertain;
+    $('request-quote').disabled = !orderWritesAllowed() || state.cart.length === 0 ||
+      !currentContext() || state.busy || state.checkoutUncertain;
     if (message) status(message);
   }
 
@@ -218,7 +241,8 @@
     $('cart-empty').hidden = state.cart.length > 0;
     $('fc-v3-cartbar').hidden = state.cart.length === 0;
     $('fc-v3-cartbar-count').textContent = itemCountLabel();
-    $('request-quote').disabled = state.cart.length === 0 || !currentContext() || state.busy || state.checkoutUncertain;
+    $('request-quote').disabled = !orderWritesAllowed() || state.cart.length === 0 ||
+      !currentContext() || state.busy || state.checkoutUncertain;
 
     state.cart.forEach(function (row, index) {
       var article = document.createElement('article');
@@ -629,7 +653,8 @@
   function setBusy(value) {
     state.busy = value === true;
     var locked = state.busy || state.checkoutUncertain;
-    $('request-quote').disabled = locked || state.cart.length === 0 || !currentContext();
+    $('request-quote').disabled = !orderWritesAllowed() || locked ||
+      state.cart.length === 0 || !currentContext();
     $('place-order').disabled = locked;
     $('retry-order').disabled = state.busy;
     ['customer-name','customer-phone','customer-email','delivery-area','delivery-address',
@@ -640,6 +665,10 @@
   }
 
   async function requestQuote() {
+    if (!orderWritesAllowed()) {
+      status('Preview mode: the real published menu is available, but checkout is disabled.', 'error');
+      return;
+    }
     if (state.busy || state.checkoutUncertain) return;
     try {
       var body = buildRequestBody();
@@ -676,6 +705,10 @@
   }
 
   async function submitOrder(retry) {
+    if (!orderWritesAllowed()) {
+      status('Preview mode: no orders can be submitted from this deployment.', 'error');
+      return;
+    }
     if (state.busy) return;
     if (!state.quoteBody || !state.quoteToken) { status('Get a fresh secure server quote before placing the order.', 'error'); return; }
     if (!retry && state.checkoutUncertain) { status('Retry the same checkout request to verify whether it was received.', 'error'); return; }
@@ -856,7 +889,8 @@
       }
       state.loaded = true;
       $('publication-meta').hidden = true;
-      pageStatus('Published menu verified.', 'ready');
+      var previewReadOnly = applyPreviewReadOnlyMode();
+      pageStatus(previewReadOnly ? 'Published menu verified · Preview only · checkout disabled.' : 'Published menu verified.', 'ready');
       renderCatalog();
       renderCart();
       syncFulfilmentControls();
