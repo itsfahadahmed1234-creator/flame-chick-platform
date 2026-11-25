@@ -673,6 +673,7 @@
         quantity = Math.max(1, quantity - 1);
         quantityValue.textContent = String(quantity);
         quantityMinus.disabled = quantity <= 1;
+        quantityPlus.disabled = quantity >= 99;
       });
       quantityPlus.addEventListener('click', function () {
         quantity = Math.min(99, quantity + 1);
@@ -843,7 +844,7 @@
       item.addEventListener('click', function () {
         if (option.disabled) return;
         select.value = option.value;
-        input.value = option.dataset.searchText || option.textContent;
+        input.value = option.textContent;
         results.hidden = true;
         input.setAttribute('aria-expanded', 'false');
         select.dispatchEvent(new Event('change', { bubbles: true }));
