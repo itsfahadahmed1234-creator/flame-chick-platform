@@ -237,3 +237,74 @@ The first create-deployment request placed `target: "preview"` in the request bo
 ### Next step
 
 Use the explicit Preview URL above to review desktop and mobile visuals. Gather visual feedback, then port approved styling/layout refinements back into `index.html` and `website-order-v3.js` while retaining V3 catalogue/checkout integration and continuing to block Production checkout from Preview.
+
+
+---
+
+## 2026-11-25 — Corrected deployment: real Flame Chick Website Preview
+
+The earlier standalone visual-review mockup was not the intended review target. The correct preview has now been deployed from the real customer Website implementation into the existing `flame-chick-website-production` Vercel project, using the isolated Website branch. The standalone mockup URL should not be used for review.
+
+### Verified real Website Preview
+
+- Existing Vercel project: `flame-chick-website-production`
+- Project ID: `prj_izBWyrFmPZIm63FHAT4jaLHUTLzu`
+- Team: `fahad-7455`
+- Git repository: `itsfahadahmed1234-creator/flame-chick-platform`
+- Branch: `work/website-parallel-development`
+- Deployed commit: `2547a6db9f2d54368735ef52bbc0d0724e3bcef3`
+- Deployment ID: `dpl_8i8kJR6xJPvsWSkvAvR9Ruuyw95w`
+- Unique Preview URL: https://flame-chick-website-production-4oiixa7th-fahad-7455.vercel.app
+- Vercel state: `READY`
+- Vercel target: `null`, confirmed by Vercel as Preview, not Production.
+- The build log confirms the actual repository branch and exact commit were cloned and deployed.
+- The deployed root is the Vercel Website project's existing app root, serving `apps/flame-chick-website/index.html`, not `visual-review/index.html`.
+
+### Deployed-page verification
+
+The deployment URL was fetched successfully:
+- HTTP response: `200 OK`
+- Page title: `Flame Chick | Order Online`
+- The actual homepage HTML contains `fc-preview-readonly-banner` and `fc-preview-checkout-notice`.
+- The homepage loads the normal V3 published catalogue client and the new Preview checkout guard.
+- The deployed `js/preview-checkout-guard.js` returned HTTP 200 and contained the exact Production-host allowlist.
+- The deployed `js/website-order-v3.js` returned HTTP 200 and contains the Preview write block.
+- The deployed page does not contain the earlier sample mockup's `Sample burger` content.
+
+### Preview safety implementation
+
+- The real published V3 catalogue still loads by read-only GET through the existing Flame Chick Catalogue endpoint, allowing review of the actual published product/deal data and images.
+- The read-only Website context GET remains available so the single currently enabled branch and fulfilment availability can be shown.
+- The Website identifies order-write permission using an exact allowlist of verified Production hostnames: `flamechic.vercel.app` plus the Vercel Production domains/hostname mapped to the confirmed Production deployment.
+- On every other hostname (including branch Preview aliases and localhost), quote and order POST calls are blocked before network submission, quote/place/retry controls are disabled, and a visible Preview-only notice is shown.
+- The V3 cart, product customization, deal customization, cart quantity/edit controls and Delivery/Takeaway selection remain available for visual review. A quote or order cannot be created from the Preview.
+- This guard is a browser-side fail-closed safeguard for the requested Preview. It does not replace server-side API validation; the deployed Preview must remain non-operational and no checkout testing is permitted against Production.
+
+### CI
+
+- Website Static Checks run: `45575943232`
+- Exact commit: `2547a6db9f2d54368735ef52bbc0d0724e3bcef3`
+- Result: **SUCCESS**
+- Verified steps: active JavaScript syntax; preview-write guard tests; core catalogue/deal/fulfilment tests; preview fixture tests; inline homepage and preview script parsing.
+- Guard regression tests cover the verified Production-host allowlist, block non-GET methods on arbitrary Preview/local hosts, allow read-only GETs and fail closed for malformed or deceptive hostnames.
+
+### Production alias verification
+
+The Production aliases were read back after deployment:
+- `flamechic.vercel.app` still maps to the pre-existing Production deployment `dpl_J5y1tZeoBZfRAfxVkmjLTZ72jq6i`.
+- `flame-chick-website-production-six.vercel.app` still maps to the same existing Production deployment.
+- `flame-chick-website-production-fahad-7455.vercel.app` still maps to that same existing Production deployment.
+- The new Preview has only its unique branch Preview alias and did not receive or replace the Production aliases.
+- No Production alias was promoted, moved, or reassigned. No Supabase resource, catalogue, order, payment, migration, staff role, POS, Admin or Rider setting was changed by this deployment.
+
+### Correct review URL
+
+Use only this actual Website Preview for customer-facing visual review:
+
+https://flame-chick-website-production-4oiixa7th-fahad-7455.vercel.app
+
+The previous standalone mockup at `flame-chick-website-visual-review-*.vercel.app` was not the real Website and should be disregarded. The existing custom domain `https://flamechic.vercel.app` remains on its original Production deployment.
+
+### Remaining verification
+
+The deployment and source response were verified, but a full interactive browser rehearsal (actual catalogue hydration, product/deal modals, cart drawer behavior, responsive screenshots) was not performed. The user should review the real Preview on desktop/mobile. Do not test Get Verified Total, Place Order or Retry on Preview.
