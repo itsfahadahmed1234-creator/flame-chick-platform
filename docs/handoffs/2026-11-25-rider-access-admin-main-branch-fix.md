@@ -31,7 +31,7 @@ The Rider portal was still inaccessible. The user asked to simplify Admin role c
    - A fixed routine audit reason is sent by the Admin invite form.
 3. `apps/flame-chick-rider/index.html`
    - Realtime initialization no longer blocks the first jobs request. It starts in the background; `loadJobs(true)` proceeds independently. If Realtime fails, a visible/manual-refresh path remains.
-4. `supabase/migrations/20261125130000_flame_chick_staff_main_branch_rider_provisioning.sql`
+4. `supabase/migrations/20261125083051_flame_chick_staff_main_branch_rider_provisioning.sql`
    - Adds a private SECURITY DEFINER Rider-profile provisioning helper, owned by postgres with direct execute revoked from application roles.
    - The staff command resolves the active Main branch on the server for Manager/Cashier/Rider role assignment and invitation creation; it refuses multi-branch or non-Main choices.
    - Invitation acceptance rejects stale/multi-branch invitations and provisions the Rider profile in the same transaction as the accepted Rider role.
