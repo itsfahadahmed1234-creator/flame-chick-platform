@@ -6,7 +6,7 @@ const adminApp = readFileSync("apps/flame-chick-admin/app.js", "utf8");
 const adminHtml = readFileSync("apps/flame-chick-admin/index.html", "utf8");
 const riderHtml = readFileSync("apps/flame-chick-rider/index.html", "utf8");
 const migration = readFileSync(
-  "supabase/migrations/20261125130000_flame_chick_staff_main_branch_rider_provisioning.sql",
+  "supabase/migrations/20261125083051_flame_chick_staff_main_branch_rider_provisioning.sql",
   "utf8"
 );
 
