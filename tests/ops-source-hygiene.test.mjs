@@ -49,8 +49,29 @@ test("POS delivery dispatch uses the targeted offer state, not a second acceptan
   assert.doesNotMatch(html,/arrived_at|arrived_at_restaurant/);
 });
 
+test("Rider Realtime uses a private own-user Broadcast topic with automatic recovery", () => {
+  const html=source[1].html;
+  assert.match(html, /fc:rider:\\?"+riderId/);
+  assert.match(html, /config:\\?\{private:true\}/);
+  assert.match(html, /\.on\("broadcast",\{event:"delivery_changed"\},scheduleRiderJobsRefresh\)/);
+  assert.doesNotMatch(html, /\.on\("postgres_changes"/);
+  assert.match(html, /function startRiderRealtimeFallback/);
+  assert.match(html, /setInterval\(\(\)=>\{/);
+  assert.match(html, /riderRealtimeFallbackTimer/);
+  assert.match(html, /scheduleRiderJobsRefresh\(\)/);
+});
+
+test("POS listens to private branch Broadcast events and refreshes after reconnect", () => {
+  const html=source[0].html;
+  assert.match(html, /fc:branch:\x27\+branch\+\x27:pos/);
+  assert.match(html, /config:\{private:true\}/);
+  assert.match(html, /event:\x27orders_changed\x27/);
+  assert.match(html, /event:\x27delivery_changed\x27/);
+  assert.match(html, /scheduleFlameChickRealtimeRefresh\(\);\s*flameChickRealtimeRefreshTimer=setInterval/);
+});
+
 test("rider Realtime channel uses the Flame Chick namespace", () => {
-  assert.match(source[1].html, /flame-chick-rider-ops-/);
+  assert.match(source[1].html, /fc:rider:/);
 });
 
 
