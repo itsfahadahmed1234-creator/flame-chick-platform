@@ -1,22 +1,29 @@
-# CURRENT WORK CHECKPOINT — RIDER ACCESS / ADMIN MAIN BRANCH
+# CURRENT WORK CHECKPOINT — ADMIN, POS, RIDER RELEASE / PRIVATE REALTIME
 **Updated:** 2026-11-25  
-**Latest focused handoff:** `docs/handoffs/2026-11-25-rider-access-admin-main-branch-fix.md`
+**Focused handoff:** `docs/handoffs/2026-11-25-rider-access-admin-main-branch-fix.md`
 
-The Admin staff form now assigns Manager/Cashier/Rider to Main automatically and keeps Admin/Owner restaurant-wide. The Rider app no longer waits for Realtime startup before loading jobs. The database now enforces the single Main branch and creates Rider profiles automatically when Rider roles are assigned or invitations accepted.
+## Current release
+All three existing app domains now route to Ready deployments built from source commit `6cff4a250abb1bdeb59fb4bedd90f28e6915210d`:
+- Admin: https://flamechicadmin.vercel.app/ — `dpl_HhALuZw9UXTercZEN3mN44JSUDUe`
+- POS: https://flamechicpos.vercel.app/ — `dpl_4QFxTS5gYsN8nei5iW8KCw5Ye8Us`
+- Rider: https://flamechickrider.vercel.app/ — `dpl_2XDw6cQ4RJReYAE1SpkBUsjhC79y`
 
-**QA status:** Full disposable Supabase QA passed on commit `f8fb97df51464cc122ad56aa10d9e22a6f61632b`, Actions run `45575145392`. Migration replay, role/access tests, Rider profile lifecycle, delivery, POS sync, website order/API and all 4 delivery + 2 payment concurrency races passed. Post-filename-alignment Staff Admin QA run `45577198252` also passed; Admin static checks after the alignment passed in runs `45577210995` and `45577217121`.
+The Vercel promote API returned 422 for the manual deployments; each verified existing custom domain alias was therefore reassigned directly to its matching Ready deployment. Read-after-write alias checks confirmed all three mappings. Vercel deployment target metadata remains `null`; use the verified production domain aliases as evidence of the live routing.
 
-**Production database:** Migration `20261125083051_flame_chick_staff_main_branch_rider_provisioning` successfully applied and verified. There remains exactly one active Main branch. Fahad’s existing Rider role/profile remain active and matched. The helper is postgres-owned SECURITY DEFINER with empty search_path and no direct execute for anon/authenticated/service_role. Security Advisor remains at baseline 51 INFO RLS-no-policy findings plus the existing Auth leaked-password warning. Preserve the existing 11 orders and 3 delivery task records.
+## Private Realtime
+Production migration `20261125092751_flame_chick_private_ops_realtime_broadcasts` applied and verified. Five triggers cover orders, delivery tasks, offers, assignments and rider profile state. Private topic authorization restricts POS to active branch staff and each Rider to their own topic. Payloads contain identifiers only; no customer or rider PII. POS has reconnect catch-up and polling fallback. Rider now uses a private Broadcast channel, remains connected when Busy/Offline to receive current assignment updates, and refreshes through the authorized delivery API with fallback polling. Rider sign-in/initial load does not depend on Realtime.
 
-**Access fixes deployed to Preview:** Browser inspection exposed an Admin CORS allowlist omission and a Rider `pending is not defined` runtime error. Staff Admin Edge Function is now version 5 with JWT verification still enabled and the exact Admin Preview origin pinned. Rider availability renderer no longer references the undefined variable. Admin static checks pass on final fix commit `fcc7303a7f6927bc0db0cb7d45e88775fb3fd50d` (run `45580020169`); Rider static checks and Staff Admin role-boundary QA pass on commit `77f97121902f8c795fa75d693ea669efd9859dd9` (runs `45579910423`, `45579910453`).
+Staff provisioning migration `20261125083051_flame_chick_staff_main_branch_rider_provisioning` also remains applied. Exactly one active Main branch; Fahad’s existing Rider role/profile remain active and matched. Production records preserved: 11 orders and 3 delivery tasks, no unresolved delivery tasks.
 
-**Corrected Vercel Preview aliases READY** on final fix commit `fcc7303a7f6927bc0db0cb7d45e88775fb3fd50d`:
-- Admin: https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app/ (`dpl_5itZsXDNyDKrMr7iW25m87CByc9D`)
-- Rider: https://flame-chick-rider-production-git-work-product-076807-fahad-7455.vercel.app/ (`dpl_2Nw8Je29X2je3cxcogc3119NazA9`)
+## QA
+- Full disposable Realtime/staff/delivery/POS/website/concurrency suite passed on `c41e9e01417d54276e3f96d09e5117660c8f05dc`, run `45583412377`.
+- POS/Rider static tests passed on `878a4e71a37e2b5f1b6b12d0ff403a7670548f1`, run `45584213000`, including Rider Busy/Offline socket continuity.
+- Admin static checks passed on `79b9a49f91613d46024da7134d0ae530c22c7d45`, run `45584204475`.
+- Final filename-aligned Staff Admin/Realtime/operations QA passed on `6cff4a250abb1bdeb59fb4bedd90f28e6915210d`, run `45586028686`.
+- Separate catalog importer and catalog publication validation QA runs for the final filename-aligned migration were still pending/in progress when this summary was updated.
+- Post-deploy Vercel error-cluster queries returned no error clusters; runtime logs had no entries in the short query window, so active browser Realtime delivery is not yet proven.
 
-Production domains remain unchanged: Admin `flamechicadmin.vercel.app` → `dpl_48CK9TiY468Tyvhc6zzMmxbDFWcd`; Rider `flamechickrider.vercel.app` → `dpl_AoAJvNZQLsBamhBGNWEspcvv3hRU`. Neither Preview was promoted. The remaining check is user sign-in on the corrected aliases; do not claim success until confirmed.
-
-Current repository branch remains `work/production-source-audit`; do not switch to main. Do not promote Preview deployments. GST remains deferred; no real customer orders/payments or restaurant launch is approved.
+The current branch remains `work/production-source-audit`. User must hard-refresh and sign in to all 3 apps, then confirm live POS-to-Rider state updates through a controlled pre-launch rehearsal. Do not create real customer orders/payments, promote further deployments, change Main branch, create additional staff accounts, or add GST. Production remains pre-launch, not cleared for restaurant operations.
 
 
 ---
