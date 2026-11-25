@@ -14,7 +14,7 @@ on:
       - "supabase/functions/flame-chick-delivery-api/**"
       - "supabase/migrations/20261121053647_flame_chick_staff_admin_commands.sql"
       - "supabase/migrations/20261121054852_flame_chick_staff_command_definer_isolation.sql"
-      - "supabase/migrations/20261125130000_flame_chick_staff_main_branch_rider_provisioning.sql"
+      - "supabase/migrations/20261125083051_flame_chick_staff_main_branch_rider_provisioning.sql"
       - "tests/staff-main-branch-rider-provisioning.test.mjs"
       - "tests/admin-invitation-acceptance.test.mjs"
       - "tests/admin-navigation-access.test.mjs"
