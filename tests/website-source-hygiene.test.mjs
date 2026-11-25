@@ -81,13 +81,14 @@ test("V2 visual language is used for V3 catalog cards without hard-coded menu pr
   assert.doesNotMatch(order, /unit_price_snapshot|line_total|price_minor|subtotal_minor/);
 });
 
-test("homepage ordering uses the current V3 publication and server-authoritative quote", () => {
+test("homepage ordering uses current V3 catalogue and one-step server-authoritative checkout", () => {
   assert.match(order, /FlameChickCatalogV3Client\.load/);
   assert.match(order, /FlameChickCatalogV3View\.buildMenuViewModel/);
   assert.match(order, /FlameChickCatalogV3DealView\.buildDealViewModel/);
   assert.match(order, /FlameChickCatalogV3DealConfigurator\.createDealConfigurator/);
-  assert.match(order, /action: 'quote_website_order'/);
-  assert.match(order, /state\.checkoutBody\.action = 'create_website_order'/);
+  assert.match(order, /action: 'place_website_order'/);
+  assert.match(order, /state\.checkoutBody\.request_id = state\.checkoutRequestId/);
+  assert.doesNotMatch(order, /quote_token|quote_website_order|create_website_order/);
   assert.match(order, /productVariantId: variantId/);
   assert.match(order, /item\.quantity = row\.quantity/);
   assert.match(order, /delivery: delivery/);
@@ -102,16 +103,16 @@ test("delivery area and locality are sent as customer selections, never as a cli
   assert.doesNotMatch(order, /delivery_fee:|deliveryFee:/);
 });
 
-test("checkout uses server quote tokens, idempotency and safe uncertain-response retry", () => {
+test("checkout submits once with server-side pricing, idempotency and safe uncertain-response retry", () => {
   assert.match(order, /PENDING_CHECKOUT_STORAGE_KEY = 'flame-chick-v3-pending-checkout-id'/);
-  assert.match(order, /typeof result\.quote_token !== 'string'/);
-  assert.match(order, /state\.checkoutBody\.quote_token = state\.quoteToken/);
+  assert.match(order, /action: 'place_website_order'/);
   assert.match(order, /state\.checkoutBody\.request_id = state\.checkoutRequestId/);
   assert.match(order, /root\.crypto\.randomUUID/);
   assert.match(order, /savePendingRequestId\(state\.checkoutRequestId\)/);
   assert.match(order, /var uncertain = !error\.status \|\| error\.status >= 500/);
-  assert.match(order, /Retry the same checkout request to verify whether it was received/);
-  assert.doesNotMatch(order, /localStorage|indexedDB/);
+  assert.match(order, /Retry this same order request/);
+  assert.doesNotMatch(order, /quote_token|quote_website_order|request-quote|localStorage|indexedDB/);
+  assert.doesNotMatch(html, /Get verified total|Verified total/);
 });
 
 test("single-branch storefront skips the branch gate and opens fulfilment from the V2-style cart drawer", () => {
@@ -123,7 +124,6 @@ test("single-branch storefront skips the branch gate and opens fulfilment from t
   assert.match(html, /id="fulfilment-delivery"[^>]*value="delivery" checked/);
   assert.match(html, /id="fulfilment-pickup"[^>]*value="pickup"/);
   assert.match(html, /id="delivery-area"/);
-  assert.match(html, /id="request-quote"/);
   assert.match(html, /id="place-order"/);
   assert.match(html, /id="order-success"/);
   assert.match(order, /context\.branches\.length !== 1/);
@@ -147,6 +147,10 @@ test("V3 Order API calculates delivery charges from database configuration and s
   assert.match(api, /website_pickup_enabled/);
   assert.match(api, /selectionType === "not_listed"/);
   assert.match(api, /selectionType === "listed_area"/);
+  assert.match(api, /action==="create_website_order"\|\|action==="place_website_order"/);
+  assert.match(api, /buildWebsiteOrderQuote\(body\)/);
+  assert.match(api, /hmacPhoneDigest\(normalizedPhone\)/);
+  assert.match(api, /callRpc\("flame_chick_create_website_order",payload\)/);
 });
 
 
