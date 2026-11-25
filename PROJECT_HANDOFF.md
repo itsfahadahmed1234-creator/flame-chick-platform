@@ -5149,3 +5149,8 @@ Latest source commit `3b1475a4879931ecb51618a90b8a57d18259a7f5`; Admin static ch
 ## 2026-11-25 — Preview access troubleshooting
 
 The one-off Preview host `flame-chick-admin-production-k6edsdg4y-fahad-7455.vercel.app` is not included in the Staff Admin function's exact CORS origin list, causing `Failed to fetch`. Vercel confirms the stable branch Preview alias `flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app` points to the latest READY deployment commit `3b1475a4879931ecb51618a90b8a57d18259a7f5` and is already CORS-allowlisted. Use the stable alias only. Keep Vercel SSO and exact-origin CORS protection enabled. Detailed diagnosis and next step are in `docs/handoffs/2026-11-25-admin-deal-editor-correction-preview.md`.
+
+
+## 2026-11-25 — Flame Duo selectable Burger placeholder UX
+
+Latest source commit `e7f3e2bdb50e122371df743218446f099494ea51`; Admin static checks run `45536317355` SUCCESS; Admin Preview deployment `dpl_Bnph8psJFixeapqHjiEzXXtmMDLt` READY. Read-only inspection confirmed Flame Duo's only active Burger mapping points to the exact “Burger” deal-only placeholder (variant label “Included”), not an actual chicken burger. The Admin editor now displays a specific placeholder explanation, requires product/variant selection, populates variants after product choice and guides adding other burger alternatives. Latest Preview must be opened using the stable branch alias and hard-refreshed. No catalog changes were made; no save/publication. Detailed IDs and controlled setup steps are in the dated handoff.
