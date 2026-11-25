@@ -40,7 +40,7 @@ BEGIN
   INSERT INTO public.restaurants(id,name,slug,currency_code,timezone,is_active)
   VALUES(r,'QA Flame Chick Delivery','flame-chick','PKR','Asia/Karachi',true);
   INSERT INTO public.branches(id,restaurant_id,branch_code,name,is_active)
-  VALUES(b,r,'qa-main','QA Main',true);
+  VALUES(b,r,'main','Main',true);
   INSERT INTO public.delivery_areas(id,restaurant_id,branch_id,name,delivery_fee,is_active)
   VALUES(a,r,b,'QA Zero Fee',0,true);
 
