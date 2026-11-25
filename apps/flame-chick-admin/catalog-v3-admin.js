@@ -279,12 +279,20 @@
       const used=new Set((group.options||[]).filter(x=>x!==option&&x.product_variant_id).map(x=>x.product_variant_id));
       let product=products.find(p=>p.id===option.product_id)||null,variants=product?product.variants.filter(v=>v.is_active!==false):[];
       let variant=variants.find(v=>v.id===option.product_variant_id)||variants.find(v=>!used.has(v.id))||variants[0]||null;
+      const savedProduct=s.products.find(item=>item&&item.id===option.product_id)||null;
       const invalidSavedProduct=/burger/i.test(String(group.display_name||''))&&!!option.product_id&&!product;
-      const placeholder='<option value="" selected>'+(invalidSavedProduct?'Saved product is outside Chicken Burgers — choose a burger':'Select a product')+'</option>';
-      const variantOptions=variants.length?variants.map(v=>'<option value="'+esc(v.id)+'"'+(variant&&v.id===variant.id?' selected':'')+'>'+esc(v.size_label)+(v.is_standalone_sellable===false?' · Deal-only':'')+'</option>').join(''):'<option value="">Select a product first</option>';
+      const savedPlaceholder=invalidSavedProduct&&savedProduct&&String(savedProduct.name_en||'').trim().toLowerCase()==='burger';
+      const placeholderText=savedPlaceholder
+        ? 'Saved product “Burger” is a placeholder — choose a real burger'
+        : (invalidSavedProduct?'Saved product is not an eligible Chicken Burger — choose a real burger':'Choose a burger product');
+      const placeholder='<option value=""'+(!product?' selected':'')+' disabled>'+esc(placeholderText)+'</option>';
+      const variantOptions=(variants.length
+        ?'<option value=""'+(!variant?' selected':'')+' disabled>Choose a variant</option>'+variants.map(v=>'<option value="'+esc(v.id)+'"'+(variant&&v.id===variant.id?' selected':'')+'>'+esc(v.size_label)+(v.is_standalone_sellable===false?' · Deal-only':'')+'</option>').join('')
+        :'<option value="" selected disabled>Choose a product first</option>');
       return '<article class="fcv3-choice-row" data-choice-row>'+(option.option_id?'<input type="hidden" data-field="option_id" value="'+esc(option.option_id)+'">':'')+
-        '<label>Choice product<select data-field="product_id" data-choice-product>'+placeholder+products.map(p=>'<option value="'+esc(p.id)+'"'+(product&&p.id===product.id?' selected':'')+'>'+esc(p.name_en)+'</option>').join('')+'</select></label>'+
-        '<label>Product variant<select data-field="product_variant_id" data-choice-variant>'+variantOptions+'</select></label>'+
+        '<label>Choice product<select data-field="product_id" data-choice-product required>'+placeholder+products.map(p=>'<option value="'+esc(p.id)+'"'+(product&&p.id===product.id?' selected':'')+'>'+esc(p.name_en)+'</option>').join('')+'</select></label>'+
+        '<label>Product variant<select data-field="product_variant_id" data-choice-variant required>'+variantOptions+'</select></label>'+
+        '<small class="fcv3-choice-help">Choose a real Chicken Burger from the product list, then select its variant. Use “+ Add choice” to include another burger alternative in this deal.</small>'+
         '<button type="button" class="fcv3-button fcv3-danger" data-action="component-choice-remove">Remove choice</button></article>';
     }
     function componentForm(c,index){
@@ -680,7 +688,11 @@
       el.onchange=event=>{
         if(event.target.matches('[data-choice-product]')){
           const row=event.target.closest('[data-choice-row]'),p=s.products.find(x=>x.id===event.target.value),select=row.querySelector('[data-choice-variant]');
-          select.innerHTML=(p?p.variants.filter(v=>v.is_active!==false):[]).map(v=>'<option value="'+esc(v.id)+'">'+esc(v.size_label)+(v.is_standalone_sellable===false?' · Deal-only':'')+'</option>').join('');
+          const variants=p?p.variants.filter(v=>v.is_active!==false):[];
+          select.innerHTML=(p?'<option value="" selected disabled>Choose a variant</option>':'<option value="" selected disabled>Choose a product first</option>')+
+            variants.map(v=>'<option value="'+esc(v.id)+'">'+esc(v.size_label)+(v.is_standalone_sellable===false?' · Deal-only':'')+'</option>').join('');
+          select.required=true;
+          if(variants.length)select.value=variants[0].id;
         }
         if(event.target.matches('[data-field="allow_repeat_option"]')){
           const group=event.target.closest('[data-component-group]'),input=group.querySelector('[data-field="max_units_per_option"]');

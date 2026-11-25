@@ -558,6 +558,11 @@ test('Burger selector form requires maximum-per-choice and validates selected Ch
   const source = await readFile(new URL('../apps/flame-chick-admin/catalog-v3-admin.js', import.meta.url), 'utf8');
   assert.match(source, /data-field="max_units_per_option" type="number"[^\n]*required/);
   assert.match(source, /eligibleChoiceProducts\(s\.products,s\.categories,group\.display_name\)/);
-  assert.match(source, /Every Burger choice must use an active product in the Chicken Burgers category/);
+  assert.match(source, /Saved product “Burger” is a placeholder — choose a real burger/);
+  assert.match(source, /data-field="product_id" data-choice-product required/);
+  assert.match(source, /data-field="product_variant_id" data-choice-variant required/);
+  assert.match(source, /Use “\+ Add choice” to include another burger alternative/);
+  assert.match(source, /select\.required=true/);
+  assert.match(source, /if\(variants\.length\)select\.value=variants\[0\]\.id/);
   assert.match(source, /const groups=buildFixedComponentGroups\(s\.components,latest\.component_groups\)/);
 });
