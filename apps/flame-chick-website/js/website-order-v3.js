@@ -795,26 +795,83 @@
     else if (!dialog.open) dialog.setAttribute('open', '');
   }
 
+  function renderDeliveryAreaResults(query) {
+    var input = $('delivery-area-search');
+    var select = $('delivery-area');
+    var results = $('delivery-area-results');
+    var search = String(query || '').trim().toLocaleLowerCase();
+    results.replaceChildren();
+    Array.from(select.options).forEach(function (option) {
+      if (!option.value) return;
+      var searchText = String(option.dataset.searchText || option.textContent).toLocaleLowerCase();
+      if (search && searchText.indexOf(search) < 0) return;
+      var item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'fc-delivery-area-result';
+      item.setAttribute('role', 'option');
+      item.setAttribute('aria-selected', select.value === option.value ? 'true' : 'false');
+      item.disabled = option.disabled;
+      item.textContent = option.textContent;
+      item.addEventListener('click', function () {
+        if (option.disabled) return;
+        select.value = option.value;
+        input.value = option.dataset.searchText || option.textContent;
+        results.hidden = true;
+        input.setAttribute('aria-expanded', 'false');
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      results.appendChild(item);
+    });
+    if (!results.children.length) {
+      var empty = document.createElement('p');
+      empty.className = 'fc-delivery-area-no-results';
+      empty.textContent = 'No matching delivery areas.';
+      results.appendChild(empty);
+    }
+    results.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+  }
+
   function populateDeliveryAreas(branch) {
-    var select = $('delivery-area'); select.replaceChildren();
+    var select = $('delivery-area');
+    var input = $('delivery-area-search');
+    var results = $('delivery-area-results');
+    select.replaceChildren();
     var placeholder = document.createElement('option');
     placeholder.value = ''; placeholder.textContent = 'Choose your area'; select.appendChild(placeholder);
     (branch?.deliveryAreas || []).forEach(function (area) {
-      var option = document.createElement('option'); option.value = area.id;
-      option.textContent = area.name + ' — ' + money(area.deliveryFee); select.appendChild(option);
+      var option = document.createElement('option');
+      option.value = area.id;
+      option.dataset.searchText = area.name;
+      option.textContent = area.name + ' — ' + money(area.deliveryFee);
+      select.appendChild(option);
     });
-    var other = document.createElement('option'); other.value = 'not_listed';
+    var other = document.createElement('option');
+    other.value = 'not_listed';
+    other.dataset.searchText = 'Not Listed / Other';
     other.textContent = branch && branch.notListedDeliveryFee !== null
       ? 'Not Listed / Other — ' + money(branch.notListedDeliveryFee)
       : 'Not Listed / Other — fee not configured';
     other.disabled = !branch || branch.notListedDeliveryFee === null;
     select.appendChild(other);
+    input.value = '';
+    results.replaceChildren();
+    results.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
     $('not-listed-confirm-row').hidden = true;
     $('other-locality-field').hidden = true;
     $('delivery-address').value = '';
-    $('delivery-instructions').value = '';
     $('other-locality').value = '';
     $('not-listed-confirm').checked = false;
+  }
+
+  function handleDeliveryAreaChange() {
+    var other = $('delivery-area').value === 'not_listed';
+    $('other-locality-field').hidden = !other;
+    $('not-listed-confirm-row').hidden = !other;
+    if (other) $('not-listed-confirm-text').textContent =
+      'I understand the Not Listed delivery fee (' + money(liveBranch().notListedDeliveryFee) + ') and want the restaurant to confirm my locality.';
+    invalidateQuote();
   }
 
   function deliverySelection() {
@@ -828,14 +885,12 @@
       if (!locality || locality.length > 120) throw new Error('Enter your locality for a Not Listed delivery.');
       return {
         selection_type: 'not_listed', other_locality: locality,
-        address: $('delivery-address').value.trim(),
-        instructions: $('delivery-instructions').value.trim() || null
+        address: $('delivery-address').value.trim()
       };
     }
     return {
       selection_type: 'listed_area', area_id: selection,
-      address: $('delivery-address').value.trim(),
-      instructions: $('delivery-instructions').value.trim() || null
+      address: $('delivery-address').value.trim()
     };
   }
 
@@ -874,8 +929,8 @@
       state.cart.length === 0 || !currentContext();
     $('place-order').disabled = locked;
     $('retry-order').disabled = state.busy;
-    ['customer-name','customer-phone','customer-email','delivery-area','delivery-address',
-      'delivery-instructions','other-locality','not-listed-confirm','order-notes'].forEach(function (id) {
+    ['customer-name','customer-phone','customer-email','delivery-area-search','delivery-area','delivery-address',
+      'other-locality','not-listed-confirm','order-notes'].forEach(function (id) {
       if ($(id)) $(id).disabled = locked;
     });
     syncFulfilmentControls();
@@ -1022,16 +1077,36 @@
     });
     $('fulfilment-delivery').addEventListener('change', function () { changeFulfilment('delivery'); });
     $('fulfilment-pickup').addEventListener('change', function () { changeFulfilment('pickup'); });
-    $('delivery-area').addEventListener('change', function () {
-      var other = $('delivery-area').value === 'not_listed';
-      $('other-locality-field').hidden = !other;
-      $('not-listed-confirm-row').hidden = !other;
-      if (other) $('not-listed-confirm-text').textContent =
-        'I understand the Not Listed delivery fee (' + money(liveBranch().notListedDeliveryFee) + ') and want the restaurant to confirm my locality.';
-      invalidateQuote();
+    $('delivery-area').addEventListener('change', handleDeliveryAreaChange);
+    $('delivery-area-search').addEventListener('focus', function () {
+      renderDeliveryAreaResults($('delivery-area-search').value);
+    });
+    $('delivery-area-search').addEventListener('input', function () {
+      var selected = $('delivery-area').value;
+      if (selected) {
+        $('delivery-area').value = '';
+        handleDeliveryAreaChange();
+      }
+      renderDeliveryAreaResults($('delivery-area-search').value);
+    });
+    $('delivery-area-search').addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        $('delivery-area-results').hidden = true;
+        $('delivery-area-search').setAttribute('aria-expanded', 'false');
+      } else if (event.key === 'ArrowDown') {
+        var first = $('delivery-area-results').querySelector('button:not(:disabled)');
+        if (first) { event.preventDefault(); first.focus(); }
+      }
+    });
+    document.addEventListener('click', function (event) {
+      var picker = $('delivery-area-search').closest('.fc-delivery-area-picker');
+      if (picker && !picker.contains(event.target)) {
+        $('delivery-area-results').hidden = true;
+        $('delivery-area-search').setAttribute('aria-expanded', 'false');
+      }
     });
     [
-      'customer-name','customer-phone','customer-email','delivery-address','delivery-instructions',
+      'customer-name','customer-phone','customer-email','delivery-address','delivery-area-search',
       'other-locality','not-listed-confirm','order-notes'
     ].forEach(function (id) {
       $(id).addEventListener('input', invalidateQuote);
@@ -1041,7 +1116,7 @@
       $('order-success').hidden = true;
       $('customer-name').value = ''; $('customer-phone').value = '';
       $('customer-email').value = ''; $('order-notes').value = '';
-      $('delivery-address').value = ''; $('delivery-instructions').value = '';
+      $('delivery-address').value = ''; $('delivery-area-search').value = ''; $('delivery-area').value = ''; $('delivery-area-results').hidden = true;
       $('delivery-area').value = ''; $('other-locality').value = '';
       $('not-listed-confirm').checked = false;
       $('request-quote').hidden = false; $('request-quote').disabled = true;
