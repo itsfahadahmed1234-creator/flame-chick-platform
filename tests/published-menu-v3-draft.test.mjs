@@ -147,41 +147,55 @@ test('all six current offers have exact base prices and fixed INCLUDED compositi
       assert.deepEqual(actualComponents, exp.components, dealTitle + ' component names/quantities');
       for (const group of actual.groups) {
         assert.equal(group.minUnits, group.maxUnits);
-        assert.equal(group.options.length, 1);
-        assert.equal(group.options[0].pricingTreatment, 'INCLUDED');
-        assert.equal(group.options[0].surchargeMinor, 0);
-        assert.equal(group.options[0].standalonePriceMinor, null);
-        assert.ok(group.options[0].maxQuantity >= group.minUnits);
+        if (group.categoryDriven === true) {
+          assert.equal(group.name, 'Burger');
+          assert.equal(group.categoryId, snapshot.categories.find(category => category.nameEn === 'Chicken Burgers').categoryId);
+          assert.deepEqual(group.options.map(option => option.productName), ['OG Crunch', 'The Injector', 'Nashville Fire']);
+        } else {
+          assert.equal(group.options.length, 1);
+        }
+        assert.ok(group.options.length >= 1);
+        assert.ok(group.options.every(option => option.pricingTreatment === 'INCLUDED'));
+        assert.ok(group.options.every(option => option.surchargeMinor === 0));
+        assert.ok(group.options.every(option => option.standalonePriceMinor === null));
+        assert.ok(group.options.every(option => option.maxQuantity >= group.minUnits));
       }
     }
   }
   assert.equal(offerCount, 6);
 });
 
-test('generic Burger uses its deal-only product and Little Crunch alone uses OG Crunch', () => {
+test('generic Burger slots expand from Chicken Burgers and exclude the hidden deal-only placeholder', () => {
   const snapshot = createPublishedMenuSnapshot();
   const result = buildDeals(snapshot, DURING_FLAME_HOUR);
   assert.equal(result.ok, true);
   const deals = result.collections[0].deals;
   const dealBurgerId = ids.productIds('deal_burger');
   const ogCrunchId = ids.productIds('og_crunch');
+  const burgerCategoryId = snapshot.categories.find(category => category.nameEn === 'Chicken Burgers').categoryId;
 
-  const genericBurgerOptions = [];
+  const burgerGroups = [];
   for (const deal of deals) {
     for (const variant of deal.variants) {
       for (const group of variant.groups.filter(item => item.name === 'Burger')) {
-        genericBurgerOptions.push(group.options[0]);
+        burgerGroups.push(group);
       }
     }
   }
-  assert.equal(genericBurgerOptions.length, 3);
-  assert.ok(genericBurgerOptions.every(option => option.productId === dealBurgerId));
-  assert.ok(genericBurgerOptions.every(option => option.productId !== ogCrunchId));
+  assert.equal(burgerGroups.length, 3);
+  for (const group of burgerGroups) {
+    assert.equal(group.categoryDriven, true);
+    assert.equal(group.categoryId, burgerCategoryId);
+    assert.deepEqual(group.options.map(option => option.productName), ['OG Crunch', 'The Injector', 'Nashville Fire']);
+    assert.ok(group.options.every(option => option.productId !== dealBurgerId));
+    assert.ok(group.options.every(option => option.pricingTreatment === 'INCLUDED' && option.surchargeMinor === 0));
+  }
 
   const littleCrunch = deals.find(deal => deal.title === 'Little Crunch');
   const namedOgCrunch = littleCrunch.variants[0].groups.find(group => group.name === 'OG Crunch');
   assert.ok(namedOgCrunch);
   assert.equal(namedOgCrunch.options[0].productId, ogCrunchId);
+  assert.equal(namedOgCrunch.categoryDriven, false);
 });
 
 test('Flame Hour is scheduled every day from 15:00 inclusive to 17:00 exclusive in Asia/Karachi', () => {
@@ -209,7 +223,7 @@ test('Flame Hour is scheduled every day from 15:00 inclusive to 17:00 exclusive 
   ));
 });
 
-test('all fixed deal components are preselected and locked in the customer configurator', () => {
+test('fixed non-Burger deal components stay locked while category-backed Burger slots require customer selection', () => {
   const snapshot = createPublishedMenuSnapshot();
   const result = buildDeals(snapshot, DURING_FLAME_HOUR);
   assert.equal(result.ok, true);
@@ -220,10 +234,23 @@ test('all fixed deal components are preselected and locked in the customer confi
     assert.equal(ui.ok, true, deal.title);
     for (const variant of deal.variants) {
       assert.equal(ui.selectVariant(variant.id).ok, true, deal.title);
-      assert.equal(ui.validate().ok, true, deal.title);
       for (const group of variant.groups) {
-        assert.equal(ui.getState().quantities[group.id][group.options[0].id], group.minUnits);
-        assert.equal(ui.setOptionQuantity(group.id, group.options[0].id, 0).code, 'COMPONENT_FIXED');
+        if (group.categoryDriven === true) {
+          const initial = ui.getState().quantities[group.id] || {};
+          assert.equal(Object.values(initial).reduce((sum, quantity) => sum + Number(quantity || 0), 0), 0);
+          assert.ok(group.options.some(option => option.productName === 'The Injector'));
+          if (group.allowRepeatOption) {
+            assert.equal(ui.setOptionQuantity(group.id, group.options[0].id, group.minUnits).ok, true);
+          } else {
+            for (const option of group.options.slice(0, group.minUnits)) {
+              assert.equal(ui.setOptionQuantity(group.id, option.id, 1).ok, true);
+            }
+          }
+          assert.equal(ui.validate().ok, true, deal.title);
+        } else {
+          assert.equal(ui.getState().quantities[group.id][group.options[0].id], group.minUnits);
+          assert.equal(ui.setOptionQuantity(group.id, group.options[0].id, 0).code, 'COMPONENT_FIXED');
+        }
       }
     }
   }
@@ -241,7 +268,6 @@ test('Flame Hour popup is read-only and cannot emit a payload outside its schedu
     });
     assert.equal(ui.ok, true);
     assert.equal(ui.selectVariant(flameHour.variants[0].id).ok, true);
-    assert.equal(ui.validate().ok, true);
     assert.equal(ui.toPayload().code, 'DEAL_READ_ONLY');
   }
 });

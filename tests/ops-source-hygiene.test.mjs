@@ -273,7 +273,7 @@ test("POS deal cart uses the declared contents array and never references an und
 test("POS renders required Burger component slots as selectable dropdowns and preserves exact V3 option IDs",()=>{
   const html=source[0].html;
   assert.match(html,/burgerSlots=\{\}/);
-  assert.match(html,/if\(\/burger\/i\.test\(String\(group\.name\|\|''\)\)&&group\.options\.length>1\)/);
+  assert.match(html,/if\(group\.categoryDriven===true\|\|\(\/burger\/i\.test\(String\(group\.name\|\|''\)\)&&group\.options\.length>1\)\)\{/);
   assert.match(html,/data-pos-deal-burger-select/);
   assert.match(html,/data-pos-deal-slot/);
   assert.match(html,/st\.selections\[groupId\]=next/);
@@ -295,8 +295,8 @@ test("POS deal Burger selectors stay collapsed until Edit and summarize selected
 });
 
 test("Website deal configurator uses a compact expandable Burger picker with slot-specific choices",async()=>{
-  const configurator=await readFile(new URL("../apps/flame-chick-website/js/catalog-v3-deal-configurator.js",import.meta.url),"utf8");
-  const page=await readFile(new URL("../apps/flame-chick-website/index.html",import.meta.url),"utf8");
+  const configurator=readFileSync("../apps/flame-chick-website/js/catalog-v3-deal-configurator.js","utf8");
+  const page=readFileSync("../apps/flame-chick-website/index.html","utf8");
   assert.match(configurator,/fc-deal-burger-picker/);
   assert.match(configurator,/burgerSlotValues/);
   assert.match(configurator,/Burger ' \+ \(slot \+ 1\)/);
