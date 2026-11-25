@@ -212,7 +212,7 @@ test('each customer-facing Burger slot offers every configured choice and respec
   const slotLoop = source.indexOf('for (let slot = 0; slot < slotCount; slot++)');
   const choiceLoop = source.indexOf('group.options.forEach(function (option) {', slotLoop);
   const optionValue = source.indexOf('optionEl.value = option.id;', choiceLoop);
-  const loopEnd = source.indexOf('select.value = slots[slot] || \'\';', choiceLoop);
+  const loopEnd = source.indexOf('select.value = slots[activeSlot] || \'\';', choiceLoop);
   assert.ok(slotLoop >= 0, 'A selector must be rendered for every required burger slot.');
   assert.ok(choiceLoop > slotLoop && choiceLoop < loopEnd, 'Each slot must be populated from the full configured Burger choice list.');
   assert.ok(optionValue > choiceLoop && optionValue < loopEnd, 'Each configured choice ID must be selectable from every slot.');
@@ -224,4 +224,26 @@ test('each customer-facing Burger slot offers every configured choice and respec
   assert.match(source, /group\.categoryDriven === true/, 'A category-backed Burger group must render the customer slot picker even when only one variant is currently available.');
   assert.match(slotRenderer, /optionCap\s*=\s*Number\(option\.maxQuantity\)/,
     'Each configured choice must use its own saved maximum-per-choice limit.');
+});
+
+
+test('deal quantity is independent of component quantities and bounded to 1–99', () => {
+  const ui = create();
+  assert.equal(ui.getState().dealQuantity, 1);
+  assert.equal(ui.setDealQuantity(3).ok, true);
+  assert.equal(ui.getState().dealQuantity, 3);
+  assert.equal(ui.setDealQuantity(0).code, 'DEAL_QUANTITY_INVALID');
+  assert.equal(ui.setDealQuantity(100).code, 'DEAL_QUANTITY_INVALID');
+  assert.equal(ui.getState().dealQuantity, 3);
+});
+
+test('renders a compact one-row burger-slot picker and visible deal quantity stepper', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-website/js/catalog-v3-deal-configurator.js', import.meta.url), 'utf8');
+  assert.match(source, /fc-deal-burger-tabs/);
+  assert.match(source, /fc-deal-burger-tab/);
+  assert.match(source, /activeBurgerSlotByGroup/);
+  assert.match(source, /slots\[activeSlot\]/);
+  assert.match(source, /fc-deal-quantity-stepper/);
+  assert.match(source, /fc-deal-quantity-button/);
+  assert.match(source, /setDealQuantity: setDealQuantity/);
 });
