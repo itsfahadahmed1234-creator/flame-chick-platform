@@ -649,7 +649,12 @@ async function activateSession(next){
   renderRiderAvailability();
   showApp();
   startRiderPresence();
-  await startRiderRealtime();
+  // Realtime is an enhancement, never a sign-in dependency. A pending WebSocket
+  // auth handshake must not block the first rider jobs request or panel entry.
+  startRiderRealtime().catch(error=>{
+    console.warn("Flame Chick rider Realtime could not start; manual refresh remains available.",error);
+    setConnection(true,"Realtime unavailable · use Refresh jobs");
+  });
   await loadJobs(true);
   ;
 }
