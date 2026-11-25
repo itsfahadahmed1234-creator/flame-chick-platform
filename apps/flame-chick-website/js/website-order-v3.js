@@ -113,16 +113,18 @@
   }
 
   function overlayCurrentBranches(snapshot, context) {
-    var current = new Map(context.branches.map(function (branch) { return [branch.id, branch]; }));
-    var branches = snapshot.branches.map(function (branch) {
-      var live = current.get(branch.branchId);
-      return Object.assign({}, branch, {
-        websiteOrderingEnabled: !!live,
-        websiteDeliveryEnabled: !!live && live.websiteDeliveryEnabled === true,
-        websitePickupEnabled: !!live && live.websitePickupEnabled === true
-      });
+    if (!Array.isArray(context.branches) || context.branches.length !== 1) {
+      throw new Error('Flame Chick online ordering currently requires exactly one enabled branch.');
+    }
+    var active = context.branches[0];
+    var published = snapshot.branches.find(function (branch) { return branch.branchId === active.id; });
+    if (!published) throw new Error('The enabled branch is not present in the current published menu.');
+    var branch = Object.assign({}, published, {
+      websiteOrderingEnabled: true,
+      websiteDeliveryEnabled: active.websiteDeliveryEnabled === true,
+      websitePickupEnabled: active.websitePickupEnabled === true
     });
-    return Object.assign({}, snapshot, { branches: branches });
+    return Object.assign({}, snapshot, { branches: [branch] });
   }
 
   function currentContext() {
@@ -133,10 +135,48 @@
 
   function liveBranch() {
     var selected = state.branchSelection && state.branchSelection.getState();
-    if (!selected || !selected.selectedBranchId) return null;
+    if (!selected || !selected.selectedBranchId || !state.websiteContext) return null;
     return state.websiteContext.branches.find(function (branch) {
       return branch.id === selected.selectedBranchId;
     }) || null;
+  }
+
+  function syncFulfilmentControls() {
+    var selected = state.branchSelection && state.branchSelection.getState();
+    var available = selected ? selected.availableFulfilmentTypes : [];
+    $('fulfilment-delivery').disabled = state.busy || state.checkoutUncertain || available.indexOf('delivery') < 0;
+    $('fulfilment-pickup').disabled = state.busy || state.checkoutUncertain || available.indexOf('pickup') < 0;
+    $('fulfilment-delivery').checked = !!selected && selected.fulfilmentType === 'delivery';
+    $('fulfilment-pickup').checked = !!selected && selected.fulfilmentType === 'pickup';
+  }
+
+  function itemCountLabel() {
+    var count = state.cart.reduce(function (sum, row) { return sum + row.quantity; }, 0);
+    return count + (count === 1 ? ' item' : ' items');
+  }
+
+  function openCartDrawer() {
+    if (state.busy || state.checkoutUncertain) return;
+    var drawer = $('fc-v3-cart-drawer');
+    drawer.inert = false;
+    drawer.setAttribute('aria-hidden', 'false');
+    drawer.classList.add('on');
+    $('fc-v3-cart-scrim').classList.add('on');
+    $('headCart').setAttribute('aria-expanded', 'true');
+    document.documentElement.classList.add('lock');
+    window.setTimeout(function () { $('close-fc-v3-cart').focus(); }, 60);
+  }
+
+  function closeCartDrawer() {
+    var drawer = $('fc-v3-cart-drawer');
+    if (!drawer || state.busy || state.checkoutUncertain) return;
+    drawer.classList.remove('on');
+    drawer.setAttribute('aria-hidden', 'true');
+    drawer.inert = true;
+    $('fc-v3-cart-scrim').classList.remove('on');
+    $('headCart').setAttribute('aria-expanded', 'false');
+    document.documentElement.classList.remove('lock');
+    $('headCart').focus();
   }
 
   function resetQuote(message) {
@@ -176,6 +216,8 @@
     $('cart-count').textContent = '(' + itemCount + ')';
     if ($('badge')) $('badge').textContent = String(itemCount);
     $('cart-empty').hidden = state.cart.length > 0;
+    $('fc-v3-cartbar').hidden = state.cart.length === 0;
+    $('fc-v3-cartbar-count').textContent = itemCountLabel();
     $('request-quote').disabled = state.cart.length === 0 || !currentContext() || state.busy || state.checkoutUncertain;
 
     state.cart.forEach(function (row, index) {
@@ -224,6 +266,7 @@
       article.append(name, meta, controls);
       list.appendChild(article);
     });
+    syncFulfilmentControls();
   }
 
   function renderCatalog() {
@@ -233,7 +276,7 @@
       $('cats').hidden = true;
       $('deals-section').hidden = true;
       $('details-section').hidden = true;
-      $('catalog-context-label').textContent = 'Select a supported branch and order type to see the menu.';
+      status('Online ordering is unavailable for the configured branch.', 'error');
       return;
     }
     $('catalog-section').hidden = false;
@@ -241,8 +284,6 @@
     $('deals-section').hidden = false;
     $('details-section').hidden = false;
     var live = liveBranch();
-    $('catalog-context-label').textContent = (live ? live.name : '') + ' · ' +
-      (context.fulfilmentType === 'delivery' ? 'Delivery' : 'Pickup');
     $('delivery-fields').hidden = context.fulfilmentType !== 'delivery';
     populateDeliveryAreas(live);
 
@@ -271,71 +312,6 @@
     }
     state.dealModel = deals;
     renderDeals(deals);
-  }
-
-  function productArtworkSource(product, categoryName) {
-    if (product && typeof product.imagePath === 'string' && product.imagePath) {
-      if (/^https:\/\//i.test(product.imagePath)) return product.imagePath;
-      var base = String((root.FLAME_CHICK_CONFIG || {}).imagesBaseUrl || '').replace(/\/$/, '');
-      if (base) return base + '/' + product.imagePath.split('/').filter(Boolean).map(encodeURIComponent).join('/');
-    }
-    var name = String(product && product.name || '').toLowerCase();
-    var category = String(categoryName || '').toLowerCase();
-    var files = [
-      [/fresh mint/, 'fresh-mint.png'],
-      [/strawberry blaze/, 'strawberry-blaze.png'],
-      [/peach kick/, 'peach-kick.png'],
-      [/berry burst/, 'berry-burst.png'],
-      [/blue flame/, 'blue-flame.png'],
-      [/fire wings|injected wings|wings/, 'fire-wings.png'],
-      [/wrap/, 'flame-chick-wrap.png'],
-      [/broast|simple injected|cheetos butter/, 'chicken-broast.webp'],
-      [/og crunch/, 'flame-chick-burger.png'],
-      [/injector|nashville fire|smash|marrow|burger|chick special/, 'flame-chick-burger-2.png'],
-      [/classic chick/, 'flame-chick.png']
-    ];
-    for (var i = 0; i < files.length; i++) {
-      if (files[i][0].test(name) || (i === 7 && category.indexOf('broast') >= 0)) {
-        return 'media/products/' + files[i][1];
-      }
-    }
-    return '';
-  }
-
-  function appendProductArtwork(target, product, categoryName) {
-    var source = productArtworkSource(product, categoryName);
-    if (source) {
-      var image = document.createElement('img');
-      image.src = source;
-      image.alt = product.name;
-      image.width = 320; image.height = 320; image.loading = 'lazy';
-      target.appendChild(image);
-      return;
-    }
-    var name = String(product.name || '').toLowerCase();
-    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 96 96');
-    svg.setAttribute('aria-hidden', 'true');
-    var art = '';
-    if (/nugget/.test(name)) {
-      art = '<g fill="#F4B53F" stroke="#C9811C" stroke-width="2"><rect x="12" y="38" width="32" height="27" rx="12" transform="rotate(-14 28 51)"/><rect x="48" y="28" width="32" height="27" rx="12" transform="rotate(12 64 41)"/><rect x="32" y="54" width="34" height="27" rx="12" transform="rotate(-4 49 67)"/></g><g fill="#C9811C" opacity=".55"><circle cx="22" cy="48" r="2"/><circle cx="35" cy="57" r="2"/><circle cx="58" cy="38" r="2"/><circle cx="69" cy="45" r="2"/><circle cx="45" cy="69" r="2"/></g>';
-    } else if (/fries/.test(name)) {
-      art = '<path d="M19 42h58l-7 43H27z" fill="#B91E27"/><g fill="#F7C34D"><rect x="26" y="16" width="9" height="45" rx="4" transform="rotate(-9 26 16)"/><rect x="40" y="10" width="9" height="48" rx="4"/><rect x="54" y="14" width="9" height="46" rx="4" transform="rotate(7 54 14)"/><rect x="68" y="23" width="8" height="38" rx="4" transform="rotate(12 68 23)"/></g>';
-    } else if (/water/.test(name)) {
-      art = '<rect x="38" y="8" width="20" height="10" rx="3" fill="#2C8FD6"/><path d="M36 20h24l5 12v50a6 6 0 0 1-6 6H37a6 6 0 0 1-6-6V32z" fill="#DDF3FF" stroke="#fff" stroke-width="2"/><rect x="32" y="46" width="32" height="22" fill="#2C8FD6"/><path d="M40 57h16" stroke="#fff" stroke-width="3" stroke-linecap="round"/>';
-    } else if (/drink|juice|cold/.test(name)) {
-      art = '<path d="M26 32h44l-6 50H32z" fill="#DB382A"/><rect x="22" y="26" width="52" height="9" rx="4.5" fill="#fff"/><path d="M57 26L65 7" stroke="#7A0A0F" stroke-width="5" stroke-linecap="round"/><g fill="#fff" opacity=".55"><rect x="36" y="41" width="9" height="9" rx="2"/><rect x="51" y="57" width="9" height="9" rx="2"/></g>';
-    } else {
-      art = '<path d="M16 44C16 26 32 15 48 15s32 11 32 29z" fill="#E8A33D"/><path d="M13 48q8-9 16 0t16 0 16 0 16 0v7H13z" fill="#69C23A"/><rect x="14" y="55" width="68" height="12" rx="6" fill="#D98A1C"/><path d="M16 69h64v5a9 9 0 0 1-9 9H25a9 9 0 0 1-9-9z" fill="#E0902F"/>';
-    }
-    svg.innerHTML = art;
-    target.appendChild(svg);
-  }
-
-  function cardPrice(minor) {
-    return 'Rs ' + (Number(minor || 0) / 100).toLocaleString('en-PK', {
-      minimumFractionDigits: 0, maximumFractionDigits: 2
-    });
   }
 
   function renderProducts(model) {
@@ -660,9 +636,7 @@
       'delivery-instructions','other-locality','not-listed-confirm','order-notes'].forEach(function (id) {
       if ($(id)) $(id).disabled = locked;
     });
-    document.querySelectorAll('#branch-selector button, #branch-selector select, #branch-selector input').forEach(function (node) {
-      node.disabled = locked;
-    });
+    syncFulfilmentControls();
   }
 
   async function requestQuote() {
@@ -791,6 +765,15 @@
     $('request-quote').addEventListener('click', requestQuote);
     $('place-order').addEventListener('click', function () { submitOrder(false); });
     $('retry-order').addEventListener('click', function () { submitOrder(true); });
+    $('headCart').addEventListener('click', openCartDrawer);
+    $('fc-v3-cartbar-open').addEventListener('click', openCartDrawer);
+    $('close-fc-v3-cart').addEventListener('click', closeCartDrawer);
+    $('fc-v3-cart-scrim').addEventListener('click', closeCartDrawer);
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && $('fc-v3-cart-drawer').classList.contains('on')) closeCartDrawer();
+    });
+    $('fulfilment-delivery').addEventListener('change', function () { changeFulfilment('delivery'); });
+    $('fulfilment-pickup').addEventListener('change', function () { changeFulfilment('pickup'); });
     $('delivery-area').addEventListener('change', function () {
       var other = $('delivery-area').value === 'not_listed';
       $('other-locality-field').hidden = !other;
@@ -815,8 +798,25 @@
       $('not-listed-confirm').checked = false;
       $('request-quote').hidden = false; $('request-quote').disabled = true;
       status('Your cart is empty. Choose more items when you are ready.');
+      closeCartDrawer();
       renderCatalog();
+      renderCart();
     });
+  }
+
+  function changeFulfilment(type) {
+    if (!state.branchSelection || state.busy || state.checkoutUncertain || !canEdit()) return;
+    var before = state.branchSelection.getState();
+    if (before.fulfilmentType === type) return;
+    var changed = state.branchSelection.selectFulfilment(type);
+    if (!changed || changed.ok !== true) {
+      status(changed?.message || 'That order type is not available.', 'error');
+      syncFulfilmentControls();
+      return;
+    }
+    resetQuote('Order type changed. Your cart is kept; review availability and request a new verified total.');
+    renderCatalog();
+    renderCart();
   }
 
   async function start() {
@@ -846,24 +846,20 @@
       var selection = root.FlameChickBranchFulfilment.createBranchFulfilmentSelection(
         state.snapshot, state.databaseNow, root.FlameChickCatalogV3
       );
-      if (!selection || selection.ok !== true) throw new Error(selection?.message || 'Branch selection could not be initialized.');
+      if (!selection || selection.ok !== true) throw new Error(selection?.message || 'Ordering context could not be initialized.');
       state.branchSelection = selection;
-      selection.render($('branch-selector'), { onChange: function () {
-        if (state.cart.length) clearCart('Branch or fulfilment changed. Review your cart again.');
-        resetQuote();
-        renderCatalog();
-      }});
-      state.loaded = true;
-      $('publication-meta').hidden = false;
-      $('publication-meta').textContent = 'Published menu #' + state.websiteContext.publicationNumber +
-        ' · ' + state.websiteContext.publicationId + ' · verified using current database time.';
-      pageStatus('Published menu verified. Choose your branch and order type.', 'ready');
-      renderCart();
-      if (selection.getState().selectedBranchId && selection.getState().availableFulfilmentTypes.length === 1) {
-        selection.selectFulfilment(selection.getState().availableFulfilmentTypes[0]);
-        selection.render($('branch-selector'), { onChange: function () { renderCatalog(); } });
-        renderCatalog();
+      var availableTypes = selection.getState().availableFulfilmentTypes;
+      var initialType = availableTypes.indexOf('delivery') >= 0 ? 'delivery' :
+        (availableTypes.indexOf('pickup') >= 0 ? 'pickup' : null);
+      if (!initialType || selection.selectFulfilment(initialType).ok !== true) {
+        throw new Error('Neither Delivery nor Takeaway is currently enabled for the single Flame Chick branch.');
       }
+      state.loaded = true;
+      $('publication-meta').hidden = true;
+      pageStatus('Published menu verified.', 'ready');
+      renderCatalog();
+      renderCart();
+      syncFulfilmentControls();
     } catch (error) {
       pageStatus(error.message || 'Online ordering is unavailable. No order has been submitted.', 'error');
       status(error.message || 'Could not load the published menu.', 'error');
