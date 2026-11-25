@@ -2,13 +2,20 @@
 **Updated:** 2026-11-25  
 **Latest focused handoff:** `docs/handoffs/2026-11-25-rider-access-admin-main-branch-fix.md`
 
-The current task is to fix Rider portal access and simplify Admin staff provisioning. Production has exactly one active Main branch. The Admin UI no longer asks for a branch selection for Manager/Cashier/Rider and displays Main as automatic; the backend migration is designed to enforce Main, automatically provision Rider profiles when a Rider role is assigned or an invitation is accepted, and safely disable Rider offers on deactivation. Rider app Realtime initialization is now nonblocking so the first jobs request proceeds independently.
+The Admin staff form now assigns Manager/Cashier/Rider to Main automatically and keeps Admin/Owner restaurant-wide. The Rider app no longer waits for Realtime startup before loading jobs. The database now enforces the single Main branch and creates Rider profiles automatically when Rider roles are assigned or invitations accepted.
 
-**QA status:** Full disposable Supabase QA passed on commit `f8fb97df51464cc122ad56aa10d9e22a6f61632b`, Actions run `45575145392`. This included complete migration replay, staff role/access tests, Rider profile provisioning/deactivation, delivery commands, POS sync, website order + local API checks, Web Push fail-closed and all 4 delivery + 2 payment concurrency races. Admin static checks run `45573782354` also passed and included the Main-branch/Rider source-contract tests.
+**QA status:** Full disposable Supabase QA passed on commit `f8fb97df51464cc122ad56aa10d9e22a6f61632b`, Actions run `45575145392`. Migration replay, role/access tests, Rider profile lifecycle, delivery, POS sync, website order/API and all 4 delivery + 2 payment concurrency races passed. Post-filename-alignment Staff Admin QA run `45577198252` also passed; Admin static checks after the alignment passed in runs `45577210995` and `45577217121`.
 
-**Production status:** New migration still NOT applied; Admin and Rider app changes not deployed. Current read-only Production snapshot: one active Main branch; 11 orders; 3 delivery tasks; 0 tasks in accepted/out_for_delivery/failed state. Preserve all records. Existing Fahad Rider role/profile remain active and matched. Previous one-time data repair is the only related Production change. Request explicit approval before applying the new role-provisioning migration; Preview deployment readiness gates remain disabled, and no production alias/promotion is authorized.
+**Production database:** Migration `20261125083051_flame_chick_staff_main_branch_rider_provisioning` successfully applied and verified. There remains exactly one active Main branch. Fahad’s existing Rider role/profile remain active and matched. The helper is postgres-owned SECURITY DEFINER with empty search_path and no direct execute for anon/authenticated/service_role. Security Advisor remains at baseline 51 INFO RLS-no-policy findings plus the existing Auth leaked-password warning. Preserve the existing 11 orders and 3 delivery task records.
 
-Current repository branch remains `work/production-source-audit`; do not switch to main. GST remains deferred; no real customer orders/payments and no production promotion.
+**Vercel Preview deployments READY** from commit `73da3989d788e503a13f2602e397f676174d3fbc`:
+- Admin: https://flame-chick-admin-production-q58bg0vac-fahad-7455.vercel.app/ (`dpl_7gmNMV1pV2BYXfJJ2Z8h6mjQmvij`)
+- Rider: https://flame-chick-rider-production-3gs08q1vn-fahad-7455.vercel.app/ (`dpl_31mGYpGkAvCovuR29Bh33uC9kMKH`)
+
+Both are ordinary Preview deployments with no production target/alias and no promotion. Vercel deployment SSO protection is enabled, so sign-in to a Vercel team account may be required. Actual browser login and Rider panel entry still require the user's confirmation.
+
+Current repository branch remains `work/production-source-audit`; do not switch to main. Do not promote Preview deployments. GST remains deferred; no real customer orders/payments or restaurant launch is approved.
+
 
 ---
 
