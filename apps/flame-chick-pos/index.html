@@ -1842,6 +1842,8 @@ let scheduledCheckTimer=null;
 function closeModal(id){$(id)?.classList.remove('open');if(id==='choiceModal'){posPizzaChoice=null;posModifierChoice=null;posDealChoice=null}}
 function openModal(id){$(id)?.classList.add('open')}
 function applyPrintSettings(){
+  const qzSelect=$('qzPrinterSelect');if(qzSelect)qzSelect.value=printSettings.qzPrinterName||'';
+  const qzDirect=$('qzDirectEnabled');if(qzDirect)qzDirect.checked=!!printSettings.qzDirectEnabled;
   const ce=$('counterEnabled');if(ce)ce.checked=printSettings.counterEnabled;
   const ke=$('kitchenEnabled');if(ke)ke.checked=printSettings.kitchenEnabled;
   const cl=$('counterLabel');if(cl)cl.value=printSettings.counterLabel;
@@ -4556,7 +4558,7 @@ async function finalizeReceiptOrder(order){
   await updateSyncBox();
   return true;
 }
-function printThermalReceipt(order){
+async function printThermalReceipt(order){
   order=normalizeReceiptOrder(order);
   const items=getLocalOrderItems(order);
   const receiptHtml=`<div style="font-family:Arial,Segoe UI,sans-serif;font-size:11px;color:#111;width:72mm;padding:5mm 4mm;box-sizing:border-box">
@@ -4587,6 +4589,15 @@ function printThermalReceipt(order){
     ${order.notes?`<div style="margin-top:8px;border:1px solid #bbb;padding:5px;font-size:11px"><strong>Note:</strong> ${esc(order.notes)}</div>`:''}
     <div style="text-align:center;font-size:9px;color:#555;margin-top:10px;line-height:1.35">Thank you for ordering from Flame Chick</div>
   </div>`;
+  if(printSettings.qzDirectEnabled&&printSettings.qzPrinterName&&window.FlameChickQZ){
+    try{
+      if(!flameChickStaffSession?.access_token)throw new Error('Sign in to the POS before direct printing.');
+      window.FlameChickQZ.setTokenProvider(()=>flameChickStaffSession?.access_token||'');
+      await window.FlameChickQZ.printReceipt({...order,items,serverOrderNumber:order.serverOrderNumber||order.serverOrderId||order.localOrderId},'Counter Receipt',printSettings.qzPrinterName);
+      showToast('Receipt sent to '+printSettings.qzPrinterName);
+      return true;
+    }catch(error){showToast('Direct print unavailable · opening browser print. '+(error?.message||''));}
+  }
   const area=$('printArea');
   area.innerHTML=receiptHtml;
   window.print();
