@@ -51,29 +51,31 @@ The Rider portal was still inaccessible. The user asked to simplify Admin role c
 - All six concurrency races passed: four delivery accept/decline/expiry scenarios and two payment collection retry/over-collection scenarios.
 - Admin static checks run `45573782354` also passed on commit `d7cf4800f9e1350bacdc51c09428d4a0f9df3de9`; that commit included the new `tests/staff-main-branch-rider-provisioning.test.mjs` source-contract tests and app/browser script parse checks.
 
-## Production / deployment status
-- The new migration has **not** been applied to Production. The full disposable QA suite passed; do not apply it until the user explicitly approves this new Production migration.
-- No current task changes have been deployed to the Rider or Admin Vercel production aliases.
-- No Production branch data, staff roles, Auth accounts, orders, payments, or delivery records were altered by this source work. The earlier one-off Rider profile repair remains the only Production data change related to this issue.
-- Admin project: `prj_kPEqsepRzivOJhNeA32Io3netjav`.
-- Rider project: `prj_U3djCTfZK0Ubl808umChQn7MPPNg`.
-- Build/test deployments must be Preview only. Do not change production aliases or promote a deployment.
-- After final disposable QA passes, apply the migration through the approved Supabase migration mechanism, verify function ACL/security advisor and the single active Main branch plus existing Rider profile, then deploy Admin and Rider previews for the user to test.
-- Only after the preview test confirms the Rider portal opens and the Admin panel can create a Rider invitation should the next POS delivery rehearsal proceed. Production remains pre-launch and not cleared for real orders or payments.
+## Production / deployment status — migration applied, previews ready
+- **Production migration applied successfully:** `20261125083051_flame_chick_staff_main_branch_rider_provisioning`.
+- Remote ledger confirms the exact version and name. Source migration filename matches the recorded Production version.
+- Live post-apply verification:
+  - Exactly one active branch, Main (`84b1b6dc-4fd1-45fa-8d9b-23d203b36cfd`).
+  - Fahad’s existing Rider role remains active.
+  - Fahad’s existing Rider profile remains active and matched to Main.
+  - New helper exists, is owned by postgres, SECURITY DEFINER, has an empty search_path, and is not executable by anon/authenticated/service_role.
+  - Existing business records were not rewritten. Production contained 11 orders and 3 delivery tasks before this migration; preserve all.
+  - Security Advisor remains at its prior baseline of 51 INFO `rls_enabled_no_policy` notices and the existing Auth leaked-password-protection warning. This migration did not resolve those findings.
+- **Admin Preview:** [Open Admin Preview](https://flame-chick-admin-production-q58bg0vac-fahad-7455.vercel.app/)  
+  Deployment: `dpl_7gmNMV1pV2BYXfJJ2Z8h6mjQmvij`, state READY, commit `73da3989d788e503a13f2602e397f676174d3fbc`.
+- **Rider Preview:** [Open Rider Preview](https://flame-chick-rider-production-3gs08q1vn-fahad-7455.vercel.app/)  
+  Deployment: `dpl_31mGYpGkAvCovuR29Bh33uC9kMKH`, state READY, commit `73da3989d788e503a13f2602e397f676174d3fbc`.
+- Both Vercel deployments use the existing Admin/Rider projects and are Preview deployments (`target=null)); no Production aliases were assigned, no deployment was promoted, and existing project production domains remain unchanged.
+- Both projects have Vercel SSO protection enabled for deployments other than custom domains. The user may need to authenticate with a Vercel account/team member who has access before opening a Preview link. Do not disable deployment protection unless separately approved.
+- Vercel reports both builds completed and READY. The current environment could not fetch either preview page directly, so visual browser sign-in and actual Rider portal entry remain unverified pending the user's test.
+- The new migration is applied, but Production is still pre-launch. Do not accept live orders/payments or promote these Preview deployments.
 
-## Next steps
-1. Confirm latest GitHub Actions Staff Admin QA run passed complete migration replay, staff role tests, delivery tests, POS sync, website order tests, and delivery concurrency checks.
-2. Run the new Node source test through CI; check any failure and repair before Production migration.
-3. Apply the one migration to Production and immediately verify:
-   - Exactly one active Main branch.
-   - Helper/function definitions and ownership.
-   - No direct helper execute for anon/authenticated/service_role.
-   - Existing Fahad Rider role + profile remain active and matched.
-   - Main-only branch assignment enforcement and role provisioning behaviour.
-   - Security advisor findings against baseline.
-4. Create Vercel Preview deployments for Admin and Rider from the latest working-branch SHA only.
-5. User tests Rider sign-in and Admin invitation flow. Invitation acceptance should create the profile automatically.
-6. Update this handoff with exact CI run, migration version and Preview URLs after those actions; do not claim sign-in works until user confirms.
+## Next steps — user verification
+1. Open the Admin Preview and sign in. Confirm Staff & Riders no longer has branch selection, and the invitation form shows Main (automatic).
+2. Open the Rider Preview and sign in using the existing Fahad Rider account. Confirm it reaches the Rider dashboard and loads jobs. If a Vercel SSO gate appears first, authenticate with an account that has access to the Vercel team/project.
+3. Do not create another Fahad/Auth account or assign Rider to the Admin account. Use the existing Rider identity.
+4. Once both app checks pass, resume the POS delivery rehearsal and verify Rider offer visibility/acceptance and delivery status. No real customer order is authorized.
+5. Record the user's test result in this handoff before proceeding to the next release checkpoint.
 
 ## Guardrails
 - Keep changes on `work/production-source-audit`; do not merge into main.
