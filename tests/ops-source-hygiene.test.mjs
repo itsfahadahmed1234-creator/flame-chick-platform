@@ -49,6 +49,15 @@ test("POS delivery dispatch uses the targeted offer state, not a second acceptan
   assert.doesNotMatch(html,/arrived_at|arrived_at_restaurant/);
 });
 
+test("Rider Go Offline keeps private Realtime for existing assigned deliveries", () => {
+  const html=source[1].html;
+  const start=html.indexOf("$('availabilityBtn').addEventListener");
+  const end=html.indexOf("\n});",start);
+  const handler=html.slice(start,end);
+  assert.match(handler,/riderWantsOnline=false;\s*stopRiderPresence\(\);\s*\/\/ Keep the rider's own private channel alive[\s\S]*?startRiderRealtime\(\);/);
+  assert.doesNotMatch(handler,/riderWantsOnline=false;[\s\S]*?stopRiderRealtime\(\)/);
+});
+
 test("Rider Realtime uses a private own-user Broadcast topic with automatic recovery", () => {
   const html=source[1].html;
   assert.ok(html.includes('const topic="fc:rider:"+riderId+":ops"'));
