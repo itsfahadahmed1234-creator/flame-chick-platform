@@ -75,11 +75,13 @@ The Rider portal was still inaccessible. The user asked to simplify Admin role c
 - Realtime notification errors are non-fatal to business writes; orders and delivery commands are never rolled back merely because a broadcast is unavailable.
 
 ### Validation
-- Full disposable Staff Admin / Realtime / delivery / POS / website / concurrency QA passed on commit `c41e9e01417d54276e3f96d09e5117660c8f05dc`, Actions run `45583412377`. The expanded role boundary assertions included authorized POS branch topic visibility, rider own-topic visibility, rejection of other-rider and Rider-to-POS access, and checks against PII in payloads.
-- POS/Rider static tests passed on final Rider offline behavior commit `878a4e71a37f6088fb47f0442424586b24b5ea4e`, run `45584213000`. This verified private Broadcast channel wiring, reconnection/fallback source contracts and that Rider remains subscribed while Busy/Offline.
-- Admin static checks passed on access-fix commit `79b9a49f91613d46024da7134d0ae530c22c7d45`, run `45584204475`.
-- Final source branch head is `6cff4a250abb1bdeb59fb4bedd90f28e6915210d`. The Staff Admin/Realtime/operational QA on that exact final filename-aligned commit passed as run `45586028686`.
-- The POS/Rider app code at final head is identical to the successful `878a4e7` app-test source; the subsequent commits aligned the migration filename and test reference to the exact Production ledger version. Catalog importer/catalog publication QA runs triggered by the migration filename change were still in progress at the time this handoff was updated; they are separate from the completed Realtime/role-boundary suite.
+- Full disposable Staff Admin / Realtime / delivery / POS / website / concurrency QA passed on commit `c41e9e01417d54276e3f96d09e5117660c8f05dc`, Actions run `45583412377`. The expanded tests checked branch POS-topic visibility, own-Rider topic visibility, rejection of cross-Rider and Rider-to-POS access, and absence of profile/customer PII in broadcast payloads.
+- POS/Rider static checks passed on commit `878a4e71a37f6088fb47f0442424586b24b5ea4e`, run `45584213000`, including Rider Busy/Offline socket continuity.
+- Admin static checks passed on commit `79b9a49f91613d46024da7134d0ae530c22c7d45`, run `45584204475`.
+- Final POS/Rider static checks including the exact Production migration filename reference passed on commit `9c4865204c673ab156b07e8a89e680082650577b`, run `45586021243`.
+- Final Staff Admin / Realtime / delivery / POS / website / concurrency QA passed on final filename-aligned release commit `6cff4a250abb1bdeb59fb4bedd90f28e6915210d`, run `45586028686`.
+- Catalog publication validation QA passed on that same final commit, run `45586028742`; Catalog V3 menu importer QA also passed on that commit, run `45586028129`.
+- Runtime error-cluster queries returned no error clusters for Admin, POS or Rider after routing. Runtime logs had no entries in the short query interval, so actual browser event reception still requires live user verification.
 
 ### Production deployments and domain routing
 All three applications were built READY from the same final source commit `6cff4a250abb1bdeb59fb4bedd90f28e6915210d` and the existing project Production domains have now been reassigned to those deployments:
