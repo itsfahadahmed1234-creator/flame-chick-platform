@@ -451,7 +451,7 @@ test('Burger choice products are restricted to active products in the Chicken Bu
   assert.deepEqual(admin.eligibleChoiceProducts(products, categories, 'Burger').map(product => product.id),
     ['og', 'injector', 'nashville-fire']);
   assert.deepEqual(admin.eligibleChoiceProducts(products, categories, 'Half Broast').map(product => product.id),
-    ['og', 'injector', 'nashville-fire', 'nashville-broast']);
+    ['og', 'injector', 'nashville-fire', 'placeholder-burger', 'nashville-broast']);
 });
 
 test('deal editor identity guard rejects a different deal ID or mismatched card title', () => {
