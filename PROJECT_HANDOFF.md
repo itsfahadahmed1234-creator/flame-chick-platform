@@ -8,11 +8,13 @@ The Admin staff form now assigns Manager/Cashier/Rider to Main automatically and
 
 **Production database:** Migration `20261125083051_flame_chick_staff_main_branch_rider_provisioning` successfully applied and verified. There remains exactly one active Main branch. Fahad’s existing Rider role/profile remain active and matched. The helper is postgres-owned SECURITY DEFINER with empty search_path and no direct execute for anon/authenticated/service_role. Security Advisor remains at baseline 51 INFO RLS-no-policy findings plus the existing Auth leaked-password warning. Preserve the existing 11 orders and 3 delivery task records.
 
-**Vercel Preview deployments READY** from commit `73da3989d788e503a13f2602e397f676174d3fbc`:
-- Admin: https://flame-chick-admin-production-q58bg0vac-fahad-7455.vercel.app/ (`dpl_7gmNMV1pV2BYXfJJ2Z8h6mjQmvij`)
-- Rider: https://flame-chick-rider-production-3gs08q1vn-fahad-7455.vercel.app/ (`dpl_31mGYpGkAvCovuR29Bh33uC9kMKH`)
+**Access fixes deployed to Preview:** Browser inspection exposed an Admin CORS allowlist omission and a Rider `pending is not defined` runtime error. Staff Admin Edge Function is now version 5 with JWT verification still enabled and the exact Admin Preview origin pinned. Rider availability renderer no longer references the undefined variable. Admin static checks pass on final fix commit `fcc7303a7f6927bc0db0cb7d45e88775fb3fd50d` (run `45580020169`); Rider static checks and Staff Admin role-boundary QA pass on commit `77f97121902f8c795fa75d693ea669efd9859dd9` (runs `45579910423`, `45579910453`).
 
-Both are ordinary Preview deployments with no production target/alias and no promotion. Vercel deployment SSO protection is enabled, so sign-in to a Vercel team account may be required. Actual browser login and Rider panel entry still require the user's confirmation.
+**Corrected Vercel Preview aliases READY** on final fix commit `fcc7303a7f6927bc0db0cb7d45e88775fb3fd50d`:
+- Admin: https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app/ (`dpl_5itZsXDNyDKrMr7iW25m87CByc9D`)
+- Rider: https://flame-chick-rider-production-git-work-product-076807-fahad-7455.vercel.app/ (`dpl_2Nw8Je29X2je3cxcogc3119NazA9`)
+
+Production domains remain unchanged: Admin `flamechicadmin.vercel.app` → `dpl_48CK9TiY468Tyvhc6zzMmxbDFWcd`; Rider `flamechickrider.vercel.app` → `dpl_AoAJvNZQLsBamhBGNWEspcvv3hRU`. Neither Preview was promoted. The remaining check is user sign-in on the corrected aliases; do not claim success until confirmed.
 
 Current repository branch remains `work/production-source-audit`; do not switch to main. Do not promote Preview deployments. GST remains deferred; no real customer orders/payments or restaurant launch is approved.
 
