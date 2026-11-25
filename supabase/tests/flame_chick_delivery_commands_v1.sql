@@ -155,11 +155,19 @@ BEGIN
     RAISE EXCEPTION 'DELIVERY_FIXTURE_STAFF_ROLES_NOT_CREATED_THROUGH_AUDITED_COMMANDS';
   END IF;
 
-  INSERT INTO public.rider_profiles(restaurant_id,branch_id,user_id,rider_code,display_name,
-    availability_status,accepting_jobs,last_seen_at,is_active)
-  VALUES
-    (r,b,rider_one,'qa-dc-r1','QA Delivery Rider One','available',true,clock_timestamp(),true),
-    (r,b,rider_two,'qa-dc-r2','QA Delivery Rider Two','available',true,clock_timestamp(),true);
+  -- Rider profiles are provisioned atomically by assign_role; set only the
+  -- disposable availability state required for this delivery rehearsal.
+  UPDATE public.rider_profiles
+  SET availability_status='available',accepting_jobs=true,
+      last_seen_at=clock_timestamp(),is_active=true
+  WHERE restaurant_id=r AND branch_id=b
+    AND user_id IN (rider_one,rider_two);
+  IF (SELECT count(*) FROM public.rider_profiles
+      WHERE restaurant_id=r AND branch_id=b
+        AND user_id IN (rider_one,rider_two)
+        AND is_active AND accepting_jobs AND availability_status='available')<>2 THEN
+    RAISE EXCEPTION 'DELIVERY_FIXTURE_RIDER_PROFILES_NOT_PROVISIONED_BY_ROLE_ASSIGNMENT';
+  END IF;
 
   INSERT INTO public.orders(id,restaurant_id,branch_id,order_number,idempotency_key,request_hash,source,
     fulfillment_type,status,customer_name,customer_phone,delivery_address,delivery_area_id,
