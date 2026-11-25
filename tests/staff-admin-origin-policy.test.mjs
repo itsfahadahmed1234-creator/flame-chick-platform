@@ -121,7 +121,10 @@ test("production invitation callback is pinned to the Admin domain", () => {
 
 test("Staff Admin preview CORS allows only the exact current and branch-stable preview origins", () => {
   const configured = parseStaffAdminOrigins("");
-  assert.equal(PREVIEW_STAFF_ADMIN_ORIGINS.length, 2);
+  assert.equal(PREVIEW_STAFF_ADMIN_ORIGINS.length, 3);
+  assert.ok(PREVIEW_STAFF_ADMIN_ORIGINS.includes(
+    "https://flame-chick-admin-production-q58bg0vac-fahad-7455.vercel.app"
+  ));
   for (const origin of PREVIEW_STAFF_ADMIN_ORIGINS) {
     assert.equal(configured.has(origin), true);
     assert.equal(isAllowedRequestOrigin(origin, configured), true);
