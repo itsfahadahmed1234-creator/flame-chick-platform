@@ -258,6 +258,6 @@ test("cart additions and checkout stages provide motion feedback with reduced-mo
 
 
 test("homepage footer copy does not claim that online checkout is disabled", () => {
-  assert.match(html, /Browse the current published menu and discover your favourites\\./);
-  assert.doesNotMatch(html, /Online checkout is not enabled yet\\./);
+  assert.match(html, /Browse the current published menu and discover your favourites\./);
+  assert.doesNotMatch(html, /Online checkout is not enabled yet\./);
 });
