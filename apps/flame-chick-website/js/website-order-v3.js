@@ -336,6 +336,16 @@
     renderDeals(deals);
   }
 
+  function cardPrice(priceMinor) {
+    var view = root.FlameChickCatalogV3View;
+    if (!view || typeof view.formatMoney !== 'function') {
+      throw new Error('The catalog price formatter is unavailable.');
+    }
+    var currency = state.websiteContext && state.websiteContext.currencyCode
+      ? state.websiteContext.currencyCode : 'PKR';
+    return view.formatMoney(priceMinor, currency, 'en-PK');
+  }
+
   function appendProductArtwork(container, product, categoryName) {
     var imagePath = typeof product.imagePath === 'string' ? product.imagePath.trim() : '';
     if (imagePath) {
