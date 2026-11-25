@@ -5276,3 +5276,14 @@ Detailed latest checkpoint: `docs/handoffs/2026-11-25-pos-history-delivery-payme
 - No GitHub Actions success status was returned for this new checkpoint; the new regression test is committed but not claimed as run. Signed-in interactive click verification remains with the user.
 - No Production aliases, catalogue publication, database/schema/order/payment records, staff, delivery settings or Realtime changes occurred. The only live change was Order API function deployment v5. Production remains pre-launch; see detailed handoff for next verification and release gates.
 
+---
+
+## Latest checkpoint — QZ Tray / iTech 900UL printer (2026-11-25)
+
+Focused details: `docs/handoffs/2026-11-25-rider-access-admin-main-branch-fix.md`.
+
+QZ Tray source integration is staged on `work/production-source-audit`: public certificate chain, server-side staff-authenticated SHA-512 signing endpoint, Windows printer discovery, opt-in direct receipt printing and browser fallback. User's iTech 900UL 80 mm is installed in Windows as `Generic / Text Only`; both USB and LAN are plugged in but active Windows port is unknown. The implementation discovers the installed queue rather than assuming the connection type. Kitchen remains disabled; no cutter command is sent.
+
+The leaf certificate key pair and root chain were verified. Sensitive `QZ_SIGNING_PRIVATE_KEY` exists only in Vercel Preview environment scoped to this working branch; no private key is in GitHub or the restaurant package.
+
+**Release blocker:** Vercel Preview deployment creation returned HTTP 402 `api-deployments-free-per-day` (daily API deployment quota exceeded; retry after 24 hours). No Preview deployment was created; the new code has not been runtime-tested. Production deployment/domain aliases remain unchanged. Do not install/trust the certificate or enable direct printing on the restaurant PC until a Preview is deployed and the signer handshake passes. After that, physically test Generic / Text Only and ask user to confirm output before any Production release. Flame Chick remains pre-launch.
