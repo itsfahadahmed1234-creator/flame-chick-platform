@@ -388,15 +388,15 @@ function startRiderRealtimeFallback(label="Realtime unavailable · automatic ref
   riderRealtimeConnected=false;
   setConnection(navigator.onLine,label);
   clearInterval(riderRealtimeFallbackTimer);
-  if(!navigator.onLine||!session?.access_token||!riderWantsOnline)return;
+  if(!navigator.onLine||!session?.access_token)return;
   riderRealtimeFallbackTimer=setInterval(()=>{
-    if(navigator.onLine&&session?.access_token&&riderWantsOnline)scheduleRiderJobsRefresh();
+    if(navigator.onLine&&session?.access_token)scheduleRiderJobsRefresh();
   },30000);
 }
 async function startRiderRealtime(){
   stopRiderRealtime();
   // Realtime is optional; initial jobs loading and periodic refresh remain available.
-  if(!session?.access_token||!user?.id||!rider?.branch_id||!riderWantsOnline)return;
+  if(!session?.access_token||!user?.id||!rider?.branch_id)return;
   if(!window.supabase?.createClient){
     startRiderRealtimeFallback();
     return false;
@@ -420,7 +420,7 @@ async function startRiderRealtime(){
         setConnection(true,"Live updates");
         clearInterval(riderRealtimeFallbackTimer);
         riderRealtimeFallbackTimer=setInterval(()=>{
-          if(navigator.onLine&&session?.access_token&&riderWantsOnline)scheduleRiderJobsRefresh();
+          if(navigator.onLine&&session?.access_token)scheduleRiderJobsRefresh();
         },120000);
         scheduleRiderJobsRefresh();
       }else if(["CHANNEL_ERROR","TIMED_OUT","CLOSED"].includes(status)){
