@@ -183,3 +183,17 @@ No catalog rows were written for this selector fix. No publication, production a
 4. Keep group quantity 2, repeat enabled, max-per-choice 2. All three choices are INCLUDED, zero surcharge (the secure command builder supplies these mappings). Keep Quarter Broast and 2 Cold Drink groups untouched. Keep price and availability unchanged.
 5. Do not save until the user sees and confirms all three alternatives. After one controlled save through the authenticated Catalog V3 Admin command workflow, verify read-only database state and audit log before moving to the next deal. Do not publish.
 
+
+
+---
+
+## 2026-11-25 — Burger choice selector layout fix (screenshot-driven)
+
+- User screenshot showed both dropdowns rendered as very narrow controls, with the guidance text alongside them and a narrow wrapped Remove button.
+- Exact layout cause: `.fcv3-choice-row` originally used `grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto`. Its direct children were product label, variant label, inline help `small`, Remove button. The helper text entered the third `auto` grid column and forced that track to expand, squeezing the two selector tracks.
+- Latest commit `70d018de8483949d40c1951809696a231a1f873b` updates `apps/flame-chick-admin/catalog-v3-admin.css`: two equal selector columns with 220px minimum tracks, help text spanning both columns, Remove button in its own full-width row; at max-width 800px all controls stack in one column. Added static regression assertions to the Admin test suite.
+- Admin static checks: run `45536813430`, SUCCESS.
+- Preview deployment: `dpl_2aFHYwqA9i32NuC7j1yQ1ZB9Aevc`, READY, built from exact commit `70d018de8483949d40c1951809696a231a1f873b`, Vercel target `null` (Preview), alias is the stable branch Preview address. The automatic GitHub Preview workflow was skipped by its existing fail-closed gate; this was not changed. A direct Git-source Preview deployment was created from the exact commit in the existing Admin project.
+- Stable branch Preview URL: https://flame-chick-admin-production-git-work-product-0d7cc4-fahad-7455.vercel.app/
+- Next user action: hard-refresh with Ctrl+Shift+R, reopen Flame Duo, visually verify the product and variant selectors are usable at sensible width. They should occupy equal columns at wider widths and stack vertically on narrower widths. Don't save yet. Continue the controlled Flame Duo option selection only after the user confirms the visible layout is fixed.
+- No catalog writes, saves, publication, production alias promotion, or production deployment occurred.
