@@ -14,6 +14,8 @@ Static customer storefront for Flame Chick, with a separate non-ordering V3 cata
 
 The browser configuration contains only the Production Project URL and a publishable API key. It has no service-role or secret key.
 
+Customer checkout uses a single **Place order** action. The browser sends the selected catalog IDs and order details to `flame-chick-order-api` with a unique idempotency request ID. The API recalculates prices, validates availability and delivery fees, and commits the order atomically; the browser does not request or hold a signed quote first. Vercel Preview deployments remain read-only: only the approved customer Production hostname may submit an order.
+
 Before enabling live ordering, complete the Production schema, published menu, storage assets, delivery-area configuration, and checkout/availability tests. The current backend schema is not yet migrated.
 
 
