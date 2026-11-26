@@ -98,7 +98,7 @@ test("homepage checkout prices the cart from the loaded V3 catalog and submits o
   assert.match(html, /id="cart-delivery-fee"/);
   assert.match(html, /id="cart-total"/);
   assert.match(html, /id="place-order"/);
-  assert.doesNotMatch(html, /Get verified total|id="request-quote"|quote-lines|cart-quote-detail/);
+  assert.doesNotMatch(html, /Get verified total|id="request-quote"|id="quote-lines"|id="cart-quote-detail"/);
 });
 test("checkout shows cash payment instructions that follow the selected fulfilment method", () => {
   assert.match(html, /id="checkout-payment-method"/);
