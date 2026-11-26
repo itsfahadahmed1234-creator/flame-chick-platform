@@ -115,12 +115,16 @@
     }).then(function (response) {
       return response.text().then(function (body) {
         const signature = String(body || '').trim();
+        const verificationHeader = response.headers.get('X-QZ-Signature-Verified');
         const result = {
           called: true,
           httpStatus: response.status,
           ok: response.ok,
           signatureReturned: response.ok && !!signature,
-          signatureLength: response.ok && signature ? signature.length : 0
+          signatureLength: response.ok && signature ? signature.length : 0,
+          signatureVerifiedAgainstServedCertificate: verificationHeader === null
+            ? null
+            : verificationHeader.toLowerCase() === 'true'
         };
         if (typeof onResult === 'function') onResult(result);
         if (!response.ok) {
@@ -173,7 +177,8 @@
               httpStatus: result.httpStatus,
               ok: result.ok,
               signatureReturned: result.signatureReturned,
-              signatureLength: result.signatureLength
+              signatureLength: result.signatureLength,
+            signatureVerifiedAgainstServedCertificate: result.signatureVerifiedAgainstServedCertificate
             });
           }).then(function () {
             state.intentionalAbort = true;
@@ -664,6 +669,7 @@
     addDiagnosticStage(state, 'diagnostic-capture-finished', {
       signatureCallbackReached: state.signatureCallbackReached,
       signerHttpStatus: state.signerHttpResult ? state.signerHttpResult.httpStatus : null,
+      signatureVerifiedAgainstServedCertificate: state.signerHttpResult ? state.signerHttpResult.signatureVerifiedAgainstServedCertificate : null,
       physicalPrinterTargeted: false
     });
 
