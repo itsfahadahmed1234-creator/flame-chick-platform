@@ -25,7 +25,15 @@ test('synthetic QZ test payload contains the expected ESC/POS initialization and
   assert.ok(payload.includes('QZ TRAY TEST PRINT'));
   assert.ok(payload.includes('POS direct thermal print connection OK'));
   assert.equal(/[^\x00-\x7F]/.test(payload), false);
-  assert.equal(payload.endsWith('\n'), true);
+  assert.equal(payload.slice(-4), '\x1D\x56\x42\x00');
+  assert.match(payload.slice(0, -4), /\n{4,}$/);
+});
+
+test('synthetic QZ test payload includes a partial paper cut after the feed lines', function () {
+  const helpers = loadQzHelpers();
+  const payload = helpers.buildTestPayload();
+  assert.equal(payload.slice(-4), '\x1D\x56\x42\x00');
+  assert.match(payload.slice(0, -4), /\n{4,}$/);
 });
 
 test('CP437 byte output exactly matches the ASCII bytes passed in the synthetic QZ payload', function () {
@@ -114,6 +122,7 @@ test('restaurant receipt payload contains branding, invoice, dine-in details, li
     ]
   });
   const readable = helpers.formatEscPosPayload(payload);
+  assert.equal(payload.slice(-4), '\x1D\x56\x42\x00');
   [
     'FLAME CHICK', 'ORIGINAL BILL', 'Invoice #FC-TEST-001', 'DINE-IN',
     'Cashier', 'Hanzala', 'Guests Served', 'Table', 'G3', 'Half Broast', 'Full Broast',

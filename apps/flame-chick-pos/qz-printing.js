@@ -294,7 +294,7 @@
       date.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}).replace(/\s/g,'');
   }
   function receiptCommands(order, label) {
-    const width=48, ESC='\x1B';
+    const width=48, ESC='\x1B', GS='\x1D';
     const fmt=v=>'Rs '+(Number(v)||0).toLocaleString('en-PK',{maximumFractionDigits:0});
     const rows=[ESC+'\x40',ESC+'\x74'+'\x00',ESC+'\x61'+'\x01',ESC+'\x45'+'\x01',center('FLAME CHICK',width),ESC+'\x45'+'\x00'];
     const itemPriceRows=function(label,amount){
@@ -364,11 +364,14 @@
     const notes=order.notes||order.Notes;
     if(notes){rows.push('-'.repeat(width));wrap('Note: '+notes,width).forEach(x=>rows.push(x));}
     rows.push('','','','');
-    return rows.join('\n')+'\n';
+    // Feed the paper before issuing the ESC/POS partial-cut command.
+    const cutterCommand=GS+'\x56\x42\x00';
+    return rows.join('\n')+'\n'+cutterCommand;
   }
 
   function testCommands() {
     const ESC = '\x1B';
+    const GS = '\x1D';
     const width = 48;
     return [
       ESC + '\x40',
@@ -389,7 +392,7 @@
       '',
       '',
       ''
-    ].join('\n') + '\n';
+    ].join('\n') + '\n' + GS + '\x56\x42\x00';
   }
 
   function encodeCp437Ascii(value) {

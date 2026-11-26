@@ -30,9 +30,18 @@ test('receipt uses the legible business address and verified phone without guess
   assert.doesNotMatch(source, /P-NTN|hanzlaawanx@gmail\.com|eposmatic\.com/i);
 });
 
-test('browser print isolates the receipt at the existing 80 mm page setting', function () {
+test('browser print fallback is pinned to the top of an 80 mm page with 72 mm printable width', function () {
   assert.match(source, /@page\{size:80mm auto;margin:0\}/);
   assert.match(source, /body,body \*\{visibility:hidden!important\}/);
   assert.match(source, /#printArea,#printArea \*\{visibility:visible!important\}/);
-  assert.match(source, /#printArea\{display:block!important;position:static!important;width:72mm!important/);
+  assert.match(source, /#printArea\{display:block!important;box-sizing:border-box!important;position:absolute!important;top:0!important;left:4mm!important;width:72mm!important;min-width:72mm!important;max-width:72mm!important/);
+  assert.match(source, /#printArea \.receipt-paper\{display:block!important;box-sizing:border-box!important;width:72mm!important;min-width:72mm!important;max-width:72mm!important/);
+});
+
+test('QZ Tray is the preferred receipt route by default and browser fallback remains available', function () {
+  assert.match(source, /qzDirectEnabled:true,qzPrimaryPreferenceVersion:1/);
+  assert.match(source, /qzPrimaryPreferenceVersion\|\|0\)<1/);
+  assert.match(source, /Direct print unavailable · opening browser print/);
+  assert.match(source, /async function printThermalReceipt\(order\)[\s\S]*?window\.print\(\)/);
+  assert.match(source, /async function printReceiptWithLabel\(o,label\)[\s\S]*?window\.print\(\)/);
 });

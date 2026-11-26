@@ -516,13 +516,14 @@ html,body{background:var(--bg);overflow:hidden}
 .btn-print:hover{background:#2d3a48}
 #printArea{display:none}
 @media print{
-  html,body{width:80mm!important;margin:0!important;padding:0!important;background:#fff!important}
+  @page{size:80mm auto;margin:0}
+  html,body{width:80mm!important;min-width:80mm!important;max-width:80mm!important;margin:0!important;padding:0!important;overflow:visible!important;background:#fff!important}
   body,body *{visibility:hidden!important}
   #printArea,#printArea *{visibility:visible!important}
-  #printArea{display:block!important;position:static!important;width:72mm!important;max-width:72mm!important;margin:0 auto!important;padding:0!important;border:0!important;background:#fff!important}
-  #printArea .receipt-paper{width:72mm!important;max-width:72mm!important;margin:0!important;padding:2mm 3mm!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+  #printArea{display:block!important;box-sizing:border-box!important;position:absolute!important;top:0!important;left:4mm!important;width:72mm!important;min-width:72mm!important;max-width:72mm!important;margin:0!important;padding:0!important;border:0!important;overflow:visible!important;background:#fff!important}
+  #printArea .receipt-paper{display:block!important;box-sizing:border-box!important;width:72mm!important;min-width:72mm!important;max-width:72mm!important;margin:0!important;padding:2mm 3mm!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow-wrap:anywhere!important;word-break:normal!important;break-inside:avoid!important;page-break-inside:avoid!important}
+  #printArea .receipt-paper *{box-sizing:border-box!important;max-width:100%!important}
   .receipt-actions,.receipt-head{display:none!important}
-  @page{size:80mm auto;margin:0}
 }
 .scheduled-orders-section{margin-top:8px;padding-top:8px;border-top:1px dashed #d8d1ca}
 .scheduled-divider{text-align:center;position:relative;margin:0 20px 10px}
@@ -1305,9 +1306,9 @@ html,body{background:var(--bg);overflow:hidden}
              <button class="btn" id="qzDiagnosticDownloadBtn" type="button">Download QZ Diagnostic Files</button>
            </div>
            <div class="sub" style="margin-top:7px">Preview-only synthetic diagnostic. It uses the selected queue only to form the QZ request and deliberately rejects the QZ signature before printer submission. It does not print.</div>
-           <div class="field" style="margin-top:9px"><label for="qzPrinterSelect">Windows printer queue</label><select id="qzPrinterSelect"><option value="">Use browser print (default)</option></select></div>
-           <label style="display:flex;gap:8px;align-items:center;margin-top:9px;font-size:12px;font-weight:700"><input id="qzDirectEnabled" type="checkbox"> Use QZ Tray direct printing when connected</label>
-           <div class="sub" style="margin-top:6px">Choose the existing “Generic / Text Only” queue after discovery. Direct printing is opt-in; if QZ Tray is unavailable, the POS falls back to the browser print dialog.</div>
+           <div class="field" style="margin-top:9px"><label for="qzPrinterSelect">Windows printer queue</label><select id="qzPrinterSelect"><option value="">Select a Windows receipt printer (browser fallback)</option></select></div>
+           <label style="display:flex;gap:8px;align-items:center;margin-top:9px;font-size:12px;font-weight:700"><input id="qzDirectEnabled" type="checkbox"> Prefer QZ Tray direct printing when connected</label>
+           <div class="sub" style="margin-top:6px">QZ Tray is the preferred receipt route. Select and save the installed iTech receipt-printer queue after discovery. If QZ Tray or the selected queue is unavailable, the same receipt falls back to the browser print dialog.</div>
          </div>
       </div>
     </div>
@@ -1850,7 +1851,7 @@ let arrivalOffsetMin=0;
 let customArrivalISO=null;
 let kitchenTiming='now';
 let defaultPrepMinutes=30;
-let printSettings={counterEnabled:true,kitchenEnabled:false,counterLabel:'Counter Receipt',kitchenLabel:'Kitchen KOT',qzPrinterName:'',qzDirectEnabled:false};
+let printSettings={counterEnabled:true,kitchenEnabled:false,counterLabel:'Counter Receipt',kitchenLabel:'Kitchen KOT',qzPrinterName:'',qzDirectEnabled:true,qzPrimaryPreferenceVersion:1};
 let scheduledCheckTimer=null;
 function closeModal(id){$(id)?.classList.remove('open');if(id==='choiceModal'){posPizzaChoice=null;posModifierChoice=null;posDealChoice=null}}
 function openModal(id){$(id)?.classList.add('open')}
@@ -2865,7 +2866,18 @@ async function init(){
     $('dbStatus').textContent='Ready';
     try{await loadLocal(); await loadTables(); await ensureDeliveryAreas();}catch(e){console.debug('local load skipped',e.message);}
     const ps=await get(STORES.settings,'defaultPrepMinutes');if(ps?.value)defaultPrepMinutes=Number(ps.value)||30;$('prepTimeInput').value=defaultPrepMinutes;
-    try{const pp=await get(STORES.settings,'printSettings');if(pp?.value&&typeof pp.value==='object')printSettings={...printSettings,...pp.value};applyPrintSettings();}catch(e){}
+    try{
+      const pp=await get(STORES.settings,'printSettings');
+      if(pp?.value&&typeof pp.value==='object'){
+        printSettings={...printSettings,...pp.value};
+        if(Number(pp.value.qzPrimaryPreferenceVersion||0)<1){
+          printSettings.qzDirectEnabled=true;
+          printSettings.qzPrimaryPreferenceVersion=1;
+          await put(STORES.settings,{key:'printSettings',value:printSettings,updatedAt:new Date().toISOString()});
+        }
+      }
+      applyPrintSettings();
+    }catch(e){}
     render();
   }catch(e){
     console.error('Local DB init failed',e);

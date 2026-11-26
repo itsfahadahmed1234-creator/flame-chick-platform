@@ -136,3 +136,45 @@ The Node `node:test` suites were added/extended but were **not executed in a Nod
 - No private QZ signing key accessed, logged, or committed.
 - No Production deployment, domain change, kitchen-print enablement, real order/payment, or restaurant-PC setup/test.
 - QZ physical output remains unverified on both development and restaurant PCs.
+
+
+## QZ-primary receipt routing and browser fallback update (2026-11-26)
+
+**Scope:** Receipt-printing software only on `work/production-source-audit`. QZ Tray is now the preferred customer-receipt route. Browser printing remains an automatic fallback, with an explicit 80 mm page / 72 mm printable-area layout.
+
+### QZ Tray changes
+
+- Added ESC/POS partial-cut candidate `GS V B 0` (`1D 56 42 00`) after the receipt feed lines in both customer receipt and synthetic QZ test payloads.
+- Added assertions that the cut instruction is the final four bytes, after the feed lines.
+- QZ signing, certificate, authentication, connection, and printer-discovery logic remain unchanged.
+- A Windows receipt queue must still be selected. If no queue is selected, QZ is unavailable, or the QZ job errors, the same receipt falls back to browser printing.
+
+### QZ preference
+
+- New installations prefer QZ Tray by default.
+- A one-time local-settings migration upgrades the earlier opt-in setting to QZ-preferred. A user can still turn it off later and save that choice.
+- Kitchen printing remains disabled and unchanged.
+
+### Browser fallback positioning
+
+- Kept the 80 mm page declaration and 72 mm receipt content width.
+- Anchored the print-only receipt at the top of the page and 4 mm from the left edge, leaving nominal 4 mm side margins on an 80 mm page.
+- Applied border-box sizing to the 72 mm receipt container and descendants so inner padding cannot unexpectedly expand the receipt width.
+- Preserved print-area isolation so only the receipt is visible in browser print.
+
+### Cutter command evidence and limitation
+
+Generic 80 mm ESC/POS printer documentation describes a 79.5 mm roll with a 72 mm print width and full/partial cutter support. A separate 80 mm thermal-printer troubleshooting reference identifies `1D 56 42 00` as a cutter command. These sources support this as a reasonable ESC/POS candidate, but neither is an iTech-branded IT900UL-specific programming manual. Treat the command as implemented but **not physically verified** on the restaurant printer. The working local POS remains the real-world benchmark when hardware access returns.
+
+References reviewed:
+- https://manuals.plus/m/e114546447e39b116daeb7ed7c2bf53f1e5941a13be9229aa6f8f6d61dac5f6c
+- https://m.media-amazon.com/images/I/B11o2-%2BETgL.pdf
+
+### Validation and deployment boundary
+
+- QZ JavaScript syntax, ESC/POS payload smoke checks, and cutter ordering: passed.
+- Browser inline-script syntax and QZ/browser test-source syntax: passed.
+- Automated Node `node:test` suite was not executed in a Node runtime in this work session.
+- Preview deployment only after code is committed.
+- No production deploy, Supabase change, order/payment operation, kitchen print activation, or restaurant-PC configuration.
+- Physical paper alignment, cut depth, and browser driver fallback still require the actual iTech 900UL printer; no physical-verification claim is made.
