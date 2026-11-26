@@ -2,17 +2,23 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import guard from '../apps/flame-chick-website/js/preview-checkout-guard.js';
 
-test('allows order writes only on the new canonical Website production domain', () => {
+test('allows order writes on canonical Production and exact allow-listed live-test Preview hosts', () => {
   assert.equal(guard.canSubmitOrders('flamechick.vercel.app'), true);
   assert.equal(guard.canSubmitOrders('FLAMECHICK.VERCEL.APP.'), true);
   assert.equal(guard.shouldBlockOrderApiWrite('POST', 'flamechick.vercel.app'), false);
+  assert.equal(guard.canSubmitOrders('flame-chick-website-production-git-work-ecbe0f-befahad1234-7050.vercel.app'), true);
+  assert.equal(guard.canSubmitOrders('flame-chick-website-production-pnfd5wg08-befahad1234-7050.vercel.app'), true);
+  assert.equal(guard.isTestCheckoutPreview('flame-chick-website-production-git-work-ecbe0f-befahad1234-7050.vercel.app'), true);
+  assert.equal(guard.isTestCheckoutPreview('flame-chick-website-production-pnfd5wg08-befahad1234-7050.vercel.app'), true);
+  assert.equal(guard.shouldBlockOrderApiWrite('POST', 'flame-chick-website-production-git-work-ecbe0f-befahad1234-7050.vercel.app'), false);
   assert.equal(guard.canSubmitOrders('flamechic.vercel.app'), false);
 });
-
 test('blocks order writes on every Preview and retired Vercel hostname', () => {
   for (const host of [
     'flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455.vercel.app',
     'flame-chick-website-production-git-work-website-parallel.vercel.app',
+    'flame-chick-website-production-git-work-ecbe0f-befahad1234-7050.vercel.app.attacker.invalid',
+    'flame-chick-website-production-pnfd5wg08-befahad1234-7050.vercel.app.attacker.invalid',
     'flame-chick-website-production-six.vercel.app',
     'flame-chick-website-production-fahad-7455.vercel.app',
     'flame-chick-website-production-wnkr3bp6s-fahad-7455.vercel.app',
@@ -46,4 +52,6 @@ test('normalizes hostname case and trailing dot but rejects lookalike and decept
   assert.equal(guard.canSubmitOrders('flamechick.vercel.app.attacker.invalid'), false);
   assert.equal(guard.canSubmitOrders('flamechic.vercel.app'), false);
   assert.equal(guard.isTestCheckoutPreview('flame-chick-preview.vercel.app'), false);
+  assert.equal(guard.isTestCheckoutPreview('flame-chick-website-production-git-work-website-parallel.vercel.app'), false);
+  assert.equal(guard.isTestCheckoutPreview('flame-chick-website-production-git-work-ecbe0f-befahad1234-7050.vercel.app.evil'), false);
 });
