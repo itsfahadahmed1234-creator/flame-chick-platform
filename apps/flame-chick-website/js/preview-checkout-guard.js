@@ -1,7 +1,8 @@
 /* Fail-closed browser guard for the customer Website's Production Order API.
  * Public catalogue/context GET requests remain available on all Preview hosts.
- * Order writes are allowed on the canonical Production host and only the exact
- * deployment URL/branch alias approved for the controlled Production rehearsal.
+ * Order writes are allowed only on the canonical customer hostname and the
+ * stable, exact Production aliases for the FahaD Website project. Random
+ * deployment and Preview URLs are never promoted into the Production allow-list.
  * Never wildcard-match Vercel Preview hostnames.
  */
 (function (root, factory) {
@@ -12,7 +13,11 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
 
-  var PRODUCTION_ORDER_HOSTS = Object.freeze(['flamechick.vercel.app']);
+  var PRODUCTION_ORDER_HOSTS = Object.freeze([
+    'flamechick.vercel.app',
+    'flame-chick-website-production.vercel.app',
+    'flame-chick-website-production-faha-d.vercel.app'
+  ]);
   var TEST_CHECKOUT_PREVIEW_HOSTS = Object.freeze([
     'flame-chick-website-production-p6r1gdef2-fahad-7455.vercel.app',
     'flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455.vercel.app'

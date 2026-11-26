@@ -288,9 +288,14 @@ test("product and deal dialogs are centered, bounded, scrollable and closed dial
 });
 
 
-test("only the exact rehearsal Preview and canonical Production host can submit orders", () => {
+test("only stable Production hosts and two explicit rehearsal Preview hosts can submit orders", () => {
   const guardSource = readFileSync(join(root, "js/preview-checkout-guard.js"), "utf8");
-  assert.match(guardSource, /PRODUCTION_ORDER_HOSTS = Object\.freeze\(\['flamechick\.vercel\.app'\]\)/);
+  assert.match(guardSource, /PRODUCTION_ORDER_HOSTS = Object\.freeze\(\[/);
+  assert.match(guardSource, /'flamechick\.vercel\.app'/);
+  assert.match(guardSource, /'flame-chick-website-production\.vercel\.app'/);
+  assert.match(guardSource, /'flame-chick-website-production-faha-d\.vercel\.app'/);
+  assert.doesNotMatch(guardSource, /flame-chick-website-production-dsokjzvak-faha-d/);
+  assert.doesNotMatch(guardSource, /flame-chick-website-production-c7mqcl781-faha-d/);
   assert.match(guardSource, /TEST_CHECKOUT_PREVIEW_HOSTS = Object\.freeze\(\[/);
   assert.match(guardSource, /flame-chick-website-production-p6r1gdef2-fahad-7455\.vercel\.app/);
   assert.match(guardSource, /flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455\.vercel\.app/);

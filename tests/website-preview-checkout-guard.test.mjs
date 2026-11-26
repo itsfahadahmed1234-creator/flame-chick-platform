@@ -2,21 +2,33 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import guard from '../apps/flame-chick-website/js/preview-checkout-guard.js';
 
+const stableProductionAliases = [
+  'flame-chick-website-production.vercel.app',
+  'flame-chick-website-production-faha-d.vercel.app'
+];
 const rehearsalUrl = 'flame-chick-website-production-p6r1gdef2-fahad-7455.vercel.app';
 const rehearsalAlias = 'flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455.vercel.app';
 
-test('allows order writes on canonical Production and the exact approved rehearsal Preview', () => {
-  assert.equal(guard.canSubmitOrders('flamechick.vercel.app'), true);
-  assert.equal(guard.canSubmitOrders('FLAMECHICK.VERCEL.APP.'), true);
-  assert.equal(guard.shouldBlockOrderApiWrite('POST', 'flamechick.vercel.app'), false);
+test('allows order writes only on canonical Production and stable FahaD project aliases', () => {
+  const allowedProductionHosts = ['flamechick.vercel.app', 'FLAMECHICK.VERCEL.APP.', ...stableProductionAliases];
+  for (const host of allowedProductionHosts) {
+    assert.equal(guard.canSubmitOrders(host), true, host);
+    assert.equal(guard.shouldBlockOrderApiWrite('POST', host), false, host);
+    assert.equal(guard.isTestCheckoutPreview(host), false, host);
+  }
+  assert.deepEqual([...guard.productionHosts], [
+    'flamechick.vercel.app',
+    ...stableProductionAliases
+  ]);
+});
 
+test('keeps only the two previously approved rehearsal Preview hosts separately recognized', () => {
   assert.equal(guard.canSubmitOrders(rehearsalUrl), true);
   assert.equal(guard.canSubmitOrders(rehearsalAlias), true);
   assert.equal(guard.isTestCheckoutPreview(rehearsalUrl), true);
   assert.equal(guard.isTestCheckoutPreview(rehearsalAlias), true);
   assert.equal(guard.shouldBlockOrderApiWrite('POST', rehearsalUrl), false);
   assert.equal(guard.shouldBlockOrderApiWrite('POST', rehearsalAlias), false);
-  assert.equal(guard.canSubmitOrders('flamechic.vercel.app'), false);
 });
 
 test('blocks order writes on every other Preview and retired Vercel hostname', () => {
@@ -24,6 +36,8 @@ test('blocks order writes on every other Preview and retired Vercel hostname', (
     'flame-chick-website-production-git-work-ecbe0f-befahad1234-7050.vercel.app',
     'flame-chick-website-production-pnfd5wg08-befahad1234-7050.vercel.app',
     'flame-chick-website-production-git-work-website-parallel.vercel.app',
+    'flame-chick-website-production-dsokjzvak-faha-d.vercel.app',
+    'flame-chick-website-production-c7mqcl781-faha-d.vercel.app',
     rehearsalUrl + '.attacker.invalid',
     rehearsalAlias + '.attacker.invalid',
     'flame-chick-website-production-six.vercel.app',
@@ -54,6 +68,8 @@ test('fails closed for malformed hosts and unrecognized methods', () => {
 
 test('normalizes hostname case and trailing dot but rejects lookalike and deceptive suffixes', () => {
   assert.equal(guard.canSubmitOrders('FLAMECHICK.VERCEL.APP'), true);
+  assert.equal(guard.canSubmitOrders('FLAME-CHICK-WEBSITE-PRODUCTION.VERCEL.APP.'), true);
+  assert.equal(guard.canSubmitOrders('FLAME-CHICK-WEBSITE-PRODUCTION-FAHA-D.VERCEL.APP.'), true);
   assert.equal(guard.canSubmitOrders('flamechick.vercel.app.'), true);
   assert.equal(guard.canSubmitOrders('evil-flamechick.vercel.app'), false);
   assert.equal(guard.canSubmitOrders('flamechick.vercel.app.attacker.invalid'), false);
