@@ -80,10 +80,13 @@ After inspecting the files, resolve the evidenced failure stage first. Only then
 
 ## Follow-up: verify the signing key matches the served certificate
 
-The signer now verifies each generated RSA-SHA512 signature in memory against the first (leaf) X.509 certificate in `qz/digital-certificate.txt` before returning it to the browser. This checks the server-only `QZ_SIGNING_PRIVATE_KEY` / public-certificate pair without exposing either private material or signature bytes.
+The signer verifies each generated RSA-SHA512 signature in memory against the first (leaf) X.509 certificate in `qz/digital-certificate.txt` before returning it to the browser. PEM extraction uses explicit BEGIN/END boundary positions (not a regular expression). This checks the server-only `QZ_SIGNING_PRIVATE_KEY` / public-certificate pair without exposing either private material or signature bytes.
 
 - If verification fails, the endpoint returns HTTP 503 with a generic mismatch message and does not return the signature.
 - If verification succeeds, the endpoint returns the same Base64 signature as before and adds `X-QZ-Signature-Verified: true`.
 - The browser diagnostic records only this boolean alongside the signer HTTP result.
 - This verifies key/certificate correspondence; it does not inspect or change QZ Tray's local `override.crt`, Site Manager entries, or Windows trust state.
 - No database, Supabase, Production branch, or Windows setting is changed.
+
+- Regression note: the first verification deployment used an over-escaped PEM extraction expression and returned HTTP 503 before key comparison. The extraction was replaced with explicit PEM boundary detection and covered by tests against the actual two-certificate bundle.
+- The additional tests also ensure a signature made by a different RSA key is rejected. A successful comparison with the configured server keypair is still confirmed only by the next authenticated Preview diagnostic.
