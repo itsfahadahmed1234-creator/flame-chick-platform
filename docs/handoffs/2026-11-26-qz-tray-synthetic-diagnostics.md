@@ -76,3 +76,14 @@ After inspecting the files, resolve the evidenced failure stage first. Only then
 - Run the Node tests and static checks against the committed source.
 - Generate and inspect one diagnostic set from the user's signed-in Preview browser.
 - Physical printer output and silent-print trust acceptance remain intentionally untested.
+
+
+## Follow-up: verify the signing key matches the served certificate
+
+The signer now verifies each generated RSA-SHA512 signature in memory against the first (leaf) X.509 certificate in `qz/digital-certificate.txt` before returning it to the browser. This checks the server-only `QZ_SIGNING_PRIVATE_KEY` / public-certificate pair without exposing either private material or signature bytes.
+
+- If verification fails, the endpoint returns HTTP 503 with a generic mismatch message and does not return the signature.
+- If verification succeeds, the endpoint returns the same Base64 signature as before and adds `X-QZ-Signature-Verified: true`.
+- The browser diagnostic records only this boolean alongside the signer HTTP result.
+- This verifies key/certificate correspondence; it does not inspect or change QZ Tray's local `override.crt`, Site Manager entries, or Windows trust state.
+- No database, Supabase, Production branch, or Windows setting is changed.
