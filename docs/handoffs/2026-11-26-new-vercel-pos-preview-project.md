@@ -50,3 +50,22 @@
 - Do not expose or add the QZ private key to Git, GitHub, chat, source files, or client assets.
 - Physical printer cut/alignment remains unverified; no restaurant-PC access or hardware test is part of this task.
 - Keep the four-app project setup independent; only the POS project is configured in this checkpoint.
+
+
+## Production release checkpoint — 2026-11-26
+
+- User explicitly approved the POS Production deployment and confirmed the hostname should be `flamechick-pos.vercel.app` (not `.vercel.com`).
+- Production hostname `flamechick-pos.vercel.app` is attached to this POS project and verified by Vercel. The prior account's separate `flamechickpos.vercel.app` hostname was not detached or modified.
+- Production deployment: `dpl_6VuqJfbd89a7f1V6TTV6L6n2CEjP`.
+- Deployment state: `READY`; target: `production`.
+- Deployment URL: `https://flame-chick-pos-development-3bbhwr2uj-faha-d.vercel.app`.
+- Production alias: `https://flamechick-pos.vercel.app`.
+- Exact source: `work/production-source-audit`, commit `f6ce0ea49aeb165fec382280dcc3f90c4747a706`.
+- Production CI status checks reported success for the deployed commit.
+- Before release, `api/qz/sign.js` was updated to allow `https://flamechick-pos.vercel.app`; the QZ origin-policy regression test accepts that hostname and explicitly rejects the invalid `.vercel.com` suffix.
+- `QZ_SIGNING_PRIVATE_KEY` is Sensitive and scoped to Production. Its value was not decrypted or exposed. The production signer must still be validated through an authenticated POS session on the production hostname.
+- The project's Ignored Build Step was temporarily set to `null` only to create this approved manual Production deployment, then restored to `exit 0` immediately afterward to prevent routine Git pushes from triggering extra deployments.
+- Project SSO protection remains enabled for non-custom domains; the verified `flamechick-pos.vercel.app` project domain is configured as a production alias.
+- No Supabase schema/data/function changes, no order/payment activity, and no physical printer test were performed by this release.
+- Physical printer output, paper alignment and cutter operation remain pending. QZ Tray was previously verified to connect, trust the certificate, obtain valid signatures and submit jobs to the Windows queue on the development PC only.
+- Next: sign in on `https://flamechick-pos.vercel.app`, verify the POS loads and the authenticated QZ signing flow works on Production using a synthetic/non-customer diagnostic. Keep live restaurant use and automatic/kitchen printing disabled until full end-to-end rehearsal and physical printer verification.
