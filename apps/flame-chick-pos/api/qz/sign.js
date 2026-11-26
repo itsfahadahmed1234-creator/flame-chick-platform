@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { extractFirstCertificatePem, verifyQzSignature } = require('./certificate-utils');
 
 const SUPABASE_URL = 'https://adkrxfnawdiljhjaavnj.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_89MQIj_drF15IrF05ZLt0w_txUjPMxy';
@@ -147,18 +148,12 @@ module.exports = async function handler(req, res) {
     // This never exposes the private key or signature; it only prevents returning a mismatched signature.
     const certificatePath = path.join(__dirname, '../../qz/digital-certificate.txt');
     const certificateBundle = fs.readFileSync(certificatePath, 'utf8');
-    const leafMatch = certificateBundle.match(/-----BEGIN CERTIFICATE-----[\\s\\S]+?-----END CERTIFICATE-----/);
-    if (!leafMatch) {
+    const leafCertificatePem = extractFirstCertificatePem(certificateBundle);
+    if (!leafCertificatePem) {
       res.status(503).send('The public QZ signing certificate is unavailable on the POS server.');
       return;
     }
-    const signingCertificate = new crypto.X509Certificate(leafMatch[0]);
-    const signatureMatchesCertificate = crypto.verify(
-      'RSA-SHA512',
-      Buffer.from(request, 'utf8'),
-      signingCertificate.publicKey,
-      signature
-    );
+    const signatureMatchesCertificate = verifyQzSignature(request, signature, leafCertificatePem);
     if (!signatureMatchesCertificate) {
       console.error('QZ signer key/certificate mismatch.');
       res.status(503).send('The configured QZ signing key does not match the public signing certificate.');
