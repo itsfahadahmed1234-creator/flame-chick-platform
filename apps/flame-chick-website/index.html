@@ -498,6 +498,14 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
           </div>
           <div class="fc-home-field fc-home-full"><label for="order-notes">Order notes (optional)</label><textarea id="order-notes" maxlength="1000" placeholder="Additional notes"></textarea></div>
         </div>
+        <section class="fc-home-payment-method" aria-labelledby="checkout-payment-heading">
+          <div>
+            <p class="fc-home-kicker" id="checkout-payment-heading">Payment method</p>
+            <strong id="checkout-payment-method">Cash on Delivery</strong>
+            <p id="checkout-payment-note">Pay in cash when your delivery arrives.</p>
+          </div>
+          <span class="fc-home-payment-cash" aria-hidden="true">CASH</span>
+        </section>
       </section>
 
       <p id="cart-empty" class="fc-home-cart-empty">Your cart is empty. Add your favourites from the menu.</p>
@@ -2032,6 +2040,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
 .fc-home-field textarea{min-height:76px;resize:vertical}
 .fc-home-confirm{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid #f0ce7a;border-radius:10px;background:#fff8e8;color:#5f430e;font:600 13px var(--f-body)}
 .fc-home-confirm input{width:18px;height:18px;flex:0 0 auto}
+.fc-home-payment-method{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:14px;padding:13px 14px;border:1px solid rgba(240,206,122,.65);border-radius:12px;background:#fff8e8;color:#5f430e}
+.fc-home-payment-method .fc-home-kicker{margin:0 0 4px;color:#8a5a00;font-size:11px}
+.fc-home-payment-method strong{display:block;font:800 15px var(--f-ui)}
+.fc-home-payment-method p:last-child{margin:4px 0 0;color:#745b2c;font:500 12px/1.45 var(--f-body)}
+.fc-home-payment-cash{flex:0 0 auto;padding:7px 9px;border:1px solid #d9b75f;border-radius:8px;font:800 11px var(--f-ui);letter-spacing:.08em}
 .fc-home-cart{border:2px solid var(--gold);background:var(--cream);color:var(--ink)}
 .fc-home-cart-inner{max-width:900px;margin:0 auto}
 .fc-home-cart h3{color:var(--ink)}
