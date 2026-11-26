@@ -1,7 +1,8 @@
 /* Flame Chick customer Website V3 order page.
  * The browser only submits catalog IDs and explicit choices. The Order API
  * recalculates every item, validates current branch/area settings, and commits
- * the order and per-phone quota atomically. No customer details are persisted.
+ * the order and per-phone quota atomically. Customer details stay in the active
+ * checkout page only and are never written to browser storage.
  */
 (function (root) {
   'use strict';
@@ -31,6 +32,7 @@
   var state = {
     snapshot: null, databaseNow: null, websiteContext: null,
     branchSelection: null, preview: null, cart: [],
+    deliveryAreasBranchId: null,
     checkoutRequestId: null, checkoutBody: null, checkoutUncertain: false,
     productDialog: null, dealConfigurator: null,
     busy: false, loaded: false
@@ -43,6 +45,9 @@
   };
   var text = function (value) { return String(value === null || value === undefined ? '' : value); };
   var clone = function (value) { return JSON.parse(JSON.stringify(value)); };
+  function isValidEmail(value) {
+    return !value || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
+  }
 
   function status(message, kind) {
     var node = $('order-status');
@@ -459,7 +464,7 @@
     if (!orderWritesAllowed() || !context || !state.cart.length || state.busy || state.checkoutUncertain) return false;
     if (!$('customer-name').value.trim() || !$('customer-phone').value.trim()) return false;
     var email = $('customer-email').value.trim();
-    if (email && !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) return false;
+    if (!isValidEmail(email)) return false;
     if (context.fulfilmentType === 'delivery') {
       if ($('delivery-address').value.trim().length < 5) return false;
       try { deliverySelection(); } catch (_) { return false; }
@@ -1092,6 +1097,16 @@
     var select = $('delivery-area');
     var input = $('delivery-area-search');
     var results = $('delivery-area-results');
+    var branchId = branch && typeof branch.id === 'string' ? branch.id : null;
+    var sameBranch = !!branchId && state.deliveryAreasBranchId === branchId;
+    if (sameBranch && select.options.length > 1) return;
+
+    var previousSelection = select.value;
+    var previousSearch = input.value;
+    var previousAddress = $('delivery-address').value;
+    var previousLocality = $('other-locality').value;
+    var previousConfirmation = $('not-listed-confirm').checked;
+
     select.replaceChildren();
     var placeholder = document.createElement('option');
     placeholder.value = ''; placeholder.textContent = 'Choose your area'; select.appendChild(placeholder);
@@ -1110,17 +1125,25 @@
       : 'Not Listed / Other — fee not configured';
     other.disabled = !branch || branch.notListedDeliveryFee === null;
     select.appendChild(other);
-    input.value = '';
+
+    var retainedOption = sameBranch ? Array.from(select.options).find(function (option) {
+      return option.value === previousSelection && !option.disabled;
+    }) : null;
+    select.value = retainedOption ? previousSelection : '';
+    $('delivery-address').value = previousAddress;
+    var retainNotListedDetails = sameBranch && !!retainedOption && previousSelection === 'not_listed';
+    $('other-locality').value = retainNotListedDetails ? previousLocality : '';
+    $('not-listed-confirm').checked = retainNotListedDetails && previousConfirmation;
+    $('not-listed-confirm-row').hidden = !retainNotListedDetails;
+    $('other-locality-field').hidden = !retainNotListedDetails;
+    if (retainNotListedDetails) $('not-listed-confirm-text').textContent =
+      'I understand the Not Listed delivery fee (' + money(branch.notListedDeliveryFee) + ') and want the restaurant to confirm my locality.';
+    input.value = retainedOption ? retainedOption.textContent : (previousSelection ? '' : previousSearch);
     results.replaceChildren();
     results.hidden = true;
     input.setAttribute('aria-expanded', 'false');
-    $('not-listed-confirm-row').hidden = true;
-    $('other-locality-field').hidden = true;
-    $('delivery-address').value = '';
-    $('other-locality').value = '';
-    $('not-listed-confirm').checked = false;
+    state.deliveryAreasBranchId = branchId;
   }
-
   function handleDeliveryAreaChange() {
     var other = $('delivery-area').value === 'not_listed';
     $('other-locality-field').hidden = !other;
@@ -1157,7 +1180,7 @@
     var phone = $('customer-phone').value.trim();
     var email = $('customer-email').value.trim();
     if (!name || !phone) throw new Error('Enter your name and phone number.');
-    if (email && !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) throw new Error('Enter a valid email address.');
+    if (!isValidEmail(email)) throw new Error('Enter a valid email address.');
     if (!state.cart.length) throw new Error('Add at least one product or deal.');
     var delivery = context.fulfilmentType === 'delivery' ? deliverySelection() : null;
     if (context.fulfilmentType === 'delivery' && delivery.address.length < 5) throw new Error('Enter your complete delivery address.');

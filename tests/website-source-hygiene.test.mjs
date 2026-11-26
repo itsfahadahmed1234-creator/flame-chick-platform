@@ -310,6 +310,41 @@ test("only stable Production hosts and two explicit rehearsal Preview hosts can 
   assert.doesNotMatch(order, /TEST ORDER SENT TO FLAME CHICK POS|WEBSITE PREVIEW QA TEST/);
 });
 
+test("optional customer email validation accepts standard addresses in both checkout gates", () => {
+  const helper = order.match(/function isValidEmail\(value\) \{[\s\S]*?\n  \}/);
+  assert.ok(helper, "A shared optional-email validator must be present.");
+  const literal = helper[0].match(/return !value \|\| (\/[^;]+?\/)\.test\(value\);/);
+  assert.ok(literal, "The shared validator must use one standard email pattern.");
+  const pattern = literal[1];
+  const lastSlash = pattern.lastIndexOf("/");
+  const validator = new RegExp(pattern.slice(1, lastSlash), pattern.slice(lastSlash + 1));
+  assert.equal(validator.test("customer@example.com"), true);
+  assert.equal(validator.test("not-an-email"), false);
+  assert.match(order, /if \(!isValidEmail\(email\)\) return false;/);
+  assert.match(order, /if \(!isValidEmail\(email\)\) throw new Error\('Enter a valid email address\.'\);/);
+});
+
+test("delivery area, address and Not Listed details survive fulfilment redraws on the same branch", () => {
+  const populationStart = order.indexOf("function populateDeliveryAreas(branch)");
+  const populationEnd = order.indexOf("function handleDeliveryAreaChange()", populationStart);
+  assert.ok(populationStart >= 0 && populationEnd > populationStart);
+  const populate = order.slice(populationStart, populationEnd);
+  assert.match(order, /deliveryAreasBranchId: null/);
+  assert.match(populate, /var sameBranch = !!branchId && state\.deliveryAreasBranchId === branchId/);
+  assert.match(populate, /sameBranch && select\.options\.length > 1/);
+  assert.match(populate, /var previousSelection = select\.value/);
+  assert.match(populate, /var previousSearch = input\.value/);
+  assert.match(populate, /var previousAddress = \$\('delivery-address'\)\.value/);
+  assert.match(populate, /var previousLocality = \$\('other-locality'\)\.value/);
+  assert.match(populate, /var previousConfirmation = \$\('not-listed-confirm'\)\.checked/);
+  assert.match(populate, /select\.value = retainedOption \? previousSelection : ''/);
+  assert.match(populate, /input\.value = retainedOption \? retainedOption\.textContent : \(previousSelection \? '' : previousSearch\)/);
+  assert.match(populate, /\$\('delivery-address'\)\.value = previousAddress/);
+  assert.match(populate, /var retainedOption = sameBranch \?/);
+  assert.match(populate, /retainNotListedDetails = sameBranch/);
+  assert.match(populate, /state\.deliveryAreasBranchId = branchId/);
+});
+
 test("the retired standalone ordering URL redirects into the primary homepage V3 checkout", () => {
   const standalone = readFileSync(join(root, "order-online-v3.html"), "utf8");
   assert.match(standalone, /http-equiv="refresh" content="0; url=index\.html#menu"/);
