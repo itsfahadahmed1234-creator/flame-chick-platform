@@ -77,3 +77,62 @@ Do not begin by assuming a standard 80 mm or 58 mm format; use the restaurant's 
 ## Safety boundary
 
 Preview and development PC only. No Production deployment, production-domain change, Vercel production-target change, Supabase change, real customer order/payment, order-workflow or role change, or kitchen-printing enablement is authorized by this checkpoint. Preserve the production branch `main` and the ongoing shared-branch work.
+
+
+## Receipt styling checkpoint — 2026-11-26
+
+**Commit:** `5b635460c21e6be2a8e794f308923aea7dff5bb6`  
+**Branch:** `work/production-source-audit`  
+**Vercel Preview:** `https://flame-chick-pos-production-9521jd4ym-befahad1234-7050.vercel.app`  
+**Deployment:** `dpl_D75dtbwpfrUY451RPfFKQYUPstWW` — READY, built from the exact commit above. This is a Preview deployment; no Production promotion or deployment was performed.
+
+### Reference images
+
+- Restaurant receipt: `docs/reference/restaurant reciept  reference.jpeg`
+- Existing faulty browser print: `docs/reference/flamechick pos browser print  that not cuts the paper + bad layout .jpeg`
+
+Both images were read directly from GitHub `main` as JPEG data. They were uploaded in main-only commit `ffff5d21debe2900ab0e08246a0727c139cc0da8`; they were not merged into the working branch.
+
+### Files changed in receipt commit
+
+- `apps/flame-chick-pos/index.html`
+- `apps/flame-chick-pos/qz-printing.js`
+- `apps/flame-chick-pos/tests/qz-printing-diagnostics.test.js`
+- `apps/flame-chick-pos/tests/pos-receipt-print-contract.test.mjs` (new)
+
+A follow-up refinement adds `apps/flame-chick-pos/assets/flame-chick-receipt-mark.svg` from the existing Flame Chick brand icon and changes the HTML receipt to show the standalone mark above the wordmark (avoid showing the full horizontal brand SVG twice).
+
+### Implementation
+
+- Reworked browser receipt preview, online-order print fallback, and local POS print fallback to use the same receipt HTML builder.
+- Reworked QZ ESC/POS text layout to follow the photographed bill hierarchy: centered Flame Chick header, Original Bill, invoice, fulfillment heading, placed date/time, optional cashier/guest/table rows, customer/delivery details when relevant, aligned item/price rows, subtotal, optional surcharge/delivery/discount, grand total, payment method/amount, and PAID/UNPAID status.
+- Removed the literal unwrapped `remove old History modal` text node from the POS HTML; it was visible in the faulty browser print.
+- Removed the stale `#thermalPrintFrame` print CSS reference (no corresponding element exists in this POS document).
+- Browser print isolates the receipt area on the existing 80 mm page setting, with a 72 mm content width inherited from the existing renderer. This is not a measured printer specification; confirm against the restaurant printer.
+- Existing QZ signing, certificate loading, connection, printer discovery, and diagnostic controls were not intentionally changed. The QZ diagnostics export now also exposes a receipt-payload builder for automated tests.
+
+### Data fidelity / unresolved receipt details
+
+The POS order snapshot does not currently provide dedicated cashier-name, guest-count, or surcharge fields in the paths inspected. The receipt renderer displays these only if supplied and does not invent them. No database/schema change was made.
+
+The photo's email address, P-NTN and powered-by footer were too blurred to transcribe confidently, so they were not fabricated or added. Confirm exact text if those must appear. The QZ ESC/POS receipt currently reproduces the text hierarchy; a raster logo/footer image has not yet been implemented for direct thermal printing.
+
+### Verification
+
+Pre-commit checks completed in the code orchestration environment:
+
+- QZ JavaScript syntax compilation: passed.
+- Synthetic Dine-in QZ receipt payload with two items, aligned item amounts, surcharge, Easypaisa, and PAID: passed.
+- Synthetic unpaid delivery receipt and omission of unavailable cashier/guest/surcharge fields: passed.
+- POS inline script syntax compilation: passed.
+- Source contract checks for stray text removal and shared browser receipt rendering: passed.
+
+The Node `node:test` suites were added/extended but were **not executed in a Node runtime** during this task. The Vercel Preview build reached READY for commit `5b635460c21e6be2a8e794f308923aea7dff5bb6`; this verifies build/deployment, not the Node test suites or browser print output. No physical printer was available, so paper width, alignment, paper feed, driver behavior, and cutter behavior remain unverified. No actual order/payment or kitchen print was created.
+
+### Safety / branch boundary
+
+- Working branch only; `main` was not modified by the receipt commits.
+- No Supabase schema/data/role/policy changes.
+- No private QZ signing key accessed, logged, or committed.
+- No Production deployment, domain change, kitchen-print enablement, real order/payment, or restaurant-PC setup/test.
+- QZ physical output remains unverified on both development and restaurant PCs.

@@ -305,7 +305,7 @@ body{background:var(--bg);color:var(--text)}
 .receipt-scroll{flex:1 1 auto;min-height:0;overflow:hidden;padding:8px;background:#eef0f3;display:flex;justify-content:center;align-items:flex-start}
 .receipt-paper{width:72mm;max-width:72mm;margin:0 auto;background:#fff;border:1px solid #d4d8df;border-radius:6px;box-shadow:0 4px 14px rgba(16,24,40,.08);padding:3mm;color:#111;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;font-size:10px;line-height:1.25}
 .receipt-business{text-align:center}
-.receipt-logo{display:block;width:31mm;height:auto;margin:0 auto 2mm;object-fit:contain}
+.receipt-logo{display:block;width:19mm;height:19mm;margin:0 auto 2mm;object-fit:contain}
 .receipt-brand{text-align:center;font-weight:1000;font-size:20px;letter-spacing:.3px}
 .receipt-contact{text-align:center;font-size:8px;color:#333;line-height:1.2;margin-top:2px}
 .receipt-rule{border-top:1px dashed #111;margin:6px 0}
@@ -4504,7 +4504,7 @@ function buildReceiptHtml(order){
   const notes=order.notes||order.Notes;
   return '<div class="receipt-paper">'+
     '<div class="receipt-business">'+
-      '<img class="receipt-logo" src="/assets/flame-chick-brand.svg" alt="Flame Chick logo">'+
+      '<img class="receipt-logo" src="/assets/flame-chick-receipt-mark.svg" alt="Flame Chick logo">'+
       '<div class="receipt-brand">Flame Chick</div>'+
       '<div class="receipt-contact">Flame Chick, Main Kamra Road Opposite to Zellbury, Attock</div>'+
       '<div class="receipt-contact">Phone: +923358044164</div>'+
