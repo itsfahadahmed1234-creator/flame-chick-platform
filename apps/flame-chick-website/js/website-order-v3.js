@@ -31,7 +31,6 @@
   var state = {
     snapshot: null, databaseNow: null, websiteContext: null,
     branchSelection: null, preview: null, cart: [],
-    quote: null, quoteBody: null, quoteToken: null, quoteExpiresAt: null,
     checkoutRequestId: null, checkoutBody: null, checkoutUncertain: false,
     productDialog: null, dealConfigurator: null,
     busy: false, loaded: false
@@ -74,8 +73,8 @@
     $('fc-preview-checkout-notice').hidden = !preview;
     if (preview) {
       $('fc-preview-checkout-notice').textContent =
-        'Website Preview is read-only. Browse the menu and review the cart; order submission is disabled.';
-      $('request-quote').disabled = true;
+        'Preview mode: menu prices and delivery fees are shown from Supabase. Live order submission is disabled on this Preview.';
+      $('place-order').disabled = true;
       $('place-order').disabled = true;
       $('retry-order').disabled = true;
     }
@@ -245,37 +244,206 @@
     $('headCart').focus();
   }
 
-  function resetQuote(message) {
-    if (state.checkoutUncertain) return;
-    state.quote = null;
-    state.quoteBody = null;
-    state.quoteToken = null;
-    state.quoteExpiresAt = null;
+  function resetCheckout(message) {
+    if (state.checkoutUncertain || state.busy) return;
     state.checkoutRequestId = null;
     state.checkoutBody = null;
     clearPendingRequestId();
-    $('cart-summary').hidden = true;
-    if ($('quote-lines')) $('quote-lines').replaceChildren();
-    $('place-order').hidden = true;
-    $('place-order').disabled = true;
     $('retry-order').hidden = true;
-    $('request-quote').hidden = false;
-    $('request-quote').disabled = !orderWritesAllowed() || state.cart.length === 0 || !currentContext();
+    $('place-order').hidden = state.cart.length === 0;
+    $('place-order').disabled = !orderWritesAllowed() || !checkoutReady();
     if (message) status(message);
   }
 
   function canEdit() { return !state.busy && !state.checkoutUncertain && $('order-success').hidden; }
-  function invalidateQuote() {
+
+  function invalidateCheckout() {
     if (state.checkoutUncertain || state.busy) return;
-    resetQuote('Your cart or checkout details changed. Get a fresh verified total before placing the order.');
+    resetCheckout();
     renderCart();
   }
 
   function clearCart(reason) {
     if (state.cart.length && reason) status(reason);
     state.cart = [];
-    invalidateQuote();
+    invalidateCheckout();
     renderCart();
+  }
+
+  function findProductModel(productId) {
+    var categories = state.productModel && Array.isArray(state.productModel.categories)
+      ? state.productModel.categories : [];
+    for (var i = 0; i < categories.length; i++) {
+      var product = (categories[i].products || []).find(function (row) { return row.id === productId; });
+      if (product) return product;
+    }
+    return null;
+  }
+
+  function findDealModel(dealId) {
+    var collections = state.dealModel && Array.isArray(state.dealModel.collections)
+      ? state.dealModel.collections : [];
+    for (var i = 0; i < collections.length; i++) {
+      var deal = (collections[i].deals || []).find(function (row) { return row.id === dealId; });
+      if (deal) return deal;
+    }
+    return null;
+  }
+
+  function modifierSelectionMap(selections) {
+    var map = Object.create(null);
+    (Array.isArray(selections) ? selections : []).forEach(function (row) {
+      if (!row || typeof row.modifierGroupId !== 'string' || !Array.isArray(row.modifierIds) ||
+          Object.prototype.hasOwnProperty.call(map, row.modifierGroupId)) {
+        throw new Error('A modifier selection in your cart is invalid. Reopen the item and choose its options again.');
+      }
+      map[row.modifierGroupId] = row.modifierIds.slice();
+    });
+    return map;
+  }
+
+  function calculateModifierTotalMinor(groups, selections) {
+    var map = modifierSelectionMap(selections);
+    var checked = root.FlameChickCatalogV3DealView.validateModifierSelections(groups, map);
+    if (!checked || checked.ok !== true) {
+      throw new Error(checked && checked.message ? checked.message : 'A selected modifier is no longer available. Review your cart.');
+    }
+    var total = 0;
+    groups.forEach(function (group) {
+      (map[group.id] || []).forEach(function (modifierId) {
+        var modifier = group.modifiers.find(function (row) { return row.id === modifierId; });
+        if (!modifier || !Number.isSafeInteger(modifier.priceMinor) || modifier.priceMinor < 0) {
+          throw new Error('A modifier price is unavailable. Refresh the published menu.');
+        }
+        total += modifier.priceMinor;
+        if (!Number.isSafeInteger(total)) throw new Error('Your cart total exceeds the supported amount.');
+      });
+    });
+    return total;
+  }
+
+  function calculateProductLine(row) {
+    var payload = row.payload || {};
+    var product = findProductModel(payload.productId);
+    var variant = product && product.variants.find(function (item) { return item.id === payload.productVariantId; });
+    if (!product || !variant || !Number.isSafeInteger(variant.priceMinor) || variant.priceMinor < 0) {
+      throw new Error('A product or size in your cart is no longer available. Refresh the menu.');
+    }
+    var modifierGroups = productModifierGroups(product, variant.id);
+    var modifierMinor = calculateModifierTotalMinor(modifierGroups, payload.modifiers);
+    var unitMinor = variant.priceMinor + modifierMinor;
+    var lineMinor = unitMinor * row.quantity;
+    if (!Number.isSafeInteger(lineMinor) || lineMinor < 0) throw new Error('A product total exceeds the supported amount.');
+    return { unitMinor:unitMinor, lineMinor:lineMinor };
+  }
+
+  function calculateDealLine(row) {
+    var payload = row.payload || {};
+    var deal = findDealModel(payload.dealId);
+    var variant = deal && deal.variants.find(function (item) { return item.id === payload.dealVariantId; });
+    if (!deal || deal.available !== true || !variant || variant.branchSatisfiable !== true ||
+        !Number.isSafeInteger(variant.basePriceMinor) || variant.basePriceMinor < 0) {
+      throw new Error('A deal or deal option in your cart is no longer available. Refresh the menu.');
+    }
+    if (!Array.isArray(payload.componentGroups)) throw new Error('Complete the choices for this deal again.');
+
+    var selectionMap = Object.create(null);
+    payload.componentGroups.forEach(function (groupInput) {
+      if (!groupInput || typeof groupInput.componentGroupId !== 'string' || !Array.isArray(groupInput.components) ||
+          Object.prototype.hasOwnProperty.call(selectionMap, groupInput.componentGroupId)) {
+        throw new Error('A deal component selection is invalid. Reopen the deal and choose again.');
+      }
+      var counts = Object.create(null);
+      groupInput.components.forEach(function (component) {
+        if (!component || typeof component.componentOptionId !== 'string') {
+          throw new Error('A deal component selection is invalid. Reopen the deal and choose again.');
+        }
+        counts[component.componentOptionId] = (counts[component.componentOptionId] || 0) + 1;
+      });
+      selectionMap[groupInput.componentGroupId] = Object.keys(counts).map(function (componentOptionId) {
+        return { componentOptionId:componentOptionId, quantity:counts[componentOptionId] };
+      });
+    });
+    var checked = root.FlameChickCatalogV3DealView.validateDealSelections(variant, selectionMap);
+    if (!checked || checked.ok !== true) {
+      throw new Error(checked && checked.message ? checked.message : 'The deal choices are no longer valid. Reopen the deal and choose again.');
+    }
+
+    var componentTotalMinor = 0;
+    variant.groups.forEach(function (group) {
+      var groupInput = payload.componentGroups.find(function (item) { return item.componentGroupId === group.id; });
+      (groupInput ? groupInput.components : []).forEach(function (component) {
+        var option = group.options.find(function (item) { return item.id === component.componentOptionId; });
+        if (!option || option.productId !== component.productId || option.productVariantId !== component.productVariantId) {
+          throw new Error('A deal component no longer matches the published menu. Reopen the deal.');
+        }
+        var contributionMinor = 0;
+        if (option.pricingTreatment === 'INCLUDED') contributionMinor = 0;
+        else if (option.pricingTreatment === 'SURCHARGE') contributionMinor = option.surchargeMinor;
+        else if (option.pricingTreatment === 'STANDALONE' && variant.pricingMode === 'BASE_PLUS_SELECTED_ITEMS') {
+          contributionMinor = option.standalonePriceMinor;
+        } else {
+          throw new Error('This deal has an unsupported published pricing option.');
+        }
+        if (!Number.isSafeInteger(contributionMinor) || contributionMinor < 0) {
+          throw new Error('A deal component price is unavailable. Refresh the published menu.');
+        }
+        componentTotalMinor += contributionMinor + calculateModifierTotalMinor(option.modifierGroups || [], component.modifiers);
+        if (!Number.isSafeInteger(componentTotalMinor)) throw new Error('Your deal total exceeds the supported amount.');
+      });
+    });
+    var unitMinor = variant.basePriceMinor + componentTotalMinor;
+    var lineMinor = unitMinor * row.quantity;
+    if (!Number.isSafeInteger(lineMinor) || lineMinor < 0) throw new Error('A deal total exceeds the supported amount.');
+    return { unitMinor:unitMinor, lineMinor:lineMinor };
+  }
+
+  function selectedDeliveryFeeMinor() {
+    var context = currentContext();
+    if (!context || context.fulfilmentType !== 'delivery') return 0;
+    var branch = liveBranch();
+    if (!branch) return null;
+    var selection = $('delivery-area').value;
+    if (!selection) return null;
+    if (selection === 'not_listed') {
+      if (branch.notListedDeliveryFee === null || branch.notListedDeliveryFee === undefined) return null;
+      var defaultFee = root.FlameChickCatalogV3.minorUnits(branch.notListedDeliveryFee);
+      return Number.isSafeInteger(defaultFee) && defaultFee >= 0 ? defaultFee : null;
+    }
+    var area = (branch.deliveryAreas || []).find(function (row) { return row.id === selection; });
+    if (!area) return null;
+    var fee = root.FlameChickCatalogV3.minorUnits(area.deliveryFee);
+    return Number.isSafeInteger(fee) && fee >= 0 ? fee : null;
+  }
+
+  function calculateCartPricing() {
+    var lines = state.cart.map(function (row) {
+      return row.kind === 'deal' ? calculateDealLine(row) : calculateProductLine(row);
+    });
+    var subtotalMinor = lines.reduce(function (total, line) {
+      var next = total + line.lineMinor;
+      if (!Number.isSafeInteger(next)) throw new Error('Your cart subtotal exceeds the supported amount.');
+      return next;
+    }, 0);
+    var deliveryFeeMinor = selectedDeliveryFeeMinor();
+    var totalMinor = deliveryFeeMinor === null ? null : subtotalMinor + deliveryFeeMinor;
+    if (totalMinor !== null && !Number.isSafeInteger(totalMinor)) throw new Error('Your order total exceeds the supported amount.');
+    return { lines:lines, subtotalMinor:subtotalMinor, deliveryFeeMinor:deliveryFeeMinor, totalMinor:totalMinor };
+  }
+
+  function checkoutReady() {
+    var context = currentContext();
+    if (!orderWritesAllowed() || !context || !state.cart.length || state.busy || state.checkoutUncertain) return false;
+    if (!$('customer-name').value.trim() || !$('customer-phone').value.trim()) return false;
+    var email = $('customer-email').value.trim();
+    if (email && !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) return false;
+    if (context.fulfilmentType === 'delivery') {
+      if ($('delivery-address').value.trim().length < 5) return false;
+      try { deliverySelection(); } catch (_) { return false; }
+      if (selectedDeliveryFeeMinor() === null) return false;
+    }
+    try { calculateCartPricing(); } catch (_) { return false; }
+    return true;
   }
 
   function renderCart() {
@@ -287,49 +455,60 @@
     $('cart-empty').hidden = state.cart.length > 0;
     $('fc-v3-cartbar').hidden = state.cart.length === 0;
     $('fc-v3-cartbar-count').textContent = itemCountLabel();
-    $('request-quote').disabled = !orderWritesAllowed() || state.cart.length === 0 ||
-      !currentContext() || state.busy || state.checkoutUncertain;
-    $('place-order').disabled = !orderWritesAllowed() || !state.quoteBody || !state.quoteToken ||
-      state.busy || state.checkoutUncertain;
+    $('cart-summary').hidden = state.cart.length === 0;
+    $('place-order').hidden = state.cart.length === 0 && !state.checkoutUncertain;
+    $('place-order').disabled = !checkoutReady();
+    $('retry-order').hidden = !state.checkoutUncertain;
+
+    var pricing = null;
+    try {
+      if (state.cart.length) pricing = calculateCartPricing();
+    } catch (error) {
+      status(error.message || 'Your cart could not be priced from the published menu.', 'error');
+    }
 
     state.cart.forEach(function (row, index) {
       var article = document.createElement('article');
       article.className = 'order-cart-row';
-      var name = document.createElement('strong');
-      name.textContent = row.label;
-      var meta = document.createElement('span');
-      meta.className = 'order-hint';
+      var name = document.createElement('strong'); name.textContent = row.label;
+      var meta = document.createElement('span'); meta.className = 'order-hint';
       meta.textContent = row.kind === 'deal' ? 'Deal selection' : 'Product selection';
-      var controls = document.createElement('div');
-      controls.className = 'order-cart-controls';
-      var decrement = document.createElement('button');
-      decrement.type = 'button'; decrement.textContent = '−'; decrement.disabled = !canEdit();
+      if (pricing && pricing.lines[index]) meta.textContent += ' · ' + cardPrice(pricing.lines[index].unitMinor) + ' each';
+      var lineAmount = document.createElement('strong');
+      lineAmount.className = 'order-cart-row-price';
+      lineAmount.textContent = pricing && pricing.lines[index] ? cardPrice(pricing.lines[index].lineMinor) : 'Price unavailable';
+      var controls = document.createElement('div'); controls.className = 'order-cart-controls';
+      var decrement = document.createElement('button'); decrement.type = 'button'; decrement.textContent = '−'; decrement.disabled = !canEdit();
       decrement.addEventListener('click', function () {
         if (!canEdit()) return;
-        if (row.quantity <= 1) state.cart.splice(index, 1);
-        else row.quantity -= 1;
-        invalidateQuote();
+        if (row.quantity <= 1) state.cart.splice(index, 1); else row.quantity -= 1;
+        invalidateCheckout();
       });
-      var quantity = document.createElement('output');
-      quantity.className = 'order-cart-quantity';
+      var quantity = document.createElement('output'); quantity.className = 'order-cart-quantity';
       quantity.textContent = String(row.quantity);
       quantity.setAttribute('aria-label', 'Quantity ' + row.quantity + ' for ' + row.label);
-      var increment = document.createElement('button');
-      increment.type = 'button'; increment.textContent = '+'; increment.disabled = !canEdit() || row.quantity >= 99;
-      increment.addEventListener('click', function () {
-        if (!canEdit() || row.quantity >= 99) return;
-        row.quantity += 1; invalidateQuote();
-      });
-      var remove = document.createElement('button');
-      remove.type = 'button'; remove.textContent = 'Remove'; remove.disabled = !canEdit();
-      remove.addEventListener('click', function () {
-        if (!canEdit()) return;
-        state.cart.splice(index, 1); invalidateQuote();
-      });
+      var increment = document.createElement('button'); increment.type = 'button'; increment.textContent = '+'; increment.disabled = !canEdit() || row.quantity >= 99;
+      increment.addEventListener('click', function () { if (!canEdit() || row.quantity >= 99) return; row.quantity += 1; invalidateCheckout(); });
+      var remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Remove'; remove.disabled = !canEdit();
+      remove.addEventListener('click', function () { if (!canEdit()) return; state.cart.splice(index, 1); invalidateCheckout(); });
       controls.append(decrement, quantity, increment, remove);
-      article.append(name, meta, controls);
+      article.append(name, meta, lineAmount, controls);
       list.appendChild(article);
     });
+
+    if (pricing) {
+      $('cart-subtotal').textContent = cardPrice(pricing.subtotalMinor);
+      var context = currentContext();
+      $('cart-delivery-row').hidden = !context || context.fulfilmentType !== 'delivery';
+      $('cart-delivery-fee').textContent = pricing.deliveryFeeMinor === null ? 'Select a delivery area' : cardPrice(pricing.deliveryFeeMinor);
+      $('cart-total').textContent = pricing.totalMinor === null ? '—' : cardPrice(pricing.totalMinor);
+      $('cart-price-note').textContent = 'Prices and delivery fees are loaded from the published Supabase menu and branch settings. The Order API checks the current prices and fee again when you place the order.';
+    } else {
+      $('cart-subtotal').textContent = '—';
+      $('cart-delivery-fee').textContent = '—';
+      $('cart-total').textContent = '—';
+      $('cart-price-note').textContent = 'Add products or deals to see your order total.';
+    }
     syncFulfilmentControls();
   }
 
@@ -562,7 +741,7 @@
         quantity: 1, modifiers: validation.selections
       }
     });
-    invalidateQuote();
+    invalidateCheckout();
     animateCartAdded();
     status(product.name + ' added to your cart.');
   }
@@ -726,7 +905,7 @@
           }
         });
         dialog.close();
-        invalidateQuote();
+        invalidateCheckout();
         animateCartAdded();
         status(product.name + ' added to your cart.');
       });
@@ -837,7 +1016,7 @@
           payload: item
         });
         $('deal-dialog').close();
-        invalidateQuote();
+        invalidateCheckout();
         animateCartAdded();
         status('Deal added to your cart.');
       }
@@ -924,7 +1103,7 @@
     $('not-listed-confirm-row').hidden = !other;
     if (other) $('not-listed-confirm-text').textContent =
       'I understand the Not Listed delivery fee (' + money(liveBranch().notListedDeliveryFee) + ') and want the restaurant to confirm my locality.';
-    invalidateQuote();
+    invalidateCheckout();
   }
 
   function deliverySelection() {
@@ -949,29 +1128,26 @@
 
   function buildRequestBody() {
     var context = currentContext();
-    if (!context) throw new Error('Choose a branch and delivery or pickup first.');
+    if (!context) throw new Error('Choose a branch and Delivery or Takeaway first.');
     var name = $('customer-name').value.trim();
     var phone = $('customer-phone').value.trim();
     var email = $('customer-email').value.trim();
     if (!name || !phone) throw new Error('Enter your name and phone number.');
-    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Enter a valid email address.');
+    if (email && !/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) throw new Error('Enter a valid email address.');
     if (!state.cart.length) throw new Error('Add at least one product or deal.');
     var delivery = context.fulfilmentType === 'delivery' ? deliverySelection() : null;
+    if (context.fulfilmentType === 'delivery' && delivery.address.length < 5) throw new Error('Enter your complete delivery address.');
     return {
-      action: 'quote_website_order',
+      action: 'place_website_order',
       schema_version: 3,
       publication_id: context.publicationId,
       version_id: context.versionId,
       branch_id: context.branchId,
       fulfillment_type: context.fulfilmentType,
-      customer: {
-        name: name,
-        phone: phone,
-        email: email || null
-      },
+      customer: { name:name, phone:phone, email:email || null },
       notes: $('order-notes').value.trim() || null,
-      delivery: delivery,
-      items: state.cart.map(function (row) {
+      delivery:delivery,
+      items:state.cart.map(function (row) {
         var item = clone(row.payload);
         item.quantity = row.quantity;
         return item;
@@ -982,8 +1158,7 @@
   function setBusy(value) {
     state.busy = value === true;
     var locked = state.busy || state.checkoutUncertain;
-    $('request-quote').disabled = !orderWritesAllowed() || locked || state.cart.length === 0 || !currentContext();
-    $('place-order').disabled = !orderWritesAllowed() || locked || !state.quoteBody || !state.quoteToken;
+    $('place-order').disabled = !orderWritesAllowed() || locked || !checkoutReady();
     $('retry-order').disabled = state.busy || !state.checkoutUncertain;
     ['customer-name','customer-phone','customer-email','delivery-area-search','delivery-area','delivery-address',
       'other-locality','not-listed-confirm','order-notes'].forEach(function (id) {
@@ -992,179 +1167,48 @@
     syncFulfilmentControls();
   }
 
-  function formatQuoteExpiry(value) {
-    var date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return String(value || '');
-    return new Intl.DateTimeFormat('en-PK', {
-      timeZone: 'Asia/Karachi', dateStyle: 'medium', timeStyle: 'short'
-    }).format(date) + ' PKT';
-  }
-
-  function renderQuoteSummary(quote, expiresAt) {
-    if (!quote || !Array.isArray(quote.items) || !quote.items.length) {
-      throw new Error('Flame Chick returned an incomplete order quote. Please request it again.');
-    }
-    var lines = $('quote-lines');
-    lines.replaceChildren();
-    quote.items.forEach(function (item) {
-      var row = document.createElement('div');
-      row.className = 'fc-home-quote-line';
-      var copy = document.createElement('div');
-      copy.className = 'fc-home-quote-line-copy';
-      var title = item.deal_title_snapshot || item.product_name_snapshot || 'Menu item';
-      if (item.variant_label_snapshot) title += ' · ' + item.variant_label_snapshot;
-      var heading = document.createElement('strong');
-      heading.textContent = String(item.quantity || 1) + ' × ' + title;
-      copy.appendChild(heading);
-      var details = [];
-      var modifierNames = (Array.isArray(item.modifiers) ? item.modifiers : []).map(function (modifier) {
-        return modifier && modifier.modifier_name_snapshot ? String(modifier.modifier_name_snapshot) : '';
-      }).filter(Boolean);
-      if (modifierNames.length) details.push('Modifiers: ' + modifierNames.join(', '));
-      var componentNames = (Array.isArray(item.components) ? item.components : []).map(function (component) {
-        if (!component) return '';
-        var name = String(component.name_snapshot || 'Included item');
-        if (component.variant_snapshot) name += ' · ' + String(component.variant_snapshot);
-        var names = (Array.isArray(component.modifiers) ? component.modifiers : []).map(function (modifier) {
-          return modifier && modifier.modifier_name_snapshot ? String(modifier.modifier_name_snapshot) : '';
-        }).filter(Boolean);
-        if (names.length) name += ' (' + names.join(', ') + ')';
-        return name;
-      }).filter(Boolean);
-      if (componentNames.length) details.push('Includes: ' + componentNames.join('; '));
-      if (details.length) {
-        var detail = document.createElement('span');
-        detail.textContent = details.join(' · ');
-        copy.appendChild(detail);
-      }
-      var amount = document.createElement('strong');
-      amount.className = 'fc-home-quote-line-amount';
-      amount.textContent = money(item.line_total);
-      row.append(copy, amount);
-      lines.appendChild(row);
-    });
-    $('cart-subtotal').textContent = money(quote.subtotal);
-    $('cart-delivery-fee').textContent = money(quote.deliveryFee);
-    $('quote-delivery-row').hidden = quote.fulfillmentType !== 'delivery';
-    $('cart-total').textContent = money(quote.total);
-    var parts = [];
-    if (quote.branch && quote.branch.name) parts.push('Branch: ' + quote.branch.name);
-    parts.push(quote.fulfillmentType === 'delivery' ? 'Delivery' : 'Takeaway');
-    if (quote.delivery && quote.delivery.area_name_snapshot) parts.push('Area: ' + quote.delivery.area_name_snapshot);
-    else if (quote.delivery && quote.delivery.other_locality) parts.push('Locality: ' + quote.delivery.other_locality);
-    parts.push('Quote valid until ' + formatQuoteExpiry(expiresAt));
-    $('cart-quote-detail').textContent = parts.join(' · ') +
-      '. Review the selected items and total. Any changes require a fresh verified quote.';
-    $('cart-summary').hidden = false;
-  }
-
-  async function requestQuote() {
-    if (!orderWritesAllowed()) {
-      status('Website Preview is read-only. The published menu can be reviewed, but checkout writes are disabled.', 'error');
-      return;
-    }
-    if (state.busy || state.checkoutUncertain) return;
-    var body;
-    try { body = buildRequestBody(); }
-    catch (error) {
-      status(error.message || 'Please check your order details and try again.', 'error');
-      return;
-    }
-    setBusy(true);
-    checkoutMotion('is-checking');
-    status('Checking the current published menu, choices and delivery fee…');
-    try {
-      var result = await orderApi('POST', '', body);
-      if (!result.quote || result.quote.publicationId !== state.snapshot.publicationId) {
-        throw new Error('The published menu changed. Refresh and review your cart before ordering.');
-      }
-      if (typeof result.quote_token !== 'string' || !result.quote_token ||
-          typeof result.quote_expires_at !== 'string' || !Number.isFinite(Date.parse(result.quote_expires_at))) {
-        throw new Error('The server did not provide a secure, time-limited quote. Please try again.');
-      }
-      renderQuoteSummary(result.quote, result.quote_expires_at);
-      state.quote = result.quote;
-      state.quoteToken = result.quote_token;
-      state.quoteExpiresAt = result.quote_expires_at;
-      state.quoteBody = body;
-      state.checkoutRequestId = state.checkoutRequestId || readPendingRequestId();
-      state.checkoutBody = null;
-      $('request-quote').hidden = true;
-      $('place-order').hidden = false;
-      $('retry-order').hidden = true;
-      status('Your exact server-verified total is ready. Review the selected items, delivery fee and total before placing the order.', 'success');
-      checkoutMotion('is-ready');
-    } catch (error) {
-      state.quote = null; state.quoteBody = null; state.quoteToken = null; state.quoteExpiresAt = null;
-      $('cart-summary').hidden = true;
-      $('request-quote').hidden = false;
-      $('place-order').hidden = true;
-      checkoutMotion('has-error');
-      status(error.message || 'Could not verify your order total. No order has been submitted.', 'error');
-    } finally {
-      setBusy(false);
-      clearCheckoutMotionLater();
-    }
-  }
-
   async function submitOrder(retry) {
-    if (!orderWritesAllowed()) {
-      status('Website Preview is read-only. No orders can be submitted from this deployment.', 'error');
-      return;
-    }
+    if (!orderWritesAllowed()) { status('This Website Preview is read-only. No live order was submitted.', 'error'); return; }
     if (state.busy) return;
     if (retry && (!state.checkoutUncertain || !state.checkoutBody || !state.checkoutRequestId)) {
       status('There is no pending order request to retry.', 'error');
       return;
     }
     if (!retry && state.checkoutUncertain) {
-      status('Your previous order response is uncertain. Retry the exact same request before making changes.', 'error');
-      return;
-    }
-    if (!state.quoteBody || !state.quoteToken || !state.quoteExpiresAt) {
-      status('Get a fresh secure server quote and review it before placing the order.', 'error');
+      status('Your previous order response is uncertain. Retry the exact same request before changing anything.', 'error');
       return;
     }
     if (!state.checkoutBody) {
       try {
         state.checkoutRequestId = state.checkoutRequestId || readPendingRequestId();
         if (!validRequestId(state.checkoutRequestId)) {
-          if (!root.crypto || typeof root.crypto.randomUUID !== 'function') {
-            throw new Error('This browser cannot create a secure checkout request ID. No order has been submitted.');
-          }
+          if (!root.crypto || typeof root.crypto.randomUUID !== 'function') throw new Error('This browser cannot create a secure order request ID. No order has been submitted.');
           state.checkoutRequestId = root.crypto.randomUUID();
         }
-        if (!savePendingRequestId(state.checkoutRequestId)) {
-          throw new Error('This browser cannot preserve safe order retry protection. Enable session storage and try again. No order has been submitted.');
-        }
-        state.checkoutBody = clone(state.quoteBody);
-        state.checkoutBody.action = 'create_website_order';
+        if (!savePendingRequestId(state.checkoutRequestId)) throw new Error('This browser cannot preserve safe order retry protection. Enable session storage and try again. No order has been submitted.');
+        state.checkoutBody = buildRequestBody();
         state.checkoutBody.request_id = state.checkoutRequestId;
-        state.checkoutBody.quote_token = state.quoteToken;
       } catch (error) {
-        status(error.message || 'Safe checkout could not be initialized. No order has been submitted.', 'error');
+        status(error.message || 'Please check your checkout details. No order has been submitted.', 'error');
         return;
       }
     }
+
     state.checkoutUncertain = true;
     setBusy(true);
     checkoutMotion('is-ordering');
     $('place-order').hidden = true;
     $('retry-order').hidden = false;
-    status('Submitting the verified quote securely. Flame Chick is rechecking the current menu and delivery fee…');
+    status('Sending your order to Flame Chick. The server is checking the latest menu prices, choices and delivery fee…');
     try {
       var result = await orderApi('POST', '', state.checkoutBody);
       if (!result.order_id || !result.order_number) throw new Error('The server did not return a confirmed order reference.');
       state.checkoutUncertain = false;
       clearPendingRequestId();
-      state.checkoutBody = null; state.checkoutRequestId = null;
-      state.quote = null; state.quoteBody = null; state.quoteToken = null; state.quoteExpiresAt = null;
-      $('cart-summary').hidden = true;
-      $('request-quote').hidden = true;
+      state.checkoutBody = null;
+      state.checkoutRequestId = null;
       state.cart = [];
-      renderCart();
-      $('retry-order').hidden = true;
-      $('place-order').hidden = true;
+      $('cart-summary').hidden = true;
       $('order-success').hidden = false;
       $('order-success').classList.add('is-confirmed');
       checkoutMotion('is-confirmed');
@@ -1173,7 +1217,8 @@
       $('success-order-message').textContent = totalText + 'Your order has been received by Flame Chick POS. Payment is due ' +
         (result.fulfillment_type === 'delivery' ? 'in cash on delivery.' : 'when you collect your takeaway.');
       status('Order confirmed and sent to Flame Chick POS. Payment has not been collected online.', 'success');
-      $('order-success').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      renderCart();
+      $('order-success').scrollIntoView({ behavior:'smooth', block:'center' });
     } catch (error) {
       checkoutMotion('has-error');
       var uncertain = !error.status || error.status >= 500 || error.status === 429;
@@ -1182,14 +1227,17 @@
         status(error.status === 429
           ? 'The website order limit was reached. Your exact request is preserved; retry the same request' +
             (error.retryAfter ? ' in ' + error.retryAfter + ' seconds.' : ' after a short wait.')
-          : 'We could not confirm the response. Your request ID and exact request are preserved. Retry this same order request without changing its details.', 'error');
+          : 'We could not confirm the response. Your request ID and exact order are preserved. Retry this exact order without changing its details.', 'error');
         $('retry-order').hidden = false;
         $('retry-order').disabled = false;
       } else {
-        state.checkoutBody = null; state.checkoutRequestId = null;
+        state.checkoutBody = null;
+        state.checkoutRequestId = null;
         clearPendingRequestId();
         state.checkoutUncertain = false;
-        resetQuote(error.message || 'The quote changed or expired. Get a fresh verified total before placing the order.');
+        $('retry-order').hidden = true;
+        $('place-order').hidden = state.cart.length === 0;
+        status(error.message || 'The current menu or delivery information changed. Review your cart and try again.', 'error');
       }
     } finally {
       setBusy(false);
@@ -1197,10 +1245,9 @@
       if (state.checkoutUncertain) {
         $('retry-order').hidden = false;
         $('retry-order').disabled = false;
-      } else if (state.quoteToken && state.checkoutBody) {
-        $('place-order').hidden = false;
       } else {
-        $('place-order').hidden = true;
+        $('place-order').hidden = state.cart.length === 0;
+        $('place-order').disabled = !checkoutReady();
       }
     }
   }
@@ -1211,7 +1258,6 @@
     $('deal-dialog').addEventListener('close', syncCatalogDialogState);
     $('close-product-dialog').addEventListener('click', function () { $('product-dialog').close(); });
     $('close-deal-dialog').addEventListener('click', function () { $('deal-dialog').close(); });
-    $('request-quote').addEventListener('click', requestQuote);
     $('place-order').addEventListener('click', function () { submitOrder(false); });
     $('retry-order').addEventListener('click', function () { submitOrder(true); });
     $('headCart').addEventListener('click', openCartDrawer);
@@ -1255,8 +1301,8 @@
       'customer-name','customer-phone','customer-email','delivery-address','delivery-area-search',
       'other-locality','not-listed-confirm','order-notes'
     ].forEach(function (id) {
-      $(id).addEventListener('input', invalidateQuote);
-      $(id).addEventListener('change', invalidateQuote);
+      $(id).addEventListener('input', invalidateCheckout);
+      $(id).addEventListener('change', invalidateCheckout);
     });
     $('continue-ordering').addEventListener('click', function () {
       $('order-success').hidden = true;
@@ -1268,10 +1314,8 @@
       $('place-order').hidden = false; $('place-order').disabled = true;
       $('retry-order').hidden = true;
       state.checkoutBody = null; state.checkoutRequestId = null; state.checkoutUncertain = false;
-      state.quote = null; state.quoteBody = null; state.quoteToken = null; state.quoteExpiresAt = null;
       clearPendingRequestId();
       $('cart-summary').hidden = true;
-      $('request-quote').hidden = false;
       $('place-order').hidden = true;
       status('Your cart is empty. Choose more items when you are ready.');
       closeCartDrawer();
@@ -1290,8 +1334,8 @@
       syncFulfilmentControls();
       return;
     }
-    resetQuote(orderWritesAllowed()
-      ? 'Order type changed. Review your cart and get a fresh verified total.'
+    resetCheckout(orderWritesAllowed()
+      ? 'Order type changed. Your cart total has been recalculated from the loaded menu.'
       : 'Order type changed. Your cart is updated; order submission is disabled on this Website Preview.');
     renderCatalog();
     renderCart();
