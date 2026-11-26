@@ -4,7 +4,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const crypto = require('node:crypto');
 const test = require('node:test');
+const { extractFirstCertificatePem, verifyQzSignature } = require('../api/qz/certificate-utils');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'qz-printing.js'), 'utf8');
 
@@ -47,4 +49,26 @@ test('CP437 diagnostic byte encoding fails closed for characters outside the ver
   assert.throws(function () {
     helpers.encodeCp437Ascii('Flame Chick £');
   }, /non-ASCII character/);
+});
+
+test('first public signing certificate is extracted correctly from the two-certificate PEM bundle', function () {
+  const bundlePath = path.join(__dirname, '..', 'qz', 'digital-certificate.txt');
+  const bundle = fs.readFileSync(bundlePath, 'utf8');
+  const firstPem = extractFirstCertificatePem(bundle);
+  assert.ok(firstPem);
+  assert.ok(firstPem.startsWith('-----BEGIN CERTIFICATE-----'));
+  assert.ok(firstPem.endsWith('-----END CERTIFICATE-----'));
+  assert.equal((firstPem.match(/-----BEGIN CERTIFICATE-----/g) || []).length, 1);
+
+  const certificate = new crypto.X509Certificate(firstPem);
+  assert.match(certificate.subject, /Flame Chick POS QZ Signing Certificate/);
+});
+
+test('RSA-SHA512 verification rejects a signature made by a different key', function () {
+  const bundle = fs.readFileSync(path.join(__dirname, '..', 'qz', 'digital-certificate.txt'), 'utf8');
+  const firstPem = extractFirstCertificatePem(bundle);
+  const otherKeyPair = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const request = 'synthetic QZ signing verification test';
+  const signature = crypto.sign('RSA-SHA512', Buffer.from(request, 'utf8'), otherKeyPair.privateKey);
+  assert.equal(verifyQzSignature(request, signature, firstPem), false);
 });
