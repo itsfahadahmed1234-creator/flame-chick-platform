@@ -1,19 +1,21 @@
-# Flame Chick POS — QZ root CA Base64 correction
+# Flame Chick POS — QZ root CA correction and development-PC checkpoint
 
 **Date:** 2026-11-26  
-**Scope:** Preview-only QZ certificate-bundle correction. No Production deployment, Supabase change, key rotation, POS order workflow change, or physical print test.
+**Scope:** Preview-only QZ certificate correction and development-workstation verification. All QZ connection, printer-discovery, and queue-submission checks described below were performed on the **development PC**, not the restaurant's PC. No Production deployment, Supabase change, key rotation, POS order workflow change, or physical print test.
 
 ## Confirmed evidence
 
 - Repository: `itsfahadahmed1234-creator/flame-chick-platform`
 - Branch: `work/production-source-audit`
-- Pre-fix branch head: `bdf6bcdd41038b28d185d5cdcdf582575b231c18`
+- Corrected-certificate commit: `1e2c5901f793df91bebdcad0a29dfe9156243c02`
+- Preview deployment: `dpl_CGF4Sr8Qe5s3pXV1VVM9idZZrNpZ`
+- Preview URL: `https://flame-chick-pos-production-jtv058kdd-befahad1234-7050.vercel.app`
 - QZ Tray runtime: 2.3.0+1
 - QZ JavaScript client: 2.2.5
 - The user's QZ Tray Details screenshot showed the expected Flame Chick POS leaf certificate, a valid request signature, but `Trusted: Untrusted website`.
 - The screenshot's displayed SHA-1 fingerprint prefix `d11569a30fbb7b593b6c728d7ccef667` matches the SHA-1 fingerprint of the leaf certificate in the deployed POS bundle.
 - The second PEM block (Flame Chick QZ Signing Root CA) had a Base64 body of 1,265 characters. A Base64 body cannot have length congruent to 1 modulo 4, so the root could not be decoded as X.509.
-- The user's installed `override.crt` had the same malformed root block.
+- The user's original installed `override.crt` had the same malformed root block.
 - The malformed fragment was `CggEBAALZVRXUi`; the corrected fragment is `CggEBALZVRXUi` (remove one duplicated `A`).
 
 ## Cryptographic verification of corrected chain
@@ -29,20 +31,49 @@ The corrected root parses as an X.509 certificate, is self-issued, and its self-
 
 - Corrected only the duplicated Base64 character in `apps/flame-chick-pos/qz/digital-certificate.txt`.
 - Added a regression test to parse both PEM blocks, verify the root self-signature, confirm the leaf/root issuer relationship, and verify the leaf signature using the root public key.
+- Automated tests were authored but were not run in a Node test environment during this checkpoint.
 - No changes to `qz-printing.js`, `api/qz/sign.js`, staff permissions, order code, Supabase, or `main`.
 
-## Next verification
+## Follow-up performed on the development PC
 
-1. Verify the new GitHub commit and its Vercel Preview deployment are READY.
-2. Download the corrected second certificate block from the new Preview or use the supplied corrected `override.crt` artifact.
-3. Back up the currently installed override file (the backup made before the first replacement must remain intact).
-4. Replace the malformed installed override with the corrected root.
-5. Fully exit and restart QZ Tray.
-6. Refresh the Preview and run **Find Windows Printers**.
-7. Inspect QZ Details. Expected: Signature Valid and Trusted/Verified.
-8. Only if QZ shows the certificate as trusted, select Remember and Allow. Confirm it moves to the Allowed list.
-9. Do not run another physical print until the trust result is verified. Kitchen printing stays disabled.
+The corrected certificate and QZ connection flow were subsequently tested on the **development PC only**:
+
+1. The user backed up the previous installed override certificate as `override-original-2026-11-26.crt` and installed the corrected `override.crt`.
+2. QZ Tray was restarted. The troubleshooting log showed it loading the corrected CA: `CN=Flame Chick QZ Signing Root CA, O=Flame Chick`.
+3. The POS initially could not establish its QZ connection. The official QZ demo connected successfully. After the user allowed the required app/local loopback access for the POS, the POS-to-QZ connection worked.
+4. QZ Tray Site Manager showed both **QZ Industries, LLC** and **Flame Chick POS** in the **Allowed** list. Keep both entries; do not remove either.
+5. **Find Windows Printers** successfully discovered Windows printer queues.
+6. A synthetic diagnostic receipt test was submitted to the Windows print queue. This was a diagnostic test, not a customer order or kitchen job.
+
+### What this does and does not prove
+
+**Confirmed on the development PC:** QZ Tray was running; the corrected root CA was loaded; the POS connected after the required app/local access was allowed; the QZ identities were allowed; Windows printer discovery worked; and a synthetic test job was accepted into a Windows print queue.
+
+**Not confirmed:** No physical printer was attached/available for this development-PC test, so no paper receipt was produced. Paper width, alignment, font rendering, character encoding on the target printer, cutter behavior, printer-driver compatibility, and final physical output remain untested. A Windows queue accepting a job is not proof that a printer physically printed it.
+
+If the synthetic diagnostic job is still pending in a Windows queue, cancel it so it cannot unexpectedly print when a printer becomes available. Keep normal order direct-printing and kitchen printing disabled until the appropriate real hardware has been tested.
+
+## Workstation boundary — important
+
+The above is **development-PC validation only**. It must not be described as installation, setup, or successful testing on the restaurant's PC.
+
+The restaurant's PC remains a separate pending workstation task. When work moves there, configure and verify QZ Tray, the corrected trust certificate, and the required browser/app local-network permissions on that PC itself. Then discover the restaurant PC's actual printer and perform a physical test only when its printer is connected and available. Do not infer restaurant-PC readiness from the development-PC result.
+
+## Next task: match the restaurant's receipt styling
+
+The next development task is to make the Flame Chick POS customer receipt match the restaurant's existing receipt style.
+
+**Required source before styling changes:** obtain a clear, straight, full-length photo or scan of an actual restaurant receipt (top/header through the bottom/footer). Redact customer names, phone numbers, addresses, order identifiers, and payment details where possible. Do not invent the visual design or assume the paper width.
+
+Once the reference is available:
+
+1. Inspect the receipt's actual layout and compare it with the current POS receipt renderer and QZ payload.
+2. Record the reference's paper width/printable area where known, header/logo treatment, text sizing and alignment, separators, item and modifier layout, quantities and prices, totals/fees, and footer.
+3. Make the styling changes on `work/production-source-audit` and verify the generated synthetic receipt payload/preview in Preview. Preserve the existing order behavior and keep kitchen printing disabled.
+4. Defer physical alignment, paper-feed, encoding, and cutter verification until the actual restaurant printer is available.
+
+Do not begin by assuming a standard 80 mm or 58 mm format; use the restaurant's physical receipt/reference and printer configuration as the source of truth.
 
 ## Safety boundary
 
-This is a certificate-encoding correction, not a certificate/key rotation. Preview only. Production branch `main`, production domains, Vercel production target, Supabase, customer orders, payments, and Windows trust stores other than the user's explicit QZ `override.crt` replacement remain untouched.
+Preview and development PC only. No Production deployment, production-domain change, Vercel production-target change, Supabase change, real customer order/payment, order-workflow or role change, or kitchen-printing enablement is authorized by this checkpoint. Preserve the production branch `main` and the ongoing shared-branch work.
