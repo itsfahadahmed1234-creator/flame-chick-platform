@@ -95,11 +95,13 @@ test('public QZ certificate file contains only the signing leaf and leaves root 
   assert.match(leaf.issuer, /Flame Chick QZ Signing Root CA/);
 });
 
-test('QZ signer origin policy accepts only HTTPS Preview hosts for the new POS project and team', function () {
+test('QZ signer origin policy accepts the intended production hostname and only approved HTTPS Preview hosts', function () {
+  assert.equal(qzSigner.isAllowedOrigin('https://flamechick-pos.vercel.app'), true);
   assert.equal(qzSigner.isAllowedOrigin('https://flame-chick-pos-development-git-work-production-source-audit-faha-d.vercel.app'), true);
   assert.equal(qzSigner.isAllowedOrigin('https://flame-chick-pos-development-a1b2c3d4-faha-d.vercel.app'), true);
   assert.equal(qzSigner.isAllowedOrigin('https://flamechicpos.vercel.app'), true);
 
+  assert.equal(qzSigner.isAllowedOrigin('https://flamechick-pos.vercel.com'), false);
   assert.equal(qzSigner.isAllowedOrigin('http://flame-chick-pos-development-git-work-production-source-audit-faha-d.vercel.app'), false);
   assert.equal(qzSigner.isAllowedOrigin('https://flame-chick-pos-development-git-work-production-source-audit-other-team.vercel.app'), false);
   assert.equal(qzSigner.isAllowedOrigin('https://flame-chick-pos-development-git-work-production-source-audit-faha-d.vercel.app:8443'), false);
