@@ -86,7 +86,7 @@ test('RSA-SHA512 verification rejects a signature made by a different key', func
 test('public QZ certificate file contains only the signing leaf and leaves root CA trust external', function () {
   const bundlePath = path.join(__dirname, '..', 'qz', 'digital-certificate.txt');
   const bundle = fs.readFileSync(bundlePath, 'utf8');
-  const certificateBlocks = bundle.match(/-----BEGIN CERTIFICATE-----[\\s\\S]*?-----END CERTIFICATE-----/g) || [];
+  const certificateBlocks = bundle.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g) || [];
 
   assert.equal(certificateBlocks.length, 1, 'public POS certificate file must contain only the leaf certificate');
 
