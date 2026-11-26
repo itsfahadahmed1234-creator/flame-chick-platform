@@ -60,12 +60,6 @@
       guard.canSubmitOrders(root.location && root.location.hostname);
   }
 
-  function isTestCheckoutPreview() {
-    var guard = root.FlameChickWebsitePreviewGuard;
-    return !!guard && typeof guard.isTestCheckoutPreview === 'function' &&
-      guard.isTestCheckoutPreview(root.location && root.location.hostname);
-  }
-
   function syncCatalogDialogState() {
     var productDialog = $('product-dialog');
     var dealDialog = $('deal-dialog');
@@ -74,17 +68,12 @@
   }
 
   function applyPreviewReadOnlyMode() {
-    var testPreview = isTestCheckoutPreview();
     var preview = !orderWritesAllowed();
     document.body.classList.toggle('fc-website-preview-readonly', preview);
-    document.body.classList.toggle('fc-website-preview-test-checkout', testPreview);
-    $('fc-preview-checkout-notice').hidden = !(preview || testPreview);
-    if (testPreview) {
+    $('fc-preview-checkout-notice').hidden = !preview;
+    if (preview) {
       $('fc-preview-checkout-notice').textContent =
-        'TEST CHECKOUT PREVIEW: a successful submission creates a clearly marked test order in the Flame Chick database and POS. Do not prepare, dispatch or collect payment.';
-    } else if (preview) {
-      $('fc-preview-checkout-notice').textContent =
-        'Preview mode is read-only here. Cart and catalogue review are available, but checkout writes are disabled.';
+        'Website Preview is read-only. Browse the menu and review the cart; order submission is disabled.';
       $('place-order').disabled = true;
       $('retry-order').disabled = true;
     }
@@ -955,14 +944,11 @@
       branch_id: context.branchId,
       fulfillment_type: context.fulfilmentType,
       customer: {
-        name: isTestCheckoutPreview() ? ('[WEBSITE QA TEST] ' + name).slice(0, 160) : name,
+        name: name,
         phone: phone,
         email: email || null
       },
-      notes: isTestCheckoutPreview()
-        ? ('[WEBSITE PREVIEW QA TEST — DO NOT PREPARE / DISPATCH / COLLECT PAYMENT] ' +
-            $('order-notes').value.trim()).slice(0, 500)
-        : ($('order-notes').value.trim() || null),
+      notes: $('order-notes').value.trim() || null,
       delivery: delivery,
       items: state.cart.map(function (row) {
         var item = clone(row.payload);
@@ -1056,7 +1042,7 @@
       var uncertain = !error.status || error.status >= 500;
       state.checkoutUncertain = uncertain;
       if (uncertain) {
-        status('We could not confirm the response. Your request ID is preserved; retry this same order request without changing its details.', 'error');
+        status('We could not confirm the response. Your request ID is preserved. Retry this same order request without changing its details.', 'error');
         $('retry-order').hidden = false;
         $('retry-order').disabled = false;
       } else {
@@ -1203,9 +1189,9 @@
       state.loaded = true;
       if ($('publication-meta')) $('publication-meta').hidden = true;
       var previewReadOnly = applyPreviewReadOnlyMode();
-      pageStatus(isTestCheckoutPreview()
-        ? 'Published menu verified · controlled QA checkout enabled.'
-        : (previewReadOnly ? 'Published menu verified · Preview only · checkout disabled.' : 'Published menu verified.'), 'ready');
+      pageStatus(previewReadOnly
+        ? 'Published menu verified · Website Preview only · checkout disabled.'
+        : 'Published menu verified.', 'ready');
       renderCatalog();
       renderCart();
       syncFulfilmentControls();
