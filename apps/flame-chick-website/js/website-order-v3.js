@@ -169,6 +169,15 @@
     }) || null;
   }
 
+  function syncPaymentMethod() {
+    var context = currentContext();
+    var pickup = !!context && context.fulfilmentType === 'pickup';
+    $('checkout-payment-method').textContent = pickup ? 'Cash at takeaway collection' : 'Cash on Delivery';
+    $('checkout-payment-note').textContent = pickup
+      ? 'Pay in cash when you collect your takeaway.'
+      : 'Pay in cash when your delivery arrives.';
+  }
+
   function syncFulfilmentControls() {
     var selected = state.branchSelection && state.branchSelection.getState();
     var available = selected ? selected.availableFulfilmentTypes : [];
@@ -176,6 +185,7 @@
     $('fulfilment-pickup').disabled = state.busy || state.checkoutUncertain || available.indexOf('pickup') < 0;
     $('fulfilment-delivery').checked = !!selected && selected.fulfilmentType === 'delivery';
     $('fulfilment-pickup').checked = !!selected && selected.fulfilmentType === 'pickup';
+    syncPaymentMethod();
   }
 
   function itemCountLabel() {
