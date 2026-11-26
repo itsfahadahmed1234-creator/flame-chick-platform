@@ -91,3 +91,56 @@ test('both certificates in the public bundle parse and the root verifies the POS
   assert.equal(leaf.issuer, root.subject, 'POS signing certificate should be issued by the Flame Chick root');
   assert.equal(leaf.verify(root.publicKey), true, 'POS signing certificate should verify with the root public key');
 });
+
+
+test('restaurant receipt payload contains branding, invoice, dine-in details, line prices and paid total', function () {
+  const helpers = loadQzHelpers();
+  const payload = helpers.buildReceiptPayload({
+    serverOrderNumber: 'FC-TEST-001',
+    createdAt: '2026-11-25T15:20:00.000Z',
+    fulfillmentType: 'Dine-in',
+    cashierName: 'Hanzala',
+    guestsServed: 1,
+    tableNumber: 'G3',
+    paymentMethod: 'Easypaisa',
+    paymentStatus: 'Paid',
+    paidAmount: 4348,
+    subtotal: 3998,
+    surcharge: 350,
+    total: 4348,
+    items: [
+      { itemName: 'Half Broast', quantity: 1, price: 1599, lineTotal: 1599 },
+      { itemName: 'Full Broast', quantity: 1, price: 2399, lineTotal: 2399 }
+    ]
+  });
+  const readable = helpers.formatEscPosPayload(payload);
+  [
+    'FLAME CHICK', 'ORIGINAL BILL', 'Invoice #FC-TEST-001', 'DINE-IN',
+    'Cashier', 'Hanzala', 'Guests Served', 'Table', 'G3', 'Half Broast', 'Full Broast',
+    'Price', 'Surcharge', 'Grand Total', 'Easypaisa', 'PAID'
+  ].forEach(function (value) {
+    assert.ok(readable.includes(value), 'receipt should contain ' + value);
+  });
+  assert.match(readable, /Half Broast @1,599\s+Rs 1,599/);
+  assert.match(readable, /Full Broast @2,399\s+Rs 2,399/);
+});
+
+test('receipt payload omits cashier, guest and surcharge details when not supplied', function () {
+  const helpers = loadQzHelpers();
+  const readable = helpers.formatEscPosPayload(helpers.buildReceiptPayload({
+    serverOrderNumber: 'FC-TEST-002',
+    fulfillmentType: 'Delivery',
+    paymentMethod: 'COD',
+    paymentStatus: 'Unpaid',
+    subtotal: 899,
+    deliveryFee: 100,
+    total: 999,
+    items: [{ itemName: 'Quarter Broast', quantity: 1, price: 899, lineTotal: 899 }]
+  }));
+  ['Invoice #FC-TEST-002', 'DELIVERY', 'Delivery', 'Quarter Broast', 'Balance Due', 'UNPAID'].forEach(function (value) {
+    assert.ok(readable.includes(value), 'receipt should contain ' + value);
+  });
+  ['Cashier', 'Guests Served', 'Surcharge'].forEach(function (value) {
+    assert.equal(readable.includes(value), false, 'receipt should omit unavailable ' + value);
+  });
+});

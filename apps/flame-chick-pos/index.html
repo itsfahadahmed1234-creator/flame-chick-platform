@@ -303,16 +303,30 @@ body{background:var(--bg);color:var(--text)}
 .receipt-head{flex:0 0 auto;padding:11px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff}
 .receipt-head h3{margin:0;font-size:16px}.receipt-head p{margin:2px 0 0;color:var(--muted);font-size:10px}.receipt-head p.receipt-status-error{color:#b42318;font-size:12px;font-weight:850;line-height:1.45;max-width:440px}
 .receipt-scroll{flex:1 1 auto;min-height:0;overflow:hidden;padding:8px;background:#eef0f3;display:flex;justify-content:center;align-items:flex-start}
-.receipt-paper{width:100%;max-width:450px;margin:0 auto;background:#fff;border:1px solid #d4d8df;border-radius:6px;box-shadow:0 4px 14px rgba(16,24,40,.08);padding:13px 14px;color:#111;transform-origin:top center}
-.receipt-brand{text-align:center;font-weight:1000;font-size:19px;letter-spacing:.3px}
-.receipt-sub{text-align:center;font-size:9px;color:#4d5560;margin-top:1px}
-.receipt-rule{border-top:1px dashed #9ba3ad;margin:7px 0}
-.receipt-meta{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:10px;line-height:1.25}.receipt-meta strong{font-weight:900;text-align:right;overflow-wrap:anywhere}
-.receipt-item-head,.receipt-item{display:grid;grid-template-columns:minmax(0,1fr) 34px 74px;gap:6px;font-size:10px;align-items:start}
-.receipt-item-head{font-weight:900;font-size:9px;color:#454d57;margin-bottom:3px}.receipt-item{margin:3px 0;line-height:1.25}.receipt-item .qty{text-align:center;margin:0;display:block}.receipt-item .amount{text-align:right;font-weight:800}.receipt-item-contents{display:block;font-size:8px;line-height:1.15;color:#555;margin-top:1px}
-.receipt-summary{border-top:1px dashed #9ba3ad;margin-top:7px;padding-top:6px;display:grid;gap:3px;font-size:10px}.receipt-summary .sumrow{display:flex;justify-content:space-between;gap:10px}.receipt-summary .total{font-size:14px;font-weight:1000;padding-top:3px}
-.receipt-notes{margin-top:7px;font-size:9px;line-height:1.3;border:1px solid #d6dae0;border-radius:5px;padding:5px;background:#f7f8fa}
-.receipt-footer{text-align:center;font-size:8px;color:#5b6470;margin-top:7px}
+.receipt-paper{width:72mm;max-width:72mm;margin:0 auto;background:#fff;border:1px solid #d4d8df;border-radius:6px;box-shadow:0 4px 14px rgba(16,24,40,.08);padding:3mm;color:#111;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;font-size:10px;line-height:1.25}
+.receipt-business{text-align:center}
+.receipt-logo{display:block;width:31mm;height:auto;margin:0 auto 2mm;object-fit:contain}
+.receipt-brand{text-align:center;font-weight:1000;font-size:20px;letter-spacing:.3px}
+.receipt-contact{text-align:center;font-size:8px;color:#333;line-height:1.2;margin-top:2px}
+.receipt-rule{border-top:1px dashed #111;margin:6px 0}
+.receipt-title{text-align:center;font-weight:900;font-size:11px}
+.receipt-invoice{text-align:center;font-weight:800;font-size:10px;margin-top:2px}
+.receipt-type{text-align:center;font-weight:900;font-size:19px;letter-spacing:.4px;margin:5px 0}
+.receipt-meta{display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 8px;font-size:9px;line-height:1.25}
+.receipt-meta strong{font-weight:700;text-align:right;overflow-wrap:anywhere}
+.receipt-item-head,.receipt-item{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;font-size:9px;line-height:1.25}
+.receipt-item-head{font-weight:900;font-size:9px;margin-bottom:3px}
+.receipt-item{margin:3px 0}
+.receipt-item .item-name{flex:1;min-width:0;overflow-wrap:anywhere}
+.receipt-item .amount{white-space:nowrap;text-align:right;font-weight:800}
+.receipt-item-contents{display:block;font-size:8px;line-height:1.15;color:#444;margin-top:1px}
+.receipt-summary{border-top:1px dashed #111;margin-top:6px;padding-top:5px;display:grid;gap:3px;font-size:9px}
+.receipt-summary .sumrow{display:flex;justify-content:space-between;gap:8px}
+.receipt-summary .sumrow strong{white-space:nowrap}
+.receipt-summary .total{font-size:12px;font-weight:1000;margin-top:2px}
+.receipt-payment{display:flex;justify-content:space-between;gap:8px;font-size:10px;font-weight:800;margin-top:6px}
+.receipt-paid{text-align:center;font-size:14px;font-weight:1000;letter-spacing:1px;margin-top:5px}
+.receipt-notes{margin-top:6px;font-size:8px;line-height:1.3;border:1px dashed #888;padding:4px}
 .receipt-actions{flex:0 0 auto;padding:9px 12px;border-top:1px solid var(--line);background:#fff;display:flex;justify-content:flex-end;gap:8px}
 .receipt-actions .print-btn{min-width:210px;min-height:42px}
 .receipt-sync-note{display:none}
@@ -321,16 +335,10 @@ body{background:var(--bg);color:var(--text)}
 @media (prefers-reduced-motion:no-preference){
   .btn,.category-tab,.type-btn,.pay-btn,.qbtn,.local-order-card,.order-card{transition:background-color .12s ease,border-color .12s ease,box-shadow .12s ease,transform .12s ease}
 }
-@media print{
-  body{background:#fff!important}
-  body>*{display:none!important}
-  #thermalPrintFrame{display:block!important}
-  @page{size:80mm auto;margin:0}
-}
 @media(max-width:600px){
   .order-detail-modal,.history-modal,.receipt-modal{width:calc(100vw - 12px);max-height:calc(100vh - 12px)}
   .order-detail-head{padding:12px}.order-detail-body-scroll{padding:12px}.order-detail-actions{padding:10px 12px}
-  .receipt-paper{padding:11px 10px}.receipt-actions{padding:9px}.receipt-actions .print-btn{width:100%}
+  .receipt-paper{padding:3mm}.receipt-actions{padding:9px}.receipt-actions .print-btn{width:100%}
 }
 
 
@@ -508,9 +516,12 @@ html,body{background:var(--bg);overflow:hidden}
 .btn-print:hover{background:#2d3a48}
 #printArea{display:none}
 @media print{
-  body *{visibility:hidden!important}
+  html,body{width:80mm!important;margin:0!important;padding:0!important;background:#fff!important}
+  body,body *{visibility:hidden!important}
   #printArea,#printArea *{visibility:visible!important}
-  #printArea{display:block!important;position:fixed;left:0;top:0;z-index:99999;background:#fff;padding:0;margin:0;border:0}
+  #printArea{display:block!important;position:static!important;width:72mm!important;max-width:72mm!important;margin:0 auto!important;padding:0!important;border:0!important;background:#fff!important}
+  #printArea .receipt-paper{width:72mm!important;max-width:72mm!important;margin:0!important;padding:2mm 3mm!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+  .receipt-actions,.receipt-head{display:none!important}
   @page{size:80mm auto;margin:0}
 }
 .scheduled-orders-section{margin-top:8px;padding-top:8px;border-top:1px dashed #d8d1ca}
@@ -1367,7 +1378,7 @@ html,body{background:var(--bg);overflow:hidden}
 </div>
 <div id="toast" class="toast"></div>
 <div id="queueModal" class="modal-wrap"><div class="modal"><h3>Local POS Orders</h3><p>Delivery, Takeaway and Dine-in orders are saved in IndexedDB first, then synchronized to the Production database when internet and staff access are available. Orders needing review stay in this queue until corrected. Use Backup in System &amp; Data to export local records.</p><div id="queueBody"></div><div class="modal-actions"><button class="btn" onclick="closeModal('queueModal')">Close</button></div></div></div>
-remove old History modal<div id="choiceModal" class="modal-wrap"><div class="modal pizza-choice"><h3 id="choiceTitle"></h3><div id="choiceBody"></div><div class="modal-actions"><button class="btn" onclick="closeModal('choiceModal')">Cancel</button></div></div></div>
+<div id="choiceModal" class="modal-wrap"><div class="modal pizza-choice"><h3 id="choiceTitle"></h3><div id="choiceBody"></div><div class="modal-actions"><button class="btn" onclick="closeModal('choiceModal')">Cancel</button></div></div></div>
 <div id="orderDetailModal" class="modal-wrap">
   <div class="modal order-detail-modal">
     <div class="order-detail-head">
@@ -1855,12 +1866,35 @@ function printOnlineOrderReceipt(order){
   if(!order)return;
   if(!printSettings.counterEnabled&&!printSettings.kitchenEnabled){showToast('All printing destinations are disabled. Enable one in System settings.');return false;}
   const hasItems=Array.isArray(order.items)&&order.items.length>0;
-  const o={serverOrderId:order.OrderID||order.serverOrderId||'',customerName:order.CustomerName||order.customerName||'',phone:order.Phone||order.phone||'',address:order.Address||order.address||'',area:order.Area||order.area||'',fulfillmentType:order.FulfillmentType||order.fulfillmentType||'Delivery',paymentMethod:order.PaymentMethod||order.paymentMethod||'Cash',paymentStatus:order.PaymentStatus||order.paymentStatus||'',notes:order.Notes||order.notes||'',items:hasItems?order.items.map(it=>({itemName:it['Item Name']||it.ItemName||it.itemName||it.name||'Item',quantity:Number(it.Quantity??it.quantity)||1,price:Number(it.Price??it.price)||0,lineTotal:Number(it['Line Total']??it.LineTotal??it.lineTotal)||0,description:it.Description||it.description||'',contents:Array.isArray(it.contents)?it.contents:[]})):[]};
-  const subtotal=o.items.reduce((s,it)=>s+(it.lineTotal||it.price*it.quantity||0),0);
+  const o={
+    serverOrderId:order.OrderID||order.serverOrderId||'',
+    serverOrderNumber:order.OrderNumber||order.serverOrderNumber||order.OrderID||order.serverOrderId||'',
+    customerName:order.CustomerName||order.customerName||'',
+    phone:order.Phone||order.phone||'',
+    address:order.Address||order.address||'',
+    area:order.Area||order.area||'',
+    fulfillmentType:order.FulfillmentType||order.fulfillmentType||'Delivery',
+    tableNumber:order.TableNumber||order.tableNumber||'',
+    cashierName:order.CashierName||order.cashierName||'',
+    guestsServed:order.GuestsServed??order.guestsServed??'',
+    paymentMethod:order.PaymentMethod||order.paymentMethod||'Cash',
+    paymentStatus:order.PaymentStatus||order.paymentStatus||'',
+    paidAmount:Number(order.PaidAmount??order.paidAmount)||0,
+    balanceDue:Number(order.BalanceDue??order.balanceDue)||0,
+    surcharge:Number(order.Surcharge??order.surcharge)||0,
+    notes:order.Notes||order.notes||'',
+    items:hasItems?order.items.map(function(it){
+      return {itemName:it['Item Name']||it.ItemName||it.itemName||it.name||'Item',
+        quantity:Number(it.Quantity??it.quantity)||1,price:Number(it.Price??it.price)||0,
+        lineTotal:Number(it['Line Total']??it.LineTotal??it.lineTotal)||0,
+        description:it.Description||it.description||'',contents:Array.isArray(it.contents)?it.contents:[]};
+    }):[]
+  };
+  const subtotal=o.items.reduce(function(sum,it){return sum+(it.lineTotal||it.price*it.quantity||0);},0);
   o.subtotal=Number(order.Subtotal||order.subtotal)||subtotal;
   o.deliveryFee=Number(order.DeliveryFee||order.deliveryFee)||0;
   o.discount=Number(order.Discount||order.discount)||0;
-  o.total=Number(order.Total||order.total)||o.subtotal+o.deliveryFee-o.discount;
+  o.total=Number(order.Total||order.total)||o.subtotal+o.surcharge+o.deliveryFee-o.discount;
   o.createdAt=order.DateTime||order.createdAt||new Date().toISOString();
   showPrintPreview(o);
 }
@@ -1883,33 +1917,7 @@ async function doPrintOrder(o){
   return printed;
 }
 async function printReceiptWithLabel(o,label){
-  const receiptHtml=`<div style="font-family:Arial,Segoe UI,sans-serif;font-size:11px;color:#111;width:72mm;padding:5mm 4mm;box-sizing:border-box">
-    <div style="text-align:center;font-size:19px;font-weight:900">Flame Chick</div>
-    <div style="text-align:center;font-size:9px;color:#444;margin-top:2px">${esc(label||'Receipt')}</div>
-    <div style="border-top:1px dashed #777;margin:9px 0"></div>
-    <div style="display:grid;grid-template-columns:1fr auto;gap:4px 8px;font-size:11px">
-      <span>Order</span><strong style="text-align:right;overflow-wrap:anywhere">${esc(o.serverOrderId)}</strong>
-      <span>Date</span><strong style="text-align:right">${esc(new Date(o.createdAt).toLocaleDateString())}</strong>
-      <span>Time</span><strong style="text-align:right">${esc(new Date(o.createdAt).toLocaleTimeString())}</strong>
-      <span>Type</span><strong style="text-align:right">${esc(o.fulfillmentType)}</strong>
-      <span>Payment</span><strong style="text-align:right">${esc(o.paymentMethod)}</strong>
-      ${o.customerName?`<span>Customer</span><strong style="text-align:right">${esc(o.customerName)}</strong>`:''}
-      ${o.phone?`<span>Phone</span><strong style="text-align:right">${esc(o.phone)}</strong>`:''}
-      ${o.address?`<span>Address</span><strong style="text-align:right">${esc(o.address)}</strong>`:''}
-      ${o.area?`<span>Area</span><strong style="text-align:right">${esc(o.area)}</strong>`:''}
-    </div>
-    <div style="border-top:1px dashed #777;margin:9px 0"></div>
-    <div style="display:grid;grid-template-columns:minmax(0,1fr) 22px 58px;gap:4px;font-weight:900;font-size:9px;color:#444"><span>ITEM</span><span>QTY</span><span style="text-align:right">AMOUNT</span></div>
-    ${o.items.map(it=>`<div style="display:grid;grid-template-columns:minmax(0,1fr) 22px 58px;gap:4px;margin:4px 0;font-size:11px"><span>${esc(it.itemName)}</span><span style="text-align:center">${it.quantity}</span><span style="text-align:right;font-weight:700">Rs. ${money(it.lineTotal||it.price*it.quantity)}</span></div>`).join('')}
-    <div style="border-top:1px dashed #777;margin:8px 0;padding-top:6px;display:grid;gap:4px;font-size:11px">
-      <div style="display:flex;justify-content:space-between"><span>Subtotal</span><strong>Rs. ${money(o.subtotal)}</strong></div>
-      <div style="display:flex;justify-content:space-between"><span>Delivery</span><strong>Rs. ${money(o.deliveryFee)}</strong></div>
-      <div style="display:flex;justify-content:space-between"><span>Discount</span><strong>Rs. ${money(o.discount)}</strong></div>
-      <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:900;margin-top:3px"><span>TOTAL</span><strong>Rs. ${money(o.total)}</strong></div>
-    </div>
-    ${o.notes?`<div style="margin-top:8px;border:1px solid #bbb;padding:5px;font-size:11px"><strong>Note:</strong> ${esc(o.notes)}</div>`:''}
-    <div style="text-align:center;font-size:9px;color:#555;margin-top:10px;line-height:1.35">Thank you for ordering from Flame Chick</div>
-  </div>`;
+  const receiptHtml=buildReceiptHtml(o);
   if(label===printSettings.counterLabel&&printSettings.qzDirectEnabled&&printSettings.qzPrinterName&&window.FlameChickQZ){
     try{
       if(!flameChickStaffSession?.access_token)throw new Error('Sign in to the POS before direct printing.');
@@ -4418,49 +4426,104 @@ function normalizeReceiptOrder(order){
   return {...order,items,subtotal:Number(order?.subtotal)===subtotal?Number(order.subtotal):subtotal,total:Number(order?.total)>0?Number(order.total):subtotal};
 }
 
+function receiptDateText(value){
+  const date=new Date(value||new Date().toISOString());
+  if(Number.isNaN(date.getTime()))return String(value||'');
+  const day=date.getDate();
+  const suffix=day%10===1&&day!==11?'st':day%10===2&&day!==12?'nd':day%10===3&&day!==13?'rd':'th';
+  const weekday=date.toLocaleDateString('en-US',{weekday:'short'});
+  const month=date.toLocaleDateString('en-US',{month:'long'});
+  const time=date.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}).replace(/\s/g,'');
+  return weekday+', '+month+' '+day+suffix+', '+time;
+}
 function buildReceiptHtml(order){
   order=normalizeReceiptOrder(order);
   const items=getLocalOrderItems(order);
-  const rows=items.length?items.map(it=>{
-    const qty=Number(it.quantity??it.Quantity)||1;
+  const invoice=order.serverOrderNumber||order.OrderNumber||order.invoiceNumber||order.InvoiceNumber||order.serverOrderId||order.OrderID||order.localOrderId||order.LocalOrderID||'';
+  const type=String(order.fulfillmentType||order.FulfillmentType||'Takeaway').toLowerCase();
+  const typeLabel=type.indexOf('dine')>=0?'DINE-IN':type.indexOf('delivery')>=0?'DELIVERY':'TAKEAWAY';
+  const meta=[['Placed',receiptDateText(order.createdAt||order.DateTime||order.placedAt||order.PlacedAt)]];
+  const cashier=order.cashierName||order.CashierName||order.cashier||'';
+  const guests=order.guestsServed??order.GuestsServed??order.guestCount??order.GuestCount??'';
+  const table=order.tableNumber||order.TableNumber||order.table||'';
+  if(cashier)meta.push(['Cashier',cashier]);
+  if(guests!==''&&guests!==null&&guests!==undefined)meta.push(['Guests Served',guests]);
+  if(table)meta.push(['Table',table]);
+  if(type.indexOf('delivery')>=0){
+    if(order.customerName||order.CustomerName)meta.push(['Customer',order.customerName||order.CustomerName]);
+    if(order.phone||order.Phone)meta.push(['Phone',order.phone||order.Phone]);
+    if(order.address||order.Address)meta.push(['Address',order.address||order.Address]);
+    if(order.area||order.Area)meta.push(['Area',order.area||order.Area]);
+  }
+  const metaHtml=meta.map(function(pair){return '<span>'+esc(pair[0])+'</span><strong>'+esc(pair[1])+'</strong>';}).join('');
+  const itemRows=items.length?items.map(function(it){
+    const qty=Math.max(1,Number(it.quantity??it.Quantity)||1);
     const name=it.itemName??it['Item Name']??it.ItemName??it.name??'Item';
     const price=Number(it.price??it.Price)||0;
     const line=Number(it.lineTotal??it.LineTotal??it['Line Total'])||(price*qty);
     const contents=Array.isArray(it.contents)?it.contents.filter(Boolean):[];
     const desc=String(it.description??it.Description??'').trim();
-    const lines=contents.length?contents:(desc&&String(name).toLowerCase().includes('deal')?desc.split(/\r?\n|\s*\+\s*/).map(x=>x.trim()).filter(Boolean):[]);
-    const detail=lines.length?`<small class="receipt-item-contents">${lines.map(v=>`• ${esc(v)}`).join('<br>')}</small>`:'';
-    return `<div class="receipt-item"><span>${esc(name)}${detail}</span><span class="qty">${qty}</span><span class="amount">Rs. ${money(line)}</span></div>`;
-  }).join(''):'<div class="receipt-item"><span>Item details unavailable</span><span class="qty">—</span><span class="amount">—</span></div>';
-  const id=order.serverOrderNumber||order.serverOrderId||order.localOrderId||'';
-  return `<div class="receipt-paper">
-    <div class="receipt-brand">Flame Chick</div>
-    <div class="receipt-sub">Order Receipt</div>
-    <div class="receipt-rule"></div>
-    <div class="receipt-meta">
-      <span>Order</span><strong class="mono">${esc(id)}</strong>
-      <span>Date</span><strong>${esc(new Date(order.createdAt).toLocaleDateString())}</strong>
-      <span>Time</span><strong>${esc(new Date(order.createdAt).toLocaleTimeString())}</strong>
-      <span>Type</span><strong>${esc(order.fulfillmentType||'Takeaway')}</strong>
-      ${order.tableNumber?`<span>Table</span><strong>${esc(order.tableNumber)}</strong>`:''}
-      <span>Payment</span><strong>${esc(order.paymentMethod||'Cash')}</strong>
-      ${order.customerName?`<span>Customer</span><strong>${esc(order.customerName)}</strong>`:''}
-      ${order.phone?`<span>Phone</span><strong>${esc(order.phone)}</strong>`:''}
-      ${order.address?`<span>Address</span><strong>${esc(order.address)}</strong>`:''}
-      ${order.area?`<span>Area</span><strong>${esc(order.area)}</strong>`:''}
-    </div>
-    <div class="receipt-rule"></div>
-    <div class="receipt-item-head"><span>ITEM</span><span>QTY</span><span style="text-align:right">AMOUNT</span></div>
-    ${rows}
-    <div class="receipt-summary">
-      <div class="sumrow"><span>Subtotal</span><strong>Rs. ${money(order.subtotal)}</strong></div>
-      <div class="sumrow"><span>Delivery</span><strong>Rs. ${money(order.deliveryFee)}</strong></div>
-      <div class="sumrow"><span>Discount</span><strong>Rs. ${money(order.discount)}</strong></div>
-      <div class="sumrow total"><span>TOTAL</span><strong>Rs. ${money(order.total)}</strong></div>
-    </div>
-    ${order.notes?`<div class="receipt-notes"><strong>Note:</strong> ${esc(order.notes)}</div>`:''}
-    <div class="receipt-footer">Thank you for ordering from Flame Chick</div>
-  </div>`;
+    const details=contents.length?contents:(desc&&String(name).toLowerCase().includes('deal')?desc.split(/\r?\n|\s*\+\s*/).map(function(x){return x.trim();}).filter(Boolean):[]);
+    const detail=details.length?'<small class="receipt-item-contents">'+details.map(function(v){return '• '+esc(v);}).join('<br>')+'</small>':'';
+    const unit=price>0?' @'+money(price):'';
+    return '<div class="receipt-item"><span class="item-name">'+qty+'x '+esc(name)+esc(unit)+detail+'</span><span class="amount">Rs '+money(line)+'</span></div>';
+  }).join(''):'<div class="receipt-item"><span class="item-name">Item details unavailable</span><span class="amount">—</span></div>';
+  const itemSubtotal=items.reduce(function(sum,it){
+    const q=Math.max(1,Number(it.quantity??it.Quantity)||1);
+    const price=Number(it.price??it.Price)||0;
+    return sum+(Number(it.lineTotal??it.LineTotal??it['Line Total'])||(price*q));
+  },0);
+  const suppliedSubtotal=Number(order.subtotal??order.Subtotal);
+  const priceTotal=Number.isFinite(suppliedSubtotal)&&suppliedSubtotal>=0?suppliedSubtotal:itemSubtotal;
+  const surcharge=Number(order.surcharge??order.Surcharge??order.serviceCharge??order.ServiceCharge)||0;
+  const deliveryFee=Number(order.deliveryFee??order.DeliveryFee)||0;
+  const discount=Number(order.discount??order.Discount)||0;
+  const suppliedTotal=Number(order.total??order.Total);
+  const total=Number.isFinite(suppliedTotal)&&suppliedTotal>0?suppliedTotal:Math.max(0,priceTotal+surcharge+deliveryFee-discount);
+  const summary=[['Price',priceTotal]];
+  if(surcharge>0)summary.push(['Surcharge',surcharge]);
+  if(deliveryFee>0)summary.push(['Delivery',deliveryFee]);
+  if(discount>0)summary.push(['Discount',discount]);
+  const summaryHtml=summary.map(function(pair){
+    return '<div class="sumrow"><span>'+esc(pair[0])+'</span><strong>Rs '+money(pair[1])+'</strong></div>';
+  }).join('');
+  const paymentMethod=order.paymentMethod||order.PaymentMethod||'Cash';
+  const paymentStatus=String(order.paymentStatus||order.PaymentStatus||'').toLowerCase();
+  const rawPaid=Number(order.paidAmount??order.PaidAmount);
+  const hasPaid=Number.isFinite(rawPaid)&&rawPaid>0;
+  const isPaid=paymentStatus==='paid'||(hasPaid&&rawPaid>=total&&total>0);
+  const paidAmount=hasPaid?rawPaid:(isPaid?total:0);
+  const paymentHtml=(isPaid||paidAmount>0)
+    ?'<div class="receipt-payment"><span>'+esc(paymentMethod)+'</span><strong>Rs '+money(paidAmount)+'</strong></div>'
+    :'<div class="receipt-payment"><span>Payment</span><strong>'+esc(paymentMethod)+'</strong></div>';
+  const balanceValue=Number(order.balanceDue??order.BalanceDue);
+  const balance=Number.isFinite(balanceValue)?balanceValue:Math.max(0,total-paidAmount);
+  const paidHtml=isPaid?'<div class="receipt-paid">* PAID *</div>':
+    ((paymentStatus==='unpaid'||paymentStatus==='pending'||paidAmount>0)
+      ?'<div class="receipt-payment"><span>Balance Due</span><strong>Rs '+money(balance)+'</strong></div><div class="receipt-paid">* UNPAID *</div>':'');
+  const notes=order.notes||order.Notes;
+  return '<div class="receipt-paper">'+
+    '<div class="receipt-business">'+
+      '<img class="receipt-logo" src="/assets/flame-chick-brand.svg" alt="Flame Chick logo">'+
+      '<div class="receipt-brand">Flame Chick</div>'+
+      '<div class="receipt-contact">Flame Chick, Main Kamra Road Opposite to Zellbury, Attock</div>'+
+      '<div class="receipt-contact">Phone: +923358044164</div>'+
+    '</div>'+
+    '<div class="receipt-rule"></div>'+
+    '<div class="receipt-title">*** Original Bill ***</div>'+
+    '<div class="receipt-invoice">Invoice #'+esc(invoice)+'</div>'+
+    '<div class="receipt-type">'+typeLabel+'</div>'+
+    '<div class="receipt-rule"></div>'+
+    '<div class="receipt-meta">'+metaHtml+'</div>'+
+    '<div class="receipt-rule"></div>'+
+    '<div class="receipt-item-head"><span>Item</span><span>Price</span></div>'+
+    itemRows+
+    '<div class="receipt-summary">'+summaryHtml+
+      '<div class="sumrow total"><span>Grand Total</span><strong>Rs '+money(total)+'</strong></div>'+
+    '</div>'+
+    paymentHtml+paidHtml+
+    (notes?'<div class="receipt-notes"><strong>Note:</strong> '+esc(notes)+'</div>':'')+
+  '</div>';
 }
 function openLocalReceipt(order,options={}){
   if(!order)return;
@@ -4673,39 +4736,13 @@ async function finalizeReceiptOrder(order){
 async function printThermalReceipt(order){
   order=normalizeReceiptOrder(order);
   const items=getLocalOrderItems(order);
-  const receiptHtml=`<div style="font-family:Arial,Segoe UI,sans-serif;font-size:11px;color:#111;width:72mm;padding:5mm 4mm;box-sizing:border-box">
-    <div style="text-align:center;font-size:19px;font-weight:900">Flame Chick</div>
-    <div style="text-align:center;font-size:9px;color:#444;margin-top:2px">Order Receipt</div>
-    <div style="border-top:1px dashed #777;margin:9px 0"></div>
-    <div style="display:grid;grid-template-columns:1fr auto;gap:4px 8px;font-size:11px">
-      <span>Order</span><strong style="text-align:right;overflow-wrap:anywhere">${esc(order.serverOrderNumber||order.serverOrderId||order.localOrderId||'')}</strong>
-      <span>Date</span><strong style="text-align:right">${esc(new Date(order.createdAt).toLocaleDateString())}</strong>
-      <span>Time</span><strong style="text-align:right">${esc(new Date(order.createdAt).toLocaleTimeString())}</strong>
-      <span>Type</span><strong style="text-align:right">${esc(order.fulfillmentType||'Takeaway')}</strong>
-      ${order.tableNumber?`<span>Table</span><strong style="text-align:right">${esc(order.tableNumber)}</strong>`:''}
-      <span>Payment</span><strong style="text-align:right">${esc(order.paymentMethod||'Cash')}</strong>
-      ${order.customerName?`<span>Customer</span><strong style="text-align:right">${esc(order.customerName)}</strong>`:''}
-      ${order.phone?`<span>Phone</span><strong style="text-align:right">${esc(order.phone)}</strong>`:''}
-      ${order.address?`<span>Address</span><strong style="text-align:right">${esc(order.address)}</strong>`:''}
-      ${order.area?`<span>Area</span><strong style="text-align:right">${esc(order.area)}</strong>`:''}
-    </div>
-    <div style="border-top:1px dashed #777;margin:9px 0"></div>
-    <div style="display:grid;grid-template-columns:minmax(0,1fr) 22px 58px;gap:4px;font-weight:900;font-size:9px;color:#444"><span>ITEM</span><span>QTY</span><span style="text-align:right">AMOUNT</span></div>
-    ${items.map(it=>{const q=Number(it.quantity??it.Quantity)||1;const n=it.itemName??it['Item Name']??it.ItemName??it.name??'Item';const price=Number(it.price??it.Price)||0;const line=Number(it.lineTotal??it.LineTotal??it['Line Total'])||(price*q);return `<div style="display:grid;grid-template-columns:minmax(0,1fr) 22px 58px;gap:4px;margin:4px 0;font-size:11px"><span>${esc(n)}</span><span style="text-align:center">${q}</span><span style="text-align:right;font-weight:700">Rs. ${money(line)}</span></div>`}).join('')}
-    <div style="border-top:1px dashed #777;margin:8px 0;padding-top:6px;display:grid;gap:4px;font-size:11px">
-      <div style="display:flex;justify-content:space-between"><span>Subtotal</span><strong>Rs. ${money(order.subtotal)}</strong></div>
-      <div style="display:flex;justify-content:space-between"><span>Delivery</span><strong>Rs. ${money(order.deliveryFee)}</strong></div>
-      <div style="display:flex;justify-content:space-between"><span>Discount</span><strong>Rs. ${money(order.discount)}</strong></div>
-      <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:900;margin-top:3px"><span>TOTAL</span><strong>Rs. ${money(order.total)}</strong></div>
-    </div>
-    ${order.notes?`<div style="margin-top:8px;border:1px solid #bbb;padding:5px;font-size:11px"><strong>Note:</strong> ${esc(order.notes)}</div>`:''}
-    <div style="text-align:center;font-size:9px;color:#555;margin-top:10px;line-height:1.35">Thank you for ordering from Flame Chick</div>
-  </div>`;
+  const receiptOrder={...order,items,serverOrderNumber:order.serverOrderNumber||order.serverOrderId||order.localOrderId};
+  const receiptHtml=buildReceiptHtml(receiptOrder);
   if(printSettings.qzDirectEnabled&&printSettings.qzPrinterName&&window.FlameChickQZ){
     try{
       if(!flameChickStaffSession?.access_token)throw new Error('Sign in to the POS before direct printing.');
       window.FlameChickQZ.setTokenProvider(()=>flameChickStaffSession?.access_token||'');
-      await window.FlameChickQZ.printReceipt({...order,items,serverOrderNumber:order.serverOrderNumber||order.serverOrderId||order.localOrderId},'Counter Receipt',printSettings.qzPrinterName);
+      await window.FlameChickQZ.printReceipt(receiptOrder,'Counter Receipt',printSettings.qzPrinterName);
       showToast('Receipt sent to '+printSettings.qzPrinterName);
       return true;
     }catch(error){showToast('Direct print unavailable · opening browser print. '+(error?.message||''));}

@@ -285,87 +285,86 @@
     return Number.isFinite(total) && total > 0 ? total : price * quantity;
   }
 
+  function receiptDateText(value) {
+    const date = new Date(value || new Date().toISOString());
+    if (Number.isNaN(date.getTime())) return cleanText(value || '');
+    const day = date.getDate();
+    const suffix = day % 10 === 1 && day !== 11 ? 'st' : day % 10 === 2 && day !== 12 ? 'nd' : day % 10 === 3 && day !== 13 ? 'rd' : 'th';
+    return date.toLocaleDateString('en-US',{weekday:'short'})+', '+date.toLocaleDateString('en-US',{month:'long'})+' '+day+suffix+', '+
+      date.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}).replace(/\s/g,'');
+  }
   function receiptCommands(order, label) {
-    const width = 48;
-    const ESC = '\x1B';
-    const rows = [
-      ESC + '\x40',
-      ESC + '\x74' + '\x00',
-      ESC + '\x61' + '\x01',
-      ESC + '\x45' + '\x01',
-      center('FLAME CHICK', width),
-      ESC + '\x45' + '\x00',
-      center(label || 'Order Receipt', width),
-      '',
-      ESC + '\x61' + '\x00',
-      '-'.repeat(width)
-    ];
-
-    const orderNumber = order.serverOrderNumber || order.OrderNumber || order.serverOrderId ||
-      order.OrderID || order.localOrderId || order.LocalOrderID || 'POS Order';
-    const createdAt = order.createdAt || order.DateTime || new Date().toISOString();
-    const date = new Date(createdAt);
-    const dateText = Number.isNaN(date.getTime()) ? cleanText(createdAt) :
-      date.toLocaleDateString('en-GB') + ' ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-
-    [
-      ['Order', orderNumber],
-      ['Date', dateText],
-      ['Type', order.fulfillmentType || order.FulfillmentType || 'Takeaway'],
-      ['Payment', order.paymentMethod || order.PaymentMethod || 'Cash']
-    ].forEach(function (pair) {
-      wrap(rightPair(pair[0], pair[1], width), width).forEach(row => rows.push(row));
+    const width=48, ESC='\x1B';
+    const fmt=v=>'Rs '+(Number(v)||0).toLocaleString('en-PK',{maximumFractionDigits:0});
+    const rows=[ESC+'\x40',ESC+'\x74'+'\x00',ESC+'\x61'+'\x01',ESC+'\x45'+'\x01',center('FLAME CHICK',width),ESC+'\x45'+'\x00'];
+    const itemPriceRows=function(label,amount){
+      const right=cleanText(amount);
+      const available=Math.max(1,width-right.length-1);
+      const leftRows=wrap(label,available);
+      const out=leftRows.slice(0,-1);
+      const last=leftRows[leftRows.length-1]||'';
+      out.push(last+' '.repeat(Math.max(1,width-last.length-right.length))+right);
+      return out;
+    };
+    ['Flame Chick, Main Kamra Road Opposite to Zellbury, Attock','Phone: +923358044164']
+      .forEach(v=>wrap(v,width).forEach(x=>rows.push(x)));
+    rows.push('',ESC+'\x45'+'\x01',center('*** ORIGINAL BILL ***',width),ESC+'\x45'+'\x00');
+    const id=order.serverOrderNumber||order.OrderNumber||order.invoiceNumber||order.InvoiceNumber||order.serverOrderId||order.OrderID||order.localOrderId||'POS Order';
+    rows.push(center('Invoice #'+id,width));
+    const ft=String(order.fulfillmentType||order.FulfillmentType||'Takeaway').toLowerCase();
+    rows.push(ESC+'\x45'+'\x01',center(ft.indexOf('dine')>=0?'DINE-IN':ft.indexOf('delivery')>=0?'DELIVERY':'TAKEAWAY',width),ESC+'\x45'+'\x00','',ESC+'\x61'+'\x00');
+    const meta=[['Placed',receiptDateText(order.createdAt||order.DateTime)],['Cashier',order.cashierName||order.CashierName||''],['Guests Served',order.guestsServed??order.GuestsServed??''],['Table',order.tableNumber||order.TableNumber||'']];
+    meta.forEach(p=>{if(p[1]!==''&&p[1]!==null&&p[1]!==undefined)wrap(rightPair(p[0],p[1],width),width).forEach(x=>rows.push(x));});
+    const customerName=order.customerName||order.CustomerName||'';
+    const phone=order.phone||order.Phone||'';
+    const address=order.address||order.Address||'';
+    const area=order.area||order.Area||'';
+    if(customerName)wrap('Customer: '+customerName,width).forEach(x=>rows.push(x));
+    if(phone)wrap('Phone: '+phone,width).forEach(x=>rows.push(x));
+    if(address)wrap('Address: '+address,width).forEach(x=>rows.push(x));
+    if(area)wrap('Area: '+area,width).forEach(x=>rows.push(x));
+    rows.push('-'.repeat(width),rightPair('Item','Price',width),'-'.repeat(width));
+    const items=Array.isArray(order.items)?order.items:[];
+    if(!items.length)rows.push('Item details unavailable');
+    items.forEach(item=>{
+      const name=item.itemName||item['Item Name']||item.ItemName||item.name||'Item';
+      const qty=Math.max(1,Number(item.quantity??item.Quantity)||1);
+      const price=Number(item.price??item.Price)||0;
+      const label=qty+'x '+name+(price>0?' @'+price.toLocaleString('en-PK',{maximumFractionDigits:0}):'');
+      itemPriceRows(label,fmt(lineTotal(item))).forEach(x=>rows.push(x));
+      const detail=Array.isArray(item.contents)?item.contents.join(', '):(item.description||item.Description||'');
+      if(detail)wrap('  '+detail,width).forEach(x=>rows.push(x));
     });
-
-    const customerName = order.customerName || order.CustomerName;
-    const phone = order.phone || order.Phone;
-    const address = order.address || order.Address;
-    const area = order.area || order.Area;
-    if (customerName) wrap('Customer: ' + customerName, width).forEach(row => rows.push(row));
-    if (phone) wrap('Phone: ' + phone, width).forEach(row => rows.push(row));
-    if (address) wrap('Address: ' + address, width).forEach(row => rows.push(row));
-    if (area) wrap('Area: ' + area, width).forEach(row => rows.push(row));
-
     rows.push('-'.repeat(width));
-    rows.push('ITEM / QTY / AMOUNT');
-    rows.push('-'.repeat(width));
-
-    const items = Array.isArray(order.items) ? order.items : [];
-    if (!items.length) rows.push('Item details unavailable');
-    items.forEach(function (item) {
-      const name = item.itemName || item['Item Name'] || item.ItemName || item.name || 'Item';
-      const quantity = Math.max(1, Number(item.quantity ?? item.Quantity) || 1);
-      wrap(quantity + ' x ' + name, width).forEach(row => rows.push(row));
-      const details = Array.isArray(item.contents) ? item.contents.join(', ') : (item.description || item.Description || '');
-      if (details) wrap('  ' + details, width).forEach(row => rows.push(row));
-      rows.push(rightPair('', money(lineTotal(item)), width));
-    });
-
-    rows.push('-'.repeat(width));
-    const subtotal = Number(order.subtotal ?? order.Subtotal) || 0;
-    const deliveryFee = Number(order.deliveryFee ?? order.DeliveryFee) || 0;
-    const discount = Number(order.discount ?? order.Discount) || 0;
-    const total = Number(order.total ?? order.Total) || (subtotal + deliveryFee - discount);
-    [
-      ['Subtotal', money(subtotal)],
-      ['Delivery', money(deliveryFee)],
-      ['Discount', money(discount)]
-    ].forEach(pair => rows.push(rightPair(pair[0], pair[1], width)));
-    rows.push(ESC + '\x45' + '\x01');
-    rows.push(rightPair('TOTAL', money(total), width));
-    rows.push(ESC + '\x45' + '\x00');
-
-    const notes = order.notes || order.Notes;
-    if (notes) {
-      rows.push('-'.repeat(width));
-      wrap('Note: ' + notes, width).forEach(row => rows.push(row));
-    }
+    const sub=Number(order.subtotal??order.Subtotal);
+    const subtotal=Number.isFinite(sub)&&sub>=0?sub:items.reduce((sum,item)=>sum+lineTotal(item),0);
+    const surcharge=Number(order.surcharge??order.Surcharge??order.serviceCharge??order.ServiceCharge)||0;
+    const delivery=Number(order.deliveryFee??order.DeliveryFee)||0;
+    const discount=Number(order.discount??order.Discount)||0;
+    const supplied=Number(order.total??order.Total);
+    const total=Number.isFinite(supplied)&&supplied>0?supplied:Math.max(0,subtotal+surcharge+delivery-discount);
+    rows.push(rightPair('Price',fmt(subtotal),width));
+    if(surcharge>0)rows.push(rightPair('Surcharge',fmt(surcharge),width));
+    if(delivery>0)rows.push(rightPair('Delivery',fmt(delivery),width));
+    if(discount>0)rows.push(rightPair('Discount',fmt(discount),width));
+    rows.push(ESC+'\x45'+'\x01',rightPair('Grand Total',fmt(total),width),ESC+'\x45'+'\x00');
+    const method=order.paymentMethod||order.PaymentMethod||'Cash';
+    const status=String(order.paymentStatus||order.PaymentStatus||'').toLowerCase();
+    const rawPaid=Number(order.paidAmount??order.PaidAmount);
+    const hasPaid=Number.isFinite(rawPaid)&&rawPaid>0;
+    const isPaid=status==='paid'||(hasPaid&&rawPaid>=total&&total>0);
+    const paid=hasPaid?rawPaid:(isPaid?total:0);
     rows.push('');
-    rows.push(ESC + '\x61' + '\x01');
-    rows.push('Thank you for ordering from Flame Chick');
-    rows.push(ESC + '\x61' + '\x00');
-    rows.push('', '', '', '');
-    return rows.join('\n') + '\n';
+    if(isPaid||paid>0)rows.push(rightPair(method,fmt(paid),width));else rows.push(rightPair('Payment',method,width));
+    if(isPaid)rows.push(ESC+'\x61'+'\x01',ESC+'\x45'+'\x01',center('* PAID *',width),ESC+'\x45'+'\x00',ESC+'\x61'+'\x00');
+    else if(status==='unpaid'||status==='pending'||paid>0){
+      const bal=Number(order.balanceDue??order.BalanceDue);
+      rows.push(rightPair('Balance Due',fmt(Number.isFinite(bal)?bal:Math.max(0,total-paid)),width),center('* UNPAID *',width));
+    }
+    const notes=order.notes||order.Notes;
+    if(notes){rows.push('-'.repeat(width));wrap('Note: '+notes,width).forEach(x=>rows.push(x));}
+    rows.push('','','','');
+    return rows.join('\n')+'\n';
   }
 
   function testCommands() {
@@ -782,6 +781,7 @@
     downloadDiagnosticFiles: downloadDiagnosticFiles,
     diagnostics: {
       buildTestPayload: testCommands,
+      buildReceiptPayload: receiptCommands,
       encodeCp437Ascii: encodeCp437Ascii,
       formatEscPosPayload: formatEscPosPayload
     }
