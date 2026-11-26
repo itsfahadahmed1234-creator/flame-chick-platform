@@ -43,15 +43,13 @@ jobs:
           npm install --global "vercel@65.17.0"
           vercel --version
 
-      - name: Link only the customer Website Vercel project
-        working-directory: apps/flame-chick-website
+      - name: Link only the customer Website Vercel project from the monorepo root
         run: |
           set -euo pipefail
           mkdir -p .vercel
           printf '{"orgId":"%s","projectId":"%s"}\n' "$VERCEL_ORG_ID" "$VERCEL_PROJECT_ID" > .vercel/project.json
 
       - name: Initialize the empty Vercel project without publishing a website
-        working-directory: apps/flame-chick-website
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
@@ -63,9 +61,9 @@ jobs:
           if [ "$deployment_count" -eq 0 ]; then
             bootstrap_dir="$(mktemp -d)"
             trap 'rm -rf "$bootstrap_dir"' EXIT
-            mkdir -p "$bootstrap_dir/.vercel"
+            mkdir -p "$bootstrap_dir/.vercel" "$bootstrap_dir/apps/flame-chick-website"
             cp .vercel/project.json "$bootstrap_dir/.vercel/project.json"
-            cat > "$bootstrap_dir/index.html" <<'HTML'
+            cat > "$bootstrap_dir/apps/flame-chick-website/index.html" <<'HTML'
           <!doctype html>
           <html lang="en">
           <meta charset="utf-8">
@@ -90,9 +88,8 @@ jobs:
             echo "Vercel project already has a deployment; no bootstrap deployment is needed."
           fi
 
-      - name: Deploy the customer Website as Preview only
+      - name: Deploy the customer Website as Preview only from the monorepo root
         id: deploy
-        working-directory: apps/flame-chick-website
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
