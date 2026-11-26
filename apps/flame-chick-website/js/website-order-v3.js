@@ -503,6 +503,7 @@
       $('cart-delivery-fee').textContent = pricing.deliveryFeeMinor === null ? 'Select a delivery area' : cardPrice(pricing.deliveryFeeMinor);
       $('cart-total').textContent = pricing.totalMinor === null ? '—' : cardPrice(pricing.totalMinor);
       $('cart-price-note').textContent = 'Prices and delivery fees are loaded from the published Supabase menu and branch settings. The Order API checks the current prices and fee again when you place the order.';
+      checkoutMotion('is-ready');
     } else {
       $('cart-subtotal').textContent = '—';
       $('cart-delivery-fee').textContent = '—';
