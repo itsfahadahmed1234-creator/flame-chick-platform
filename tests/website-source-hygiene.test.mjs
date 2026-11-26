@@ -317,5 +317,5 @@ test("the retired standalone ordering URL redirects into the primary homepage V3
   const standalone = readFileSync(join(root, "order-online-v3.html"), "utf8");
   assert.match(standalone, /http-equiv="refresh" content="0; url=index\\.html#menu"/);
   assert.match(standalone, /location\\.replace\\('index\\.html#menu'\\)/);
-  assert.doesNotMatch(standalone, /js\\/website-order-v3\\.js/);
+  assert.equal(standalone.includes('js/website-order-v3.js'), false);
 });
