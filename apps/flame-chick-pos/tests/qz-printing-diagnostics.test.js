@@ -7,6 +7,7 @@ const vm = require('node:vm');
 const crypto = require('node:crypto');
 const test = require('node:test');
 const { extractFirstCertificatePem, verifyQzSignature } = require('../api/qz/certificate-utils');
+const qzSigner = require('../api/qz/sign');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'qz-printing.js'), 'utf8');
 
@@ -59,7 +60,7 @@ test('CP437 diagnostic byte encoding fails closed for characters outside the ver
   }, /non-ASCII character/);
 });
 
-test('first public signing certificate is extracted correctly from the two-certificate PEM bundle', function () {
+test('first public signing certificate is extracted correctly from the leaf-only PEM file', function () {
   const bundlePath = path.join(__dirname, '..', 'qz', 'digital-certificate.txt');
   const bundle = fs.readFileSync(bundlePath, 'utf8');
   const firstPem = extractFirstCertificatePem(bundle);
@@ -82,22 +83,27 @@ test('RSA-SHA512 verification rejects a signature made by a different key', func
 });
 
 
-test('both certificates in the public bundle parse and the root verifies the POS signing certificate', function () {
+test('public QZ certificate file contains only the signing leaf and leaves root CA trust external', function () {
   const bundlePath = path.join(__dirname, '..', 'qz', 'digital-certificate.txt');
   const bundle = fs.readFileSync(bundlePath, 'utf8');
   const certificateBlocks = bundle.match(/-----BEGIN CERTIFICATE-----[\\s\\S]*?-----END CERTIFICATE-----/g) || [];
 
-  assert.equal(certificateBlocks.length, 2, 'bundle should contain one leaf and one root certificate');
+  assert.equal(certificateBlocks.length, 1, 'public POS certificate file must contain only the leaf certificate');
 
   const leaf = new crypto.X509Certificate(certificateBlocks[0]);
-  const root = new crypto.X509Certificate(certificateBlocks[1]);
-
   assert.match(leaf.subject, /Flame Chick POS QZ Signing Certificate/);
-  assert.match(root.subject, /Flame Chick QZ Signing Root CA/);
-  assert.equal(root.subject, root.issuer, 'root certificate should be self-issued');
-  assert.equal(root.verify(root.publicKey), true, 'root self-signature should verify');
-  assert.equal(leaf.issuer, root.subject, 'POS signing certificate should be issued by the Flame Chick root');
-  assert.equal(leaf.verify(root.publicKey), true, 'POS signing certificate should verify with the root public key');
+  assert.match(leaf.issuer, /Flame Chick QZ Signing Root CA/);
+});
+
+test('QZ signer origin policy accepts only HTTPS Preview hosts for the new POS project and team', function () {
+  assert.equal(qzSigner.isAllowedOrigin('https://flame-chick-pos-development-git-work-production-source-audit-faha-d.vercel.app'), true);
+  assert.equal(qzSigner.isAllowedOrigin('https://flame-chick-pos-development-a1b2c3d4-faha-d.vercel.app'), true);
+  assert.equal(qzSigner.isAllowedOrigin('https://flamechicpos.vercel.app'), true);
+
+  assert.equal(qzSigner.isAllowedOrigin('http://flame-chick-pos-development-git-work-production-source-audit-faha-d.vercel.app'), false);
+  assert.equal(qzSigner.isAllowedOrigin('https://flame-chick-pos-development-git-work-production-source-audit-other-team.vercel.app'), false);
+  assert.equal(qzSigner.isAllowedOrigin('https://flame-chick-pos-development-git-work-production-source-audit-faha-d.vercel.app:8443'), false);
+  assert.equal(qzSigner.isAllowedOrigin('https://flame-chick-pos-development.vercel.app'), false);
 });
 
 

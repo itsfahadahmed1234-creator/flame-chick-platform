@@ -1441,11 +1441,9 @@ html,body{background:var(--bg);overflow:hidden}
 const API_URL='https://adkrxfnawdiljhjaavnj.supabase.co/functions/v1/flame-chick-order-api';
 const FLAME_CHICK_DELIVERY_API='https://adkrxfnawdiljhjaavnj.supabase.co/functions/v1/flame-chick-delivery-api';
 const FLAME_CHICK_SUPABASE_URL='https://adkrxfnawdiljhjaavnj.supabase.co';
-// Staff API key for protected backend endpoints (newOrders, order, orderHistory, syncCheck, updatestatus).
-// SECURITY NOTE: This key is visible in browser source. The POS is an internal staff-only tool
-// served from a local file, not a public website. The backend key in ScriptProperties is the
-// real secret; this copy enables the POS to authenticate. Replace with a random key before
-// production launch if the POS URL is ever exposed publicly.
+// Retired Apps Script compatibility only. Active POS workflows use the authenticated Supabase APIs.
+// FLAME_CHICK_ORDER_API_READY remains true; legacy recovery/status paths must stay unreachable.
+// Keep this empty: never place a backend or Apps Script secret in browser source.
 const STAFF_API_KEY='';
 const DB_NAME='FLAME_CHICK_POS'; const DB_VERSION=6;
 const STORES={settings:'settings',menu:'menu',categories:'categories',deliveryAreas:'deliveryAreas',orders:'orders',queue:'queue',statusQueue:'statusQueue',tables:'tables',catalog:'catalog'};
@@ -2770,7 +2768,8 @@ function bindPreorderControls(){
   const qzDiagnosticBtn=$('qzDiagnosticDownloadBtn');
   function isQzDiagnosticPreviewHost(){
     const host=String(location.hostname||'').toLowerCase();
-    return /^flame-chick-pos-production-[a-z0-9-]+-(?:befahad1234-7050|fahad-7455)\.vercel\.app$/.test(host);
+    return /^flame-chick-pos-development-[a-z0-9-]+-faha-d\.vercel\.app$/.test(host) ||
+      /^flame-chick-pos-production-[a-z0-9-]+-(?:befahad1234-7050|fahad-7455)\.vercel\.app$/.test(host);
   }
   if(qzDiagnosticBtn&&!isQzDiagnosticPreviewHost()){
     qzDiagnosticBtn.disabled=true;
@@ -4165,7 +4164,7 @@ async function saveLocalOrder(){
   showToast('Takeaway saved locally — confirm the receipt to sync it to Production');
 }
 async function reconcileLocalOrderOnServer(localOrderId){
-  if(!FLAME_CHICK_ORDER_API_READY)return null;
+  if(FLAME_CHICK_ORDER_API_READY)return null;
   const key=String(localOrderId||'').trim();
   if(!key || !navigator.onLine)return null;
   try{

@@ -36,4 +36,6 @@ jobs:
           node-version: "22"
 
       - name: Check POS and Rider source
-        run: node --test tests/ops-source-hygiene.test.mjs tests/pos-payment-collection.test.mjs tests/pos-catalog-v3-adapter.test.mjs tests/pos-unified-sync-v3.test.mjs
+        run: |
+          node --check apps/flame-chick-pos/api/qz/sign.js
+          node --test tests/ops-source-hygiene.test.mjs tests/pos-payment-collection.test.mjs tests/pos-catalog-v3-adapter.test.mjs tests/pos-unified-sync-v3.test.mjs apps/flame-chick-pos/tests/qz-printing-diagnostics.test.js

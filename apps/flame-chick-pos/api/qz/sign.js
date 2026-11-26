@@ -20,11 +20,20 @@ function allowedOrigin(value) {
   if (ALLOWED_ORIGINS.has(value)) return true;
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && (
-      /^flamechickpos-[a-z0-9-]+-befahad1234-7050\.vercel\.app$/i.test(url.hostname) ||
-      /^flame-chick-pos-production-[a-z0-9-]+-befahad1234-7050\.vercel\.app$/i.test(url.hostname) ||
-      /^flame-chick-pos-production-[a-z0-9-]+-fahad-7455\.vercel\.app$/i.test(url.hostname)
-    );
+    // Browser Origin headers are origin-only. Reject ports, paths, credentials and non-HTTPS requests.
+    return url.protocol === 'https:' &&
+      url.origin === value &&
+      !url.port &&
+      !url.username &&
+      !url.password &&
+      url.pathname === '/' &&
+      !url.search &&
+      !url.hash && (
+        /^flamechickpos-[a-z0-9-]+-befahad1234-7050\.vercel\.app$/i.test(url.hostname) ||
+        /^flame-chick-pos-production-[a-z0-9-]+-befahad1234-7050\.vercel\.app$/i.test(url.hostname) ||
+        /^flame-chick-pos-production-[a-z0-9-]+-fahad-7455\.vercel\.app$/i.test(url.hostname) ||
+        /^flame-chick-pos-development-[a-z0-9-]+-faha-d\.vercel\.app$/i.test(url.hostname)
+      );
   } catch {
     return false;
   }
@@ -168,3 +177,6 @@ module.exports = async function handler(req, res) {
     res.status(500).send('The POS signing service could not sign this print request.');
   }
 };
+
+// Expose the pure origin policy for the Node test suite; it does not alter the HTTP handler.
+module.exports.isAllowedOrigin = allowedOrigin;
