@@ -1,24 +1,35 @@
 # Flame Chick Platform
 
-Private source repository for the Flame Chick customer website, POS, Admin panel, Rider portal, and Supabase backend.
+Source repository for the Flame Chick customer Website, POS, Admin panel, Rider portal, and shared Supabase backend.
 
-## Project handoff
+## Start every new work session here
 
-Start every new work session with [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md). It records the verified project context, safety rules, current branch/stage, completed work, known risks, and next implementation steps. The latest Website Preview and one-step checkout stage is recorded in this [handoff addendum](docs/operations/2026-11-26-website-preview-one-step-checkout.md); the earlier local-preview stage is recorded in this [local-preview addendum](docs/operations/2026-11-23-local-preview-fixture-checkpoint.md). Keep both current as the project changes.
+1. Read [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the project-wide history, decisions, Supabase state and safety rules. It is a large historical handoff; use its headings and search to find the latest relevant checkpoints.
+2. Read the [Website context index](docs/handoffs/WEBSITE_PARALLEL_CONTEXT_INDEX.md).
+3. Read the latest [new FahaD Website Production environment handoff](docs/operations/2026-11-26-new-vercel-website-production-handoff.md).
+4. Read the complete [Website parallel-development audit](docs/handoffs/2026-11-25-website-parallel-audit.md) before editing Website code.
+
+The 26 November new-environment handoff supersedes older Website Vercel project IDs, hostnames and Preview-only deployment instructions. The earlier [one-step checkout addendum](docs/operations/2026-11-26-website-preview-one-step-checkout.md) remains historical context, not the current hosting configuration. The earlier [local-preview fixture checkpoint](docs/operations/2026-11-23-local-preview-fixture-checkpoint.md) remains relevant only to its synthetic local test harness.
 
 ## Current platform
 
-- **Supabase Production:** `Flame Chick Production`
-- **Project ref:** `adkrxfnawdiljhjaavnj`
-- **Region:** Mumbai (`ap-south-1`)
+- **Supabase Production:** Flame Chick Production
+- **Project ref:** \`adkrxfnawdiljhjaavnj\`
+- **Region:** Mumbai (\`ap-south-1\`)
 - **Plan:** Free
-- **Shared backend:** all four applications will use this one Production project.
+- **Backend:** shared by the four applications.
 
-The Production project has been created and its initial security baseline has been applied. The application schema, menu, production delivery configuration, and Edge Functions are **not yet migrated and verified**. Do not deploy these application roots to the active Vercel projects until the backend migration and end-to-end checks are complete.
+The top-level Production handoff records the seven operational migrations as applied on 24 November 2026, bringing the recorded Production migration count to 33. That is a dated handoff checkpoint, not proof of the current live state. Before any Place Order runtime test, independently verify the live schema, relevant RPCs, active Edge Function version, server-only secrets (presence only), branch website flags and delivery configuration using read-only checks. Older Website notes contain statements that the schema was not yet migrated; treat those statements as superseded by the newer Production migration checkpoint, while still verifying the live system.
+
+## Active Website environment
+
+The selected Website target is the READY Vercel Production deployment documented in [the current environment handoff](docs/operations/2026-11-26-new-vercel-website-production-handoff.md). It belongs to the separate FahaD Hobby team and uses the Website root directory \`apps/flame-chick-website\`.
+
+The requested custom hostname \`flamechick.vercel.app\` is not attached to this project. Do not assume it is available or remove it from another project. The customer Place Order path is the next task; the current deployment must not be described as fully production-ready until that path is diagnosed and verified.
 
 ## Repository layout
 
-```text
+\`\`\`text
 apps/
   flame-chick-website/
   flame-chick-pos/
@@ -32,53 +43,53 @@ supabase/
 docs/
   architecture/
   deployment/
+  handoffs/
   operations/
-.github/
-```
+\`\`\`
 
 ## Vercel project roots
 
-| Vercel project | Root Directory |
+| App | Root Directory |
 |---|---|
-| Customer website | `apps/flame-chick-website` |
-| POS | `apps/flame-chick-pos` |
-| Admin | `apps/flame-chick-admin` |
-| Rider portal | `apps/flame-chick-rider` |
+| Customer Website | \`apps/flame-chick-website\` |
+| POS | \`apps/flame-chick-pos\` |
+| Admin | \`apps/flame-chick-admin\` |
+| Rider portal | \`apps/flame-chick-rider\` |
 
-Keep the existing Vercel project settings and deployments unchanged until migration is ready. Each project must be connected to this repository and its corresponding root directory before changing its Git source.
+Keep the four apps separate. Do not change POS, Admin or Rider projects while working on the Website Place Order task.
 
-## Supabase
+## Supabase and application security
 
-All browser clients use the Production project URL and a **publishable** key only. Never put a Supabase secret/service-role key in browser code, Git, Vercel client-side variables, or documentation.
+All browser apps use the Production project URL and a **publishable** key only. Never put a Supabase secret/service-role key in browser code, Git, client-side Vercel variables or documentation.
 
-Edge Functions that need privileged database access read secrets from the Supabase Function Secrets store. Set these values in the Supabase Dashboard or another approved secret manager; do not commit them.
+Privileged Edge Functions read credentials from Supabase Function Secrets. Do not paste secret values into chat or documentation; verify presence without printing values.
 
-- Function source is in `supabase/functions/`.
-- Only reviewed Production SQL belongs in `supabase/migrations/`.
-- The original Demo migrations are archived under `supabase/demo-reference/migrations/` for audit/reference. They contain Demo-specific behavior and must **not** be applied directly to Production.
+- Function source is in \`supabase/functions/\`.
+- Only reviewed Production SQL belongs in \`supabase/migrations/\`.
+- Historical Demo migrations are archived under \`supabase/demo-reference/migrations/\` and must never be pushed to Production.
+
+## Deployment discipline
+
+The Website Vercel project is connected to this shared Git repository. A Git push can create a Vercel deployment automatically. The user requires minimal deployments: do not trigger manual/API/CLI deployments, promote deployments, or retry failed deployment requests without explicit approval. Before any source push, check whether it will automatically deploy the Website project. Prefer local/static tests first and group related changes into one reviewed change. A docs-only change is not a reason to deploy the Website.
+
+Before changing Production data, applying migrations, deploying Edge Functions, changing domains or testing a live Place Order submission, verify the exact target and obtain approval for that operation.
 
 ## Local work
 
-These apps are currently plain HTML/CSS/JavaScript applications. Open each app folder with a static web server or use its Vercel preview after the backend is ready.
+These applications are plain HTML/CSS/JavaScript. For the synthetic local catalogue preview, use the [loopback-only fixture runbook](docs/operations/local-catalog-preview-fixture.md). It is separate from the Production-backed customer storefront.
 
-For a browser-only review of the separate V3 menu preview, use the [loopback-only synthetic fixture runbook](docs/operations/local-catalog-preview-fixture.md). That harness is outside the Website Vercel root, does not load the production config, and uses artificial catalog data only.
+For Supabase CLI reference:
 
-For Supabase CLI work:
-
-```bash
+\`\`\`bash
 supabase --help
 supabase status
 supabase migration list
-```
-
-Before applying or deploying anything to Production, review the migration, verify the target project ref, and obtain the required change approval.
+\`\`\`
 
 ## Source history and separation
 
-The first organized source snapshot is based on the latest Flame Chick storefront branch in the previous shared repository. HFP/Pizza Bite applications, SQL migrations, secrets, customer/order data, and unrelated files are intentionally excluded.
-
-The original repository and its branches remain unchanged as a source archive until the new repository and Vercel connections are fully verified.
+The repository is the canonical Flame Chick application source. Preserve the separate historical repository/branches as source archives; do not merge, cherry-pick, reset or overwrite parallel Production/POS work without explicit approval.
 
 ## Security
 
-See [SECURITY.md](SECURITY.md). Do not commit `.env`, `.env.local`, Vercel OIDC tokens, database passwords, Supabase secret keys, service-role keys, signing keys, or recovery codes.
+See [SECURITY.md](SECURITY.md). Never commit \`.env\`, \`.env.local\`, Vercel tokens, OIDC tokens, database passwords, Supabase secret keys, service-role keys, signing keys or recovery codes.
