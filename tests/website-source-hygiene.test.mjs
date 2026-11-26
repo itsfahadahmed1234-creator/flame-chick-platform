@@ -81,21 +81,22 @@ test("V2 visual language is used for V3 catalog cards without hard-coded menu pr
   assert.doesNotMatch(order, /unit_price_snapshot|line_total|price_minor|subtotal_minor/);
 });
 
-test("homepage ordering uses current V3 catalogue and one-step server-authoritative checkout", () => {
+test("homepage ordering uses published V3 data and requires a signed quote before committing", () => {
   assert.match(order, /FlameChickCatalogV3Client\.load/);
   assert.match(order, /FlameChickCatalogV3View\.buildMenuViewModel/);
   assert.match(order, /FlameChickCatalogV3DealView\.buildDealViewModel/);
   assert.match(order, /FlameChickCatalogV3DealConfigurator\.createDealConfigurator/);
-  assert.match(order, /action: 'place_website_order'/);
-  assert.match(order, /state\.checkoutBody\.request_id = state\.checkoutRequestId/);
-  assert.doesNotMatch(order, /quote_token|quote_website_order|create_website_order/);
-  assert.match(order, /productVariantId: variantId/);
+  assert.match(order, /action: 'quote_website_order'/);
+  assert.match(order, /state\.checkoutBody\.action = 'create_website_order'/);
+  assert.match(order, /state\.checkoutBody\.quote_token = state\.quoteToken/);
+  assert.match(order, /function requestQuote\(\)/);
+  assert.match(order, /function renderQuoteSummary\(quote, expiresAt\)/);
+  assert.match(order, /quoteExpiresAt/);
+  assert.match(order, /quote\.items\.forEach/);
   assert.match(order, /item\.quantity = row\.quantity/);
   assert.match(order, /delivery: delivery/);
-  assert.doesNotMatch(order, /unit_price_snapshot|line_total|price_minor|subtotal_minor|delivery_fee:/);
-});
-
-test("delivery area and locality are sent as customer selections, never as a client fee", () => {
+  assert.doesNotMatch(order, /place_website_order|unit_price_snapshot|line_total|price_minor|subtotal_minor|delivery_fee:/);
+});test("delivery area and locality are sent as customer selections, never as a client fee", () => {
   assert.match(order, /selection_type: 'not_listed'/);
   assert.match(order, /selection_type: 'listed_area'/);
   assert.match(order, /other_locality: locality/);
@@ -103,19 +104,24 @@ test("delivery area and locality are sent as customer selections, never as a cli
   assert.doesNotMatch(order, /delivery_fee:|deliveryFee:/);
 });
 
-test("checkout submits once with server-side pricing, idempotency and safe uncertain-response retry", () => {
+test("checkout requires customer review, stores only a retry UUID and replays the exact create request", () => {
   assert.match(order, /PENDING_CHECKOUT_STORAGE_KEY = 'flame-chick-v3-pending-checkout-id'/);
-  assert.match(order, /action: 'place_website_order'/);
+  assert.match(order, /action: 'quote_website_order'/);
+  assert.match(order, /state\.checkoutBody\.action = 'create_website_order'/);
   assert.match(order, /state\.checkoutBody\.request_id = state\.checkoutRequestId/);
+  assert.match(order, /state\.checkoutBody\.quote_token = state\.quoteToken/);
   assert.match(order, /root\.crypto\.randomUUID/);
   assert.match(order, /savePendingRequestId\(state\.checkoutRequestId\)/);
-  assert.match(order, /var uncertain = !error\.status \|\| error\.status >= 500/);
-  assert.match(order, /Retry this same order request/);
-  assert.doesNotMatch(order, /quote_token|quote_website_order|request-quote|localStorage|indexedDB/);
-  assert.doesNotMatch(html, /Get verified total|Verified total/);
-});
-
-test("single-branch storefront skips the branch gate and opens fulfilment from the V2-style cart drawer", () => {
+  assert.match(order, /Retry the exact same request/);
+  assert.match(order, /quoteToken/);
+  assert.match(order, /sessionStorage\.setItem/);
+  assert.doesNotMatch(order, /place_website_order|localStorage|indexedDB/);
+  assert.match(html, /id="request-quote"/);
+  assert.match(html, /id="cart-summary"/);
+  assert.match(html, /id="quote-lines"/);
+  assert.match(html, /Get verified total/);
+  assert.match(html, /Total confirmed by Flame Chick/);
+});test("single-branch storefront skips the branch gate and opens fulfilment from the V2-style cart drawer", () => {
   assert.match(html, /id="badge"/);
   assert.match(order, /if \(\$\('badge'\)\)/);
   assert.doesNotMatch(html, /id="branch-selector"|id="catalog-context-label"|Choose your branch/);
@@ -238,7 +244,7 @@ test("delivery area search uses one visible field and retains the selected area 
 });
 
 test("cart checkout details are unique and the checkout actions stay in a sticky bottom footer", () => {
-  for (const id of ["details-section","customer-name","customer-phone","delivery-fields","delivery-area-search","delivery-address","place-order"]) {
+  for (const id of ["details-section","customer-name","customer-phone","delivery-fields","delivery-area-search","delivery-address","request-quote","place-order"]) {
     assert.equal((html.match(new RegExp('id="' + id + '"', "g")) || []).length, 1, id + " must appear exactly once");
   }
   assert.doesNotMatch(html, /delivery-instructions/);
@@ -251,7 +257,8 @@ test("cart additions and checkout stages provide motion feedback with reduced-mo
   assert.match(order, /function animateCartAdded\(\)/);
   assert.match(order, /replayAnimation\(rows && rows\.lastElementChild, 'is-added'\)/);
   assert.match(order, /animateCartAdded\(\)/);
-  assert.doesNotMatch(order, /checkoutMotion\('is-checking'\)|checkoutMotion\('is-ready'\)/);
+  assert.match(order, /checkoutMotion\('is-checking'\)/);
+  assert.match(order, /checkoutMotion\('is-ready'\)/);
   assert.match(order, /checkoutMotion\('is-ordering'\)/);
   assert.match(order, /checkoutMotion\('is-confirmed'\)/);
   assert.match(html, /@keyframes fcCartRowAdded/);
@@ -304,4 +311,11 @@ test("every Website Preview is read-only and only the verified customer hostname
   assert.match(html, /id="fc-preview-checkout-notice"/);
   assert.match(order, /if \(String\(method \|\| ''\)\.toUpperCase\(\) !== 'GET' && !orderWritesAllowed\(\)\)/);
   assert.doesNotMatch(order, /TEST ORDER SENT TO FLAME CHICK POS|WEBSITE PREVIEW QA TEST/);
+});
+
+test("the retired standalone ordering URL redirects into the primary homepage V3 checkout", () => {
+  const standalone = readFileSync(join(root, "order-online-v3.html"), "utf8");
+  assert.match(standalone, /http-equiv="refresh" content="0; url=index\\.html#menu"/);
+  assert.match(standalone, /location\\.replace\\('index\\.html#menu'\\)/);
+  assert.doesNotMatch(standalone, /js\\/website-order-v3\\.js/);
 });

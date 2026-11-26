@@ -503,10 +503,22 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
       <p id="cart-empty" class="fc-home-cart-empty">Your cart is empty. Add your favourites from the menu.</p>
       <div id="cart-lines" class="fc-home-cart-lines"></div>
 
+      <section id="cart-summary" class="fc-home-cart-summary" hidden aria-live="polite" aria-labelledby="verified-quote-heading">
+        <p class="fc-home-kicker" id="verified-quote-heading">Review your verified order</p>
+        <div id="quote-lines" class="fc-home-quote-lines"></div>
+        <div class="fc-home-quote-breakdown">
+          <div><span>Items subtotal</span><strong id="cart-subtotal">—</strong></div>
+          <div id="quote-delivery-row"><span>Delivery fee</span><strong id="cart-delivery-fee">—</strong></div>
+          <div class="fc-home-quote-total"><span>Total confirmed by Flame Chick</span><strong id="cart-total">—</strong></div>
+        </div>
+        <p id="cart-quote-detail" class="fc-home-quote-detail"></p>
+      </section>
+
       <footer class="fc-v3-cart-footer">
         <p id="fc-preview-checkout-notice" class="fc-preview-checkout-notice" hidden role="status">Preview checkout status is being verified.</p>
         <div class="fc-home-cart-actions">
-          <button id="place-order" class="btn btn-gold" type="button" disabled>Place order</button>
+          <button id="request-quote" class="btn btn-gold" type="button" disabled>Get verified total</button>
+          <button id="place-order" class="btn btn-gold" type="button" disabled hidden>Place order</button>
           <button id="retry-order" class="btn btn-gold" type="button" disabled hidden>Retry order confirmation</button>
         </div>
         <p id="order-status" class="fc-home-order-status" role="status" aria-live="polite">No order has been submitted.</p>
@@ -2510,6 +2522,19 @@ body.fc-catalog-dialog-open .ana-sticky{
   .fc-home-deal-dialog .fc-home-dialog-content{padding:9px 11px;gap:7px}
 }
 
+/* Server-authoritative quote shown before customer order submission. */
+.fc-home-cart-summary{margin:14px 0;padding:14px;border:1px solid var(--rule);border-radius:13px;background:#fff}
+.fc-home-quote-lines{display:grid;gap:10px;margin:8px 0 12px}
+.fc-home-quote-line{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:9px;border-bottom:1px solid var(--rule);font:500 12px/1.4 var(--f-body)}
+.fc-home-quote-line-copy{display:grid;gap:3px;min-width:0}
+.fc-home-quote-line-copy strong{font-weight:800;color:var(--ink)}
+.fc-home-quote-line-copy span{color:var(--muted)}
+.fc-home-quote-line-amount{flex:0 0 auto;color:var(--ink);font-weight:800}
+.fc-home-quote-breakdown{display:grid;gap:7px;font:600 13px/1.35 var(--f-body)}
+.fc-home-quote-breakdown>div{display:flex;justify-content:space-between;gap:12px}
+.fc-home-quote-total{padding-top:9px;border-top:1px solid var(--rule);font-size:15px;font-weight:900}
+.fc-home-quote-detail{margin:9px 0 0;color:var(--muted);font:500 11px/1.5 var(--f-body)}
+.fc-home-cart-actions #request-quote[disabled],.fc-home-cart-actions #place-order[disabled]{opacity:.5;cursor:not-allowed}
 </style>
 <script src="js/catalog-v3.js"></script>
 <script src="js/catalog-v3-client.js"></script>

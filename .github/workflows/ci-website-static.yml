@@ -71,7 +71,7 @@ jobs:
 
       - name: Run core catalog regression tests
         run: |
-          node --test tests/website-preview-checkout-guard.test.mjs tests/website-source-hygiene.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs tests/catalog-v3-view.test.mjs tests/catalog-v3-deal-view.test.mjs tests/catalog-v3-deal-configurator.test.mjs tests/branch-fulfilment-v3.test.mjs tests/catalog-database-time-migration.test.mjs tests/published-menu-v3-draft.test.mjs
+          node --test tests/website-preview-checkout-guard.test.mjs tests/website-source-hygiene.test.mjs tests/website-order-quote-token.test.mjs tests/catalog-v3-contract.test.mjs tests/catalog-v3-client.test.mjs tests/catalog-v3-view.test.mjs tests/catalog-v3-deal-view.test.mjs tests/catalog-v3-deal-configurator.test.mjs tests/branch-fulfilment-v3.test.mjs tests/catalog-database-time-migration.test.mjs tests/published-menu-v3-draft.test.mjs
 
       - name: Run preview regression tests
         run: |
