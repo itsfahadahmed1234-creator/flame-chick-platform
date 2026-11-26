@@ -95,9 +95,11 @@ test("homepage ordering uses published V3 data and requires a signed quote befor
   assert.match(order, /quote\.items\.forEach/);
   assert.match(order, /item\.quantity = row\.quantity/);
   assert.match(order, /delivery: delivery/);
-  assert.match(order, /amount\\.textContent = money\\(item\\.line_total\\)/);
+  assert.ok(order.includes('amount.textContent = money(item.line_total)'));
   assert.doesNotMatch(order, /unit_price_snapshot\\s*:|price_minor\\s*:|subtotal_minor\\s*:|delivery_fee\\s*:/);
-});test("checkout shows cash payment instructions that follow the selected fulfilment method", () => {
+});
+
+test("checkout shows cash payment instructions that follow the selected fulfilment method", () => {
   assert.match(html, /id="checkout-payment-method"/);
   assert.match(html, /id="checkout-payment-note"/);
   assert.match(order, /function syncPaymentMethod\(\)/);
