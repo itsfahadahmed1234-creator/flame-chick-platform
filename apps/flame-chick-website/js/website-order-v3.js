@@ -31,8 +31,7 @@
   var state = {
     snapshot: null, databaseNow: null, websiteContext: null,
     branchSelection: null, preview: null, cart: [],
-    quote: null, quoteBody: null, quoteToken: null, checkoutRequestId: null,
-    checkoutBody: null, checkoutUncertain: false,
+    checkoutRequestId: null, checkoutBody: null, checkoutUncertain: false,
     productDialog: null, dealConfigurator: null,
     busy: false, loaded: false
   };
@@ -86,7 +85,6 @@
     } else if (preview) {
       $('fc-preview-checkout-notice').textContent =
         'Preview mode is read-only here. Cart and catalogue review are available, but checkout writes are disabled.';
-      $('request-quote').disabled = true;
       $('place-order').disabled = true;
       $('retry-order').disabled = true;
     }
@@ -246,34 +244,29 @@
     $('headCart').focus();
   }
 
-  function resetQuote(message) {
-    state.quote = null;
-    state.quoteBody = null;
-    state.quoteToken = null;
-    if (!state.checkoutUncertain) {
-      state.checkoutRequestId = null;
-      state.checkoutBody = null;
-    }
-    $('cart-summary').hidden = true;
-    $('place-order').hidden = true;
+  function resetCheckout(message) {
+    if (state.checkoutUncertain || state.busy) return;
+    state.checkoutRequestId = null;
+    state.checkoutBody = null;
+    clearPendingRequestId();
+    $('place-order').hidden = false;
     $('retry-order').hidden = true;
-    $('request-quote').hidden = false;
-    $('request-quote').disabled = !orderWritesAllowed() || state.cart.length === 0 ||
-      !currentContext() || state.busy || state.checkoutUncertain;
+    $('place-order').disabled = !orderWritesAllowed() || state.cart.length === 0 ||
+      !currentContext();
     if (message) status(message);
   }
 
   function canEdit() { return !state.busy && !state.checkoutUncertain && $('order-success').hidden; }
-  function invalidateQuote() {
+  function invalidateCheckout() {
     if (state.checkoutUncertain || state.busy) return;
-    resetQuote('Your changes need a fresh server quote.');
+    resetCheckout('Your changes are ready. Place your order when you are finished.');
     renderCart();
   }
 
   function clearCart(reason) {
     if (state.cart.length && reason) status(reason);
     state.cart = [];
-    invalidateQuote();
+    invalidateCheckout();
     renderCart();
   }
 
@@ -286,7 +279,7 @@
     $('cart-empty').hidden = state.cart.length > 0;
     $('fc-v3-cartbar').hidden = state.cart.length === 0;
     $('fc-v3-cartbar-count').textContent = itemCountLabel();
-    $('request-quote').disabled = !orderWritesAllowed() || state.cart.length === 0 ||
+    $('place-order').disabled = !orderWritesAllowed() || state.cart.length === 0 ||
       !currentContext() || state.busy || state.checkoutUncertain;
 
     state.cart.forEach(function (row, index) {
@@ -305,7 +298,7 @@
         if (!canEdit()) return;
         if (row.quantity <= 1) state.cart.splice(index, 1);
         else row.quantity -= 1;
-        invalidateQuote();
+        invalidateCheckout();
       });
       var quantity = document.createElement('output');
       quantity.className = 'order-cart-quantity';
@@ -315,13 +308,13 @@
       increment.type = 'button'; increment.textContent = '+'; increment.disabled = !canEdit() || row.quantity >= 99;
       increment.addEventListener('click', function () {
         if (!canEdit() || row.quantity >= 99) return;
-        row.quantity += 1; invalidateQuote();
+        row.quantity += 1; invalidateCheckout();
       });
       var remove = document.createElement('button');
       remove.type = 'button'; remove.textContent = 'Remove'; remove.disabled = !canEdit();
       remove.addEventListener('click', function () {
         if (!canEdit()) return;
-        state.cart.splice(index, 1); invalidateQuote();
+        state.cart.splice(index, 1); invalidateCheckout();
       });
       controls.append(decrement, quantity, increment, remove);
       article.append(name, meta, controls);
@@ -559,7 +552,7 @@
         quantity: 1, modifiers: validation.selections
       }
     });
-    invalidateQuote();
+    invalidateCheckout();
     animateCartAdded();
     status(product.name + ' added to your cart.');
   }
@@ -723,7 +716,7 @@
           }
         });
         dialog.close();
-        invalidateQuote();
+        invalidateCheckout();
         animateCartAdded();
         status(product.name + ' added to your cart.');
       });
@@ -834,7 +827,7 @@
           payload: item
         });
         $('deal-dialog').close();
-        invalidateQuote();
+        invalidateCheckout();
         animateCartAdded();
         status('Deal added to your cart.');
       }
@@ -921,7 +914,7 @@
     $('not-listed-confirm-row').hidden = !other;
     if (other) $('not-listed-confirm-text').textContent =
       'I understand the Not Listed delivery fee (' + money(liveBranch().notListedDeliveryFee) + ') and want the restaurant to confirm my locality.';
-    invalidateQuote();
+    invalidateCheckout();
   }
 
   function deliverySelection() {
@@ -955,7 +948,7 @@
     if (!state.cart.length) throw new Error('Add at least one product or deal.');
     var delivery = context.fulfilmentType === 'delivery' ? deliverySelection() : null;
     return {
-      action: 'quote_website_order',
+      action: 'place_website_order',
       schema_version: 3,
       publication_id: context.publicationId,
       version_id: context.versionId,
@@ -982,10 +975,9 @@
   function setBusy(value) {
     state.busy = value === true;
     var locked = state.busy || state.checkoutUncertain;
-    $('request-quote').disabled = !orderWritesAllowed() || locked ||
+    $('place-order').disabled = !orderWritesAllowed() || locked ||
       state.cart.length === 0 || !currentContext();
-    $('place-order').disabled = locked;
-    $('retry-order').disabled = state.busy;
+    $('retry-order').disabled = !state.checkoutUncertain || state.busy;
     ['customer-name','customer-phone','customer-email','delivery-area-search','delivery-area','delivery-address',
       'other-locality','not-listed-confirm','order-notes'].forEach(function (id) {
       if ($(id)) $(id).disabled = locked;
@@ -993,121 +985,78 @@
     syncFulfilmentControls();
   }
 
-  async function requestQuote() {
-    if (!orderWritesAllowed()) {
-      status('Preview mode: the real published menu is available, but checkout is disabled.', 'error');
-      return;
-    }
-    if (state.busy || state.checkoutUncertain) return;
-    try {
-      var body = buildRequestBody();
-      setBusy(true);
-      checkoutMotion('is-checking');
-      status('Checking the current menu, availability and delivery fee…');
-      var result = await orderApi('POST', '', body);
-      if (!result.quote || result.quote.publicationId !== state.snapshot.publicationId) {
-        throw new Error('The published menu changed. Refresh and review your cart before ordering.');
-      }
-      if (typeof result.quote_token !== 'string' || !result.quote_token ||
-          typeof result.quote_expires_at !== 'string' || !Number.isFinite(Date.parse(result.quote_expires_at))) {
-        throw new Error('The server did not provide a secure, time-limited quote. Please try again.');
-      }
-      state.quote = result.quote;
-      state.quoteToken = result.quote_token;
-      state.quoteBody = body;
-      // Only a random request UUID is stored, never customer or cart details.
-      state.checkoutRequestId = state.checkoutRequestId || readPendingRequestId();
-      state.checkoutBody = null;
-      $('cart-summary').hidden = false;
-      $('cart-total').textContent = money(result.quote.total);
-      $('cart-quote-detail').textContent = (isTestCheckoutPreview() ? 'TEST ONLY · ' : '') +
-        'Items ' + money(result.quote.subtotal) +
-        (result.quote.fulfillmentType === 'delivery' ? ' · Delivery ' + money(result.quote.deliveryFee) : ' · Pickup');
-      $('request-quote').hidden = true;
-      $('place-order').hidden = false;
-      $('place-order').disabled = false;
-      $('retry-order').hidden = true;
-      status(isTestCheckoutPreview()
-        ? 'Test quote verified by the Flame Chick Order API. Review the amount before creating the QA test order.'
-        : 'Your server-verified total is ready. Review your details and place the order.', 'success');
-      checkoutMotion('is-ready');
-    } catch (error) {
-      checkoutMotion('has-error');
-      state.quote = null; state.quoteBody = null; state.quoteToken = null;
-      status(error.message || 'Could not verify your order total.', 'error');
-      $('cart-summary').hidden = true;
-      $('request-quote').hidden = false;
-    } finally {
-      setBusy(false);
-      clearCheckoutMotionLater();
-    }
-  }
-
   async function submitOrder(retry) {
     if (!orderWritesAllowed()) {
-      status('Preview mode: no orders can be submitted from this deployment.', 'error');
+      status('Preview mode: the menu is available for review, but order submission is disabled.', 'error');
       return;
     }
     if (state.busy) return;
-    if (!state.quoteBody || !state.quoteToken) { status('Get a fresh secure server quote before placing the order.', 'error'); return; }
-    if (!retry && state.checkoutUncertain) { status('Retry the same checkout request to verify whether it was received.', 'error'); return; }
-    if (!state.checkoutRequestId) {
-      if (!root.crypto || typeof root.crypto.randomUUID !== 'function') {
-        status('This browser cannot create a secure checkout request ID. No order has been submitted.', 'error');
-        return;
-      }
-      state.checkoutRequestId = root.crypto.randomUUID();
-    }
-    if (!savePendingRequestId(state.checkoutRequestId)) {
-      status('This browser cannot preserve secure retry protection for this session. Enable session storage and try again. No order has been submitted.', 'error');
+    if (retry && (!state.checkoutUncertain || !state.checkoutBody || !state.checkoutRequestId)) {
+      status('There is no pending order request to retry.', 'error');
       return;
     }
-    if (!state.checkoutBody) {
-      state.checkoutBody = clone(state.quoteBody);
-      state.checkoutBody.action = 'create_website_order';
-      state.checkoutBody.request_id = state.checkoutRequestId;
-      state.checkoutBody.quote_token = state.quoteToken;
+    if (!retry && state.checkoutUncertain) {
+      status('Your previous order response is uncertain. Retry the same request before making changes.', 'error');
+      return;
     }
+
+    if (!state.checkoutBody) {
+      try {
+        var body = buildRequestBody();
+        state.checkoutRequestId = state.checkoutRequestId || readPendingRequestId();
+        if (!validRequestId(state.checkoutRequestId)) {
+          if (!root.crypto || typeof root.crypto.randomUUID !== 'function') {
+            throw new Error('This browser cannot create a secure order request ID. No order has been submitted.');
+          }
+          state.checkoutRequestId = root.crypto.randomUUID();
+        }
+        body.action = 'place_website_order';
+        body.request_id = state.checkoutRequestId;
+        if (!savePendingRequestId(state.checkoutRequestId)) {
+          throw new Error('This browser cannot preserve safe order retry protection. Enable session storage and try again. No order has been submitted.');
+        }
+        state.checkoutBody = body;
+      } catch (error) {
+        status(error.message || 'Please check your order details and try again.', 'error');
+        return;
+      }
+    }
+
     state.checkoutUncertain = true;
     setBusy(true);
     checkoutMotion('is-ordering');
     $('place-order').hidden = true;
     $('retry-order').hidden = false;
-    status('Submitting your order securely…');
+    status('Placing your order securely. Prices, availability and delivery fees are being checked by Flame Chick…');
     try {
       var result = await orderApi('POST', '', state.checkoutBody);
-      if (!result.order_id || !result.order_number) throw new Error('The server did not return a confirmed order reference.');
+      if (!result.order_id || !result.order_number) {
+        throw new Error('The server did not return a confirmed order reference.');
+      }
       state.checkoutUncertain = false;
       clearPendingRequestId();
       state.checkoutBody = null;
       state.checkoutRequestId = null;
-      state.quote = null;
-      state.quoteBody = null;
-      state.quoteToken = null;
       state.cart = [];
       renderCart();
-      $('cart-summary').hidden = true;
       $('retry-order').hidden = true;
-      $('request-quote').hidden = true;
       $('place-order').hidden = true;
       $('order-success').hidden = false;
       $('order-success').classList.add('is-confirmed');
       checkoutMotion('is-confirmed');
       $('success-order-number').textContent = result.order_number;
-      $('success-order-message').textContent = isTestCheckoutPreview()
-        ? 'TEST ORDER SENT TO FLAME CHICK POS. No payment was collected. Do not prepare, dispatch or collect payment for this QA record.'
-        : 'Your order is with Flame Chick POS. Payment is due ' +
-          (result.fulfillment_type === 'delivery' ? 'in cash on delivery.' : 'when you collect your pickup.');
-      status(isTestCheckoutPreview()
-        ? 'QA test order committed to the database and sent to the POS. No payment was collected.'
-        : 'Order confirmed.', 'success');
+      var totalText = Number.isFinite(Number(result.total))
+        ? 'Order total: ' + money(result.total) + '. ' : '';
+      $('success-order-message').textContent = totalText + 'Your order is with Flame Chick POS. Payment is due ' +
+        (result.fulfillment_type === 'delivery' ? 'in cash on delivery.' : 'when you collect your takeaway.');
+      status('Order confirmed and sent to Flame Chick POS.', 'success');
       $('order-success').scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (error) {
       checkoutMotion('has-error');
       var uncertain = !error.status || error.status >= 500;
       state.checkoutUncertain = uncertain;
       if (uncertain) {
-        status('We could not confirm the response. Your request ID is preserved; retry without changing your order.', 'error');
+        status('We could not confirm the response. Your request ID is preserved; retry the same order without changing it.', 'error');
         $('retry-order').hidden = false;
         $('retry-order').disabled = false;
       } else {
@@ -1115,17 +1064,9 @@
         state.checkoutBody = null;
         state.checkoutRequestId = null;
         state.checkoutUncertain = false;
-        state.quoteToken = null;
         $('retry-order').hidden = true;
         $('place-order').hidden = false;
-        $('place-order').disabled = false;
         status(error.message + (error.retryAfter ? ' Try again in ' + error.retryAfter + ' seconds.' : ''), 'error');
-        if (error.status === 409 || error.status === 429) {
-          state.quote = null; state.quoteBody = null;
-          $('cart-summary').hidden = true;
-          $('request-quote').hidden = false;
-          $('place-order').hidden = true;
-        }
       }
     } finally {
       setBusy(false);
@@ -1133,6 +1074,8 @@
       if (state.checkoutUncertain) {
         $('retry-order').hidden = false;
         $('retry-order').disabled = false;
+      } else {
+        $('place-order').hidden = $('order-success').hidden === false;
       }
     }
   }
@@ -1143,7 +1086,6 @@
     $('deal-dialog').addEventListener('close', syncCatalogDialogState);
     $('close-product-dialog').addEventListener('click', function () { $('product-dialog').close(); });
     $('close-deal-dialog').addEventListener('click', function () { $('deal-dialog').close(); });
-    $('request-quote').addEventListener('click', requestQuote);
     $('place-order').addEventListener('click', function () { submitOrder(false); });
     $('retry-order').addEventListener('click', function () { submitOrder(true); });
     $('headCart').addEventListener('click', openCartDrawer);
@@ -1187,8 +1129,8 @@
       'customer-name','customer-phone','customer-email','delivery-address','delivery-area-search',
       'other-locality','not-listed-confirm','order-notes'
     ].forEach(function (id) {
-      $(id).addEventListener('input', invalidateQuote);
-      $(id).addEventListener('change', invalidateQuote);
+      $(id).addEventListener('input', invalidateCheckout);
+      $(id).addEventListener('change', invalidateCheckout);
     });
     $('continue-ordering').addEventListener('click', function () {
       $('order-success').hidden = true;
@@ -1197,7 +1139,10 @@
       $('delivery-address').value = ''; $('delivery-area-search').value = ''; $('delivery-area').value = ''; $('delivery-area-results').hidden = true;
       $('delivery-area').value = ''; $('other-locality').value = '';
       $('not-listed-confirm').checked = false;
-      $('request-quote').hidden = false; $('request-quote').disabled = true;
+      $('place-order').hidden = false; $('place-order').disabled = true;
+      $('retry-order').hidden = true;
+      state.checkoutBody = null; state.checkoutRequestId = null; state.checkoutUncertain = false;
+      clearPendingRequestId();
       status('Your cart is empty. Choose more items when you are ready.');
       closeCartDrawer();
       renderCatalog();
@@ -1215,7 +1160,7 @@
       syncFulfilmentControls();
       return;
     }
-    resetQuote('Order type changed. Your cart is kept; review availability and request a new verified total.');
+    resetCheckout('Order type changed. Review your cart and place your order when ready.');
     renderCatalog();
     renderCart();
   }
