@@ -8,6 +8,7 @@ const { extractFirstCertificatePem, verifyQzSignature } = require('./certificate
 const SUPABASE_URL = 'https://adkrxfnawdiljhjaavnj.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_89MQIj_drF15IrF05ZLt0w_txUjPMxy';
 const ALLOWED_ORIGINS = new Set([
+  'https://flamechick-pos.vercel.app',
   'https://flamechicpos.vercel.app',
   'https://flamechickpos.vercel.app',
   'https://flame-chick-pos-production-two.vercel.app',
