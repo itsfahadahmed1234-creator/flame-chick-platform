@@ -238,7 +238,7 @@ test("delivery area search uses one visible field and retains the selected area 
 });
 
 test("cart checkout details are unique and the checkout actions stay in a sticky bottom footer", () => {
-  for (const id of ["details-section","customer-name","customer-phone","delivery-fields","delivery-area-search","delivery-address","place-order","request-quote"]) {
+  for (const id of ["details-section","customer-name","customer-phone","delivery-fields","delivery-area-search","delivery-address","place-order"]) {
     assert.equal((html.match(new RegExp('id="' + id + '"', "g")) || []).length, 1, id + " must appear exactly once");
   }
   assert.doesNotMatch(html, /delivery-instructions/);
@@ -295,14 +295,14 @@ test("product and deal dialogs are centered, bounded, scrollable and closed dial
 });
 
 
-test("the controlled Website Preview submits visibly marked QA orders while other Previews remain blocked", () => {
+test("every Website Preview is read-only and only the verified customer hostname may submit orders", () => {
   const guardSource = readFileSync(join(root, "js/preview-checkout-guard.js"), "utf8");
-  assert.match(guardSource, /TEST_CHECKOUT_PREVIEW_HOSTS/);
-  assert.match(guardSource, /isTestCheckoutPreview/);
-  assert.match(order, /function isTestCheckoutPreview\(\)/);
-  assert.match(order, /\[WEBSITE QA TEST\]/);
-  assert.match(order, /WEBSITE PREVIEW QA TEST — DO NOT PREPARE \/ DISPATCH \/ COLLECT PAYMENT/);
-  assert.match(order, /TEST ORDER SENT TO FLAME CHICK POS/);
+  assert.match(guardSource, /PRODUCTION_ORDER_HOSTS = Object\.freeze\(\['flamechick\.vercel\.app'\]\)/);
+  assert.match(guardSource, /TEST_CHECKOUT_PREVIEW_HOSTS = \[\]/);
+  assert.match(guardSource, /function isTestCheckoutPreview\(\) \{ return false; \}/);
+  assert.match(order, /function orderWritesAllowed\(\)/);
+  assert.match(order, /Checkout is disabled on this Website Preview/);
   assert.match(html, /id="fc-preview-checkout-notice"/);
   assert.match(order, /if \(String\(method \|\| ''\)\.toUpperCase\(\) !== 'GET' && !orderWritesAllowed\(\)\)/);
+  assert.doesNotMatch(order, /TEST ORDER SENT TO FLAME CHICK POS|WEBSITE PREVIEW QA TEST/);
 });
