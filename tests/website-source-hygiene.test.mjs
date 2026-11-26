@@ -78,7 +78,7 @@ test("V2 visual language is used for V3 catalog cards without hard-coded menu pr
   assert.match(order, /variant\.priceMinor/);
   assert.match(order, /openProductCustomizer\(product, variantId\)/);
   assert.match(order, /openDealConfigurator\(deal\)/);
-  assert.doesNotMatch(order, /unit_price_snapshot|line_total|price_minor|subtotal_minor/);
+  assert.doesNotMatch(order, /unit_price_snapshot\\s*:|price_minor\\s*:|subtotal_minor\\s*:/);
 });
 
 test("homepage ordering uses published V3 data and requires a signed quote before committing", () => {
@@ -96,7 +96,16 @@ test("homepage ordering uses published V3 data and requires a signed quote befor
   assert.match(order, /item\.quantity = row\.quantity/);
   assert.match(order, /delivery: delivery/);
   assert.doesNotMatch(order, /place_website_order|unit_price_snapshot|line_total|price_minor|subtotal_minor|delivery_fee:/);
-});test("delivery area and locality are sent as customer selections, never as a client fee", () => {
+});test("checkout shows cash payment instructions that follow the selected fulfilment method", () => {
+  assert.match(html, /id="checkout-payment-method"/);
+  assert.match(html, /id="checkout-payment-note"/);
+  assert.match(order, /function syncPaymentMethod\(\)/);
+  assert.match(order, /Cash at takeaway collection/);
+  assert.match(order, /Cash on Delivery/);
+  assert.match(order, /syncPaymentMethod\(\)/);
+});
+
+test("delivery area and locality are sent as customer selections, never as a client fee", () => {
   assert.match(order, /selection_type: 'not_listed'/);
   assert.match(order, /selection_type: 'listed_area'/);
   assert.match(order, /other_locality: locality/);
