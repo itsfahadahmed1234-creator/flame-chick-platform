@@ -98,7 +98,7 @@ test("homepage checkout prices the cart from the loaded V3 catalog and submits o
   assert.match(html, /id="cart-delivery-fee"/);
   assert.match(html, /id="cart-total"/);
   assert.match(html, /id="place-order"/);
-  assert.doesNotMatch(html, /Place order|id="place-order"|quote-lines|cart-price-note/);
+  assert.doesNotMatch(html, /Get verified total|id="request-quote"|quote-lines|cart-quote-detail/);
 });
 test("checkout shows cash payment instructions that follow the selected fulfilment method", () => {
   assert.match(html, /id="checkout-payment-method"/);
@@ -128,7 +128,7 @@ test("Place Order sends an idempotent ID-only request and retries the exact same
   assert.doesNotMatch(order, /quote_website_order|create_website_order|quote_token|localStorage|indexedDB/);
   assert.match(html, /id="place-order"/);
   assert.match(html, /id="retry-order"/);
-  assert.doesNotMatch(html, /Place order|id="place-order"/);
+  assert.doesNotMatch(html, /Get verified total|id="request-quote"/);
 });
 test("V3 Order API calculates delivery charges from database configuration and supports CORS preflight", () => {
   const api = readFileSync("supabase/functions/flame-chick-order-api/index.ts", "utf8");
@@ -244,7 +244,7 @@ test("cart additions and checkout stages provide motion feedback with reduced-mo
   assert.match(order, /function animateCartAdded\(\)/);
   assert.match(order, /replayAnimation\(rows && rows\.lastElementChild, 'is-added'\)/);
   assert.match(order, /animateCartAdded\(\)/);
-  assert.match(order, /checkoutMotion\('is-checking'\)/);
+  assert.doesNotMatch(order, /checkoutMotion\('is-checking'\)/);
   assert.match(order, /checkoutMotion\('is-ready'\)/);
   assert.match(order, /checkoutMotion\('is-ordering'\)/);
   assert.match(order, /checkoutMotion\('is-confirmed'\)/);
