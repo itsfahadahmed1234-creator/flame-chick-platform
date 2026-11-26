@@ -2,6 +2,10 @@
 
 > Entry point for continuing the customer Website. Read the linked handoffs and establish an overview before editing code.
 
+## Latest status — 26 November 2026
+
+The checkout fix has been released to the FahaD Website Production project. Read the latest release checkpoint at the top of the [26 November FahaD Website Production environment handoff](../operations/2026-11-26-new-vercel-website-production-handoff.md). Current Production source commit: `c57be50d1674e597693117d1f39867c4c042f43a`; deployment: `dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy` (**READY**). Website static CI passed. No real Production order has been submitted; a controlled end-to-end order rehearsal still requires explicit approval.
+
 ## Read-first sequence
 
 1. Read the repository root [PROJECT_HANDOFF.md](../../PROJECT_HANDOFF.md). It is a large historical record; search its current checkpoints and project-wide decisions instead of treating old statements as current.

@@ -4,6 +4,38 @@
 **Scope:** Customer Website only. Current work target is the exact Vercel deployment selected by the user. The next implementation task is the Place Order fix.  
 **No application code or database writes were made as part of this handoff update.**
 
+## Latest checkout-fix release checkpoint — 26 November 2026
+
+**Status:** Website checkout correction released to the FahaD Production project.
+
+- Source branch: `work/website-parallel-development`
+- Source commit: `c57be50d1674e597693117d1f39867c4c042f43a`
+- Production deployment: `dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy`
+- Production deployment URL: https://flame-chick-website-production-d8hn72gzf-faha-d.vercel.app/
+- Verified stable Production aliases: `flame-chick-website-production.vercel.app` and `flame-chick-website-production-faha-d.vercel.app`
+- Deployment state: **READY**, target **Production**, source SHA matches the commit above.
+- Website static CI: **success**, including JavaScript syntax checks, core and preview regression tests, and inline-script parsing.
+- Git-triggered Preview build for the same source SHA: **READY**. No extra manual Preview deployment was requested.
+- The only application files changed were `apps/flame-chick-website/js/website-order-v3.js` and `tests/website-source-hygiene.test.mjs`.
+
+### Checkout changes
+
+1. The optional email validator now accepts standard email addresses and rejects malformed non-empty values. The same validator is used for button readiness and submit-time validation.
+2. Delivery area, address, Not Listed locality and fee confirmation remain in the active page session when switching Delivery ↔ Takeaway on the same branch. If the branch changes and the previously selected area is no longer valid, the stale area and Not Listed confirmation are cleared; the typed address remains available for correction.
+3. Customer delivery information is not written to localStorage or sessionStorage. Existing order API pricing, delivery-fee validation, idempotency and rate limits remain unchanged.
+
+### Verification and remaining boundary
+
+- The isolated checkout behavior suite passed **4/4** checks.
+- Full Website static CI passed on the exact release commit.
+- The Production deployment and stable aliases were verified read-only.
+- No real Production order was submitted. No Supabase schema, Edge Function, secret, role, POS, Admin or Rider changes were made.
+- A controlled end-to-end Production order rehearsal is still outstanding and requires separate explicit approval because it creates a real order visible to the live POS.
+
+**Next step:** Ask the user to refresh the stable Production Website and verify the button and Delivery ↔ Takeaway retention with a non-submitted checkout. Do not place a real order during this check.
+
+---
+
 ## 1. User direction and hard boundaries
 
 The user has moved the Flame Chick production hosting work to a newly connected Vercel account/team and explicitly selected this exact Website deployment to continue with:
