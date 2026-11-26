@@ -3,9 +3,10 @@ name: Deploy Flame Chick Customer Website Preview
 on:
   push:
     branches:
-      - work/production-source-audit
+      - work/website-parallel-development
     paths:
       - "apps/flame-chick-website/**"
+      - ".github/workflows/deploy-flame-chick-website-preview.yml"
 
 permissions:
   contents: read
@@ -16,21 +17,19 @@ concurrency:
 
 jobs:
   deploy-preview:
-    # Fail closed until the backend/app readiness gate is explicitly approved.
-    # This workflow is pinned to the current working branch and never targets production.
     if: >-
-      github.ref == 'refs/heads/work/production-source-audit' &&
+      github.ref == 'refs/heads/work/website-parallel-development' &&
       vars.FLAME_CHICK_WEBSITE_PREVIEW_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    environment: flame-chick-preview
+    timeout-minutes: 20
+    environment: flamechick-preview
     env:
-      VERCEL_ORG_ID: team_Rpf9jeGg9r3cmMguFXHtziqz
-      VERCEL_PROJECT_ID: prj_izBWyrFmPZIm63FHAT4jaLHUTLzu
+      VERCEL_ORG_ID: team_lrFy9ILYEz9umsBy98GCyQjI
+      VERCEL_PROJECT_ID: prj_MYylq6dmZrxfwCGHqRV1WLkg8yqo
       VERCEL_TELEMETRY_DISABLED: "1"
 
     steps:
-      - name: Check out reviewed source
+      - name: Check out reviewed Website source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
@@ -46,33 +45,82 @@ jobs:
           npm install --global "vercel@65.17.0"
           vercel --version
 
-      - name: Deploy preview only
+      - name: Link only the customer Website Vercel project
+        working-directory: apps/flame-chick-website
+        run: |
+          set -euo pipefail
+          mkdir -p .vercel
+          printf '{"orgId":"%s","projectId":"%s"}\n' "$VERCEL_ORG_ID" "$VERCEL_PROJECT_ID" > .vercel/project.json
+
+      - name: Initialize the empty Vercel project without publishing a website
+        working-directory: apps/flame-chick-website
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          response="$(curl --fail --silent --show-error --retry 2 \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            "https://api.vercel.com/v6/deployments?projectId=${VERCEL_PROJECT_ID}&teamId=${VERCEL_ORG_ID}&limit=1")"
+          deployment_count="$(jq -r '(.deployments // []) | length' <<< "$response")"
+          if [ "$deployment_count" -eq 0 ]; then
+            bootstrap_dir="$(mktemp -d)"
+            trap 'rm -rf "$bootstrap_dir"' EXIT
+            mkdir -p "$bootstrap_dir/.vercel"
+            cp .vercel/project.json "$bootstrap_dir/.vercel/project.json"
+            cat > "$bootstrap_dir/index.html" <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <meta charset="utf-8">
+          <meta name="robots" content="noindex,nofollow">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>Flame Chick Website Preview Bootstrap</title>
+          <body>
+            <main>
+              <h1>Flame Chick Website Preview Setup</h1>
+              <p>This is a temporary, unaliased project-initialization page.</p>
+              <p>It is not the customer website. Use the protected Preview deployment.</p>
+            </main>
+          </body>
+          </html>
+          HTML
+            if ! (cd "$bootstrap_dir" && vercel deploy --prod --skip-domain --yes > /tmp/flamechick-bootstrap.log 2>&1); then
+              cat /tmp/flamechick-bootstrap.log
+              exit 1
+            fi
+            echo "Created the one-time unaliased Production bootstrap. No customer domain was assigned."
+          else
+            echo "Vercel project already has a deployment; no bootstrap deployment is needed."
+          fi
+
+      - name: Deploy the customer Website as Preview only
         id: deploy
         working-directory: apps/flame-chick-website
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -euo pipefail
           deploy_output="$(vercel deploy --yes --target=preview 2>&1)"
           printf '%s\n' "$deploy_output"
           deployment_url="$(printf '%s\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\.vercel\.app' | tail -n 1 || true)"
           if [ -z "$deployment_url" ]; then
-            echo "Could not extract a Vercel preview URL from the CLI output." >&2
+            echo "Could not extract a Vercel Preview URL from the CLI output." >&2
             exit 1
           fi
           DEPLOYMENT_URL="$deployment_url" node --input-type=module -e '
             const value = (process.env.DEPLOYMENT_URL ?? "").trim();
             const url = new URL(value);
             if (url.protocol !== "https:" || !url.hostname.endsWith(".vercel.app")) {
-              throw new Error("Deployment URL is not a Vercel HTTPS preview URL");
+              throw new Error("Deployment URL is not a Vercel HTTPS Preview URL");
             }
-            console.log(`Validated preview URL: ${url.origin}`);
+            console.log(`Validated Website Preview URL: ${url.origin}`);
           '
           printf 'url=%s\n' "$deployment_url" >> "$GITHUB_OUTPUT"
           {
-            echo "### Flame Chick Customer Website preview deployment"
+            echo "### Flame Chick Customer Website Preview"
             echo "- URL: $deployment_url"
-            echo "- Vercel project: ${VERCEL_PROJECT_ID}"
+            echo "- Vercel project: flamechick"
             echo "- Commit: ${GITHUB_SHA}"
-            echo "- Target: preview only"
+            echo "- Target: Preview only"
+            echo "- Checkout: read-only on Preview; no test orders are submitted by this workflow"
           } >> "$GITHUB_STEP_SUMMARY"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
