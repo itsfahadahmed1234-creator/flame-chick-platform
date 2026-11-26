@@ -7,7 +7,8 @@ const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_89MQIj_drF15IrF05ZLt0w_txUjPMxy
 const ALLOWED_ORIGINS = new Set([
   'https://flamechicpos.vercel.app',
   'https://flamechickpos.vercel.app',
-  'https://flame-chick-pos-production-two.vercel.app'
+  'https://flame-chick-pos-production-two.vercel.app',
+  'https://flame-chick-pos-production.vercel.app'
 ]);
 const rateBuckets = new Map();
 

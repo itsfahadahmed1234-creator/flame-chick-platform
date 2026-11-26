@@ -1,108 +1,17 @@
-name: Deploy Flame Chick POS Preview
-# Preview-only run enabled after confirming VERCEL_TOKEN and repository variable.
+name: Retired Flame Chick POS GitHub Actions Preview deployment
+# Superseded by Vercel's native GitHub integration on flame-chick-pos-production.
+# Kept as a no-op record so manual or push triggers cannot deploy to the old temporary project.
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - work/production-source-audit
-    paths:
-      - "apps/flame-chick-pos/**"
-      - ".github/workflows/deploy-flame-chick-pos-preview.yml"
 
 permissions:
   contents: read
 
-concurrency:
-  group: flame-chick-pos-preview-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
-  deploy-preview:
-    # Fail closed until the preview project and secret are confirmed.
-    # This workflow is pinned to the working branch and always targets Preview.
-    if: >-
-      github.ref == 'refs/heads/work/production-source-audit' &&
-      vars.FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED == 'true' &&
-      vars.FLAME_CHICK_POS_PREVIEW_PROJECT_READY == 'true'
+  retired:
+    if: false
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      VERCEL_ORG_ID: team_lrFy9ILYEz9umsBy98GCyQjI
-      VERCEL_PROJECT_ID: prj_Ce8GbSsG5VZApCyEVCh9zC0qfeRv
-      VERCEL_TELEMETRY_DISABLED: "1"
-
     steps:
-      - name: Check out reviewed source
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: "22"
-
-      - name: Install pinned Vercel CLI
-        run: |
-          set -euo pipefail
-          npm install --global "vercel@65.17.0"
-          vercel --version
-
-      - name: Verify preview-only target
-        run: |
-          set -euo pipefail
-          test "$VERCEL_ORG_ID" = "team_lrFy9ILYEz9umsBy98GCyQjI"
-          test "$VERCEL_PROJECT_ID" = "prj_Ce8GbSsG5VZApCyEVCh9zC0qfeRv"
-          test -n "${VERCEL_TOKEN:-}"
-          echo "Vercel project scope and Preview token are present."
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
-      - name: Link the exact preview project from repository root
-        run: |
-          set -euo pipefail
-          mkdir -p .vercel
-          cat > .vercel/project.json <<'EOF'
-          {
-            "orgId": "team_lrFy9ILYEz9umsBy98GCyQjI",
-            "projectId": "prj_Ce8GbSsG5VZApCyEVCh9zC0qfeRv"
-          }
-          EOF
-
-      - name: Deploy Preview only
-        id: deploy
-        run: |
-          set -euo pipefail
-          set +e
-          deploy_output="$(vercel deploy --yes --environment=preview --token="$VERCEL_TOKEN" 2>&1)"
-          deploy_status=$?
-          set -e
-          printf '%s\n' "$deploy_output"
-          if [ "$deploy_status" -ne 0 ]; then
-            echo "Vercel CLI exited with status $deploy_status." >&2
-            exit "$deploy_status"
-          fi
-          deployment_url="$(printf '%s\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\.vercel\.app' | tail -n 1 || true)"
-          if [ -z "$deployment_url" ]; then
-            echo "Could not extract a Vercel Preview URL from the CLI output." >&2
-            exit 1
-          fi
-          DEPLOYMENT_URL="$deployment_url" node --input-type=module -e '
-            const value = (process.env.DEPLOYMENT_URL ?? "").trim();
-            const url = new URL(value);
-            if (url.protocol !== "https:" || !url.hostname.endsWith(".vercel.app")) {
-              throw new Error("Deployment URL is not a Vercel HTTPS Preview URL");
-            }
-            console.log(`Validated Preview URL: ${url.origin}`);
-          '
-          printf 'url=%s\n' "$deployment_url" >> "$GITHUB_OUTPUT"
-          {
-            echo "### Flame Chick POS Preview deployment"
-            echo "- URL: $deployment_url"
-            echo "- Vercel project: ${VERCEL_PROJECT_ID}"
-            echo "- Commit: ${GITHUB_SHA}"
-            echo "- Target: Preview only"
-          } >> "$GITHUB_STEP_SUMMARY"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Explain retired workflow
+        run: echo "This workflow is retired. POS Preview deployments are managed by the linked Vercel project."
