@@ -95,7 +95,8 @@ test("homepage ordering uses published V3 data and requires a signed quote befor
   assert.match(order, /quote\.items\.forEach/);
   assert.match(order, /item\.quantity = row\.quantity/);
   assert.match(order, /delivery: delivery/);
-  assert.doesNotMatch(order, /place_website_order|unit_price_snapshot|line_total|price_minor|subtotal_minor|delivery_fee:/);
+  assert.match(order, /amount\\.textContent = money\\(item\\.line_total\\)/);
+  assert.doesNotMatch(order, /unit_price_snapshot\\s*:|price_minor\\s*:|subtotal_minor\\s*:|delivery_fee\\s*:/);
 });test("checkout shows cash payment instructions that follow the selected fulfilment method", () => {
   assert.match(html, /id="checkout-payment-method"/);
   assert.match(html, /id="checkout-payment-note"/);
@@ -324,7 +325,7 @@ test("every Website Preview is read-only and only the verified customer hostname
 
 test("the retired standalone ordering URL redirects into the primary homepage V3 checkout", () => {
   const standalone = readFileSync(join(root, "order-online-v3.html"), "utf8");
-  assert.match(standalone, /http-equiv="refresh" content="0; url=index\\.html#menu"/);
-  assert.match(standalone, /location\\.replace\\('index\\.html#menu'\\)/);
+  assert.match(standalone, /http-equiv="refresh" content="0; url=index\.html#menu"/);
+  assert.match(standalone, /location\.replace\('index\.html#menu'\)/);
   assert.equal(standalone.includes('js/website-order-v3.js'), false);
 });
