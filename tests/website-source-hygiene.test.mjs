@@ -251,8 +251,7 @@ test("cart additions and checkout stages provide motion feedback with reduced-mo
   assert.match(order, /function animateCartAdded\(\)/);
   assert.match(order, /replayAnimation\(rows && rows\.lastElementChild, 'is-added'\)/);
   assert.match(order, /animateCartAdded\(\)/);
-  assert.match(order, /checkoutMotion\('is-checking'\)/);
-  assert.match(order, /checkoutMotion\('is-ready'\)/);
+  assert.doesNotMatch(order, /checkoutMotion\('is-checking'\)|checkoutMotion\('is-ready'\)/);
   assert.match(order, /checkoutMotion\('is-ordering'\)/);
   assert.match(order, /checkoutMotion\('is-confirmed'\)/);
   assert.match(html, /@keyframes fcCartRowAdded/);
