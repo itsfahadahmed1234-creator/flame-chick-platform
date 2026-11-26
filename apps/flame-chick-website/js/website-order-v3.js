@@ -60,6 +60,29 @@
       guard.canSubmitOrders(root.location && root.location.hostname);
   }
 
+  function isProductionRehearsalPreview() {
+    var guard = root.FlameChickWebsitePreviewGuard;
+    return !!guard && typeof guard.isTestCheckoutPreview === 'function' &&
+      guard.isTestCheckoutPreview(root.location && root.location.hostname);
+  }
+
+  function confirmProductionRehearsal(retry) {
+    if (!isProductionRehearsalPreview()) return true;
+    if (typeof root.confirm !== 'function') {
+      status('The rehearsal confirmation is unavailable. No order was submitted.', 'error');
+      return false;
+    }
+    var action = retry
+      ? 'Retry the exact same order request? The idempotency key will be preserved.'
+      : 'Submit this rehearsal order now?';
+    return root.confirm(
+      'PRODUCTION REHEARSAL ORDER\n\n' +
+      'This is a real order, not a simulation. It will be saved in Production Supabase and sent to the live Flame Chick POS.\n\n' +
+      'The order notes will be tagged [TEST ORDER - ADMIN DELETE]. Admin must manually remove this rehearsal order before the first customer is invited.\n\n' +
+      action
+    );
+  }
+
   function syncCatalogDialogState() {
     var productDialog = $('product-dialog');
     var dealDialog = $('deal-dialog');
@@ -1146,7 +1169,14 @@
       branch_id: context.branchId,
       fulfillment_type: context.fulfilmentType,
       customer: { name:name, phone:phone, email:email || null },
-      notes: $('order-notes').value.trim() || null,
+      notes: (function () {
+        var value = $('order-notes').value.trim();
+        if (isProductionRehearsalPreview()) {
+          var marker = '[TEST ORDER - ADMIN DELETE]';
+          if (value.indexOf(marker) === -1) value = value ? marker + ' ' + value : marker;
+        }
+        return value || null;
+      })(),
       delivery:delivery,
       items:state.cart.map(function (row) {
         var item = clone(row.payload);
@@ -1177,6 +1207,10 @@
     }
     if (!retry && state.checkoutUncertain) {
       status('Your previous order response is uncertain. Retry the exact same request before changing anything.', 'error');
+      return;
+    }
+    if (!confirmProductionRehearsal(retry)) {
+      status('No order was submitted.', '');
       return;
     }
     if (!state.checkoutBody) {
