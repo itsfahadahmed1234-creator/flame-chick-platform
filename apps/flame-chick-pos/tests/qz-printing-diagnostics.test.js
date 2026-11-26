@@ -72,3 +72,22 @@ test('RSA-SHA512 verification rejects a signature made by a different key', func
   const signature = crypto.sign('RSA-SHA512', Buffer.from(request, 'utf8'), otherKeyPair.privateKey);
   assert.equal(verifyQzSignature(request, signature, firstPem), false);
 });
+
+
+test('both certificates in the public bundle parse and the root verifies the POS signing certificate', function () {
+  const bundlePath = path.join(__dirname, '..', 'qz', 'digital-certificate.txt');
+  const bundle = fs.readFileSync(bundlePath, 'utf8');
+  const certificateBlocks = bundle.match(/-----BEGIN CERTIFICATE-----[\\s\\S]*?-----END CERTIFICATE-----/g) || [];
+
+  assert.equal(certificateBlocks.length, 2, 'bundle should contain one leaf and one root certificate');
+
+  const leaf = new crypto.X509Certificate(certificateBlocks[0]);
+  const root = new crypto.X509Certificate(certificateBlocks[1]);
+
+  assert.match(leaf.subject, /Flame Chick POS QZ Signing Certificate/);
+  assert.match(root.subject, /Flame Chick QZ Signing Root CA/);
+  assert.equal(root.subject, root.issuer, 'root certificate should be self-issued');
+  assert.equal(root.verify(root.publicKey), true, 'root self-signature should verify');
+  assert.equal(leaf.issuer, root.subject, 'POS signing certificate should be issued by the Flame Chick root');
+  assert.equal(leaf.verify(root.publicKey), true, 'POS signing certificate should verify with the root public key');
+});
