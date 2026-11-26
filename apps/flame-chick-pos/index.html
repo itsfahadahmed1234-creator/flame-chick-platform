@@ -2682,11 +2682,78 @@ function bindPreorderControls(){
     printSettings.kitchenEnabled=$('kitchenEnabled').checked;
     printSettings.counterLabel=($('counterLabel').value||'Counter Receipt').trim()||'Counter Receipt';
     printSettings.kitchenLabel=($('kitchenLabel').value||'Kitchen KOT').trim()||'Kitchen KOT';
+    printSettings.qzPrinterName=String($('qzPrinterSelect')?.value||'').trim();
+    printSettings.qzDirectEnabled=!!$('qzDirectEnabled')?.checked;
+    if(printSettings.qzDirectEnabled&&!printSettings.qzPrinterName){
+      showToast('Choose a Windows printer before enabling QZ Tray direct printing.');
+      return;
+    }
     $('counterLabel').value=printSettings.counterLabel;
     $('kitchenLabel').value=printSettings.kitchenLabel;
     await put(STORES.settings,{key:'printSettings',value:printSettings,updatedAt:new Date().toISOString()});
     const txt=$('printingSavedText');txt.style.display='inline';setTimeout(()=>txt.style.display='none',2000);
     showToast('Printing settings saved');
+  });
+
+  const qzStatus=$('qzStatusText');
+  const qzScanBtn=$('qzScanPrintersBtn');
+  const qzTestBtn=$('qzTestPrintBtn');
+  const qzPrinterSelect=$('qzPrinterSelect');
+  function setQzStatus(message){
+    if(qzStatus)qzStatus.textContent=message;
+  }
+  function setQzTokenProvider(){
+    if(!window.FlameChickQZ)throw new Error('QZ Tray printing library did not load. Refresh the POS page.');
+    if(!flameChickStaffSession?.access_token)throw new Error('Your POS staff session is missing or expired. Sign in again.');
+    window.FlameChickQZ.setTokenProvider(()=>flameChickStaffSession?.access_token||'');
+  }
+  if(qzScanBtn)qzScanBtn.addEventListener('click',async()=>{
+    qzScanBtn.disabled=true;
+    setQzStatus('Connecting to QZ Tray and searching for Windows printers…');
+    try{
+      setQzTokenProvider();
+      const printers=await window.FlameChickQZ.scanPrinters();
+      const current=String(printSettings.qzPrinterName||qzPrinterSelect?.value||'');
+      if(qzPrinterSelect){
+        qzPrinterSelect.innerHTML='<option value="">Select a Windows printer…</option>';
+        printers.forEach(name=>{
+          const option=document.createElement('option');
+          option.value=String(name);
+          option.textContent=String(name);
+          qzPrinterSelect.appendChild(option);
+        });
+        if(printers.includes(current))qzPrinterSelect.value=current;
+        else if(printers.length===1)qzPrinterSelect.value=String(printers[0]);
+      }
+      setQzStatus(printers.length
+        ? 'Connected to QZ Tray. Found '+printers.length+' printer(s). Select the receipt printer and save settings.'
+        : 'QZ Tray connected, but Windows returned no printers. Check that the printer is installed in Windows.');
+      if(!printers.length)showToast('QZ Tray connected, but no Windows printers were found.');
+    }catch(error){
+      const message=error?.message||'Unknown QZ Tray connection error.';
+      setQzStatus('QZ Tray connection failed: '+message);
+      showToast('QZ Tray unavailable: '+message);
+    }finally{
+      qzScanBtn.disabled=false;
+    }
+  });
+  if(qzTestBtn)qzTestBtn.addEventListener('click',async()=>{
+    const printerName=String(qzPrinterSelect?.value||printSettings.qzPrinterName||'').trim();
+    if(!printerName){showToast('Find Windows Printers and select the receipt printer first.');return;}
+    qzTestBtn.disabled=true;
+    setQzStatus('Sending a clearly labelled QZ Tray test receipt to '+printerName+'…');
+    try{
+      setQzTokenProvider();
+      await window.FlameChickQZ.testPrint(printerName);
+      setQzStatus('QZ Tray test receipt sent to '+printerName+'.');
+      showToast('QZ Tray test receipt sent to '+printerName);
+    }catch(error){
+      const message=error?.message||'Unknown QZ Tray print error.';
+      setQzStatus('QZ Tray test print failed: '+message);
+      showToast('QZ Tray test print failed: '+message);
+    }finally{
+      qzTestBtn.disabled=false;
+    }
   });
 }
 function updateCustomArrivalFromInput(){
