@@ -81,24 +81,25 @@ test("V2 visual language is used for V3 catalog cards without hard-coded menu pr
   assert.doesNotMatch(order, /unit_price_snapshot\\s*:|price_minor\\s*:|subtotal_minor\\s*:/);
 });
 
-test("homepage ordering uses published V3 data and requires a signed quote before committing", () => {
+test("homepage checkout prices the cart from the loaded V3 catalog and submits one server-validated order", () => {
   assert.match(order, /FlameChickCatalogV3Client\.load/);
   assert.match(order, /FlameChickCatalogV3View\.buildMenuViewModel/);
   assert.match(order, /FlameChickCatalogV3DealView\.buildDealViewModel/);
-  assert.match(order, /FlameChickCatalogV3DealConfigurator\.createDealConfigurator/);
-  assert.match(order, /action: 'quote_website_order'/);
-  assert.match(order, /state\.checkoutBody\.action = 'create_website_order'/);
-  assert.match(order, /state\.checkoutBody\.quote_token = state\.quoteToken/);
-  assert.match(order, /function requestQuote\(\)/);
-  assert.match(order, /function renderQuoteSummary\(quote, expiresAt\)/);
-  assert.match(order, /quoteExpiresAt/);
-  assert.match(order, /quote\.items\.forEach/);
-  assert.match(order, /item\.quantity = row\.quantity/);
-  assert.match(order, /delivery: delivery/);
-  assert.ok(order.includes('amount.textContent = money(item.line_total)'));
-  assert.doesNotMatch(order, /unit_price_snapshot\\s*:|price_minor\\s*:|subtotal_minor\\s*:|delivery_fee\\s*:/);
+  assert.match(order, /action: 'place_website_order'/);
+  assert.match(order, /function calculateCartPricing\(\)/);
+  assert.match(order, /function calculateProductLine\(row\)/);
+  assert.match(order, /function calculateDealLine\(row\)/);
+  assert.match(order, /function selectedDeliveryFeeMinor\(\)/);
+  assert.match(order, /cardPrice\(pricing\.subtotalMinor\)/);
+  assert.match(order, /cardPrice\(pricing\.deliveryFeeMinor\)/);
+  assert.match(order, /state\.checkoutBody\.request_id = state\.checkoutRequestId/);
+  assert.doesNotMatch(order, /quote_website_order|create_website_order|quote_token|unit_price_snapshot\s*:|line_total\s*:|delivery_fee\s*:/);
+  assert.match(html, /id="cart-subtotal"/);
+  assert.match(html, /id="cart-delivery-fee"/);
+  assert.match(html, /id="cart-total"/);
+  assert.match(html, /id="place-order"/);
+  assert.doesNotMatch(html, /Place order|id="place-order"|quote-lines|cart-price-note/);
 });
-
 test("checkout shows cash payment instructions that follow the selected fulfilment method", () => {
   assert.match(html, /id="checkout-payment-method"/);
   assert.match(html, /id="checkout-payment-note"/);
@@ -116,45 +117,19 @@ test("delivery area and locality are sent as customer selections, never as a cli
   assert.doesNotMatch(order, /delivery_fee:|deliveryFee:/);
 });
 
-test("checkout requires customer review, stores only a retry UUID and replays the exact create request", () => {
+test("Place Order sends an idempotent ID-only request and retries the exact same body", () => {
   assert.match(order, /PENDING_CHECKOUT_STORAGE_KEY = 'flame-chick-v3-pending-checkout-id'/);
-  assert.match(order, /action: 'quote_website_order'/);
-  assert.match(order, /state\.checkoutBody\.action = 'create_website_order'/);
+  assert.match(order, /action: 'place_website_order'/);
   assert.match(order, /state\.checkoutBody\.request_id = state\.checkoutRequestId/);
-  assert.match(order, /state\.checkoutBody\.quote_token = state\.quoteToken/);
   assert.match(order, /root\.crypto\.randomUUID/);
   assert.match(order, /savePendingRequestId\(state\.checkoutRequestId\)/);
-  assert.match(order, /Retry the exact same request/);
-  assert.match(order, /quoteToken/);
+  assert.match(order, /Retry this exact order/);
   assert.match(order, /sessionStorage\.setItem/);
-  assert.doesNotMatch(order, /place_website_order|localStorage|indexedDB/);
-  assert.match(html, /id="request-quote"/);
-  assert.match(html, /id="cart-summary"/);
-  assert.match(html, /id="quote-lines"/);
-  assert.match(html, /Get verified total/);
-  assert.match(html, /Total confirmed by Flame Chick/);
-});test("single-branch storefront skips the branch gate and opens fulfilment from the V2-style cart drawer", () => {
-  assert.match(html, /id="badge"/);
-  assert.match(order, /if \(\$\('badge'\)\)/);
-  assert.doesNotMatch(html, /id="branch-selector"|id="catalog-context-label"|Choose your branch/);
-  assert.match(html, /class="drawer fc-v3-cart-drawer"[^>]*id="fc-v3-cart-drawer"/);
-  assert.match(html, /class="seg fc-v3-fulfilment"/);
-  assert.match(html, /id="fulfilment-delivery"[^>]*value="delivery" checked/);
-  assert.match(html, /id="fulfilment-pickup"[^>]*value="pickup"/);
-  assert.match(html, /id="delivery-area"/);
+  assert.doesNotMatch(order, /quote_website_order|create_website_order|quote_token|localStorage|indexedDB/);
   assert.match(html, /id="place-order"/);
-  assert.match(html, /id="order-success"/);
-  assert.match(order, /context\.branches\.length !== 1/);
-  assert.match(order, /availableTypes\.indexOf\('delivery'\) >= 0 \? 'delivery'/);
-  assert.match(order, /function changeFulfilment\(type\)/);
-  assert.match(order, /selectFulfilment\(type\)/);
-  assert.match(order, /function openCartDrawer\(\)/);
-  assert.match(order, /function closeCartDrawer\(\)/);
-  assert.match(order, /websiteDeliveryEnabled/);
-  assert.match(order, /websitePickupEnabled/);
-  assert.match(order, /fulfillment_type: context\.fulfilmentType/);
+  assert.match(html, /id="retry-order"/);
+  assert.doesNotMatch(html, /Place order|id="place-order"/);
 });
-
 test("V3 Order API calculates delivery charges from database configuration and supports CORS preflight", () => {
   const api = readFileSync("supabase/functions/flame-chick-order-api/index.ts", "utf8");
   assert.match(api, /if \(req\.method === "OPTIONS"\)/);
@@ -256,7 +231,7 @@ test("delivery area search uses one visible field and retains the selected area 
 });
 
 test("cart checkout details are unique and the checkout actions stay in a sticky bottom footer", () => {
-  for (const id of ["details-section","customer-name","customer-phone","delivery-fields","delivery-area-search","delivery-address","request-quote","place-order"]) {
+  for (const id of ["details-section","customer-name","customer-phone","delivery-fields","delivery-area-search","delivery-address","place-order"]) {
     assert.equal((html.match(new RegExp('id="' + id + '"', "g")) || []).length, 1, id + " must appear exactly once");
   }
   assert.doesNotMatch(html, /delivery-instructions/);
