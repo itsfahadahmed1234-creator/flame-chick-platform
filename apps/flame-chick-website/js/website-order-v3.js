@@ -1011,11 +1011,11 @@
           state.checkoutRequestId = root.crypto.randomUUID();
         }
         body.action = 'place_website_order';
-        body.request_id = state.checkoutRequestId;
         if (!savePendingRequestId(state.checkoutRequestId)) {
           throw new Error('This browser cannot preserve safe order retry protection. Enable session storage and try again. No order has been submitted.');
         }
         state.checkoutBody = body;
+        state.checkoutBody.request_id = state.checkoutRequestId;
       } catch (error) {
         status(error.message || 'Please check your order details and try again.', 'error');
         return;
@@ -1056,7 +1056,7 @@
       var uncertain = !error.status || error.status >= 500;
       state.checkoutUncertain = uncertain;
       if (uncertain) {
-        status('We could not confirm the response. Your request ID is preserved; retry the same order without changing it.', 'error');
+        status('We could not confirm the response. Your request ID is preserved; retry this same order request without changing its details.', 'error');
         $('retry-order').hidden = false;
         $('retry-order').disabled = false;
       } else {
