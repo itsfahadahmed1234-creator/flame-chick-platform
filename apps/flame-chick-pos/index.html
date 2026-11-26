@@ -2770,7 +2770,7 @@ function bindPreorderControls(){
   const qzDiagnosticBtn=$('qzDiagnosticDownloadBtn');
   function isQzDiagnosticPreviewHost(){
     const host=String(location.hostname||'').toLowerCase();
-    return /^flame-chick-pos-production-[a-z0-9-]+-befahad1234-7050\.vercel\.app$/.test(host);
+    return /^flame-chick-pos-production-[a-z0-9-]+-(?:befahad1234-7050|fahad-7455)\.vercel\.app$/.test(host);
   }
   if(qzDiagnosticBtn&&!isQzDiagnosticPreviewHost()){
     qzDiagnosticBtn.disabled=true;
