@@ -1291,7 +1291,9 @@ html,body{background:var(--bg);overflow:hidden}
            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">
              <button class="btn" id="qzScanPrintersBtn" type="button">Find Windows Printers</button>
              <button class="btn" id="qzTestPrintBtn" type="button">Print Test Receipt</button>
+             <button class="btn" id="qzDiagnosticDownloadBtn" type="button">Download QZ Diagnostic Files</button>
            </div>
+           <div class="sub" style="margin-top:7px">Preview-only synthetic diagnostic. It uses the selected queue only to form the QZ request and deliberately rejects the QZ signature before printer submission. It does not print.</div>
            <div class="field" style="margin-top:9px"><label for="qzPrinterSelect">Windows printer queue</label><select id="qzPrinterSelect"><option value="">Use browser print (default)</option></select></div>
            <label style="display:flex;gap:8px;align-items:center;margin-top:9px;font-size:12px;font-weight:700"><input id="qzDirectEnabled" type="checkbox"> Use QZ Tray direct printing when connected</label>
            <div class="sub" style="margin-top:6px">Choose the existing “Generic / Text Only” queue after discovery. Direct printing is opt-in; if QZ Tray is unavailable, the POS falls back to the browser print dialog.</div>
@@ -2753,6 +2755,40 @@ function bindPreorderControls(){
       showToast('QZ Tray test print failed: '+message);
     }finally{
       qzTestBtn.disabled=false;
+    }
+  });
+
+  const qzDiagnosticBtn=$('qzDiagnosticDownloadBtn');
+  function isQzDiagnosticPreviewHost(){
+    const host=String(location.hostname||'').toLowerCase();
+    return /^flame-chick-pos-production-[a-z0-9-]+-befahad1234-7050\.vercel\.app$/.test(host);
+  }
+  if(qzDiagnosticBtn&&!isQzDiagnosticPreviewHost()){
+    qzDiagnosticBtn.disabled=true;
+    qzDiagnosticBtn.title='QZ diagnostics are available only on Flame Chick Preview deployments.';
+  }
+  if(qzDiagnosticBtn)qzDiagnosticBtn.addEventListener('click',async()=>{
+    if(!isQzDiagnosticPreviewHost()){
+      setQzStatus('QZ diagnostics are disabled outside the Flame Chick Preview deployment.');
+      return;
+    }
+    qzDiagnosticBtn.disabled=true;
+    setQzStatus('Building a synthetic QZ diagnostic. No physical print will be sent…');
+    try{
+      if(!window.FlameChickQZ||typeof window.FlameChickQZ.downloadDiagnosticFiles!=='function'){
+        throw new Error('QZ Tray printing library did not load. Refresh the POS Preview page.');
+      }
+      window.FlameChickQZ.setTokenProvider(()=>flameChickStaffSession?.access_token||'');
+      const printerName=String(qzPrinterSelect?.value||printSettings.qzPrinterName||'').trim();
+      const result=await window.FlameChickQZ.downloadDiagnosticFiles(printerName);
+      setQzStatus(result.userMessage);
+      showToast('QZ diagnostic files downloaded; no physical print was sent.');
+    }catch(error){
+      const message=error?.message||'Unknown QZ diagnostic error.';
+      setQzStatus('QZ diagnostic failed: '+message);
+      showToast('QZ diagnostic failed: '+message);
+    }finally{
+      qzDiagnosticBtn.disabled=false;
     }
   });
 }
