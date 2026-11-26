@@ -4,7 +4,7 @@ Private source repository for the Flame Chick customer website, POS, Admin panel
 
 ## Project handoff
 
-Start every new work session with [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md). It records the verified project context, safety rules, current branch/stage, completed work, known risks, and next implementation steps. The latest local-preview stage is recorded in this [handoff addendum](docs/operations/2026-11-23-local-preview-fixture-checkpoint.md). Keep both current as the project changes.
+Start every new work session with [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md). It records the verified project context, safety rules, current branch/stage, completed work, known risks, and next implementation steps. The latest Website Preview and one-step checkout stage is recorded in this [handoff addendum](docs/operations/2026-11-26-website-preview-one-step-checkout.md); the earlier local-preview stage is recorded in this [local-preview addendum](docs/operations/2026-11-23-local-preview-fixture-checkpoint.md). Keep both current as the project changes.
 
 ## Current platform
 
