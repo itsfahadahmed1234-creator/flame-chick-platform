@@ -1146,7 +1146,9 @@
       syncFulfilmentControls();
       return;
     }
-    resetCheckout('Order type changed. Review your cart and place your order when ready.');
+    resetCheckout(orderWritesAllowed()
+      ? 'Order type changed. Review your cart and place your order when ready.'
+      : 'Order type changed. Your cart is updated; order submission is disabled on this Website Preview.');
     renderCatalog();
     renderCart();
   }
