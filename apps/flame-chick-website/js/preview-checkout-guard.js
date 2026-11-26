@@ -1,7 +1,8 @@
 /* Fail-closed browser guard for the customer Website's Production Order API.
- * Published catalogue and website-context GET requests remain available on Preview.
- * Only the verified public Production hostnames may quote or submit orders.
- * This is a UI safety guard; the Order API remains the authoritative security boundary.
+ * Public catalogue/context GET requests remain available on all Preview hosts.
+ * Order writes are allowed on the canonical Production host and only the exact
+ * deployment URL/branch alias approved for the controlled Production rehearsal.
+ * Never wildcard-match Vercel Preview hostnames.
  */
 (function (root, factory) {
   'use strict';
@@ -12,18 +13,27 @@
   'use strict';
 
   var PRODUCTION_ORDER_HOSTS = Object.freeze(['flamechick.vercel.app']);
-  var TEST_CHECKOUT_PREVIEW_HOSTS = [];
+  var TEST_CHECKOUT_PREVIEW_HOSTS = Object.freeze([
+    'flame-chick-website-production-p6r1gdef2-fahad-7455.vercel.app',
+    'flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455.vercel.app'
+  ]);
 
   function normalizedHost(hostname) {
     if (typeof hostname !== 'string') return '';
     return hostname.trim().toLowerCase().replace(/\.$/, '');
   }
 
-  function isTestCheckoutPreview() { return false; }
+  function isTestCheckoutPreview(hostname) {
+    var host = normalizedHost(hostname);
+    return !!host && TEST_CHECKOUT_PREVIEW_HOSTS.indexOf(host) !== -1;
+  }
 
   function canSubmitOrders(hostname) {
     var host = normalizedHost(hostname);
-    return !!host && PRODUCTION_ORDER_HOSTS.indexOf(host) !== -1;
+    return !!host && (
+      PRODUCTION_ORDER_HOSTS.indexOf(host) !== -1 ||
+      isTestCheckoutPreview(host)
+    );
   }
 
   function shouldBlockOrderApiWrite(method, hostname) {
