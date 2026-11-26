@@ -17,9 +17,7 @@ concurrency:
 
 jobs:
   deploy-preview:
-    if: >-
-      github.ref == 'refs/heads/work/website-parallel-development' &&
-      vars.FLAME_CHICK_WEBSITE_PREVIEW_DEPLOY_ENABLED == 'true'
+    if: github.ref == 'refs/heads/work/website-parallel-development'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: flamechick-preview
