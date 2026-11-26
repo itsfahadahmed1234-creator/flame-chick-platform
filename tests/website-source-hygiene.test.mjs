@@ -288,15 +288,20 @@ test("product and deal dialogs are centered, bounded, scrollable and closed dial
 });
 
 
-test("every Website Preview is read-only and only the verified customer hostname may submit orders", () => {
+test("only the exact rehearsal Preview and canonical Production host can submit orders", () => {
   const guardSource = readFileSync(join(root, "js/preview-checkout-guard.js"), "utf8");
   assert.match(guardSource, /PRODUCTION_ORDER_HOSTS = Object\.freeze\(\['flamechick\.vercel\.app'\]\)/);
-  assert.match(guardSource, /TEST_CHECKOUT_PREVIEW_HOSTS = \[\]/);
-  assert.match(guardSource, /function isTestCheckoutPreview\(\) \{ return false; \}/);
+  assert.match(guardSource, /TEST_CHECKOUT_PREVIEW_HOSTS = Object\.freeze\(\[/);
+  assert.match(guardSource, /flame-chick-website-production-p6r1gdef2-fahad-7455\.vercel\.app/);
+  assert.match(guardSource, /flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455\.vercel\.app/);
+  assert.match(guardSource, /function isTestCheckoutPreview\(hostname\)/);
   assert.match(order, /function orderWritesAllowed\(\)/);
-  assert.match(order, /Checkout is disabled on this Website Preview/);
-  assert.match(html, /id="fc-preview-checkout-notice"/);
+  assert.match(order, /function isProductionRehearsalPreview\(\)/);
+  assert.match(order, /function confirmProductionRehearsal\(retry\)/);
+  assert.match(order, /PRODUCTION REHEARSAL ORDER/);
+  assert.match(order, /\[TEST ORDER - ADMIN DELETE\]/);
   assert.match(order, /if \(String\(method \|\| ''\)\.toUpperCase\(\) !== 'GET' && !orderWritesAllowed\(\)\)/);
+  assert.match(html, /id="fc-preview-checkout-notice"/);
   assert.doesNotMatch(order, /TEST ORDER SENT TO FLAME CHICK POS|WEBSITE PREVIEW QA TEST/);
 });
 
