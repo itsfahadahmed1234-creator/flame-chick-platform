@@ -13,6 +13,14 @@
 
 ## Connected Cloudflare account / target
 
+## Parallel Website work — strict separation
+
+- A separate ChatGPT conversation is actively handling the Flame Chick **Website**. That conversation owns Website investigation, source edits, builds, hosting configuration and deployment.
+- This continuation is **POS hosting only**. Do not open, edit, deploy, reconfigure, or otherwise interfere with `apps/flame-chick-website`, its hosting project, Worker/Pages resources, DNS, environment variables, build pipeline, or Website domain.
+- Do not create a shared combined Website+POS Worker. Create only the independent POS Worker/project named `flamechickpos` and limit all Cloudflare writes to that POS resource.
+- The Cloudflare account is shared, so inspect account-level resources read-only only as needed to confirm names and avoid collisions. Leave every resource owned by the Website conversation untouched.
+- Coordinate only if a shared account/domain conflict is discovered; do not assume the Website chat is finished or wait for it before preparing the isolated POS Worker.
+
 **Upload boundary:** The unchanged source files include private Node QZ signer code and test files. They are not public assets. Build the public static output from a strict allowlist (POS HTML, browser JS/CSS, public SVGs and the public leaf certificate only); port the signer separately to Worker code and keep its private key as an encrypted secret.
 
 - Account: `Itsfahadahmed1234@gmail.com's Account`, connected identity `itsfahadahmed1234@gmail.com`.

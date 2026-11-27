@@ -1,3 +1,11 @@
+## Parallel Website work — strict separation
+
+- A separate ChatGPT conversation is actively handling the Flame Chick **Website**. That conversation owns Website investigation, source edits, builds, hosting configuration and deployment.
+- This continuation is **POS hosting only**. Do not open, edit, deploy, reconfigure, or otherwise interfere with `apps/flame-chick-website`, its hosting project, Worker/Pages resources, DNS, environment variables, build pipeline, or Website domain.
+- Do not create a shared combined Website+POS Worker. Create only the independent POS Worker/project named `flamechickpos` and limit all Cloudflare writes to that POS resource.
+- The Cloudflare account is shared, so inspect account-level resources read-only only as needed to confirm names and avoid collisions. Leave every resource owned by the Website conversation untouched.
+- Coordinate only if a shared account/domain conflict is discovered; do not assume the Website chat is finished or wait for it before preparing the isolated POS Worker.
+
 **Hostname boundary:** The expected initial validation hostname is `flamechickpos.itsfahadahmed1234.workers.dev`. Cloudflare recommends a custom domain/route rather than `workers.dev` for business-critical production. The connected account currently has no zones attached, and the user supplied only the label `flamechickpos`, not a registered full domain/TLD. Use the workers.dev hostname for initial testing only; do not invent a suffix, purchase/register a domain, add a zone, or change DNS. Record the exact full custom production hostname after the user connects the zone/domain.
 
 # HOSTING DIRECTION UPDATE — 2026-11-27
