@@ -22,7 +22,7 @@
 - Working-branch fixes add payment-only Dine-in finalization, stable payment request reuse, read-only reconciliation of an exact completed/paid server match, server-aware Dine-in table occupancy and a sync wake-up flag. Takeaway's Print & Complete gate is preserved.
 - Production database rows, migrations, Edge Functions and Vercel configuration remain unchanged. No order or payment was created for diagnosis.
 
-The new POS regression tests and CI must pass before one intentional Preview is prepared. No Production deployment is authorized. Keep Hobby/Free, GST deferred, kitchen printing disabled and physical printer output/cut/alignment unverified.
+The first POS static CI run passed on `bde1c66eb0dc0f79a6489faa9bf3874090ac1220`; a follow-up now covers History API payment fields and executes the actual Dine-in payment handler in a VM regression. Await that CI run before one intentional Preview is prepared. No Production deployment is authorized. Keep Hobby/Free, GST deferred, kitchen printing disabled and physical printer output/cut/alignment unverified.
 
 ## Mandatory first actions in the new chat
 

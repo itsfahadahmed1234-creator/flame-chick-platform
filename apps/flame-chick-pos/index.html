@@ -4289,7 +4289,7 @@ async function reconcileAlreadyPaidPosOrder(order,error){
   const expectedMethod=window.FlameChickPosPaymentCollection.normalizeMethod(pending.method);
   const actualMethod=window.FlameChickPosPaymentCollection.normalizeMethod(remote.paymentMethod);
   const status=String(remote.status||'').toLowerCase(),paymentStatus=String(remote.paymentStatus||'').toLowerCase();
-  const paidAmount=Number(remote.paidAmount)||0,balanceDue=Number(remote.balanceDue)||0;
+  const paidAmount=Number(remote.paidAmount??remote.PaidAmount)||0,balanceDue=Number(remote.balanceDue??remote.BalanceDue)||0;
   const localType=window.FlameChickPosSyncV3.normalizeFulfillment(order.fulfillmentType);
   const remoteType=window.FlameChickPosSyncV3.normalizeFulfillment(remote.fulfillmentType);
   if(status!=='completed'||paymentStatus!=='paid'||remoteType!==localType||

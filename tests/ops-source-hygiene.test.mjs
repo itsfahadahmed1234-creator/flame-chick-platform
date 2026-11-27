@@ -437,3 +437,48 @@ test("POS safely reconciles a paid server order and drains concurrent sync reque
   assert.match(html,/if\(syncInProgress\)\{syncRequested=true;return;\}/);
   assert.match(html,/if\(syncRequested\)\{[\s\S]*syncPendingUnifiedPosOrders\(\)/);
 });
+
+
+test("Dine-in Complete the Payment handler executes and persists the updated check",async()=>{
+  const html=source[0].html;
+  const start=html.indexOf('async function takePaymentAndCloseTable');
+  const end=html.indexOf('async function saveLocalOrder',start);
+  assert.ok(start>=0&&end>start,'Dine-in payment function boundaries must exist');
+  const fn=html.slice(start,end);
+  const writes=[];
+  let opened=null,prepareOptions=null;
+  const stored={
+    localOrderId:'LOCAL-DINE-1',syncOrderId:'99000000-0000-4000-8000-000000000001',
+    localRevision:8,fulfillmentType:'Dine-in',tableId:'T1',tableNumber:'Table 1',
+    total:599,discount:0,items:[{itemName:'QA Burger',price:599,quantity:1}]
+  };
+  const elements={
+    paymentMethod:{value:'Card'},customerName:{value:'Walk-in'},phone:{value:''},notes:{value:''}
+  };
+  const context={
+    activeDineCheckId:'LOCAL-DINE-1',selectedTableId:'T1',cart:[{itemName:'QA Burger',price:599,quantity:1}],
+    STORES:{orders:'orders',queue:'queue'},
+    get:async(store,id)=>store==='orders'&&id==='LOCAL-DINE-1'?{...stored}:null,
+    put:async(store,order)=>writes.push({store,order:{...order}}),
+    findTable:()=>({id:'T1',name:'Table 1'}),
+    $:id=>elements[id],
+    prepareLocalPosSyncOrder:(order,options)=>{prepareOptions=options;return {...order,syncOrderId:stored.syncOrderId,localRevision:stored.localRevision};},
+    renderCart:()=>{},
+    openLocalReceipt:(order,options)=>{opened={order,options};},
+    window:{editingLocalOrderId:''},
+    receiptEditContext:null,
+    JSON,Date,Math,Number,String,Array,Object,console,
+  };
+  const vmContext=vm.createContext(context);
+  new vm.Script(fn+'\ntakePaymentAndCloseTable();',{filename:'takePaymentAndCloseTable.regression.js'}).runInContext(vmContext);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(writes.length,2);
+  assert.deepEqual(writes.map(x=>x.store),['orders','queue']);
+  assert.equal(writes[0].order.localRevision,8);
+  assert.equal(writes[0].order.paymentStatus,'Unpaid');
+  assert.equal(writes[0].order.status,'Open');
+  assert.equal(prepareOptions?.bumpRevision,undefined);
+  assert.equal(opened?.options.editable,true);
+  assert.equal(opened?.order.paymentStatus,'Paid');
+  assert.equal(context.window.editingLocalOrderId,'LOCAL-DINE-1');
+});
