@@ -1,3 +1,45 @@
+# Newer hosting checkpoint — Cloudflare transition (27 November 2026, 14:37 PKT)
+
+This 27 November update supersedes older deployment identity/status statements below where they conflict. The older material is retained as environment history.
+
+## Current Vercel Production truth
+
+Read-only Vercel checks on 27 November reconfirmed that Website Production is still:
+- Project: `flame-chick-website-production`, ID `prj_zv5EB2w4yZHagZ2uZuwk0YUeXsiA`, FahaD Hobby team `team_whJsonilovUt4vVCoIBD6L1m`.
+- Latest verified Production deployment: `dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy`, READY, target Production.
+- Deployment URL: https://flame-chick-website-production-d8hn72gzf-faha-d.vercel.app/
+- Production branch: `work/website-parallel-development`.
+- Production commit: `c57be50d1674e597693117d1f39867c4c042f43a`.
+- Stable aliases verified: `flame-chick-website-production.vercel.app`, `flame-chick-website-production-faha-d.vercel.app`, `flame-chick-website-production-git-work-website-p-ecbe0f-faha-d.vercel.app`.
+
+The project-level latest deployment at that inspection was `dpl_FUiromQAXcEUw71k2F2dJscUzEU7`, READY but Preview (API target null), branch `work/production-source-audit`, commit `b878a60c847abdd017bb292793c55bc5f5070ce9`. It is not Production and must not be confused with C57.
+
+## Newer Website code candidate — not Production
+
+Website reliability branch: `work/website-reliability-phase1-review`. Latest known candidate commit: `9bd5f81ca59d80da7192c96d6aa8e694bfbb03e5`. Its matching Website Static Checks run `45971366391` succeeded (151 core tests, 25 Preview tests, syntax checks and inline-script parse). This branch's latest changes have **not** been released to the Vercel Production project. A Vercel deployment attempt for this commit was blocked by the Free-plan API daily deployment cap (HTTP 402); no deployment was created. It is a candidate for the Cloudflare migration after the current source branch, pending work and branch dependencies are inspected. Do not simply point Cloudflare Production at an arbitrary branch or at the C57/old main commit.
+
+## Cloudflare status
+
+Cloudflare account and GitHub connection were checked directly:
+- Authenticated Cloudflare email: `itsfahadahmed1234@gmail.com`.
+- Cloudflare account: `Itsfahadahmed1234@gmail.com's Account`, ID `831422f51dea96c387ae8917d451a6bf`.
+- GitHub repository linked in Workers Builds: `itsfahadahmed1234-creator/flame-chick-platform` (repository ID `1464312723`), branch `main`.
+- Cloudflare Pages project inventory: zero projects.
+- A Worker named `flame-chick-platform` was created by the dashboard flow. Its Workers Build root is `/`, build command blank, deploy command `npx wrangler deploy`; it is not one of the desired frontend Pages apps.
+- Its first build `2c2b8b0f-c9af-4848-94ce-05654bbf117d` failed with exact error: `Could not detect a directory containing static files (e.g. html, css and js) for the project`. This indicates incorrect Worker/static-assets deployment configuration, not a broken GitHub repository or proof that app source is invalid.
+- Do not delete the Worker yet; leave it as an unsuccessful setup artifact until the four Pages projects are operating.
+- Create four separate Pages projects rooted at `apps/flame-chick-website`, `apps/flame-chick-pos`, `apps/flame-chick-admin`, and `apps/flame-chick-rider`. Inspect the app files to configure real build command/output directories. Do not reuse root Worker command `npx wrangler deploy`.
+
+Full procedure, environment/security rules, domain cutover and next-session order are in [Cloudflare hosting transition handoff](2026-11-27-cloudflare-hosting-transition-handoff.md).
+
+## Deployment outcome requested by the user
+
+The user's goal is not simply to connect GitHub or create project shells: after the four correct Pages projects are configured, deploy the latest intended/reviewed application changes to Cloudflare Production, so the four hosted apps remain current. First compare the current live C57 release, Website reliability candidate and all relevant branches; identify the correct release source per app. Then configure per-app branch/path filters and only deploy the approved latest changes. Record each Pages production deployment's branch, source SHA, URL and build result.
+
+Keep Vercel Production online as fallback until all four Cloudflare apps pass smoke tests and domains are deliberately cut over. Do not disconnect Vercel GitHub integration, delete Vercel projects, or change DNS while testing. Supabase Production remains the shared backend; no backend migration is part of this frontend-hosting change. Never put Supabase service-role/secret keys in frontend environment variables or bundles.
+
+---
+
 # Flame Chick Website — New FahaD Vercel Production Environment Handoff
 
 **Updated:** 26 November 2026, 20:06 PKT  
