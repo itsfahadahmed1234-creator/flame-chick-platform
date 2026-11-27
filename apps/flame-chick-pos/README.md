@@ -1,3 +1,5 @@
+**Hostname boundary:** The expected initial validation hostname is `flamechickpos.itsfahamed1234.workers.dev`. Cloudflare recommends a custom domain/route rather than `workers.dev` for business-critical production. The connected account currently has no zones attached, and the user supplied only the label `flamechickpos`, not a registered full domain/TLD. Use the workers.dev hostname for initial testing only; do not invent a suffix, purchase/register a domain, add a zone, or change DNS. Record the exact full custom production hostname after the user connects the zone/domain.
+
 # Current hosting direction — 2026-11-27
 
 The primary next hosting task is a new Cloudflare Workers + Workers Static Assets project named `flamechickpos` in the connected Cloudflare account. No Cloudflare POS project/deployment has been created yet. The latest validated POS source candidate is this directory at commit `41c8aea80febd434048e50c352b386c01b02e7d4`; all 20 POS files match the later documentation-only branch checkpoint.

@@ -32,6 +32,9 @@
 - A read-only check found no zones currently attached to this account.
 - A read-only check found an existing separate Worker named `flame-chick-platform`, created from a Dashboard template, without static assets or custom routes. **Do not edit, repurpose, rename, deploy over, or delete this existing Worker.** The POS needs its own separate Worker/project.
 - User's exact requested POS host/project label is **`flamechickpos`**.
+
+**Hostname boundary:** The expected initial validation hostname is `flamechickpos.itsfahamed1234.workers.dev`. Cloudflare recommends a custom domain/route rather than `workers.dev` for business-critical production. The connected account currently has no zones attached, and the user supplied only the label `flamechickpos`, not a registered full domain/TLD. Use the workers.dev hostname for initial testing only; do not invent a suffix, purchase/register a domain, add a zone, or change DNS. Record the exact full custom production hostname after the user connects the zone/domain.
+
 - The possible default workers.dev hostname for a Worker with this name is `flamechickpos.itsfahadahmed1234.workers.dev`. Treat this as a candidate/test hostname until confirmed after creation and deployment.
 - The user has not supplied a full custom domain (there is no TLD suffix in `flamechickpos`) and the connected account currently has no zones. Do **not** invent `.com`, `.pk`, or another suffix; do not buy/register a domain, add a zone, move nameservers, create DNS records, or make custom-domain changes without the exact domain and explicit authorization. Ask one direct question only if a full custom hostname is required to complete a later production DNS cutover.
 
@@ -78,7 +81,7 @@ Production Supabase project `adkrxfnawdiljhjaavnj` is healthy in Mumbai on Free 
 
 ## 7. Free-plan / reliability guardrails
 
-- Verify the connected Cloudflare account's actual Workers plan and current limits before deployment. Current Workers Free documentation lists 100,000 dynamic Worker requests/day, 10 ms CPU time per invocation, 128 MB memory, 50 subrequests/request and a maximum 20,000 static asset files per Worker version (25 MiB each). Static asset requests are free/unlimited; requests that execute the QZ signer Worker code are dynamic Worker invocations and count toward usage. Measure the RSA signer against the Free CPU limit; do not assume it fits without testing.
+- Verify the connected Cloudflare account's actual Workers plan and current limits before deployment. As documented on 2026-11-27, Workers Free lists 100,000 dynamic Worker requests/day, 10 ms CPU time per invocation, 128 MB memory, 50 subrequests/request, 20,000 static asset files per Worker version and 25 MiB per individual static asset. Static asset requests are free/unlimited; requests that execute the QZ signer Worker code count against dynamic Worker request/CPU limits. Measure the RSA signer against the Free CPU limit; do not assume it fits without testing. Re-check current limits at deployment time.
 - No Cloudflare paid upgrade, billable add-on, extra service or plan change without user approval.
 - Do not add D1, KV, R2, Durable Objects, Queues or a separate database unless a concrete requirement is discovered and explained. The existing POS uses IndexedDB locally and Supabase for shared backend state.
 - No new Supabase project, schema, secrets, Edge Function, role, policy, or data changes are part of the hosting creation task unless explicitly justified and approved.
@@ -102,6 +105,7 @@ Production Supabase project `adkrxfnawdiljhjaavnj` is healthy in Mumbai on Free 
 - Static asset billing and limitations: https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/
 - Workers Free limits: https://developers.cloudflare.com/workers/platform/limits/
 - Workers secrets: https://developers.cloudflare.com/workers/configuration/secrets/
-- `workers.dev` subdomain behavior and production hostname guidance: https://developers.cloudflare.com/workers/configuration/routing/workers-dev/
+- `workers.dev` subdomain behavior and production hostname guidance: https://developers.cloudflare.com/workers/configuration/routing/workers-dev/ (Cloudflare recommends custom domains/routes for business-critical production).
+- Free plan limits and static asset billing: https://developers.cloudflare.com/workers/platform/limits/ and https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/
 
 The product recommendation and limit information above was checked against current Cloudflare documentation on 2026-11-27. Re-check docs and current account limits at execution time.

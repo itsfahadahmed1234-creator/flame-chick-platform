@@ -1,3 +1,5 @@
+**Hostname boundary:** The expected initial validation hostname is `flamechickpos.itsfahamed1234.workers.dev`. Cloudflare recommends a custom domain/route rather than `workers.dev` for business-critical production. The connected account currently has no zones attached, and the user supplied only the label `flamechickpos`, not a registered full domain/TLD. Use the workers.dev hostname for initial testing only; do not invent a suffix, purchase/register a domain, add a zone, or change DNS. Record the exact full custom production hostname after the user connects the zone/domain.
+
 # HOSTING DIRECTION UPDATE — 2026-11-27
 
 The immediate next-session task is now the Cloudflare POS host, not another Vercel Preview/Production deployment. Read `docs/handoffs/2026-11-27-cloudflare-pos-hosting-continuation.md` and the current top of `PROJECT_HANDOFF.md` first.

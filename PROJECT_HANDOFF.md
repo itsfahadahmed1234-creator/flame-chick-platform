@@ -16,7 +16,8 @@
 - Account: `Itsfahadahmed1234@gmail.com's Account`, connected identity `itsfahadahmed1234@gmail.com`.
 - Workers subdomain: `itsfahadahmed1234`.
 - Exact requested new POS Worker/project name: `flamechickpos`.
-- The account had no zones at the read-only check. Full custom domain/TLD is unknown; do not invent a suffix, buy a domain, add a zone or change DNS.
+- Expected initial verification hostname: `flamechickpos.itsfahamed1234.workers.dev`; this is not yet the final business-critical custom domain.
+- The account had no zones at the read-only check. Full custom domain/TLD is unknown; do not invent a suffix, buy a domain, add a zone or change DNS. Cloudflare recommends a custom domain/route rather than workers.dev for business-critical production; the workers.dev hostname is for initial validation.
 - A separate existing Worker named `flame-chick-platform` is present; leave it untouched.
 - Use a separate Workers + Workers Static Assets project for the POS, with a Worker route for QZ signing. Keep Supabase as the backend and use the existing Production project/API.
 
