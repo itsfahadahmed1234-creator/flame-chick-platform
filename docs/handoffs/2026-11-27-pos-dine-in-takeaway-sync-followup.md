@@ -159,3 +159,16 @@ The second Preview test correlated with Production FC-261127-0007: local amount 
 Working-branch repair stores canonical sync-content fingerprints, compares legacy local orders to the read-only Production order, bumps the revision only when an editable check's content changed, and preserves the accepted revision/catalog for unchanged payment-only closure. Changed carts are blocked after Production advances the order. The receipt no longer reports success unless the order is actually synced, paid and completed.
 
 CI and Preview validation remain pending. No Production rows, migrations, Edge Functions or deployment settings changed.
+
+
+## 14. CI and Preview validation — 2026-11-27
+
+- Final working-branch source/test commit: `72ef877cc9c5956b15395bc7f65234db8d2f7d51`.
+- GitHub POS/Rider Static Checks run `45936014733`: **success**, job `140299275688`. This is the run after correcting the Dine-in total fixture and conditional-revision static assertion.
+- Vercel Preview deployment: `dpl_HTgEAgGjMPBnZkzthV5hLcXDUKAo`, URL `https://flame-chick-pos-development-xvmiukqrq-faha-d.vercel.app`, state **READY**, source SHA `72ef877cc9c5956b15395bc7f65234db8d2f7d51`.
+- The Preview build passed its Preview-only ignored-build condition and completed. The original Ignored Build Step was restored to `exit 0`.
+- Production domain `flamechick-pos.vercel.app` still routes to `dpl_6VuqJfbd89a7f1V6TTV6L6n2CEjP`, SHA `f6ce0ea49aeb165fec382280dcc3f90c4747a706`. No Production deployment, alias reassignment, database write, migration or Edge Function deployment occurred.
+
+### Transaction testing boundary
+
+The Preview app is served from a different browser origin and has separate IndexedDB from the Production POS. It also uses the shared Flame Chick Production Supabase backend. Therefore, do not create a new order or take payment from Preview for QA. Preview is available for visual/source smoke review only; an end-to-end payment rehearsal requires an explicitly approved safe test environment or an approved Production release/test plan. The existing Production order FC-261127-0007 remains new/unpaid at PKR 4,647 with no payment ledger entry; the local PKR 5,346 pending order remains in the originating Production browser's IndexedDB and should not be duplicated.
