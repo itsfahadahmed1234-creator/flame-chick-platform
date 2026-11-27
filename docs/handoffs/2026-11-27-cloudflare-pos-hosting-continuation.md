@@ -1,3 +1,43 @@
+# CURRENT STATUS — POS HOSTING COMPLETE; NEXT TASK IS MANUAL DELIVERY UX (2026-11-27)
+
+> **Read this section first.** The deployment setup instructions in the historical record below have been completed and are superseded by this current status. Do not create another Worker or repeat the hosting migration.
+
+- Continue the existing POS in `itsfahadahmed1234-creator/flame-chick-platform`, branch `work/production-source-audit`, app root `apps/flame-chick-pos`. Verify the latest branch head and POS tree before editing.
+- Cloudflare Worker `flamechickpos` is live at **https://flamechickpos.itsfahadahmed1234.workers.dev**. Active deployment is **Worker version 6**, version ID `a3999f9d-65fc-48a3-9f89-0c26ac45c940`, receiving 100% traffic. The isolate-local QZ signer cache source is commit `136c8fe8a5dcaa9d47968b6b6e4e663f2a874914`. Keep the Vercel POS URL as fallback.
+- User confirmed POS login succeeded and a takeaway receipt print request reached the printer. The receipt-print popup/modal did **not** close after successful printing; the user had to close it with its X.
+- Do not touch the Website project/resources, Admin or Rider apps, Supabase schema/data/functions, Vercel deployments/aliases, DNS, or unrelated Cloudflare Workers. Do not upgrade any plan.
+- Cloudflare Workers Builds is configured to watch only `work/production-source-audit` and `apps/flame-chick-pos/**`. **Create a separate feature branch from the latest working branch for the next UI fix. Do not push POS source changes to `work/production-source-audit` during investigation/development**, because that branch is wired to auto-deploy the production POS Worker. Only move reviewed, tested source to the deployment branch after an explicit release decision.
+- Do not create real Production orders/payments or send additional physical receipt/kitchen print jobs for tests. Prefer unit tests and mocked/synthetic UI tests that verify request count, loading/disabled state and popup close behavior without external side effects.
+
+## Next task — Manual Delivery submit and receipt-print popup
+
+Investigate and fix these two existing POS UI issues. Read the actual current source, event handlers, print adapter and tests before making changes; do not guess component names or replace the existing business flow.
+
+1. **Manual Delivery — Place Order button**
+   - When clicked, it currently does not show a circular loading/spinner animation while order creation is in progress.
+   - Rapid repeated clicks are possible and could submit the same manual order more than once.
+   - Expected behavior: show an obvious circular loading animation during the in-flight submit; disable the control immediately; add a synchronous/re-entrancy guard so multiple rapid clicks invoke the submission path only once; restore the button on a handled failure so the cashier can retry. Preserve existing order idempotency, payment-preference semantics, validations and error feedback. Do not add a second order-submission route or alter backend behavior without evidence.
+2. **Receipt print popup**
+   - After the print popup/modal opens, clicking **Print Receipt** sends the print request to the printer, but the popup stays open and the cashier has to close it manually with the X.
+   - Expected behavior: close the popup automatically only after the existing print operation reports success/completion; keep it open and show the existing/appropriate error if printing fails, so the cashier can retry. Prevent accidental repeated print submissions while one is in progress. Do not change the receipt content, QZ signing contract, printer routing, or enable automatic/kitchen printing.
+
+### Safe development and verification
+
+- Inspect the manual Delivery Place Order handler, its async lifecycle, current submission/idempotency controls, print popup lifecycle, QZ print completion/error callbacks, and the relevant POS source/static tests.
+- Add regression tests with mocked order submission and mocked print adapter:
+  - repeated rapid Place Order clicks produce exactly one submit call;
+  - loading indicator appears and button is disabled while pending;
+  - button recovers correctly after success/failure;
+  - successful receipt print closes the popup once;
+  - failed/cancelled print leaves it open and shows failure; a deliberate retry remains possible;
+  - no duplicate print dispatch occurs while an earlier print is pending.
+- Avoid tests that call Production Supabase to create or modify orders/payments, and avoid sending physical print jobs. The user has already confirmed one real takeaway receipt reached the printer; use that only as evidence the current printer request path works, not as permission to print again during automated QA.
+- Preserve existing local IndexedDB data and pending orders. Do not clear browser storage.
+- Run focused tests plus the applicable POS source/static checks. Be transparent about any unrelated pre-existing failures; do not mask or delete tests to make CI green.
+- Do not deploy automatically as part of development. First present the code/test results and exact files changed; deploy only after the user explicitly authorizes release.
+
+---
+
 # NEW-CHAT EXECUTION DIRECTIVE — POS CLOUDFLARE DEPLOYMENT
 
 **This is the next task. Continue the existing Flame Chick POS work; do not restart the project.**
@@ -210,3 +250,15 @@ The initial Cloudflare deployment is complete; full browser, staff-session and Q
 3. Confirm the public QZ certificate and browser JS assets load. The QZ signer can then be tested without submitting a print job: missing bearer token should return 401; an authorized existing staff session should return a signature whose verification header is true.
 4. Measure actual CPU time for authorized `/api/qz/sign` invocations using Cloudflare Worker invocation metrics/logs. Do not assume the isolate cache alone proves compliance with the Free plan's 10 ms CPU allowance.
 5. Keep the existing Vercel POS URL as fallback. Do not switch aliases or DNS until the user explicitly approves a cutover and the browser/session checks pass.
+
+
+## Post-optimization operational verification and CPU observations (2026-11-27)
+
+- User manually confirmed the POS login succeeded.
+- User then printed a takeaway receipt from the POS. The print request reached the printer. The receipt print popup remained open after the request and required manual close using the X; this is recorded as the next UI bug, not as a QZ signing failure.
+- Cloudflare's invocation log rows for `POST /api/qz/sign` provided 19 complete post-version-6 samples. Across those user-supplied samples: displayed CPU readings were 0–7 ms, average approximately **2.42 ms**, median **2 ms**, maximum **7 ms**. No supplied complete sample exceeded 10 ms. One additional row at 19:53:09 was truncated before its CPU/wall values and is excluded.
+- The latest 16 complete readings (19:53–20:05 Pakistan time) had average CPU approximately **2.06 ms** and maximum **4 ms**. The earlier post-deployment readings included 7 ms, 3 ms and 3 ms. These are a small manual sample, not a full statistical distribution or guarantee for every cold start.
+- Wall time in the supplied rows ranged from about 117 ms to 1.09 seconds. This is elapsed request time, not Worker CPU time; it includes time spent waiting on network services. Continue monitoring CPU separately.
+- Current assessment: the isolate-local key/certificate cache is producing encouraging observed CPU results, comfortably below the 10 ms Free-plan per-invocation allowance in the supplied sample. Do not modify the signer or add more infrastructure based on these measurements alone. Continue monitoring occasional cold-start requests.
+- The deployed source change was commit `136c8fe8a5dcaa9d47968b6b6e4e663f2a874914`. Cloudflare push build `5e6997c3-fad4-4c1d-b6f7-d9addfcc36ea` succeeded and deployed version 5; a subsequent successful manual build `18002a21-c249-4f2d-a5a2-a0fb309d48f6` deployed version 6 (`a3999f9d-65fc-48a3-9f89-0c26ac45c940)). Cloudflare readback showed version 6 at 100% traffic. The QZ private key remains a Worker secret; its value was not read or changed.
+- Handoff documentation-only update commit will follow. These docs are outside the Cloudflare Workers Builds path filter, so they should not trigger a POS production deployment.
