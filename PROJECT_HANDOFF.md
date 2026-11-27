@@ -1,3 +1,43 @@
+# CURRENT TASK — 2026-11-27 — POS DINE-IN / TAKEAWAY SYNC + TABLE PAYMENT ERROR
+
+**Next task handoff:** `docs/handoffs/2026-11-27-pos-dine-in-takeaway-sync-followup.md`
+
+## Current POS Production release
+
+- Live POS: https://flamechick-pos.vercel.app/
+- Vercel account/team: `imfahad0123-5106` / `FahaD` (Hobby / Free).
+- Project: `flame-chick-pos-development`; project ID `prj_oWxuLLIJBMutlBzVX4Ko5N4jBWEw`; root `apps/flame-chick-pos`.
+- Production deployment `dpl_6VuqJfbd89a7f1V6TTV6L6n2CEjP`, READY, built from `work/production-source-audit` at commit `f6ce0ea49aeb165fec382280dcc3f90c4747a706`.
+- Domain `flamechick-pos.vercel.app` is verified and attached. The prior account's separate `flamechickpos.vercel.app` was not changed.
+- Ignored Build Step was restored to `exit 0` after the deliberate Production deployment. Preserve this deployment-quota guard.
+- QZ signing private key is Sensitive and configured for Production; never decrypt/read/expose it.
+- QZ Tray / Windows print queue integration succeeded on the development PC; actual paper output, cut, alignment and restaurant PC are not verified. Kitchen print stays disabled.
+
+## Immediate user-reported bugs — investigate next
+
+1. POS **Takeaway** orders are not syncing to the Supabase database.
+2. POS **Dine-in** orders are not syncing to the Supabase database.
+3. Opening a Dine-in table and clicking **Complete the Payment** throws the exact runtime error: `Assignment to constant variable.`
+
+No root cause has yet been established and no fix has been applied for these three reports. Treat Dine-in sync and Takeaway sync as separate paths until proved to share a failure. Trace UI → local persistence → sync queue/retry → network payload → Order Edge Function → DB command → read-only authoritative row check. For the table payment error, inspect the handler/call stack and identify the const binding that is reassigned. Preserve idempotency and local pending receipts/orders; never duplicate or delete records for diagnosis.
+
+## Mandatory first actions in the new chat
+
+1. Read this file and the focused handoff above before editing.
+2. Read `README.md`, `docs/architecture/overview.md`, `docs/operations/production-readiness-checklist.md`, and related POS sync/payment handoffs, especially:
+   - `docs/handoffs/2026-11-26-new-vercel-pos-preview-project.md`
+   - `docs/handoffs/2026-11-25-pos-history-delivery-payment-checkpoint.md`
+   - `docs/handoffs/2026-11-25-pos-production-delivery-sync-hotfix.md`
+   - `docs/handoffs/2026-11-23-cashier-payment-collection-v1.md`
+   - `docs/handoffs/2026-11-25-rider-access-admin-main-branch-fix.md`
+3. Verify current branch head and deployment before any source change. Continue on `work/production-source-audit`; do not touch `main`.
+4. Inspect actual current POS source, tests, current Order Edge Function bundle/version and relevant Production schema/API contract. Do not infer from Demo code or stale handoffs.
+5. Use synthetic/disposable QA, add regression tests and report evidenced root causes. No Production DB mutations, migrations, function deployments, or Vercel Production releases as debugging shortcuts. If a Production change is necessary, explain and seek separate approval.
+6. Batch fixes, run relevant CI, then make at most one intentional Preview deployment; restore Ignored Build Step to `exit 0` immediately. User must verify Preview before any separately approved Production rollout.
+7. Keep Free plan, no GST implementation, no secret exposure, no real orders/payments, no live restaurant operation until the full rehearsal/backup/restore/role and physical-printer gates are passed.
+
+---
+
 # CURRENT WORK CHECKPOINT — ADMIN, POS, RIDER RELEASE / PRIVATE REALTIME
 **Updated:** 2026-11-25  
 **Focused handoff:** `docs/handoffs/2026-11-25-rider-access-admin-main-branch-fix.md`
