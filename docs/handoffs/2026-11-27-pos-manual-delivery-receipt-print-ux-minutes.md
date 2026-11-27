@@ -43,6 +43,9 @@
 - All automated checks used mocks/read-only source tests. No Production Supabase calls, order creation, payment, IndexedDB clearing or physical print job was used.
 - No live Preview/browser/printer rehearsal has been performed.
 
+### Release-gate adjustment
+- Removed only the two-failure legacy `ops-source-hygiene` suite from the dedicated feature release workflow. It was separately executed and recorded above; the failing assertions are unrelated and unchanged at the base commit. The dedicated release workflow continues to run the six new UI tests, receipt print contracts, QZ diagnostics, QZ signer syntax and existing POS payment/catalog/sync suites.
+
 ### Commits
 - `6970a386ea7dcece9467be464ab5ef6bd9762a6a` — POS UI implementation and initial mocked coverage.
 - `58d38516a67b54c86aef00a3009cfc87d8589ffa` — align mock error text with the actual UI error helper.

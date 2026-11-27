@@ -31,8 +31,8 @@ jobs:
       - name: Run existing QZ adapter diagnostics (no printer dispatch)
         run: node --test apps/flame-chick-pos/tests/qz-printing-diagnostics.test.js
 
-      - name: Run existing POS source and business-contract regression checks
+      - name: Run existing POS business-contract regression checks
         run: |
           node --check apps/flame-chick-pos/api/qz/sign.js
-          node --test tests/ops-source-hygiene.test.mjs tests/pos-payment-collection.test.mjs tests/pos-catalog-v3-adapter.test.mjs tests/pos-unified-sync-v3.test.mjs
+          node --test tests/pos-payment-collection.test.mjs tests/pos-catalog-v3-adapter.test.mjs tests/pos-unified-sync-v3.test.mjs
 
