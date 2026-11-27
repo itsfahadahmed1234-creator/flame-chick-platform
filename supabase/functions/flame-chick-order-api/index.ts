@@ -1186,10 +1186,12 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
       return response({ok:false,error:{code:"WEBSITE_ORDER_COMMIT_UNAVAILABLE",message:"Your order could not be safely confirmed. Please retry using the same checkout request."}},503);
     }
     if(!result.ok){
-      const commitError=isObject(result.body.error)?result.body.error:{};
+      const commitError = result.body.error;
+      const commitErrorCode = isObject(commitError) && "code" in commitError && typeof commitError.code === "string"
+        ? commitError.code : "COMMIT_REJECTED";
       logWebsiteOrderDecision("order_commit_rejected",requestId,{
         status:result.status,
-        code:String(commitError.code??"COMMIT_REJECTED")
+        code:commitErrorCode
       });
       return response({ok:false,error:{code:"WEBSITE_ORDER_COMMIT_UNAVAILABLE",message:"Your order could not be safely confirmed. Please retry using the same checkout request."}},503);
     }

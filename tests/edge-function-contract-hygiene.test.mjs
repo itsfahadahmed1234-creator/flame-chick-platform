@@ -7,6 +7,7 @@ const root = "supabase/functions/";
 const names = ["flame-chick-catalog", "flame-chick-order-api", "flame-chick-delivery-api", "flame-chick-staff-admin"];
 const sources = Object.fromEntries(names.map((name) => [name, readFileSync(root + name + "/index.ts", "utf8")]));
 const paymentMigration=readFileSync("supabase/migrations/20261124033426_flame_chick_payment_collection_v1.sql","utf8");
+const staffContextMigration=readFileSync("supabase/migrations/20261127060000_flame_chick_delivery_payment_preference_v1.sql","utf8");
 const deliveryFixture=readFileSync("supabase/tests/flame_chick_delivery_commands_v1.sql","utf8");
 const websiteOrderMigration=readFileSync("supabase/migrations/20261124033430_flame_chick_website_order_create_v1.sql","utf8");
 const websiteRetryMigration=readFileSync("supabase/migrations/20261124033433_flame_chick_website_order_idempotency_lookup_v1.sql","utf8");
@@ -77,11 +78,15 @@ test("Staff Admin continues to use its dedicated command RPCs", () => {
   assert.match(sources["flame-chick-staff-admin"], /flame_chick_staff_admin_system_command/);
 });
 
-test("Order and Delivery APIs resolve staff roles through the service-only role projection RPC", () => {
+test("Order and Delivery APIs use the consolidated service-only staff-context projection", () => {
   for (const name of ["flame-chick-order-api", "flame-chick-delivery-api"]) {
-    assert.match(sources[name], /flame_chick_get_staff_role_rows/);
+    assert.match(sources[name], /flame_chick_get_staff_context/);
     assert.doesNotMatch(sources[name], /readAsService\("user_roles\?/);
   }
+  assert.match(staffContextMigration,/CREATE OR REPLACE FUNCTION public\.flame_chick_get_staff_context\(p_user_id uuid\)/);
+  assert.match(staffContextMigration,/FROM public\.flame_chick_get_staff_role_rows\(p_user_id\)/);
+  assert.match(staffContextMigration,/GRANT EXECUTE ON FUNCTION public\.flame_chick_get_staff_context\(uuid\) TO service_role/);
+  assert.match(staffContextMigration,/NOT pg_catalog\.has_function_privilege\('authenticated'/);
 });
 
 test("Staff Admin relies on gateway JWT validation plus database actor authorization", () => {
@@ -101,13 +106,13 @@ test("Staff Admin uses exact-origin policy and the dedicated invite callback", (
 });
 
 
-test("order API resolves roles through the service-only Staff Role Projection RPC", () => {
+test("order API resolves roles through the combined service-only Staff Context RPC", () => {
   const source = sources["flame-chick-order-api"];
   assert.match(source, /async function resolveStaffContext\(userId: string\)/);
-  assert.match(source, /\/rest\/v1\/rpc\/flame_chick_get_staff_role_rows/);
-  assert.match(source, /p_user_id: userId/);
+  assert.match(source, /\/rest\/v1\/rpc\/flame_chick_get_staff_context/);
+  assert.match(source, /p_user_id:userId/);
   assert.match(source, /row\.role_key/);
-  assert.match(source, /row\.restaurant_id === restaurant\.id/);
+  assert.match(source, /row\.restaurant_id===restaurantId/);
   assert.doesNotMatch(source, /readAsService\("user_roles\?/);
   assert.match(source, /view === "staff_context"/);
   assert.match(source, /query\.set\("branch_id", "eq\." \+ branchId\)/);
@@ -128,11 +133,11 @@ test("Rider browser obtains its profile through the authenticated delivery API",
   assert.doesNotMatch(source, /REST_URL\+'\/user_roles/);
 });
 
-test("delivery API checks Rider roles through the restricted projection RPC", () => {
+test("delivery API checks Rider roles from the restricted staff-context projection", () => {
   const source = sources["flame-chick-delivery-api"];
-  assert.match(source, /flame_chick_get_staff_role_rows/);
-  assert.match(source, /row\.restaurant_id === restaurantId/);
-  assert.match(source, /row\.role_key === "rider"/);
+  assert.match(source, /flame_chick_get_staff_context/);
+  assert.match(source, /row\.restaurant_id===restaurantId/);
+  assert.match(source, /row\.role_key==="rider"/);
   assert.doesNotMatch(source, /readAsService\("user_roles\?/);
   assert.match(source, /view === "profile"/);
   assert.match(source, /readAsService\("rider_profiles\?/);
@@ -148,11 +153,11 @@ test("Rider API refuses accounts with ambiguous active branch assignments", () =
 });
 
 
-test("delivery dispatch resolves branch context through the restricted role projection RPC", () => {
+test("delivery dispatch resolves branch context through the combined restricted staff-context RPC", () => {
   const source = sources["flame-chick-delivery-api"];
   assert.match(source, /async function resolveDispatchContext\(userId: string\)/);
-  assert.match(source, /flame_chick_get_staff_role_rows/);
-  assert.match(source, /row\.restaurant_id === restaurantId/);
+  assert.match(source, /flame_chick_get_staff_context/);
+  assert.match(source, /row\.restaurant_id===restaurantId/);
   assert.match(source, /const staffContext = await resolveDispatchContext\(user\.id\)/);
   assert.match(source, /requestedBranch !== staffContext\.branchId/);
   assert.match(source, /readAsService\("delivery_tasks\?/);
@@ -182,12 +187,13 @@ test("POS order-board select matches the deployed schema and keeps GST fields de
     "Order board must not select a field absent from the current Production schema: "+retiredOrUncreated);
 });
 
-test("order API exposes authenticated self staff-context to Rider before restricting POS order-board roles", () => {
+test("order API exposes authenticated self staff-context before restricting POS order-board roles", () => {
   const source=sources["flame-chick-order-api"];
   const getStart=source.indexOf('if (req.method === "GET")');
   const contextAt=source.indexOf('if (view === "staff_context")',getStart);
-  const boardGateAt=source.indexOf('const canReadBoard = await verifyStaffRole',getStart);
-  assert.ok(getStart>=0&&contextAt>getStart&&boardGateAt>contextAt);
+  const contextReturnAt=source.indexOf('return response({ ok: true, staff: context });',contextAt);
+  const boardGateAt=source.indexOf('if (!context || !["owner", "admin", "manager", "cashier"].includes(context.role))',contextReturnAt);
+  assert.ok(getStart>=0&&contextAt>getStart&&contextReturnAt>contextAt&&boardGateAt>contextReturnAt);
   assert.match(source,/\["owner", "admin", "manager", "cashier"\]/);
   assert.doesNotMatch(source,/\["owner", "admin", "manager", "cashier", "kitchen"\]/);
 });
@@ -276,7 +282,7 @@ test("Website order API exposes safe public V3 context and server-calculated quo
 
 test("Website create route uses stable request identity, HMAC phone privacy and the transactionally limited commit RPC", () => {
   const source=sources["flame-chick-order-api"];
-  const start=source.indexOf('if(action==="create_website_order")');
+  const start=source.indexOf('if(action==="create_website_order"||action==="place_website_order")');
   const end=source.indexOf('if (action === "create")',start);
   const route=source.slice(start,end);
   assert.ok(start>=0&&end>start);
