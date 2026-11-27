@@ -1369,11 +1369,12 @@ html,body{background:var(--bg);overflow:hidden}
       <button type="button" class="history-tab" data-history-tab="cancelled">Cancelled Orders</button>
     </div>
     <div class="history-tools">
-      <input id="historySearch" class="history-search" type="search" placeholder="Search order ID, customer, phone, area or table…" autocomplete="off">
+      <input id="historySearch" class="history-search" type="search" placeholder="Search loaded orders…" autocomplete="off">
       <button id="historyRefreshBtn" class="btn" type="button">Refresh</button>
     </div>
     <div id="historySummary" class="history-summary"></div>
     <div id="historyBody" class="history-scroll"></div>
+    <button id="historyLoadMoreBtn" class="btn" type="button" style="display:none;margin:12px auto">Load 15 more orders</button>
   </div>
 </section>
 </div>
@@ -1836,8 +1837,22 @@ function flameChickNormalizeOrder(row){
     return {itemName:name+variant+(mods.length?' — '+mods.join(', '):''),quantity:Number(it.quantity)||1,price:Number(it.unit_price_snapshot)||0,lineTotal:Number(it.line_total)||0,description:[...mods,...comps].join(', '),contents:[...mods,...comps]};
   });
   const statusMap={new:'Pending',accepted:'Accepted',preparing:'Preparing',ready:'Ready','out_for_delivery':'Out for Delivery',delivered:'Delivered',collected:'Collected',served:'Served',completed:'Completed',rejected:'Rejected',cancelled:'Cancelled'};
-  return {OrderID:row.id,OrderNumber:row.order_number,DateTime:row.created_at||row.placed_at,UpdatedAt:row.updated_at,OrderSource:row.source,LocalOrderID:row.local_order_id||'',TableID:row.table_reference||'',TableNumber:row.table_label_snapshot||row.table_reference||'',Status:statusMap[row.status]||row.status,CustomerName:row.customer_name,Phone:row.customer_phone,Address:row.delivery_address||'',Area:row.delivery_area_name_snapshot||'',FulfillmentType:row.fulfillment_type==='delivery'?'Delivery':row.fulfillment_type==='dine_in'?'Dine-in':'Takeaway',PaymentMethod:row.payment_method_summary,PaymentStatus:row.payment_status||'unpaid',PaidAmount:Number(row.paid_amount)||0,BalanceDue:row.balance_due===null||row.balance_due===undefined?Math.max(0,(Number(row.total)||0)-(Number(row.paid_amount)||0)):Number(row.balance_due),Notes:row.notes,Subtotal:Number(row.subtotal)||0,DeliveryFee:Number(row.delivery_fee)||0,Total:Number(row.total)||0,items,itemsReady:true,raw:row};
+  return {OrderID:row.id,OrderNumber:row.order_number,DateTime:row.created_at||row.placed_at,UpdatedAt:row.updated_at,OrderSource:row.source,LocalOrderID:row.local_order_id||'',TableID:row.table_reference||'',TableNumber:row.table_label_snapshot||row.table_reference||'',Status:statusMap[row.status]||row.status,CustomerName:row.customer_name,Phone:row.customer_phone,Address:row.delivery_address||'',Area:row.delivery_area_name_snapshot||'',FulfillmentType:row.fulfillment_type==='delivery'?'Delivery':row.fulfillment_type==='dine_in'?'Dine-in':'Takeaway',PaymentMethod:row.payment_method_summary||'',ProposedPaymentMethod:row.proposed_payment_method||'',PaymentStatus:row.payment_status||'unpaid',PaidAmount:Number(row.paid_amount)||0,BalanceDue:row.balance_due===null||row.balance_due===undefined?Math.max(0,(Number(row.total)||0)-(Number(row.paid_amount)||0)):Number(row.balance_due),Notes:row.notes,Subtotal:Number(row.subtotal)||0,DeliveryFee:Number(row.delivery_fee)||0,Total:Number(row.total)||0,items,itemsReady:true,raw:row};
 }
+function flameChickPaymentDisplay(order){
+  const status=String(order?.PaymentStatus??order?.paymentStatus??"unpaid").toLowerCase();
+  const actual=String(order?.PaymentMethod??order?.paymentMethod??"").trim();
+  const fulfillment=String(order?.FulfillmentType??order?.fulfillmentType??"").toLowerCase();
+  const paid=Number(order?.PaidAmount??order?.paidAmount)||0;
+  if(status==="paid"||status==="partially_paid"||status==="partial"||paid>0)
+    return (status==="paid"?"Paid":"Partially paid")+(actual?" · "+actual:"");
+  if(fulfillment==="delivery"){
+    const preference=String(order?.ProposedPaymentMethod??order?.proposedPaymentMethod??order?.paymentMethod??"").trim();
+    return "Unpaid"+(preference?" · Preference: "+preference.toUpperCase():"");
+  }
+  return status==="unpaid"?"Unpaid":(actual||status);
+}
+
 
 let recoveryInFlight=new Set();
 const $=id=>document.getElementById(id);
@@ -1877,7 +1892,8 @@ function printOnlineOrderReceipt(order){
     tableNumber:order.TableNumber||order.tableNumber||'',
     cashierName:order.CashierName||order.cashierName||'',
     guestsServed:order.GuestsServed??order.guestsServed??'',
-    paymentMethod:order.PaymentMethod||order.paymentMethod||'Cash',
+    paymentMethod:order.PaymentMethod||order.paymentMethod||'',
+    proposedPaymentMethod:order.ProposedPaymentMethod||order.proposedPaymentMethod||'',
     paymentStatus:order.PaymentStatus||order.paymentStatus||'',
     paidAmount:Number(order.PaidAmount??order.paidAmount)||0,
     balanceDue:Number(order.BalanceDue??order.balanceDue)||0,
@@ -2479,7 +2495,7 @@ function renderOrderCard(o){
       ${esc(o.Address||'')}${o.Area?` · ${esc(o.Area)}`:''}
     </div>
     <div class="order-card-items">${itemHtml}</div>
-    <div class="order-card-total"><span>${esc(o.PaymentMethod||'')}</span><strong>Rs. ${money(o.Total)}</strong></div>
+    <div class="order-card-total"><span>${esc(flameChickPaymentDisplay(o))}</span><strong>Rs. ${money(o.Total)}</strong></div>
     <div class="card-actions">${action}</div>
   </article>`;
 }
@@ -2515,7 +2531,7 @@ function openOrderDetails(orderId){
       <div class="order-detail-box"><div class="label">Customer</div><div class="value">${esc(o.CustomerName||'Customer')}</div></div>
       <div class="order-detail-box"><div class="label">Phone</div><div class="value">${esc(o.Phone||'Not provided')}</div></div>
       <div class="order-detail-box"><div class="label">Fulfillment</div><div class="value">${esc(o.FulfillmentType||'Delivery')}</div></div>
-      <div class="order-detail-box"><div class="label">Payment</div><div class="value">${esc(o.PaymentMethod||'')}</div></div>
+      <div class="order-detail-box"><div class="label">Payment</div><div class="value">${esc(flameChickPaymentDisplay(o))}</div></div>
       <div class="order-detail-box"><div class="label">Source</div><div class="value">${esc(sourceLabel)}</div></div>
       <div class="order-detail-box" style="grid-column:1/-1"><div class="label">Address / Area</div><div class="value">${esc(o.Address||'Not provided')}${o.Area?` · ${esc(o.Area)}`:''}</div></div>
       ${o.Notes?`<div class="order-detail-box" style="grid-column:1/-1"><div class="label">Notes</div><div class="value">${esc(o.Notes)}</div></div>`:''}
@@ -4187,7 +4203,8 @@ async function saveLocalOrder(){
       order.updatedAt=now;order.customerName=customerName;order.phone=phone;order.notes=$('notes').value.trim();
       order.items=cart.map(x=>({...x}));order.subtotal=subtotal;order.deliveryFee=0;
       order.discount=Number(order.discount)||0;order.total=Math.max(0,subtotal-order.discount);
-      order.paymentMethod=paymentMethod;order.paymentStatus='Unpaid';order.status=orderStatus;
+      order.paymentMethod=paymentMethod;
+    if(type==='Delivery')order.proposedPaymentMethod=String(paymentMethod||'COD').toLowerCase();else delete order.proposedPaymentMethod;order.paymentStatus='Unpaid';order.status=orderStatus;
       order.tableId=table?table.id:'';order.tableNumber=table?table.name:'';
       if(isPreorder){order.arrivalTime=arrivalISO;order.prepareAt=prepareAtISO;order.kitchenTiming='schedule';}
       else{delete order.arrivalTime;delete order.prepareAt;delete order.kitchenTiming;}
@@ -4230,6 +4247,7 @@ async function saveLocalOrder(){
       localOrderId,createdAt:now,updatedAt:now,orderSource:'POS',fulfillmentType:type,
       customerName,phone,address:$('address').value.trim(),area:$('area').value.trim(),
       deliveryFee,subtotal,discount:0,total:subtotal+deliveryFee,paymentMethod,
+      ...(type==='Delivery'?{proposedPaymentMethod:String(paymentMethod||'COD').toLowerCase()}:{}),
       paymentStatus:type==='Delivery'||paymentMethod==='COD'?'Unpaid':'Paid',
       status:'Pending',notes:$('notes').value.trim(),tableNumber:'',items:cart.map(x=>({...x})),
       syncStatus:'pending',syncAttempts:0,checkoutPending:true
@@ -4697,15 +4715,18 @@ function buildReceiptHtml(order){
   const summaryHtml=summary.map(function(pair){
     return '<div class="sumrow"><span>'+esc(pair[0])+'</span><strong>Rs '+money(pair[1])+'</strong></div>';
   }).join('');
-  const paymentMethod=order.paymentMethod||order.PaymentMethod||'Cash';
-  const paymentStatus=String(order.paymentStatus||order.PaymentStatus||'').toLowerCase();
+  const paymentStatus=String(order.paymentStatus||order.PaymentStatus||'unpaid').toLowerCase();
+  const typeIsDelivery=type.indexOf('delivery')>=0;
+  const actualPaymentMethod=String(order.paymentMethod||order.PaymentMethod||'').trim();
+  const proposedPaymentMethod=String(order.proposedPaymentMethod||order.ProposedPaymentMethod||(typeIsDelivery?order.paymentMethod:'')||'').trim();
   const rawPaid=Number(order.paidAmount??order.PaidAmount);
   const hasPaid=Number.isFinite(rawPaid)&&rawPaid>0;
   const isPaid=paymentStatus==='paid'||(hasPaid&&rawPaid>=total&&total>0);
   const paidAmount=hasPaid?rawPaid:(isPaid?total:0);
+  const paymentMethod=actualPaymentMethod||(typeIsDelivery&&proposedPaymentMethod?'Customer preference: '+proposedPaymentMethod.toUpperCase():'');
   const paymentHtml=(isPaid||paidAmount>0)
-    ?'<div class="receipt-payment"><span>'+esc(paymentMethod)+'</span><strong>Rs '+money(paidAmount)+'</strong></div>'
-    :'<div class="receipt-payment"><span>Payment</span><strong>'+esc(paymentMethod)+'</strong></div>';
+    ?'<div class="receipt-payment"><span>'+esc(actualPaymentMethod||'Payment collected')+'</span><strong>Rs '+money(paidAmount)+'</strong></div>'
+    :(typeIsDelivery?'<div class="receipt-payment"><span>Payment</span><strong>Not collected</strong></div>'+(proposedPaymentMethod?'<div class="receipt-payment"><span>Customer preference</span><strong>'+esc(proposedPaymentMethod.toUpperCase())+'</strong></div>':''):'<div class="receipt-payment"><span>Payment</span><strong>'+esc(paymentMethod||'Not collected')+'</strong></div>');
   const balanceValue=Number(order.balanceDue??order.BalanceDue);
   const balance=Number.isFinite(balanceValue)?balanceValue:Math.max(0,total-paidAmount);
   const paidHtml=isPaid?'<div class="receipt-paid">* PAID *</div>':
@@ -4977,9 +4998,10 @@ async function retryLocalOrderSync(localOrderId){
   showToast(latest?.serverOrderId?'Order synchronized to Production.':latest?.lastSyncError||'Order remains safely queued.');
   await showQueue();
 }
+
 function historyOrderSource(order){
   const source=String(order?.OrderSource??order?.orderSource??'').trim().toLowerCase();
-  if(source) return source==='website'?'online':'pos';
+  if(source)return source==='website'?'online':'pos';
   const local=String(order?.LocalOrderID??order?.localOrderId??'').trim();
   return local?'pos':'online';
 }
@@ -4990,23 +5012,52 @@ function normalizeHistoryOrder(o){
   const serverOrderId=String(o.serverOrderId??o.OrderID??o.orderId??'').trim();
   const createdAt=o.createdAt??o.DateTime??o.CreatedAt??o.Timestamp??'';
   const total=Number(o.total??o.Total)||0;
-  return {...o,localOrderId,serverOrderId,createdAt,updatedAt:o.updatedAt??o.UpdatedAt??createdAt,total,subtotal:Number(o.subtotal??o.Subtotal)||0,deliveryFee:Number(o.deliveryFee??o.DeliveryFee)||0,discount:Number(o.discount??o.Discount)||0,customerName:o.customerName??o.CustomerName??'',phone:o.phone??o.Phone??'',address:o.address??o.Address??'',area:o.area??o.Area??'',orderSource:source==='online'?'Website':'POS',fulfillmentType:o.fulfillmentType??o.FulfillmentType??'Takeaway',paymentMethod:o.paymentMethod??o.PaymentMethod??'Cash',paymentStatus:o.paymentStatus??o.PaymentStatus??'',status:o.status??o.Status??'',notes:o.notes??o.Notes??'',tableNumber:o.tableNumber??o.TableNumber??''};
+  const fulfillmentType=o.fulfillmentType??o.FulfillmentType??'Takeaway';
+  const localPayment=o.paymentMethod??o.PaymentMethod??'';
+  return {...o,localOrderId,serverOrderId,createdAt,updatedAt:o.updatedAt??o.UpdatedAt??createdAt,total,
+    subtotal:Number(o.subtotal??o.Subtotal)||0,deliveryFee:Number(o.deliveryFee??o.DeliveryFee)||0,
+    discount:Number(o.discount??o.Discount)||0,customerName:o.customerName??o.CustomerName??'',
+    phone:o.phone??o.Phone??'',address:o.address??o.Address??'',area:o.area??o.Area??'',
+    orderSource:source==='online'?'Website':'POS',fulfillmentType,
+    paymentMethod:localPayment,
+    proposedPaymentMethod:o.proposedPaymentMethod??o.ProposedPaymentMethod??(String(fulfillmentType).toLowerCase()==='delivery'?localPayment:''),
+    paymentStatus:o.paymentStatus??o.PaymentStatus??'unpaid',status:o.status??o.Status??'',
+    notes:o.notes??o.Notes??'',tableNumber:o.tableNumber??o.TableNumber??'',
+    itemsReady:o.itemsReady!==undefined?Boolean(o.itemsReady):Array.isArray(o.items)};
 }
-// History workspace state is explicit because this page runs in strict mode.
+const HISTORY_PAGE_SIZE=15;
 let historyActiveTab='pos';
 let historyLoading=false;
+let historyLocalRows=[];
 const historyServerRows={pos:[],online:[],all:[],cancelled:[]};
-
+const historyRemoteRows={pos:[],online:[],all:[],cancelled:[]};
+const historyVisibleCounts={pos:15,online:15,all:15,cancelled:15};
+const historyPagination={pos:{cursor:null,hasMore:false,loaded:false},online:{cursor:null,hasMore:false,loaded:false},all:{cursor:null,hasMore:false,loaded:false},cancelled:{cursor:null,hasMore:false,loaded:false}};
+function historyPaymentText(order){
+  const status=String(order.paymentStatus??order.PaymentStatus??'unpaid').toLowerCase();
+  const actual=String(order.PaymentMethod??order.paymentMethod??'').trim();
+  const type=String(order.fulfillmentType??order.FulfillmentType??'').toLowerCase();
+  const paid=Number(order.paidAmount??order.PaidAmount)||0;
+  if(status==='paid'||status==='partially_paid'||status==='partial'||paid>0)
+    return (status==='paid'?'Paid':'Partially paid')+(actual?' · '+actual:'');
+  if(type==='delivery'){
+    const preference=String(order.proposedPaymentMethod??order.ProposedPaymentMethod??order.paymentMethod??'').trim();
+    return 'Unpaid'+(preference?' · Preference: '+preference.toUpperCase():'');
+  }
+  return status==='unpaid'?'Unpaid':(actual||status);
+}
 function historySearchMatches(order,query){
   if(!query)return true;
   const q=String(query).trim().toLowerCase();
   if(!q)return true;
-  const hay=[order.serverOrderId,order.localOrderId,order.customerName,order.phone,order.address,order.area,order.tableNumber,order.fulfillmentType,order.paymentMethod,order.status,order.orderSource].map(v=>String(v??'').toLowerCase()).join(' | ');
-  return hay.includes(q);
+  const values=[order.serverOrderId,order.localOrderId,order.customerName,order.phone,order.address,order.area,
+    order.tableNumber,order.fulfillmentType,order.paymentMethod,order.proposedPaymentMethod,order.status,order.orderSource];
+  return values.map(v=>String(v??'').toLowerCase()).join(' | ').includes(q);
 }
 function historyItemText(order){
+  if(order.itemsReady===false)return 'Open to load item details';
   const items=Array.isArray(order.items)?order.items:[];
-  return items.map(it=>`${Number(it.quantity??it.Quantity)||1} × ${it.itemName??it['Item Name']??it.ItemName??it.name??'Item'}`).join(' · ');
+  return items.map(it=>String(Number(it.quantity??it.Quantity)||1)+' × '+String(it.itemName??it['Item Name']??it.ItemName??it.name??'Item')).join(' · ');
 }
 function historySyncState(order){
   const sync=String(order.syncStatus||order.SyncStatus||'').toLowerCase();
@@ -5017,54 +5068,69 @@ function historySyncState(order){
   if(order.localOrderId)return {cls:'pending',text:'Waiting to sync'};
   return {cls:'synced',text:'Cloud'};
 }
-function historyStatusText(order){
-  return String(order.status||'—').trim() || '—';
-}
+function historyStatusText(order){return String(order.status||'—').trim()||'—';}
 function historyOrderId(order){return order.serverOrderId||order.localOrderId||'Unknown';}
-function historySourceBadge(order){
-  return order.orderSource==='Website'?'<span class="source-badge website">WEBSITE</span>':'<span class="source-badge pos">POS</span>';
+function historySourceBadge(order){return order.orderSource==='Website'?'<span class="source-badge website">WEBSITE</span>':'<span class="source-badge pos">POS</span>';}
+function rebuildHistoryTab(tab){
+  const local=historyLocalRows.filter(o=>o.orderSource==='POS');
+  const remote=historyRemoteRows[tab]||[];
+  let rows=[];
+  if(tab==='pos')rows=mergeHistoryRows(remote,local);
+  else if(tab==='online')rows=remote.slice();
+  else if(tab==='all')rows=mergeHistoryRows(remote,local);
+  else rows=mergeHistoryRows(remote,local.filter(o=>['cancelled','returned'].includes(String(o.status||'').toLowerCase())));
+  rows.sort((a,b)=>{
+    const at=Date.parse(String(a.createdAt||'')),bt=Date.parse(String(b.createdAt||''));
+    return (Number.isFinite(bt)?bt:0)-(Number.isFinite(at)?at:0);
+  });
+  historyServerRows[tab]=rows;
 }
 function renderHistoryRows(rows){
-  const q=String($('historySearch')?.value||'').trim();
-  const filtered=rows.filter(o=>historySearchMatches(o,q));
-  const historyLabel=historyActiveTab==='cancelled'?'cancelled orders':historyActiveTab==='pos'?'POS orders':historyActiveTab==='online'?'website orders':'all orders';
-  const summary=`${filtered.length} order${filtered.length===1?'':'s'} shown · ${historyLabel}`;
-  $('historySummary').textContent=summary;
-  if(!filtered.length){$('historyBody').innerHTML='<div class="empty">No orders match this view.</div>';return;}
-  $('historyBody').innerHTML=`<div class="local-order-list">${filtered.slice(0,HISTORY_LIST_LIMIT).map(o=>{
-    const sync=historySyncState(o); const itemText=historyItemText(o); const type=o.fulfillmentType||'Takeaway';
-    const scheduledTag=o.arrivalTime?' · Scheduled':'';
-    return `<article class="local-order-card" data-history-id="${esc(o.localOrderId||o.serverOrderId)}" data-history-source="${esc(o.orderSource)}">
-      <div class="loc-top"><div><div class="loc-id">${esc(historyOrderId(o))}</div><div class="loc-time">${esc(o.createdAt?new Date(o.createdAt).toLocaleString():'Time unavailable')}</div></div><div class="loc-total">Rs. ${money(o.total)}</div></div>
-      <div class="loc-customer">${historySourceBadge(o)} <span style="margin-left:6px">${esc(o.customerName||'Walk-in customer')}</span></div>
-      <div class="loc-meta"><strong>${esc(type)}${esc(scheduledTag)}</strong>${o.tableNumber?` · Table ${esc(o.tableNumber)}`:''}${o.phone?` · ${esc(o.phone)}`:''}${o.area?` · ${esc(o.area)}`:''} · ${esc(o.paymentMethod||'Cash')}${o.paymentStatus?` · ${esc(o.paymentStatus)}`:''}</div>
-      <div class="loc-items">${esc(itemText||'Item details unavailable')}</div>
-      <div class="loc-bottom"><span class="sync-state ${sync.cls}">${esc(sync.text)}</span><span class="loc-meta">Status: ${esc(historyStatusText(o))}</span></div>
-    </article>`;
-  }).join('')}</div>`;
-  $('historyBody').querySelectorAll('.local-order-card').forEach(card=>card.onclick=()=>openHistoryOrderDetails(card.dataset.historyId,card.dataset.historySource));
+  const tab=historyActiveTab;
+  const query=String($('historySearch')?.value||'').trim();
+  const filtered=rows.filter(o=>historySearchMatches(o,query));
+  const visible=filtered.slice(0,historyVisibleCounts[tab]||15);
+  const labels={pos:'POS orders',online:'website orders',all:'all orders',cancelled:'cancelled orders'};
+  $('historySummary').textContent='Showing '+visible.length+' of '+filtered.length+' loaded '+labels[tab]+(query?' · search applies to loaded orders':'');
+  if(!filtered.length){
+    $('historyBody').innerHTML='<div class="empty">No loaded orders match this search.</div>';
+  }else{
+    $('historyBody').innerHTML='<div class="local-order-list">'+visible.map(o=>{
+      const sync=historySyncState(o),type=o.fulfillmentType||'Takeaway';
+      const table=o.tableNumber?' · Table '+esc(o.tableNumber):'';
+      const phone=o.phone?' · '+esc(o.phone):'';
+      const area=o.area?' · '+esc(o.area):'';
+      return '<article class="local-order-card" data-history-id="'+esc(o.serverOrderId||o.localOrderId)+'" data-history-source="'+esc(o.orderSource)+'">'+
+        '<div class="loc-top"><div><div class="loc-id">'+esc(historyOrderId(o))+'</div><div class="loc-time">'+esc(o.createdAt?new Date(o.createdAt).toLocaleString():'Time unavailable')+'</div></div><div class="loc-total">Rs. '+money(o.total)+'</div></div>'+
+        '<div class="loc-customer">'+historySourceBadge(o)+' <span style="margin-left:6px">'+esc(o.customerName||'Walk-in customer')+'</span></div>'+
+        '<div class="loc-meta"><strong>'+esc(type)+table+'</strong>'+phone+area+' · '+esc(historyPaymentText(o))+'</div>'+
+        '<div class="loc-items">'+esc(historyItemText(o)||'Item details unavailable')+'</div>'+
+        '<div class="loc-bottom"><span class="sync-state '+sync.cls+'">'+esc(sync.text)+'</span><span class="loc-meta">Status: '+esc(historyStatusText(o))+'</span></div>'+
+      '</article>';
+    }).join('')+'</div>';
+    $('historyBody').querySelectorAll('.local-order-card').forEach(card=>card.onclick=()=>openHistoryOrderDetails(card.dataset.historyId,card.dataset.historySource));
+  }
+  const page=historyPagination[tab],more=$('historyLoadMoreBtn');
+  more.style.display=(page.hasMore||visible.length<filtered.length)?'inline-flex':'none';
+  more.disabled=historyLoading;
+  more.textContent=historyLoading?'Loading…':'Load 15 more orders';
 }
-async function fetchServerHistory(source,limit=100){
-  if(!FLAME_CHICK_ORDER_API_READY||!flameChickStaffSession?.access_token)return [];
+async function fetchServerHistory(tab,cursor){
+  if(!FLAME_CHICK_ORDER_API_READY||!flameChickStaffSession?.access_token||!navigator.onLine)return {rows:[],hasMore:false,nextCursor:null};
   if(!flameChickStaffProfile?.branch_id)throw new Error('Your Flame Chick staff account is not assigned to a branch.');
-  const query={board:'all',limit:String(Math.max(1,Math.min(limit,100)))};
-  const wanted=String(source||'').toLowerCase();
-  if(wanted)query.source=wanted==='website'?'website':'pos';
+  const query={board:'history',limit:String(HISTORY_PAGE_SIZE)};
+  if(tab==='pos')query.source='pos';
+  else if(tab==='online')query.source='website';
+  else if(tab==='cancelled')query.cancelled='true';
+  if(cursor&&cursor.created_at&&cursor.id){
+    query.before_created_at=cursor.created_at;
+    query.before_id=cursor.id;
+  }
   const response=await flameChickOrderRequest('GET',query);
-  const rows=Array.isArray(response.data)?response.data:[];
-  return rows.map(flameChickNormalizeOrder).map(normalizeHistoryOrder).filter(Boolean);
+  const rows=(Array.isArray(response.data)?response.data:[]).map(flameChickNormalizeOrder).map(normalizeHistoryOrder).filter(Boolean);
+  return {rows,hasMore:response.has_more===true,nextCursor:response.next_cursor||null};
 }
-async function refreshHistoryData(){
-  if(historyLoading)return;
-  historyLoading=true;
-  $('historyBody').innerHTML='<div class="empty">Loading order history…</div>';
-  try{
-    const localRows=(await all(STORES.orders)).map(normalizeHistoryOrder).filter(Boolean).filter(o=>o.orderSource==='POS');
-    if(navigator.onLine){
-      const serverAll=await fetchServerHistory('',HISTORY_LIST_LIMIT);
-      const serverPos=serverAll.filter(o=>String(o.orderSource||'').toLowerCase()==='pos');
-      const serverOnline=serverAll.filter(o=>String(o.orderSource||'').toLowerCase()==='website');
-      const merge=(serverRows,localRowsForSource)=>{
+function mergeHistoryRows(serverRows,localRowsForSource){
         const records=new Map();
         const alias=new Map();
         const serverCandidates=[];
@@ -5149,39 +5215,85 @@ async function refreshHistoryData(){
           addAlias(sid,local); addAlias(lid,local);
         });
         return [...records.values()];
-      };
-      historyServerRows.pos=merge(serverPos,localRows);
-      historyServerRows.online=serverOnline;
-      historyServerRows.all=merge([...serverPos,...serverOnline],localRows);
-      historyServerRows.cancelled=historyServerRows.all.filter(o=>['cancelled','returned'].includes(String(o.status||'').trim().toLowerCase()));
-    }else{
-      historyServerRows.pos=localRows;
-      historyServerRows.online=[];
-      historyServerRows.all=localRows;
-      historyServerRows.cancelled=localRows.filter(o=>['cancelled','returned'].includes(String(o.status||'').trim().toLowerCase()));
+      }
+
+function sortRebuildHistory(tab){rebuildHistoryTab(tab);renderHistoryRows(historyServerRows[tab]||[]);}
+async function loadHistoryTab(tab,reset){
+  if(historyLoading)return;
+  if(reset){
+    historyRemoteRows[tab]=[];
+    historyVisibleCounts[tab]=15;
+    historyPagination[tab]={cursor:null,hasMore:false,loaded:false};
+  }
+  historyLoading=true;
+  if(!(historyServerRows[tab]||[]).length)$('historyBody').innerHTML='<div class="empty">Loading up to 15 orders…</div>';
+  try{
+    if(navigator.onLine){
+      const page=await fetchServerHistory(tab,historyPagination[tab].cursor);
+      historyRemoteRows[tab]=page.rows;
+      historyPagination[tab]={cursor:page.nextCursor,hasMore:page.hasMore,loaded:true};
+    }else historyPagination[tab]={cursor:null,hasMore:false,loaded:true};
+    rebuildHistoryTab(tab);
+  }catch(error){
+    historyPagination[tab].loaded=true;
+    rebuildHistoryTab(tab);
+    $('historySummary').textContent='Cloud History unavailable — showing locally saved records';
+  }finally{
+    historyLoading=false;
+    renderHistoryRows(historyServerRows[tab]||[]);
+  }
+}
+async function refreshHistoryData(){
+  if(historyLoading)return;
+  historyLocalRows=(await all(STORES.orders)).map(normalizeHistoryOrder).filter(Boolean).filter(o=>o.orderSource==='POS');
+  await loadHistoryTab(historyActiveTab,true);
+}
+async function loadMoreHistory(){
+  if(historyLoading)return;
+  const tab=historyActiveTab;
+  const page=historyPagination[tab];
+  historyLoading=true;
+  historyVisibleCounts[tab]=(historyVisibleCounts[tab]||15)+15;
+  try{
+    if(page.hasMore&&navigator.onLine){
+      const result=await fetchServerHistory(tab,page.cursor);
+      const combined=new Map();
+      for(const row of [...historyRemoteRows[tab],...result.rows]){
+        const key=String(row.serverOrderId||row.localOrderId||'');
+        if(key)combined.set(key,row);
+      }
+      historyRemoteRows[tab]=[...combined.values()];
+      historyPagination[tab]={cursor:result.nextCursor,hasMore:result.hasMore,loaded:true};
     }
-    const sorter=(a,b)=>{const am=Date.parse(String(a.createdAt||'')),bm=Date.parse(String(b.createdAt||''));return (Number.isFinite(bm)?bm:0)-(Number.isFinite(am)?am:0)};
-    historyServerRows.pos.sort(sorter);historyServerRows.online.sort(sorter);historyServerRows.all.sort(sorter);
-    renderHistoryRows(historyServerRows[historyActiveTab]);
-  }catch(e){
-    console.debug('history refresh failed',e.message);
-    const localRows=(await all(STORES.orders)).map(normalizeHistoryOrder).filter(Boolean);
-    historyServerRows.pos=localRows.filter(o=>o.orderSource==='POS');
-    historyServerRows.online=[];
-    historyServerRows.all=localRows;
-      historyServerRows.cancelled=localRows.filter(o=>['cancelled','returned'].includes(String(o.status||'').trim().toLowerCase()));
-    renderHistoryRows(historyServerRows[historyActiveTab]);
-    $('historySummary').textContent=(navigator.onLine?'Cloud history unavailable — showing local records':'Offline — showing local POS records');
-  }finally{historyLoading=false;}
+    rebuildHistoryTab(tab);
+  }catch(error){
+    $('historySummary').textContent='Could not load the next page. Use Refresh to retry.';
+  }finally{
+    historyLoading=false;
+    renderHistoryRows(historyServerRows[tab]||[]);
+  }
 }
 async function openHistoryOrderDetails(id,source){
-  const key=String(id||'').trim();
-  let order=null;
-  if(source==='POS')order=(historyServerRows.pos||[]).find(o=>String(o.localOrderId||o.serverOrderId)===key || String(o.serverOrderId||'')===key);
-  if(source==='Website')order=(historyServerRows.online||[]).find(o=>String(o.serverOrderId||o.localOrderId)===key);
-  if(!order)order=(historyServerRows.all||[]).find(o=>String(o.localOrderId||o.serverOrderId)===key || String(o.serverOrderId||'')===key);
-  
+  const key=String(id||'').trim(),tab=source==='Website'?'online':historyActiveTab;
+  const find=rows=>rows.find(o=>String(o.serverOrderId||'')===key||String(o.localOrderId||'')===key);
+  let order=find(historyServerRows[tab]||[]);
+  if(!order)for(const candidate of ['pos','online','all','cancelled']){
+    order=find(historyServerRows[candidate]||[]);
+    if(order)break;
+  }
   if(!order)return;
+  if(order.itemsReady===false&&order.serverOrderId&&navigator.onLine){
+    try{
+      const result=await flameChickOrderRequest('GET',{board:'all',order_id:order.serverOrderId,limit:'1'});
+      const raw=Array.isArray(result.data)?result.data[0]:null;
+      if(raw){
+        order={...order,...normalizeHistoryOrder(flameChickNormalizeOrder(raw)),itemsReady:true};
+        for(const tabName of ['pos','online','all','cancelled']){
+          historyServerRows[tabName]=historyServerRows[tabName].map(row=>row.serverOrderId===order.serverOrderId?order:row);
+        }
+      }
+    }catch(error){showToast(error?.message||'Could not load order details.');return;}
+  }
   openRichHistoryDetails(order);
 }
 function openRichHistoryDetails(o){
@@ -5199,7 +5311,7 @@ function openRichHistoryDetails(o){
       <div class="order-detail-box"><div class="label">Sync Status</div><div class="value">${esc(sync.text)}${o.lastSyncError?` · ${esc(o.lastSyncError)}`:''}</div></div>
       <div class="order-detail-box"><div class="label">Customer</div><div class="value">${esc(o.customerName||'Walk-in customer')}</div></div>
       <div class="order-detail-box"><div class="label">Phone</div><div class="value">${esc(o.phone||'Not provided')}</div></div>
-      <div class="order-detail-box"><div class="label">Payment</div><div class="value">${esc(o.paymentMethod||'Cash')}${o.paymentStatus?` · ${esc(o.paymentStatus)}`:''}</div></div>
+      <div class="order-detail-box"><div class="label">Payment</div><div class="value">${esc(historyPaymentText(o))}${o.paymentStatus?` · ${esc(o.paymentStatus)}`:''}</div></div>
       <div class="order-detail-box"><div class="label">Server Order ID</div><div class="value">${esc(o.serverOrderId||'Not synced')}</div></div>
       <div class="order-detail-box" style="grid-column:1/-1"><div class="label">Address / Area</div><div class="value">${esc(o.address||'Not provided')}${o.area?` · ${esc(o.area)}`:''}</div></div>
       <div class="order-detail-box"><div class="label">Subtotal</div><div class="value">Rs. ${money(o.subtotal)}</div></div>
@@ -5233,6 +5345,33 @@ function bindHistoryControls(){
   $('historyRefreshBtn')?.addEventListener('click',refreshHistoryData);
 }
 
+
+async function showHistory(){
+  closeModal('systemModal');
+  historyActiveTab='pos';
+  document.querySelectorAll('.history-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.historyTab==='pos'));
+  $('historySearch').value='';
+  for(const tab of ['pos','online','all','cancelled']){
+    historyRemoteRows[tab]=[];
+    historyServerRows[tab]=[];
+    historyVisibleCounts[tab]=15;
+    historyPagination[tab]={cursor:null,hasMore:false,loaded:false};
+  }
+  historyLocalRows=[];
+  showPage('history');
+  await refreshHistoryData();
+}
+function bindHistoryControls(){
+  document.querySelectorAll('.history-tab').forEach(btn=>btn.addEventListener('click',async()=>{
+    historyActiveTab=btn.dataset.historyTab||'pos';
+    document.querySelectorAll('.history-tab').forEach(b=>b.classList.toggle('active',b===btn));
+    if(!historyPagination[historyActiveTab].loaded)await loadHistoryTab(historyActiveTab,false);
+    else renderHistoryRows(historyServerRows[historyActiveTab]||[]);
+  }));
+  $('historySearch')?.addEventListener('input',()=>renderHistoryRows(historyServerRows[historyActiveTab]||[]));
+  $('historyRefreshBtn')?.addEventListener('click',refreshHistoryData);
+  $('historyLoadMoreBtn')?.addEventListener('click',loadMoreHistory);
+}
 function bindStaticControls(){
   $('systemOpenBtn').onclick=()=>{openModal('systemModal');updateSystemPanel()};
   $('placeBtn').onclick=()=>guardedOrderAction('placeBtn',saveLocalOrder);

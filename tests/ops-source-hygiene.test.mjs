@@ -6,6 +6,9 @@ import vm from "node:vm";
 const files = ["apps/flame-chick-pos/index.html", "apps/flame-chick-rider/index.html"];
 const source = files.map((file) => ({ file, html: readFileSync(file, "utf8") }));
 const posCatalogAdapter = readFileSync("apps/flame-chick-pos/catalog-v3-adapter.js", "utf8");
+const posSync = readFileSync("apps/flame-chick-pos/sync-v3.js", "utf8");
+const orderApi = readFileSync("supabase/functions/flame-chick-order-api/index.ts", "utf8");
+const deliveryApi = readFileSync("supabase/functions/flame-chick-delivery-api/index.ts", "utf8");
 
 test("POS and Rider source use Flame Chick identifiers only", () => {
   const all = source.map((x) => x.html).join("\n");
@@ -696,4 +699,44 @@ test("Dine-in checkout stores accepted content fingerprints and reports payment 
   const a=html.indexOf('async function finalizeReceiptOrder');
   const b=html.indexOf('async function printThermalReceipt',a);
   assert.match(html.slice(a,b),/Payment was NOT confirmed/);
+});
+
+test("History has a bounded first page, server-side source/status filtering and explicit keyset paging",()=>{
+  const html=source[0].html;
+  assert.match(html,/const HISTORY_PAGE_SIZE=15/);
+  assert.match(html,/board:'history',limit:String\(HISTORY_PAGE_SIZE\)/);
+  assert.match(html,/historyLoadMoreBtn/);
+  assert.match(html,/before_created_at=cursor\.created_at/);
+  assert.match(orderApi,/async function readOrderHistory/);
+  assert.match(orderApi,/Math\.min\(Math\.trunc\(limit\)\|\|15,15\)/);
+  assert.match(orderApi,/created_at\.desc,id\.desc/);
+  assert.doesNotMatch(orderApi,/readOrderHistory[\s\S]{0,1600}order_items\(/);
+  assert.match(html,/board:'all',order_id:order\.serverOrderId,limit:'1'/);
+  assert.match(html,/Search loaded orders/);
+  assert.doesNotMatch(html,/HISTORY_LIST_LIMIT/);
+});
+test("Unpaid Delivery payment preference is separate from actual payment collection",()=>{
+  const html=source[0].html;
+  const migration=readFileSync("supabase/migrations/20261127060000_flame_chick_delivery_payment_preference_v1.sql","utf8");
+  assert.match(posSync,/proposed_payment_method/);
+  assert.match(orderApi,/proposed_payment_method/);
+  assert.match(html,/ProposedPaymentMethod:row\.proposed_payment_method/);
+  assert.match(migration,/ADD COLUMN IF NOT EXISTS proposed_payment_method text/);
+  assert.match(migration,/proposed_payment_method=CASE WHEN v_fulfillment='delivery'/);
+  assert.match(migration,/payment_method_summary=v_payment_method/);
+  assert.doesNotMatch(migration,/payment_method_summary\s*=\s*v_proposed_payment_method/);
+  assert.match(migration,/not a payment or ledger entry/);
+  assert.match(html,/PaymentMethod:order\.PaymentMethod\|\|order\.paymentMethod\|\|''/);
+  assert.match(html,/Customer preference/);
+});
+test("Staff context projection is private and request Auth remains verified",()=>{
+  const migration=readFileSync("supabase/migrations/20261127060000_flame_chick_delivery_payment_preference_v1.sql","utf8");
+  assert.match(orderApi,/flame_chick_get_staff_context/);
+  assert.match(deliveryApi,/flame_chick_get_staff_context/);
+  assert.match(orderApi,/verifyStaffUser\(token, apiKey\)/);
+  assert.match(deliveryApi,/verifyStaffUser\(token, apiKey\)/);
+  assert.match(migration,/GRANT EXECUTE ON FUNCTION public\.flame_chick_get_staff_context\(uuid\) TO service_role/);
+  assert.match(migration,/NOT pg_catalog\.has_function_privilege\('authenticated'/);
+  assert.match(deliveryApi,/deliveryExpirySweepInFlight/);
+  assert.match(orderApi,/staffContextCache\.set\(userId/);
 });

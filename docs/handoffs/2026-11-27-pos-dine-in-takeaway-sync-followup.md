@@ -204,3 +204,13 @@ CI run `45938023376`, job `140305632811`: **success**; 86 tests passed, 0 failed
 A fresh Preview build was created from branch `work/production-source-audit`, commit `e385d3246276847395330cb064e3471072b62cff`: deployment `dpl_TSCPgDhiZm4pokMgWB2RRd5cv2Ru`, URL `https://flame-chick-pos-development-keghy8uq6-faha-d.vercel.app`, **READY**. This build uses the already-corrected POS checkout source; the latest commit adds lifecycle regression coverage only. The original Vercel Ignored Build Step was restored to `exit 0`.
 
 No Production deployment, alias switch, Supabase migration, Edge Function deployment, Production order or payment write was performed. End-to-end shared-Production transaction rehearsal remains prohibited until a safe isolated transaction environment or explicit test plan is approved.
+
+
+
+## History paging, Delivery payment preference and log-load reduction — implementation in progress (2026-11-27)
+
+- The strict-mode History failure was the undeclared `HISTORY_LIST_LIMIT`. The POS now uses a fixed `HISTORY_PAGE_SIZE = 15`; each tab fetches its own first page only. Summary rows omit item/modifier/component/delivery-task nesting. The API uses branch/source/cancelled filters, keyset cursor `(created_at,id)`, no OFFSET and no COUNT. A **Load 15 more orders** action fetches the next server page only when requested. The search placeholder states that it searches loaded rows. Full order details are fetched by order ID only when a row is opened. Existing local IndexedDB merge and legacy duplicate matching have been retained.
+- Manual Delivery's chosen COD/Cash/Card/Online is recorded as a proposed preference, not a collection. Server-normalized POS rows now expose `ProposedPaymentMethod`; unpaid cards and receipts say payment is not collected and display the preference separately. The actual summary and payment ledger remain reserved for confirmed Cashier collections.
+- Log-load source changes use the private staff-context projection, 15-second warm-isolate cache, and coalesced branch expiry sweep. Auth user validation still occurs for every request; the rider offer expiry deadline and Realtime fallback schedule are unchanged.
+- A control-flow error in the Order API context cache was caught during review and repaired in commit `43cf1b579801b8395aad7ab103e2a7780a3c4d18`. The cache now stores a constructed `StaffContext` before returning it.
+- These changes remain source-only. No migration has been applied, no Edge Function deployed, no Production order/payment created, and no Vercel Production deployment performed. Do not use the current Production backend to functionally test Preview until the migration and both Edge Functions are separately approved and deployed.
