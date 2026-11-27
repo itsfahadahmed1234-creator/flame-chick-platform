@@ -1,0 +1,12 @@
+{
+  "name": "flame-chick-pos-cloudflare",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-cloudflare.mjs",
+    "test:cloudflare": "node --test tests/cloudflare-worker.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.168.0"
+  }
+}
