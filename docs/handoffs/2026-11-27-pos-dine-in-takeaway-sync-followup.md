@@ -172,3 +172,35 @@ CI and Preview validation remain pending. No Production rows, migrations, Edge F
 ### Transaction testing boundary
 
 The Preview app is served from a different browser origin and has separate IndexedDB from the Production POS. It also uses the shared Flame Chick Production Supabase backend. Therefore, do not create a new order or take payment from Preview for QA. Preview is available for visual/source smoke review only; an end-to-end payment rehearsal requires an explicitly approved safe test environment or an approved Production release/test plan. The existing Production order FC-261127-0007 remains new/unpaid at PKR 4,647 with no payment ledger entry; the local PKR 5,346 pending order remains in the originating Production browser's IndexedDB and should not be duplicated.
+
+
+## 15. Repeated Dine-in Save Table workflow — lifecycle QA — 2026-11-27
+
+The user confirmed that incremental items before checkout are intended functionality. The expected cashier flow is:
+
+1. Open a Dine-in table, add items and press **Save Table**.
+2. Reopen the same table, add further items and press **Save Table** again as many times as necessary.
+3. Each save updates the same Production check/local order identity and increments its revision only for changed content. The table remains occupied and unpaid.
+4. When finished, **Complete Payment** queues payment against the latest accepted order content/revision. After the server confirms the payment and completed status, the table is released.
+5. A retry must reuse the same pending payment request ID and never add another ledger row.
+
+Working source path review:
+- `saveLocalOrder()` reuses `activeDineCheckId` when editing an existing Dine-in table check, applies the changed cart and calls `prepareLocalPosSyncOrder(order,{bumpRevision:true})`, then writes both local order and queue under the same legacy local key. A fresh check is created only when no active local check is loaded.
+- `getOpenDineCheckForTable_()` keeps unpaid/nonterminal Dine-in checks discoverable for the table selector; after reopening, `openOrStartTable()` reloads the same `localOrderId` and its cart.
+- Successful sync persists `serverOrderId`, `serverLocalOrderId`, revision and canonical content fingerprint. Later saves retain the same server order/local sync identity and submit a higher revision.
+- `takePaymentAndCloseTable()` checks the content against the latest accepted signature; unchanged checkout keeps the latest revision/catalog publication so payment is attached as a payment-only request. If cart contents changed since the latest accepted save, the current handler treats the edit as a changed revision and permits that only while Production status is still `new`/editable.
+- `finalizeReceiptOrder()` writes a stable idempotent payment request into the same order and queue. The table is only considered closed after acknowledgement of `synced + paid + completed`; an error or pending result leaves it open.
+
+Automated coverage was added in `tests/ops-source-hygiene.test.mjs` and run via GitHub Actions:
+- Three saves on one table/order identity, revisions 1 → 2 → 3.
+- No duplicate local check; same server local-order identity retained.
+- Table remains occupied after each successful save.
+- Latest revision 3 is retained for payment-only finalization.
+- Payment completes the same server order, records one ledger entry, drains the queue and releases the table.
+- Retrying finalization does not create a second payment.
+
+CI run `45938023376`, job `140305632811`: **success**; 86 tests passed, 0 failed.
+
+A fresh Preview build was created from branch `work/production-source-audit`, commit `e385d3246276847395330cb064e3471072b62cff`: deployment `dpl_TSCPgDhiZm4pokMgWB2RRd5cv2Ru`, URL `https://flame-chick-pos-development-keghy8uq6-faha-d.vercel.app`, **READY**. This build uses the already-corrected POS checkout source; the latest commit adds lifecycle regression coverage only. The original Vercel Ignored Build Step was restored to `exit 0`.
+
+No Production deployment, alias switch, Supabase migration, Edge Function deployment, Production order or payment write was performed. End-to-end shared-Production transaction rehearsal remains prohibited until a safe isolated transaction environment or explicit test plan is approved.
