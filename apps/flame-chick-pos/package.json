@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "node scripts/build-cloudflare.mjs",
-    "test:cloudflare": "node --test tests/cloudflare-worker.test.mjs"
+    "test:cloudflare": "node --test tests/cloudflare-worker.test.cjs"
   },
   "devDependencies": {
     "wrangler": "4.168.0"
