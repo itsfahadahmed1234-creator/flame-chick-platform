@@ -5,12 +5,13 @@ Source repository for the Flame Chick customer Website, POS, Admin panel, Rider 
 ## Start every new work session here
 
 1. Read [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the project-wide history, decisions, Supabase state and safety rules. It is a large historical handoff; use its headings and search to find the latest relevant checkpoints.
-2. Read the [Website context index](docs/handoffs/WEBSITE_PARALLEL_CONTEXT_INDEX.md).
-3. Read the latest [new FahaD Website Production environment handoff](docs/operations/2026-11-26-new-vercel-website-production-handoff.md).
-4. Read the current [27 November Website UI reliability continuation handoff](docs/handoffs/2026-11-27-website-ui-reliability-next-session.md), including the completed OpenCode Playwright findings and exact pending correction plan.
-5. Read the complete [Website parallel-development audit](docs/handoffs/2026-11-25-website-parallel-audit.md) before editing Website code.
+2. Read the newest [Cloudflare hosting transition handoff](docs/operations/2026-11-27-cloudflare-hosting-transition-handoff.md) for the verified GitHub connection, failed Worker build, four Pages setup plan and latest Vercel Production source.
+3. Read the [Website context index](docs/handoffs/WEBSITE_PARALLEL_CONTEXT_INDEX.md).
+4. Read the [27 November Website UI reliability continuation handoff](docs/handoffs/2026-11-27-website-ui-reliability-next-session.md), including the completed OpenCode Playwright findings and pending correction plan.
+5. Read the [26 November FahaD Website Production environment handoff](docs/operations/2026-11-26-new-vercel-website-production-handoff.md) for the earlier Vercel environment history.
+6. Read the complete [Website parallel-development audit](docs/handoffs/2026-11-25-website-parallel-audit.md) before editing Website code.
 
-The 26 November new-environment handoff supersedes older Website Vercel project IDs, hostnames and Preview-only deployment instructions. The earlier [one-step checkout addendum](docs/operations/2026-11-26-website-preview-one-step-checkout.md) remains historical context, not the current hosting configuration. The earlier [local-preview fixture checkpoint](docs/operations/2026-11-23-local-preview-fixture-checkpoint.md) remains relevant only to its synthetic local test harness.
+The 27 November Cloudflare transition handoff is the newest hosting checkpoint and supersedes older hosting instructions where it gives a newer verified state. Vercel C57 remains the current Website Production deployment until Cloudflare's four Pages projects are created, deployed and verified. The 26 November new-environment handoff retains important historical Vercel project/domain context. The earlier [one-step checkout addendum](docs/operations/2026-11-26-website-preview-one-step-checkout.md) remains historical context, not the current hosting configuration. The earlier [local-preview fixture checkpoint](docs/operations/2026-11-23-local-preview-fixture-checkpoint.md) remains relevant only to its synthetic local test harness.
 
 ## Current platform
 
@@ -68,6 +69,12 @@ Privileged Edge Functions read credentials from Supabase Function Secrets. Do no
 - Function source is in \`supabase/functions/\`.
 - Only reviewed Production SQL belongs in \`supabase/migrations/\`.
 - Historical Demo migrations are archived under \`supabase/demo-reference/migrations/\` and must never be pushed to Production.
+
+## Current hosting transition
+
+GitHub remains the canonical source repository. Cloudflare account access is connected to this repository, but the first attempt created a Workers Build named `flame-chick-platform`, not Cloudflare Pages. That Worker build failed because it ran `npx wrangler deploy` at repository root with no static asset directory. No Cloudflare Pages projects existed at the 27 November 2026 checkpoint. The goal is four separate Pages projects rooted at `apps/flame-chick-website`, `apps/flame-chick-pos`, `apps/flame-chick-admin`, and `apps/flame-chick-rider`. Read the Cloudflare transition handoff before changing hosting.
+
+The latest verified Vercel Website Production deployment remains C57, commit `c57be50d1674e597693117d1f39867c4c042f43a`, deployment `dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy`. The newer Website reliability candidate `9bd5f81ca59d80da7192c96d6aa8e694bfbb03e` passed static CI but is not the live Production revision and must be compared/reconciled before deploying to Cloudflare. Keep Vercel intact as rollback/fallback until all four Cloudflare apps work.
 
 ## Deployment discipline
 
