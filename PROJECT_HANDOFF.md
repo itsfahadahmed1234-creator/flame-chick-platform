@@ -5557,3 +5557,12 @@ No Production deployment, DB changes, migrations, Edge Function changes, alias s
 - Do not deploy during development. Report files changed and test results first; deploy only after explicit release approval.
 
 See `docs/handoffs/2026-11-27-cloudflare-pos-hosting-continuation.md` for the detailed current continuation instructions and historical deployment record.
+
+
+## Ongoing project minutes and continuity archive
+
+- Keep a dated, chronological project-minutes log for this long-running Flame Chick project. At the end of every work session, record the date/time (Asia/Karachi), task, decisions, files/commits changed, tests and results, deployments/versions if any, unresolved issues, and the exact next step.
+- Keep the readable source-of-truth in the repository under `docs/handoffs/` and update `PROJECT_HANDOFF.md` with a short current-status pointer.
+- The user also requests a Cloudflare-side archive. At the start of the next task, inspect whether an appropriate **private** Cloudflare storage resource already exists. If none exists, evaluate a private R2 bucket for the minutes archive and confirm its current free allowance/cost implications before provisioning. Do not incur charges or enable a paid plan/add-on without the user's explicit approval.
+- Never put internal project minutes, credentials, personal/customer data, or private operational notes in `apps/flame-chick-pos/dist`, Workers Static Assets, a public URL, or the POS Worker's public response. Do not bind the minutes archive to the live POS Worker or alter its runtime for note storage.
+- Keep backups synchronized: add/update the Markdown minutes in GitHub and, once a private Cloudflare destination is safely available, copy the same version there. Record the Cloudflare bucket/object path and last-sync timestamp in the handoff. Do not claim the Cloudflare copy exists until it has been verified by reading it back.
