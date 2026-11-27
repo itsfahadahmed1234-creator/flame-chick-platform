@@ -411,8 +411,9 @@ test("Dine-in payment is payment-only and retains the server revision",()=>{
   const end=html.indexOf('async function saveLocalOrder',start);
   const handler=html.slice(start,end);
   assert.match(handler,/let order=await get\(STORES\.orders,activeDineCheckId\)/);
-  assert.match(handler,/prepareLocalPosSyncOrder\(order\)/);
-  assert.doesNotMatch(handler,/prepareLocalPosSyncOrder\(order,\{bumpRevision:true\}\)/);
+  assert.match(handler,/prepareLocalPosSyncOrder\(draftOrder,\{bumpRevision:contentChanged,preserveCatalog:!contentChanged\}\)/);
+  assert.match(handler,/serverOrderMatchesSyncPayload/);
+  assert.match(handler,/serverSyncContentSignature/);
   const finalize=html.slice(html.indexOf('async function finalizeReceiptOrder'),html.indexOf('async function printThermalReceipt'));
   assert.match(finalize,/current\.serverOrderId&&!current.checkoutPending&&!current.pendingPayment/);
   assert.match(finalize,/FlameChickPosPaymentCollection\.attachPendingPayment/);
