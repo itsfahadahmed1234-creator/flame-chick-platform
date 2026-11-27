@@ -269,12 +269,11 @@ test("mobile product-card actions stay inside cards and single-variant products 
   assert.match(html, /\.fc-home-product-card \.add\{[\s\S]*?max-width:100%/);
 });
 
-test("Preview header banner is removed while checkout remains read-only outside verified Production hosts", () => {
-  assert.doesNotMatch(html, /fc-preview-readonly-banner|Preview mode — live Flame Chick catalogue/);
-  assert.doesNotMatch(order, /fc-preview-readonly-banner/);
-  assert.match(html, /id="fc-preview-checkout-notice"/);
+test("Preview-specific customer banner is absent while checkout remains fail-closed outside approved hosts", () => {
+  assert.doesNotMatch(html, /fc-preview-readonly-banner|Preview mode — live Flame Chick catalogue|fc-preview-checkout-notice/);
+  assert.doesNotMatch(order, /fc-preview-readonly-banner|fc-preview-checkout-notice|Checkout is disabled on this Website Preview/);
   assert.match(order, /orderWritesAllowed\(\)/);
-  assert.match(order, /Checkout is disabled on this Website Preview/);
+  assert.match(order, /Online ordering is currently unavailable/);
   assert.match(order, /String\(method \|\| ''\)\.toUpperCase\(\) !== 'GET'/);
 });
 
