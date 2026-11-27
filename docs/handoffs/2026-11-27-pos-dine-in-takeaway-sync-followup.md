@@ -4,7 +4,7 @@
 
 The immediate next-session task is now the Cloudflare POS host, not another Vercel Preview/Production deployment. Read `docs/handoffs/2026-11-27-cloudflare-pos-hosting-continuation.md` and the current top of `PROJECT_HANDOFF.md` first.
 
-- Latest validated POS app source candidate: commit `41c8aea80febd434048e50c352b386c01b02e7d4`, root `apps/flame-chick-pos`. The later `7a818860` commit only updated docs; the 14 tracked POS files other than README.md were byte-for-byte identical; README.md was updated for hosting documentation only.
+- Latest validated POS app source candidate: commit `41c8aea80febd434048e50c352b386c01b02e7d4`, root `apps/flame-chick-pos`. The later Cloudflare hosting handoff commits only update documentation; the 14 tracked POS files other than README.md remain byte-for-byte identical to the validated POS source pin. README.md was updated for hosting documentation only.
 - Create a new isolated Cloudflare Workers + Workers Static Assets project/Worker named `flamechickpos` in the connected account. No Cloudflare POS project exists yet.
 - The connected Cloudflare account has workers.dev subdomain `itsfahadahmed1234`, no zones, and a separate pre-existing `flame-chick-platform` Worker that must not be touched. Full custom-domain TLD remains unknown.
 - Port `/api/qz/sign` to Workers securely; keep `QZ_SIGNING_PRIVATE_KEY` as a Cloudflare encrypted secret and preserve staff auth / RSA-SHA512 / certificate verification / CORS / rate limit. Do not expose it or ship Node signer sources as assets.

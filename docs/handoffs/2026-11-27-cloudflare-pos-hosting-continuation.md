@@ -10,7 +10,7 @@
 - Continue on: `work/production-source-audit`. Do not switch to or modify `main`.
 - POS app root: `apps/flame-chick-pos`
 - Latest fully validated POS source-tree pin: **`41c8aea80febd434048e50c352b386c01b02e7d4`**.
-- The hosting handoff commits after validated source pin `41c8aea80febd434048e50c352b386c01b02e7d4` changed documentation only. The current branch head at this handoff revision is `d9ec1dc8b12770c056ab436177d6e20fc429fcdb`. A full Git tree comparison confirms **14 tracked POS files other than README.md** are byte-for-byte identical to the validated pin. `apps/flame-chick-pos/README.md` was updated as documentation only and is not a public deployment asset.
+- The hosting handoff commits after validated source pin `41c8aea80febd434048e50c352b386c01b02e7d4` changed documentation only. The hosting handoff commits after the validated POS source pin are documentation-only. A full Git tree comparison confirms **14 tracked POS files other than README.md** are byte-for-byte identical to the validated pin. `apps/flame-chick-pos/README.md` was updated as documentation only and is not a public deployment asset.
 - Therefore the POS source to package and upload is the current `apps/flame-chick-pos/` directory from `work/production-source-audit`; its contents match the validated `41c8aea` pin. Re-check the branch head and POS app subtree before building, in case another chat has made new app changes.
 - **Important status distinction:** `41c8aea` is the current validated source candidate, not a READY Cloudflare build or deployment. No Cloudflare POS project has been created and no POS files have been uploaded to Cloudflare yet.
 
