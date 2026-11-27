@@ -7,7 +7,7 @@ on:
       - work/website-parallel-development
     paths:
       - "apps/flame-chick-website/**"
-      - "supabase/functions/flame-chick-order-api/index.ts"
+      - "supabase/functions/flame-chick-order-api/**"
       - "tests/website-source-hygiene.test.mjs"
       - "tests/website-preview-checkout-guard.test.mjs"
       - "tests/website-source-hygiene.test.mjs"
