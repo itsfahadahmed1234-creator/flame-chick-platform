@@ -20,7 +20,7 @@ Production customer storefront for Flame Chick.
   - `js/catalog-v3-deal-configurator.js`
   - `js/preview-checkout-guard.js`
   - `js/website-order-v3.js`
-- The homepage still contains a legacy hidden V2 drawer/form and inline handlers. They are not the V3 checkout path and should not be extended. Removal is deferred until after the current UI rehearsal to avoid disturbing markup/event bindings prematurely.
+- The homepage still contains a legacy hidden V2 drawer/form and inline handlers. They are not the V3 checkout path and should not be extended. The 27 November OpenCode Playwright audit confirmed two uncaught errors from legacy `renderCart`/`spy` paths. Remove or safely guard these only after mapping every selector/event dependency; do not blindly delete the legacy inline block.
 
 ## Production services
 
@@ -52,4 +52,4 @@ Preview checkout remains restricted by `preview-checkout-guard.js`. Never add wi
 
 Static website checks cover script syntax, catalogue and deal regressions, branch/fulfilment behaviour, preview checkout guards and inline-script parsing. The production API source is now included in the website hygiene checks so an endpoint-source change retriggers CI.
 
-A read-only UI rehearsal checklist and current audit findings are in `docs/audits/FLAME_CHICK_WEBSITE_AUDIT_2026-11-27.md`.
+The backend/catalogue/source audit is in `docs/audits/FLAME_CHICK_WEBSITE_AUDIT_2026-11-27.md`. The completed 27 November OpenCode Playwright UI audit, defects C1–C10, test results and staged correction plan are in `docs/handoffs/2026-11-27-website-ui-reliability-next-session.md`. The user uses OpenCode + Playwright for interactive browser tests; do not assume ChatGPT Work mode is available. Fixes are not implemented just because they are documented in the handoff.
