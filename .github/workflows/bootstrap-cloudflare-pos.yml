@@ -41,7 +41,7 @@ jobs:
           cache: npm
           cache-dependency-path: apps/flame-chick-pos/package.json
       - name: Install pinned Wrangler
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm install --no-audit --no-fund
       - name: Test Worker and build public assets
         run: |
           npm run test:cloudflare
