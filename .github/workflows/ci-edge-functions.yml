@@ -5,6 +5,7 @@ on:
     branches:
       - work/production-source-audit
       - work/admin-dashboard-release
+      - cloudflare/admin-production
     paths:
       - "supabase/functions/**"
       - "apps/flame-chick-website/js/catalog-v3.js"
