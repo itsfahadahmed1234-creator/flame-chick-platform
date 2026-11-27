@@ -647,7 +647,7 @@
       $('deals-section').hidden = true;
       $('details-section').hidden = true;
       status('Online ordering is unavailable for the configured branch.', 'error');
-      return;
+      return false;
     }
     $('catalog-section').hidden = false;
     $('cats').hidden = false;
@@ -669,7 +669,7 @@
       $('deal-catalog').replaceChildren();
       $('deals-empty').hidden = false;
       $('deals-empty').textContent = 'Published deals are unavailable because the product menu could not be built.';
-      return;
+      return false;
     }
     state.productModel = model;
     renderProducts(model);
@@ -683,7 +683,8 @@
       $('deal-catalog').replaceChildren();
       $('deals-empty').hidden = false;
       $('deals-empty').textContent = deals?.message || 'Published deals could not be evaluated.';
-      return;
+      status(deals?.message || 'Published deals could not be evaluated.', 'error');
+      return false;
     }
     state.dealModel = deals;
     renderDeals(deals);
@@ -702,6 +703,7 @@
       });
       $('catsIn').appendChild(dealsJump);
     }
+    return true;
   }
 
   function cardPrice(priceMinor) {
@@ -1552,10 +1554,10 @@
       state.loaded = true;
       if ($('publication-meta')) $('publication-meta').hidden = true;
       applyPreviewReadOnlyMode();
-      renderCatalog();
+      var catalogRendered = renderCatalog();
       renderCart();
       syncFulfilmentControls();
-      status('Menu loaded. Add items to start your order.');
+      if (catalogRendered) status('Menu loaded. Add items to start your order.');
     } catch (error) {
       status(error.message || 'Could not load the published menu.', 'error');
     }

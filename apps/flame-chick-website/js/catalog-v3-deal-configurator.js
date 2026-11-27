@@ -745,7 +745,7 @@
       var priceSummary = makeElement(doc, 'div', 'fc-deal-price-summary');
       if (priceEstimate.ok) {
         var basePriceRow = makeElement(doc, 'div', 'fc-deal-price-row');
-        basePriceRow.appendChild(makeElement(doc, 'span', '', 'Base deal price'));
+        basePriceRow.appendChild(makeElement(doc, 'span', '', 'Base price (per deal)'));
         basePriceRow.appendChild(makeElement(doc, 'strong', '', formatAmount(
           priceEstimate.basePriceMinor, viewModel.currencyCode, options.formatMoney
         )));
@@ -753,7 +753,7 @@
 
         if (priceEstimate.componentTotalMinor > 0) {
           var additionsRow = makeElement(doc, 'div', 'fc-deal-price-row');
-          additionsRow.appendChild(makeElement(doc, 'span', '', 'Selected additions'));
+          additionsRow.appendChild(makeElement(doc, 'span', '', 'Selected additions (per deal)'));
           additionsRow.appendChild(makeElement(doc, 'strong', '', formatAmount(
             priceEstimate.componentTotalMinor, viewModel.currencyCode, options.formatMoney
           )));
@@ -761,7 +761,7 @@
         }
 
         var totalRow = makeElement(doc, 'div', 'fc-deal-price-row is-total');
-        totalRow.appendChild(makeElement(doc, 'span', '', priceEstimate.complete ? 'Deal total' : 'Current estimate'));
+        totalRow.appendChild(makeElement(doc, 'span', '', priceEstimate.complete ? ('Total for ' + priceEstimate.dealQuantity + ' deal(s)') : ('Current estimate for ' + priceEstimate.dealQuantity + ' deal(s)')));
         totalRow.appendChild(makeElement(doc, 'strong', '', formatAmount(
           priceEstimate.totalMinor, viewModel.currencyCode, options.formatMoney
         )));

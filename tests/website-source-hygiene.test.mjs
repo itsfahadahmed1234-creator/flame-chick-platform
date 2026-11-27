@@ -402,6 +402,9 @@ test("cart drawer traps focus, isolates the background and restores the actual o
 test("order status preserves the visual base class and exits the loading state after successful initialization", () => {
   assert.match(order, /node\.className = 'fc-home-order-status' \+ \(kind \? ' ' \+ kind : ''\)/);
   assert.match(order, /status\('Menu loaded\. Add items to start your order\.'\)/);
+  assert.match(order, /var catalogRendered = renderCatalog\(\)/);
+  assert.match(order, /if \(catalogRendered\) status\(/);
+  assert.match(order, /status\(deals\?\.message \|\| 'Published deals could not be evaluated\.', 'error'\)/);
   assert.match(html, /\.fc-home-order-status\.success/);
   assert.match(html, /\.fc-home-order-status\.error/);
 });
