@@ -344,8 +344,11 @@ test('display estimate fails closed for unsafe published values', () => {
 });
 
 
-test('fixed component group requirements use exact quantity wording rather than a confusing range', () => {
-  const ui = create();
+test('single-choice component groups use exact quantity wording rather than a confusing range', () => {
+  const view = createView();
+  const group = view.collections[0].deals[0].variants[0].groups.find(item => item.id === IDS.componentGroup);
+  group.options.push({ ...group.options[0], id: 'alternate-burger-option' });
+  const ui = create(view);
   assert.equal(ui.selectVariant(IDS.dealVariant).ok, true);
   const result = ui.validate();
   assert.equal(result.ok, false);
