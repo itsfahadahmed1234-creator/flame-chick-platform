@@ -141,3 +141,37 @@ Production Supabase project `adkrxfnawdiljhjaavnj` is healthy in Mumbai on Free 
 - Free plan limits and static asset billing: https://developers.cloudflare.com/workers/platform/limits/ and https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/
 
 The product recommendation and limit information above was checked against current Cloudflare documentation on 2026-11-27. Re-check docs and current account limits at execution time.
+
+
+---
+
+## 10. Execution update — initial POS Cloudflare deployment (2026-11-27)
+
+**The isolated POS Worker has now been deployed successfully.** This supersedes the earlier status above that said no POS files had been uploaded.
+
+- Cloudflare account: `Itsfahadahmed1234@gmail.com's Account` (`831422f51dea96c387ae8917d451a6bf`).
+- Worker: `flamechickpos`.
+- Live Workers hostname returned by Wrangler: **https://flamechickpos.itsfahadahmed1234.workers.dev**.
+- Successful Cloudflare Build: `90ce59b9-1246-4977-9b36-512e3784de4f`, outcome `success`.
+- Deployed Worker version: **3**, version ID `eead5ce9-7dbd-40b6-9a4a-fd17ef93ae71`.
+- Cloudflare build root: `/apps/flame-chick-pos`; branch: `work/production-source-audit`.
+- Build log confirms exactly **10 allowlisted public assets** uploaded, including `index.html`, browser JS modules, brand/receipt SVGs and the public QZ leaf certificate. The Node signer source, helper, tests, repository docs and private trust material were not uploaded as public assets.
+- Worker bindings after deployment: `ASSETS` (static assets) and `QZ_SIGNING_PRIVATE_KEY` (`secret_text`). The existing private signing-key secret survived the deployment.
+- Worker code now handles `POST /api/qz/sign` and `OPTIONS`, with Supabase Auth validation, active Admin/Owner/Manager/Cashier + branch checks, RSA-SHA512, public leaf-certificate SPKI verification, strict HTTPS origin checks, no-store/no-sniff headers, a 262,144-character signing-request cap, and isolate-local 90/minute throttling.
+- Cloudflare Workers Builds configuration is active and connected to the GitHub repository, watching only `apps/flame-chick-pos/**` on `work/production-source-audit`. Branch Previews are disabled.
+- GitHub bootstrap workflow: `.github/workflows/bootstrap-cloudflare-pos.yml`. It keeps the Cloudflare API token in GitHub Actions secrets, scopes it to the Cloudflare configuration step, runs the Cloudflare-specific tests, builds the public allowlist, and validates the Wrangler bundle before configuring/triggering Cloudflare Builds.
+- The GitHub bootstrap workflow completed successfully on commit `3a52dc436e64749032f52531c02b09eadb34e66f`. The dedicated Cloudflare Worker test command and public-asset build passed; Wrangler dry-run validation passed.
+- Follow-up repository config commit `b70ec59868c0d152021244b44a19933fd519b2cf` explicitly sets `preview_urls: false`. A Cloudflare push build was queued for this commit. The Worker subdomain API was also set to `enabled: true, previews_enabled: false`; the last readback confirmed those values.
+- The current Worker version 3 was successfully deployed before the `preview_urls: false` follow-up. At last inspection, the follow-up build was still queued/initializing; re-check its final outcome and Worker version before considering the deployment fully settled.
+- The assistant's external HTTP fetch environment blocks requests to `workers.dev`, so browser-level HTTP smoke checks could not be completed from the tool environment. The deployment logs confirm the hostname and asset upload, but do not replace a real browser smoke test.
+
+### Remaining verification gates
+
+1. Open **https://flamechickpos.itsfahadahmed1234.workers.dev** in a browser and confirm the POS login page renders.
+2. Confirm the public certificate and at least one browser JS asset load from the same hostname.
+3. Test sign-in and read-only History/order-board/dispatch views using an existing staff account. Do not create an order/payment or clear browser storage.
+4. Test the QZ signer unauthenticated path (expect 401) and, with an existing authorized cashier/manager/admin/owner session, confirm the signer returns a signature verified against the served certificate. Do not send a print job or enable kitchen/automatic printing.
+5. Re-check the follow-up build for commit `b70ec59868c0d152021244b44a19933fd519b2cf`, confirm `preview_urls` remains disabled, and record the resulting Worker version.
+6. Keep the Vercel POS URL as fallback. Do not switch aliases, change DNS, or claim a custom-domain cutover. No custom domain has been supplied.
+
+The initial Cloudflare deployment is complete; full browser, staff-session and QZ integration verification remains open. Admin and Rider hosting remain separate later phases.
