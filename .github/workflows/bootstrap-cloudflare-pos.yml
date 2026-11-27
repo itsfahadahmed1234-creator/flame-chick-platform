@@ -5,7 +5,6 @@ on:
     branches:
       - work/production-source-audit
     paths:
-      - 'apps/flame-chick-pos/**'
       - '.github/workflows/bootstrap-cloudflare-pos.yml'
   workflow_dispatch:
 
@@ -89,7 +88,7 @@ jobs:
               previews_base_config: {
                 build_caching_enabled: true,
                 build_command: "npm run build",
-                deploy_command: "npx wrangler versions upload --config wrangler.jsonc",
+                deploy_command: "npx wrangler deploy --config wrangler.jsonc",
                 build_token_uuid: $build_token,
                 environment_variables: {},
                 path_includes: ["apps/flame-chick-pos/**"],
