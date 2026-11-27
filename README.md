@@ -11,7 +11,7 @@ Source repository for the Flame Chick customer Website, POS, Admin panel, Rider 
 5. Read the [26 November FahaD Website Production environment handoff](docs/operations/2026-11-26-new-vercel-website-production-handoff.md) for the earlier Vercel environment history.
 6. Read the complete [Website parallel-development audit](docs/handoffs/2026-11-25-website-parallel-audit.md) before editing Website code.
 
-The 27 November Cloudflare transition handoff is the newest hosting checkpoint and supersedes older hosting instructions where it gives a newer verified state. Vercel C57 remains the current Website Production deployment until Cloudflare's four Pages projects are created, deployed and verified. The 26 November new-environment handoff retains important historical Vercel project/domain context. The earlier [one-step checkout addendum](docs/operations/2026-11-26-website-preview-one-step-checkout.md) remains historical context, not the current hosting configuration. The earlier [local-preview fixture checkpoint](docs/operations/2026-11-23-local-preview-fixture-checkpoint.md) remains relevant only to its synthetic local test harness.
+The 27 November Cloudflare transition handoff is the newest hosting record. The Customer Website now runs on Cloudflare Pages at flamechick.pages.dev; Vercel C57 remains available and unchanged as fallback. POS hosting is managed by a separate conversation; Admin and Rider Cloudflare hosting remain pending. The 26 November Vercel handoff retains historical project/domain context. The earlier [one-step checkout addendum](docs/operations/2026-11-26-website-preview-one-step-checkout.md) remains historical checkout context, not the active hosting configuration. The [local-preview fixture checkpoint](docs/operations/2026-11-23-local-preview-fixture-checkpoint.md) remains relevant only to its synthetic local test harness.
 
 ## Current platform
 
@@ -25,9 +25,13 @@ The top-level Production handoff records the seven operational migrations as app
 
 ## Active Website environment
 
-The selected Website target is the READY Vercel Production deployment documented in [the current environment handoff](docs/operations/2026-11-26-new-vercel-website-production-handoff.md). It belongs to the separate FahaD Hobby team and uses the Website root directory \`apps/flame-chick-website\`.
+- **Cloudflare Pages Production:** project flamechick, https://flamechick.pages.dev/
+- **Production branch:** work/website-reliability-phase1-review
+- **Deployed commit:** 2a63046e1e5d81ced272acc08b17c1a3021b779d
+- **Deployment:** 07297e8b-e79d-46ae-9696-78be7f28c7f8 (READY; all Cloudflare stages successful)
+- **Vercel fallback:** project flame-chick-website-production; unchanged Production deployment dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy, commit c57be50d1674e597693117d1f39867c4c042f43a.
 
-The requested custom hostname \`flamechick.vercel.app\` is not attached to this project. Do not assume it is available or remove it from another project. The customer Place Order path is the next task; the current deployment must not be described as fully production-ready until that path is diagnosed and verified.
+The new Pages hostname has an exact allowlist entry for Website order writes; arbitrary Pages previews/deployment hostnames remain blocked. Static assets and the published catalogue were verified on the earlier Pages hostname. The new hostname's full interactive and signed-in API smoke test remains pending. Do not submit Place Order or Retry against Production without a separately approved safe test procedure. No DNS/domain cutover has occurred.
 
 ## Repository layout
 
@@ -72,9 +76,29 @@ Privileged Edge Functions read credentials from Supabase Function Secrets. Do no
 
 ## Current hosting transition
 
-GitHub remains the canonical source repository. Cloudflare account access is connected to this repository, but the first attempt created a Workers Build named `flame-chick-platform`, not Cloudflare Pages. That Worker build failed because it ran `npx wrangler deploy` at repository root with no static asset directory. No Cloudflare Pages projects existed at the 27 November 2026 checkpoint. The goal is four separate Pages projects rooted at `apps/flame-chick-website`, `apps/flame-chick-pos`, `apps/flame-chick-admin`, and `apps/flame-chick-rider`. Read the Cloudflare transition handoff before changing hosting.
+The Customer Website is now deployed to Cloudflare Pages Production:
 
-The latest verified Vercel Website Production deployment remains C57, commit `c57be50d1674e597693117d1f39867c4c042f43a`, deployment `dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy`. The newer Website reliability candidate `9bd5f81ca59d80da7192c96d6aa8e694bfbb03e` passed static CI but is not the live Production revision and must be compared/reconciled before deploying to Cloudflare. Keep Vercel intact as rollback/fallback until all four Cloudflare apps work.
+- Pages project: flamechick
+- Production URL: https://flamechick.pages.dev/
+- Immutable deployment URL: https://07297e8b.flamechick.pages.dev/
+- Project ID: 5daf4460-c018-4115-af98-3093e2b280ef
+- Production deployment ID: 07297e8b-e79d-46ae-9696-78be7f28c7f8
+- Production branch: work/website-reliability-phase1-review
+- Exact deployed commit: 2a63046e1e5d81ced272acc08b17c1a3021b779d
+- Build root: apps/flame-chick-website
+- Build command: blank (plain static HTML/CSS/JavaScript)
+- Output directory: .
+- GitHub source: itsfahadahmed1234-creator/flame-chick-platform
+- Production deployments enabled; Website Preview branch: work/website-parallel-development
+- Build watch include: apps/flame-chick-website/*; exclusions: none
+
+The matching Website Static Checks run 45981432738 passed for the exact deployed commit. Cloudflare reports queued, initialize, clone_repo, build and deploy all successful, and this deployment is canonical Production. The project has no Pages environment variables: browser code uses only the existing Supabase Production URL and public publishable key.
+
+The prior Pages project has been retained as flamechick-legacy at https://flame-chick-website.pages.dev/. Its existing deployment was preserved, and new automatic Production/Preview deployments have been disabled so it does not duplicate builds. Vercel Website Production is also still online and unchanged as fallback: deployment dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy, commit c57be50d1674e597693117d1f39867c4c042f43a, branch work/website-parallel-development.
+
+The new Pages hostname was added to the strict checkout-host allowlist. The old Pages hostname remains allowed, while arbitrary Pages preview/deployment hostnames remain blocked. No Place Order or Retry action has been used. The new hostname has not yet had a full interactive browser/checkout walkthrough; treat the Cloudflare deployment API as verified and the interactive application smoke test as pending.
+
+POS is managed in a separate conversation; do not touch its Worker, app code or deployment. Admin and Rider hosting remain pending. Keep Vercel intact and do not change DNS or customer domains without explicit approval.
 
 ## Deployment discipline
 

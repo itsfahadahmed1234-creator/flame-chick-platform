@@ -190,3 +190,21 @@ The next ChatGPT session should read the project handoffs listed at the top, the
 > “I have read the Flame Chick project and Website handoffs. The current task is to fix the confirmed 27 November Playwright findings on `work/website-parallel-development`, beginning with legacy page-load errors, cart focus management, status lifecycle/styling and deal-price visibility. The live C57 site remains the reference for the reported defects, but source fixes must target the current branch and be verified against its actual code. No production deployment, order submission, database change or publication change is authorized. I will work through the corrections with you and use OpenCode for the browser regression pass.”
 
 Wait for the user to review the project overview and confirm the first source-fix batch before making application-code changes.
+
+
+---
+
+## Superseding hosting/release checkpoint — flamechick.pages.dev — 27 November 2026
+
+The Customer Website is now deployed to Cloudflare Pages Production at https://flamechick.pages.dev/.
+
+- Pages project flamechick; project ID 5daf4460-c018-4115-af98-3093e2b280ef.
+- Production deployment 07297e8b-e79d-46ae-9696-78be7f28c7f8; URL https://07297e8b.flamechick.pages.dev/; Cloudflare reports all stages SUCCESS and this deployment canonical.
+- Release branch work/website-reliability-phase1-review; source SHA 2a63046e1e5d81ced272acc08b17c1a3021b779d.
+- Commit extends the strict checkout allowlist with flamechick.pages.dev. It retains the exact former flame-chick-website.pages.dev host and continues blocking all other Pages preview/deployment hosts.
+- Website Static Checks run 45981432738 passed for this exact commit.
+- Build root apps/flame-chick-website; blank build command; output directory .; Git owner itsfahadahmed1234-creator; repository flame-chick-platform; production auto-deploy enabled; preview branch work/website-parallel-development; build-watch include apps/flame-chick-website/*.
+- Pages environment variables: none. Browser config uses the existing Supabase Production URL and public publishable key only.
+- Previous Pages project is preserved as flamechick-legacy at flame-chick-website.pages.dev; automatic production/preview builds are disabled. Vercel C57 is still online and unchanged as fallback.
+
+This is a static release/hosting checkpoint, not completion of all runtime QA. The new Pages deployment passed Cloudflare's API stages. Read-only connected-browser catalogue inspection previously used the former hostname; the new hostname still requires its own interaction walk-through and signed-in API checks. Do not submit Place Order or Retry on Production. No Supabase data, schema, functions, Realtime, orders, payments, DNS, Vercel aliases or projects were modified. POS is controlled by the separate conversation; Admin/Rider hosting are pending.

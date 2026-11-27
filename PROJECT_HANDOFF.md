@@ -5230,3 +5230,42 @@ Detailed latest checkpoint: `docs/handoffs/2026-11-25-pos-history-delivery-payme
 - No GitHub Actions success status was returned for this new checkpoint; the new regression test is committed but not claimed as run. Signed-in interactive click verification remains with the user.
 - No Production aliases, catalogue publication, database/schema/order/payment records, staff, delivery settings or Realtime changes occurred. The only live change was Order API function deployment v5. Production remains pre-launch; see detailed handoff for next verification and release gates.
 
+
+
+---
+
+## 2026-11-27 — Customer Website Cloudflare Pages hostname flamechick.pages.dev
+
+**Scope:** Customer Website only. POS Cloudflare work belongs to a separate conversation. Admin and Rider hosting remain pending. Supabase continues as the shared backend and was not changed.
+
+### Cloudflare Production project
+
+- Account ID: 831422f51dea96c387ae8917d451a6bf.
+- Project: flamechick (ID 5daf4460-c018-4115-af98-3093e2b280ef).
+- Canonical Production hostname: https://flamechick.pages.dev/.
+- Exact deployment URL: https://07297e8b.flamechick.pages.dev/.
+- Deployment ID: 07297e8b-e79d-46ae-9696-78be7f28c7f8; all Cloudflare stages succeeded; canonical Production.
+- Production branch: work/website-reliability-phase1-review.
+- Exact deployed commit: 2a63046e1e5d81ced272acc08b17c1a3021b779d.
+- GitHub repository: itsfahadahmed1234-creator/flame-chick-platform (repository ID 1464312723). The owner name includes “ahmed”.
+- Build root apps/flame-chick-website; blank build command; output directory .; plain static HTML/CSS/JavaScript.
+- Git source enables Production branch deployments and has the Website preview branch work/website-parallel-development. Build watch includes apps/flame-chick-website/* so unrelated application paths are excluded under the Cloudflare Pages watch-path rules.
+- Pages environment-variable map is empty. Browser configuration uses only the Production Supabase URL and public publishable key. No privileged key is in Pages variables or frontend code.
+- Matching Website Static Checks run 45981432738 passed for the exact deployed commit.
+
+### Checkout-host security and previous Pages project
+
+The Website's strict checkout guard explicitly allows the exact flamechick.pages.dev Production hostname and retains the old exact flame-chick-website.pages.dev hostname. Unrecognized Pages preview/deployment hostnames remain blocked. No wildcard Pages subdomains are allowed.
+
+The previous Pages project ID de453d35-d86f-4c42-8f68-737f2bd77ab9 has been renamed flamechick-legacy, preserving its prior flame-chick-website.pages.dev hostname and existing successful deployment (778c220c-a7f6-49ac-be88-6ad27ec0b39b). Automatic Production and Preview deployments are disabled on this legacy project to prevent duplicate future builds. Do not delete it until the new hostname has passed functional verification and the user no longer needs it.
+
+### Verification boundary and rollback
+
+- Cloudflare confirms the new deployment is canonical Production and all stages succeeded.
+- Connected-browser inspection previously rendered the storefront/catalogue and deals on the original Pages hostname. The newly named flamechick.pages.dev hostname has not yet had a complete interactive browser test in this session.
+- Do not click Place Order or Retry on Production without a separately approved safe test procedure.
+- Existing Vercel Website Production remains untouched as fallback: dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy, branch work/website-parallel-development, commit c57be50d1674e597693117d1f39867c4c042f43a.
+- No Vercel projects/aliases/custom domains/DNS were changed. No Supabase schema, RLS, Auth, Edge Functions, Realtime, Storage objects, orders, payments or catalogue publication were changed.
+- POS remains owned by the separate conversation. Admin and Rider Cloudflare deployment remain pending.
+
+**Current next action:** complete read-only functional smoke testing of flamechick.pages.dev while preserving Vercel and flamechick-legacy. Do not perform domain/DNS cutover without explicit approval.

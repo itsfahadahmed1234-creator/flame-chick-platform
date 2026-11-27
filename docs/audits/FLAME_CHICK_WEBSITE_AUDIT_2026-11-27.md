@@ -4,9 +4,10 @@ Updated: 2026-11-27
 
 ## Current source and runtime
 
-- Customer site: `https://flame-chick-website-production.vercel.app`
+- Customer site (Cloudflare Pages Production): https://flamechick.pages.dev/
+- Vercel fallback (unchanged Production): https://flame-chick-website-production.vercel.app
 - Repository: `itsfahadahmed1234-creator/flame-chick-platform`
-- Active source branch for the storefront: `work/website-parallel-development`
+- Active Cloudflare Website source branch: work/website-reliability-phase1-review
 - Customer entrypoint: `apps/flame-chick-website/index.html`
 - Production Supabase project: `adkrxfnawdiljhjaavnj` (Mumbai, `ap-south-1`)
 - Production Website Order API: `flame-chick-order-api`, deployed version 11
@@ -52,3 +53,14 @@ The homepage still contains a legacy, hidden V2 drawer/form and old inline JavaS
 The read-only Playwright/Chrome customer journey test is complete. It covered 1440×900 desktop and 390×844, 360×800 and 320×568 mobile. No source files, cookies/storage or Production data were changed; no Place Order/Retry action or non-GET request occurred. The audit found confirmed defects C1–C10, including stale/mis-styled status, legacy inline errors, missing images/generic deal art, missing deal prices, silent validation, cart focus escape, 320px clipping and awkward deal copy. The audit also confirmed correct catalogue loading, item/deal/cart calculations, delivery fees and repeated Delivery/Takeaway switching.
 
 **Do not repeat the old checklist above as pending.** The full findings, exact Playwright evidence references, source causes, pass results, test limitations and prioritized correction phases are in [the 27 November UI reliability continuation handoff](../handoffs/2026-11-27-website-ui-reliability-next-session.md). The live site is order-writable, so automated QA must stop before Place Order/Retry. No fixes to C1–C10 are implied by this audit record; they remain pending source work. Continue on `work/website-parallel-development`, compare current branch files to live C57 snapshot before editing, and obtain explicit approval before any deployment, Production write or real order.
+
+
+## Cloudflare Pages hostname update — 27 November 2026
+
+- Production Pages project flamechick, ID 5daf4460-c018-4115-af98-3093e2b280ef.
+- Production URL https://flamechick.pages.dev/; deployment 07297e8b-e79d-46ae-9696-78be7f28c7f8; Cloudflare reports all stages successful and this is the canonical deployment.
+- Source branch work/website-reliability-phase1-review; exact deployed commit 2a63046e1e5d81ced272acc08b17c1a3021b779d. Static Checks run 45981432738 passed.
+- Exact flamechick.pages.dev was added to the strict checkout host allowlist. The previous hostname flame-chick-website.pages.dev stays allowed during transition; unrecognized Pages previews/deployment hosts stay blocked.
+- Old Pages project is preserved as flamechick-legacy at flame-chick-website.pages.dev; its automatic Production/Preview deployments are disabled. Vercel C57 remains untouched as a fallback.
+- The new hostname's complete interactive/cart/checkout API walkthrough remains pending. Do not create a real order by clicking Place Order or Retry.
+- POS migration is managed by a separate conversation. Admin/Rider still pending. Supabase Production and DNS were not changed.

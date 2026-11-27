@@ -2,7 +2,22 @@
 
 > Entry point for continuing the customer Website. Read the linked handoffs and establish an overview before editing code.
 
-## Latest hosting checkpoint — 27 November 2026 — Cloudflare Git connection verified; Pages setup pending
+## Latest hosting checkpoint — 27 November 2026 — Website on flamechick.pages.dev
+
+Customer Website Cloudflare Pages Production is now READY:
+- Project flamechick; ID 5daf4460-c018-4115-af98-3093e2b280ef.
+- URL https://flamechick.pages.dev/.
+- Canonical deployment 07297e8b-e79d-46ae-9696-78be7f28c7f8; immutable URL https://07297e8b.flamechick.pages.dev/.
+- Branch work/website-reliability-phase1-review; deployed commit 2a63046e1e5d81ced272acc08b17c1a3021b779d.
+- Build root apps/flame-chick-website; blank build command; output directory .; GitHub source itsfahadahmed1234-creator/flame-chick-platform.
+- Production auto-deploy enabled; preview branch work/website-parallel-development; path include apps/flame-chick-website/*.
+- Matching Website Static Checks run 45981432738 passed.
+- Exact flamechick.pages.dev hostname is allowed by the strict checkout guard; arbitrary Pages previews stay blocked.
+- The old Pages URL remains preserved under flamechick-legacy, with automatic deployments disabled. Vercel C57 remains unchanged fallback.
+- Cloudflare API deployment stages all passed. The earlier Pages hostname rendered the catalogue in-browser; full interactive testing of the new hostname and checkout/API connectivity remain pending. Do not click Place Order/Retry on Production without a separately approved procedure.
+- POS is handled in another conversation. Admin/Rider remain pending. Supabase and DNS/Vercel are unchanged.
+
+## Historical hosting checkpoint — 27 November 2026 — initial Cloudflare Git connection and Pages plan
 
 Read [Cloudflare hosting transition handoff](../operations/2026-11-27-cloudflare-hosting-transition-handoff.md) first for the exact connection state and next steps. Cloudflare is authenticated to the expected account and has confirmed the GitHub repository connection through a Workers Build configuration. That first resource is a Worker, not Pages, and its build failed because Wrangler could not find a static assets directory at the repository root. The Pages project inventory remains empty. Create four separate Pages projects for the Website, POS, Admin and Rider apps; do not repeat the root-level Worker deployment setup.
 
@@ -10,11 +25,11 @@ Latest verified Vercel Website Production remains deployment `dpl_7EzwXVHFsjG91o
 
 A newer Website reliability candidate exists on `work/website-reliability-phase1-review` at `9bd5f81ca59d80da7192c96d6aa8e694bfbb03e5`; matching Website CI passed, but the candidate is not live Vercel Production and must be compared/reconciled before Cloudflare Production release. Do not blindly deploy `main`, C57 or unrelated POS/production-source-audit work.
 
-## Latest status — 27 November 2026 — UI audit completed; corrections pending
+## Historical UI audit checkpoint — 27 November 2026 — before reliability release
 
 The live customer Website was tested by OpenCode with Playwright/Chrome at 1440×900, 390×844, 360×800 and 320×568. The production snapshot used for the audit is commit `c57be50d1674e597693117d1f39867c4c042f43a` and deployment URL `https://flame-chick-website-production.vercel.app`. The audit confirmed 10 UI defects (C1–C10), while catalogue selection, cart calculations, fulfilment switching and delivery-fee calculations passed. No source files, cookies/storage or Production data were changed; no Place Order/Retry action or non-GET request occurred. Read the new [27 November Website UI reliability continuation handoff](2026-11-27-website-ui-reliability-next-session.md) for exact findings, source causes, test coverage and the phased correction plan. The prior [source/catalogue/API audit](../audits/FLAME_CHICK_WEBSITE_AUDIT_2026-11-27.md) remains complementary background.
 
-The current Website source branch checkpoint for the handoff is `6fccc8c958463ccc789a7b506faf6df95b10a37e` on `work/website-parallel-development`. The continuation handoff is stored on the documentation-only branch `handoff/website-ui-reliability-2026-11-27`; this does not mean the fixes have been implemented. Live C57 remains the reference for reported defects until source/runtime comparison and a new deployment are explicitly approved.
+The original C57 audit is historical evidence. The Website reliability candidate was subsequently reviewed, updated and deployed to Cloudflare as recorded above. Do not repeat the old 'corrections pending' wording as current. Full interactive functional QA remains outstanding.
 
 ## Read-first sequence
 

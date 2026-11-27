@@ -1,8 +1,8 @@
 # Flame Chick — Cloudflare Hosting Migration Handoff
 
-**Updated:** 27 November 2026, 14:37 PKT  
+**Updated:** 27 November 2026, 15:24 PKT  
 **Scope:** Move the four Flame Chick frontend applications from Vercel to Cloudflare Pages while keeping GitHub as the source of truth and Supabase Production as the shared backend.  
-**Current status:** GitHub access is connected to Cloudflare Workers Builds, but no Cloudflare Pages project has been created. The first build failed because Cloudflare created a Worker workflow with the wrong build command/root, not because the app source failed.
+**Current status:** Customer Website is deployed to Cloudflare Pages Production at flamechick.pages.dev. POS is managed by a separate conversation; Admin and Rider remain pending. The initial root Worker remains a separate failed setup resource.
 
 ## Read this first in the next chat
 
@@ -149,3 +149,32 @@ The 27 November OpenCode Playwright audit also recorded C1–C10 UI findings aga
 9. Update this handoff and the project indexes with the exact Pages project/deployment IDs, domains, production branches, source SHAs, environment-variable names and remaining issues.
 
 **Do not finish the task at GitHub connection or empty project creation. The target outcome is four working Cloudflare-hosted Flame Chick apps running the latest intended source, with Supabase still serving as their backend.**
+
+
+---
+
+## SUPERCEDING WEBSITE HOSTNAME RELEASE — 27 November 2026
+
+The Customer Website is deployed under the exact requested Cloudflare hostname.
+
+- Project: flamechick; project ID 5daf4460-c018-4115-af98-3093e2b280ef.
+- Production hostname: https://flamechick.pages.dev/.
+- Unique deployment URL: https://07297e8b.flamechick.pages.dev/.
+- Deployment ID: 07297e8b-e79d-46ae-9696-78be7f28c7f8; Production; Cloudflare reports queued/initialize/clone_repo/build/deploy all SUCCESS and the project lists this as canonical deployment.
+- Production branch: work/website-reliability-phase1-review.
+- Deployed source SHA: 2a63046e1e5d81ced272acc08b17c1a3021b779d.
+- Matching GitHub Website Static Checks: run 45981432738 — SUCCESS.
+- Repository: itsfahadahmed1234-creator/flame-chick-platform (the owner string includes “ahmed”).
+- Build settings: root apps/flame-chick-website, blank build command, output directory ., static HTML/CSS/JavaScript.
+- Git deployment settings: Production deployment enabled on work/website-reliability-phase1-review; Preview branch work/website-parallel-development; build-watch include apps/flame-chick-website/*; no excludes.
+- Pages env vars: none. Existing browser config uses Supabase Production URL and public publishable key only.
+- The exact hostname flamechick.pages.dev is explicitly allowlisted for Website order writes. The former exact Pages hostname flame-chick-website.pages.dev remains accepted during transition; all other Pages hostnames remain blocked.
+
+### Preserved previous hosting
+
+- Previous Pages project renamed flamechick-legacy; ID de453d35-d86f-4c42-8f68-737f2bd77ab9; old hostname flame-chick-website.pages.dev remains assigned. The original successful deployment 778c220c-a7f6-49ac-be88-6ad27ec0b39b remains available. Legacy project's automatic Production/Preview builds are disabled to avoid duplicated builds.
+- Vercel Website Production remains online and unchanged as fallback: dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy, commit c57be50d1674e597693117d1f39867c4c042f43a. No Vercel projects, aliases, custom domains or DNS were changed.
+
+### Verification limits and scope
+
+The new Cloudflare deployment is API-verified as canonical and successful. The former Pages hostname previously rendered the catalogue and deals in the connected browser; the new flamechick.pages.dev hostname still needs its own full interactive smoke test. No Place Order/Retry was clicked. Supabase Production was unchanged. POS belongs to the other conversation; Admin/Rider remain pending.
