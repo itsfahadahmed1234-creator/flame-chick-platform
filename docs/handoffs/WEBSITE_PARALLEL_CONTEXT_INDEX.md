@@ -58,3 +58,11 @@ A successful Place Order request writes a real order to Production and sends it 
 ## Completion criteria for this task
 
 The Place Order button must behave correctly on the selected URL; the UI must explain validation failures accurately; one request must create at most one order; uncertain retries must not duplicate; server-side pricing and delivery checks must remain authoritative; and POS receipt of the order must be verified under an approved test procedure. Do not call it production-ready merely because the button becomes enabled.
+
+
+## 27 November 2026 — UI reliability review in progress
+
+- Isolated Website UI reliability work is on `work/website-reliability-phase1-review`, based on source checkpoint `6fccc8c958463ccc789a7b506faf6df95b10a37e`.
+- Latest checkpoint commit: `a7b3fcb3407b25c06910248b4e11f516da888a05`. Read the Phase 1 section in [27 November Website UI reliability handoff](2026-11-27-website-ui-reliability-next-session.md) before continuing.
+- Production remains on `work/website-parallel-development` commit `c57be50d1674e597693117d1f39867c4c042f43a`, deployment `dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy`. Do not commit or push to that branch: Vercel Git auto-deploys it to Production.
+- One earlier Static Checks run passed; a later run failed on a stale test label, corrected in `a7b3fcb...`. Confirm the latest run before calling Phase 1 validated.
