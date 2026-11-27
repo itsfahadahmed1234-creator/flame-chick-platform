@@ -552,6 +552,7 @@ test("Dine-in can save multiple item rounds then take one payment and release th
     updateSyncBox:async()=>{},resetPreorderState:()=>{},resetMenuToStart:()=>{},resetNewOrderMode:()=>{},
     renderCart:()=>{},showToast:()=>{},openLocalReceipt:(order,options)=>{openedReceipt={order,options};},
     printThermalReceipt:async()=>{printed++;return true;},closeModal:()=>{},receiptEditContext:null,
+    dineInMode:'immediate',kitchenTiming:'now',
     Date,Math,Number,String,Array,Object,JSON,console
   };
   const sandbox=vm.createContext(ctx);
