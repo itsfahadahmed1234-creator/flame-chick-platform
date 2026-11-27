@@ -6,6 +6,7 @@ on:
       - work/production-source-audit
     paths:
       - '.github/workflows/bootstrap-cloudflare-pos.yml'
+      - 'apps/flame-chick-pos/tests/cloudflare-worker.test.cjs'
   workflow_dispatch:
 
 permissions:
