@@ -17,7 +17,8 @@
     'flamechick.vercel.app',
     'flame-chick-website-production.vercel.app',
     'flame-chick-website-production-faha-d.vercel.app',
-    'flame-chick-website.pages.dev'
+    'flame-chick-website.pages.dev',
+    'flamechick.pages.dev'
   ]);
   var TEST_CHECKOUT_PREVIEW_HOSTS = Object.freeze([
     'flame-chick-website-production-p6r1gdef2-fahad-7455.vercel.app',

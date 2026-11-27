@@ -10,9 +10,10 @@ const rehearsalUrl = 'flame-chick-website-production-p6r1gdef2-fahad-7455.vercel
 const rehearsalAlias = 'flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455.vercel.app';
 const currentReviewAlias = 'flame-chick-website-production-git-work-website-r-07b9f9-faha-d.vercel.app';
 const cloudflareProductionHost = 'flame-chick-website.pages.dev';
+const desiredCloudflareProductionHost = 'flamechick.pages.dev';
 
 test('allows order writes only on canonical Production and stable FahaD project aliases', () => {
-  const allowedProductionHosts = ['flamechick.vercel.app', 'FLAMECHICK.VERCEL.APP.', ...stableProductionAliases, cloudflareProductionHost];
+  const allowedProductionHosts = ['flamechick.vercel.app', 'FLAMECHICK.VERCEL.APP.', ...stableProductionAliases, cloudflareProductionHost, desiredCloudflareProductionHost];
   for (const host of allowedProductionHosts) {
     assert.equal(guard.canSubmitOrders(host), true, host);
     assert.equal(guard.shouldBlockOrderApiWrite('POST', host), false, host);
@@ -21,7 +22,8 @@ test('allows order writes only on canonical Production and stable FahaD project 
   assert.deepEqual([...guard.productionHosts], [
     'flamechick.vercel.app',
     ...stableProductionAliases,
-    cloudflareProductionHost
+    cloudflareProductionHost,
+    desiredCloudflareProductionHost
   ]);
 });
 
@@ -33,7 +35,9 @@ test('allows order writes only on the exact Cloudflare Pages Production hostname
     'branch.flame-chick-website.pages.dev',
     'preview.flame-chick-website.pages.dev',
     'flame-chick-website-preview.pages.dev',
-    'another-site.pages.dev'
+    'another-site.pages.dev',
+    'preview.flamechick.pages.dev',
+    'random.flamechick.pages.dev'
   ]) {
     assert.equal(guard.canSubmitOrders(host), false, host);
     assert.equal(guard.shouldBlockOrderApiWrite('POST', host), true, host);
