@@ -8,10 +8,12 @@
 - Branch: `work/production-source-audit`
 - Validated POS source pin: `41c8aea80febd434048e50c352b386c01b02e7d4`
 - POS root: `apps/flame-chick-pos`
-- The later hosting-handoff commits changed documentation only, apart from `apps/flame-chick-pos/README.md`, which now records the Cloudflare hosting direction. The latest complete-tree comparison confirms that all **19 POS code/static-asset inputs (excluding README.md)** remain byte-for-byte identical to validated source pin `41c8aea80febd434048e50c352b386c01b02e7d4`. The current branch head is `f6a9496cb792847cc2d7db475353c0dda11f7c75`. Re-check before upload; do not include README.md, tests or the Node signer source in public assets.
+- The later hosting-handoff commits changed documentation only, apart from `apps/flame-chick-pos/README.md`, which now records the Cloudflare hosting direction. The latest complete-tree comparison confirms that all **14 POS files other than README.md** remain byte-for-byte identical to validated source pin `41c8aea80febd434048e50c352b386c01b02e7d4`. The current branch head at this handoff revision is `b04b1bac2f60c923dc2a9820dc03234506fe8703`. Re-check before upload; do not include README.md, tests or the Node signer source in public assets.
 - This is the latest validated **source candidate**, not a Cloudflare deployment. No Cloudflare POS project/deployment exists yet.
 
 ## Connected Cloudflare account / target
+
+**Upload boundary:** The unchanged source files include private Node QZ signer code and test files. They are not public assets. Build the public static output from a strict allowlist (POS HTML, browser JS/CSS, public SVGs and the public leaf certificate only); port the signer separately to Worker code and keep its private key as an encrypted secret.
 
 - Account: `Itsfahadahmed1234@gmail.com's Account`, connected identity `itsfahadahmed1234@gmail.com`.
 - Workers subdomain: `itsfahadahmed1234`.

@@ -10,11 +10,13 @@
 - Continue on: `work/production-source-audit`. Do not switch to or modify `main`.
 - POS app root: `apps/flame-chick-pos`
 - Latest fully validated POS source-tree pin: **`41c8aea80febd434048e50c352b386c01b02e7d4`**.
-- The hosting handoff commits after validated source pin `41c8aea80febd434048e50c352b386c01b02e7d4` changed documentation only. The current branch head is `f6a9496cb792847cc2d7db475353c0dda11f7c75`. A full Git tree comparison confirms **19 POS code/static-asset inputs (excluding README.md)** are byte-for-byte identical to the validated pin. `apps/flame-chick-pos/README.md` was updated as documentation only and is not a public deployment asset.
+- The hosting handoff commits after validated source pin `41c8aea80febd434048e50c352b386c01b02e7d4` changed documentation only. The current branch head at this handoff revision is `b04b1bac2f60c923dc2a9820dc03234506fe8703`. A full Git tree comparison confirms **19 POS code/static-asset inputs (excluding README.md)** are byte-for-byte identical to the validated pin. `apps/flame-chick-pos/README.md` was updated as documentation only and is not a public deployment asset.
 - Therefore the POS source to package and upload is the current `apps/flame-chick-pos/` directory from `work/production-source-audit`; its contents match the validated `41c8aea` pin. Re-check the branch head and POS app subtree before building, in case another chat has made new app changes.
 - **Important status distinction:** `41c8aea` is the current validated source candidate, not a READY Cloudflare build or deployment. No Cloudflare POS project has been created and no POS files have been uploaded to Cloudflare yet.
 
 ### POS app structure / build input facts
+
+**Upload boundary:** The unchanged source files include private Node QZ signer code and test files. They are not public assets. Build the public static output from a strict allowlist (POS HTML, browser JS/CSS, public SVGs and the public leaf certificate only); port the signer separately to Worker code and keep its private key as an encrypted secret.
 
 - It is a plain static HTML/CSS/JavaScript cashier application. Main entry point: `apps/flame-chick-pos/index.html` (title: “Flame Chick POS — Local First · Cashier”).
 - Local modules currently used by the page include `catalog-v3.js`, `catalog-v3-deal-view.js`, `catalog-v3-adapter.js`, `sync-v3.js`, `payment-collection.js`, and `qz-printing.js`; public brand assets are under `assets/`.
