@@ -13,6 +13,7 @@ Read these files in this order before proposing or changing anything:
 5. `docs/operations/2026-11-26-new-vercel-website-production-handoff.md` — selected Website environment/hosting history; older project IDs and hostnames in other notes may be superseded.
 6. `docs/handoffs/2026-11-25-website-parallel-audit.md` — Website architecture, source map and previous parallel-development decisions.
 7. `docs/audits/FLAME_CHICK_WEBSITE_AUDIT_2026-11-27.md` — source/catalogue/order API audit and cleanup record.
+8. `docs/operations/2026-11-27-cloudflare-hosting-transition-handoff.md` — newest hosting target, failed initial Worker build, four Pages plan and verified Vercel Production deployment.
 
 Do not treat an older statement in a historical handoff as current if a newer dated checkpoint supersedes it. After reading, give the user a short summary of the active project, active branch, live deployment, previous work and remaining tasks before editing source.
 
@@ -23,6 +24,17 @@ Do not treat an older statement in a historical handoff as current if a newer da
 - Continue collaborating with the user step by step. Use OpenCode for active browser/Playwright testing when requested; ChatGPT should review its evidence, guide fixes, inspect repository/handoffs and help verify results.
 - The user wants continuity, not a rebuild or a fresh architecture. Read all handoffs first, preserve established decisions, explain dependencies and avoid assumptions.
 - User-authorized work in this handoff is documentation only. The pending source fixes below are the next implementation scope; do not interpret this handoff as permission to deploy, submit a real order, change Production data, or change shared backend infrastructure.
+
+## Latest hosting and release status — 27 November 2026
+
+The user has directed the project to move the four frontend apps to Cloudflare Pages and, after the correct Pages projects are configured, deploy the latest intended/reviewed changes to Cloudflare Production so the apps remain current. This is a hosting transition, not a Supabase/backend migration. Read `docs/operations/2026-11-27-cloudflare-hosting-transition-handoff.md` for the full current checkpoint and exact next steps.
+
+- Cloudflare account is connected as `itsfahadahmed1234@gmail.com`; the GitHub repository connection to `itsfahadahmed1234-creator/flame-chick-platform` is confirmed through Workers Builds.
+- The initial Cloudflare dashboard flow created a Worker named `flame-chick-platform`, **not Pages**. It failed because it ran `npx wrangler deploy` at repository root and could not detect a static assets directory. Pages inventory still had zero projects.
+- Create four separate Pages projects with roots: `apps/flame-chick-website`, `apps/flame-chick-pos`, `apps/flame-chick-admin`, `apps/flame-chick-rider`. Inspect each app's actual configuration to select valid build/output settings; do not copy the failed root Worker configuration.
+- Latest verified Vercel Website Production remains C57: deployment `dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy`, source commit `c57be50d1674e597693117d1f39867c4c042f43a`, branch `work/website-parallel-development`, READY/Production. A newer project-level Vercel deployment is merely a Preview from `work/production-source-audit`, not Production.
+- Newer Website reliability candidate `9bd5f81ca59d80da7192c96d6aa8e694bfbb03e5` on `work/website-reliability-phase1-review` passed its matching Website Static Checks, but was not deployed to Vercel Production. Compare and reconcile that candidate with current source and outstanding UI findings before choosing Cloudflare's production branch/commit.
+- Keep Vercel available as fallback until all four Cloudflare Pages applications pass smoke tests; do not disconnect Vercel, delete projects or cut over DNS during setup.
 
 ## Repository, branch and deployment context
 
