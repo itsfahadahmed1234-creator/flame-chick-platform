@@ -21,7 +21,7 @@
 - Deployment immutable URL: https://flame-chick-pos-development-3bbhwr2uj-faha-d.vercel.app/
 - The Vercel project is on Hobby / Free. Do not upgrade or add paid services without explicit approval.
 - Vercel Production Branch is configured as main, but the approved POS deployment was created manually from the working branch at the exact SHA above. Do not deploy main or change the Production Branch.
-- After the Production deployment, the only subsequent GitHub change was a documentation handoff update. The branch head at time of this handoff preparation was c1ffbbf7a1af3697d7ef47abb5be6290aa0493cd; verify the live branch head before making source changes.
+- The first Production-release handoff was recorded in commit c1ffbbf7a1af3697d7ef47abb5be6290aa0493cd. This POS bug handoff was then added in commit 62f06ba0672de5a1f71b315425fedb93aebedbb1, and the primary PROJECT_HANDOFF pointer was updated in commit 2a304d908fe64c623b6a9fe5cee8f3c2d78328f4. Verify the current branch head before making source changes.
 - The user's former account's flamechickpos.vercel.app hostname is separate and was not detached, transferred or modified. Do not touch that old account/domain.
 
 ## 2. Vercel deployment guard / quota protection
