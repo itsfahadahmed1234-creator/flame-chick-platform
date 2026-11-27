@@ -2,9 +2,11 @@
 
 > Entry point for continuing the customer Website. Read the linked handoffs and establish an overview before editing code.
 
-## Latest status — 26 November 2026
+## Latest status — 27 November 2026 — UI audit completed; corrections pending
 
-The checkout fix has been released to the FahaD Website Production project. Read the latest release checkpoint at the top of the [26 November FahaD Website Production environment handoff](../operations/2026-11-26-new-vercel-website-production-handoff.md). Current Production source commit: `c57be50d1674e597693117d1f39867c4c042f43a`; deployment: `dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy` (**READY**). Website static CI passed. No real Production order has been submitted; a controlled end-to-end order rehearsal still requires explicit approval.
+The live customer Website was tested by OpenCode with Playwright/Chrome at 1440×900, 390×844, 360×800 and 320×568. The production snapshot used for the audit is commit `c57be50d1674e597693117d1f39867c4c042f43a` and deployment URL `https://flame-chick-website-production.vercel.app`. The audit confirmed 10 UI defects (C1–C10), while catalogue selection, cart calculations, fulfilment switching and delivery-fee calculations passed. No source files, cookies/storage or Production data were changed; no Place Order/Retry action or non-GET request occurred. Read the new [27 November Website UI reliability continuation handoff](2026-11-27-website-ui-reliability-next-session.md) for exact findings, source causes, test coverage and the phased correction plan. The prior [source/catalogue/API audit](../audits/FLAME_CHICK_WEBSITE_AUDIT_2026-11-27.md) remains complementary background.
+
+The current Website source branch checkpoint for the handoff is `6fccc8c958463ccc789a7b506faf6df95b10a37e` on `work/website-parallel-development`. The continuation handoff is stored on the documentation-only branch `handoff/website-ui-reliability-2026-11-27`; this does not mean the fixes have been implemented. Live C57 remains the reference for reported defects until source/runtime comparison and a new deployment are explicitly approved.
 
 ## Read-first sequence
 
@@ -12,7 +14,8 @@ The checkout fix has been released to the FahaD Website Production project. Read
 2. Read this index.
 3. Read the current [26 November FahaD Website Production environment handoff](../operations/2026-11-26-new-vercel-website-production-handoff.md).
 4. Read the complete [25 November Website parallel-development audit](2026-11-25-website-parallel-audit.md) for the Website architecture and file map.
-5. Use the earlier [Preview/one-step checkout addendum](../operations/2026-11-26-website-preview-one-step-checkout.md) as historical context only; its Vercel project/team/host details are superseded.
+5. Read the [27 November Website UI reliability continuation handoff](2026-11-27-website-ui-reliability-next-session.md) for current Playwright findings and the pending source-fix sequence.
+6. Use the earlier [Preview/one-step checkout addendum](../operations/2026-11-26-website-preview-one-step-checkout.md) as historical context only; its Vercel project/team/host details are superseded.
 
 **Before making changes:** provide the user with a concise, evidence-based project overview, state which exact deployment and branch are active, identify relevant dependencies and unresolved risks, and confirm the proposed Place Order fix scope. Do not start by rebuilding the Website or making speculative edits.
 
@@ -58,3 +61,10 @@ A successful Place Order request writes a real order to Production and sends it 
 ## Completion criteria for this task
 
 The Place Order button must behave correctly on the selected URL; the UI must explain validation failures accurately; one request must create at most one order; uncertain retries must not duplicate; server-side pricing and delivery checks must remain authoritative; and POS receipt of the order must be verified under an approved test procedure. Do not call it production-ready merely because the button becomes enabled.
+
+
+## Current working method — OpenCode browser QA
+
+The user uses OpenCode + DeepSeek 4.1 Flash with Playwright/Chrome because ChatGPT Work mode is not available in their Free-mode setup. Use OpenCode for active browser interaction and return screenshots, JSON evidence, console/network results and exact reproduction steps. ChatGPT should read the evidence, inspect current repository source, guide changes and verify that tests match the intended behaviours. Do not tell the user to switch to Work mode.
+
+The OpenCode audit completed read-only on 27 November 2026. Its full findings and test matrix are in [the current Website continuation handoff](2026-11-27-website-ui-reliability-next-session.md). No application code corrections from C1–C10 have been implemented just by recording that handoff.
