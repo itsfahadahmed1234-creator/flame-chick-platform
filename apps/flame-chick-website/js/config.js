@@ -9,9 +9,6 @@ var FLAME_CHICK_CONFIG = {
   apiBase: 'https://adkrxfnawdiljhjaavnj.supabase.co/functions/v1/flame-chick-catalog',
   orderApiBase: 'https://adkrxfnawdiljhjaavnj.supabase.co/functions/v1/flame-chick-order-api',
   publishableKey: 'sb_publishable_89MQIj_drF15IrF05ZLt0w_txUjPMxy',
-  /* Version-aware schema-v2 catalog cache (localStorage, validated on read). */
-  catalogCacheKey: 'flame_chick_catalog_v1',
-  cacheFormatVersion: 2,
   /* Network behaviour. */
   requestTimeoutMs: 12000,
   retries: 2,
