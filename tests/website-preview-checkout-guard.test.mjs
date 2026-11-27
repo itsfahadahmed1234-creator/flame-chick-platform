@@ -9,9 +9,10 @@ const stableProductionAliases = [
 const rehearsalUrl = 'flame-chick-website-production-p6r1gdef2-fahad-7455.vercel.app';
 const rehearsalAlias = 'flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455.vercel.app';
 const currentReviewAlias = 'flame-chick-website-production-git-work-website-r-07b9f9-faha-d.vercel.app';
+const cloudflareProductionHost = 'flame-chick-website.pages.dev';
 
 test('allows order writes only on canonical Production and stable FahaD project aliases', () => {
-  const allowedProductionHosts = ['flamechick.vercel.app', 'FLAMECHICK.VERCEL.APP.', ...stableProductionAliases];
+  const allowedProductionHosts = ['flamechick.vercel.app', 'FLAMECHICK.VERCEL.APP.', ...stableProductionAliases, cloudflareProductionHost];
   for (const host of allowedProductionHosts) {
     assert.equal(guard.canSubmitOrders(host), true, host);
     assert.equal(guard.shouldBlockOrderApiWrite('POST', host), false, host);
@@ -19,8 +20,24 @@ test('allows order writes only on canonical Production and stable FahaD project 
   }
   assert.deepEqual([...guard.productionHosts], [
     'flamechick.vercel.app',
-    ...stableProductionAliases
+    ...stableProductionAliases,
+    cloudflareProductionHost
   ]);
+});
+
+test('allows order writes only on the exact Cloudflare Pages Production hostname', () => {
+  assert.equal(guard.canSubmitOrders(cloudflareProductionHost), true);
+  assert.equal(guard.isTestCheckoutPreview(cloudflareProductionHost), false);
+  assert.equal(guard.shouldBlockOrderApiWrite('POST', cloudflareProductionHost), false);
+  for (const host of [
+    'branch.flame-chick-website.pages.dev',
+    'preview.flame-chick-website.pages.dev',
+    'flame-chick-website-preview.pages.dev',
+    'another-site.pages.dev'
+  ]) {
+    assert.equal(guard.canSubmitOrders(host), false, host);
+    assert.equal(guard.shouldBlockOrderApiWrite('POST', host), true, host);
+  }
 });
 
 test('allows the exact current review branch Preview to use tagged Production test checkout', () => {
