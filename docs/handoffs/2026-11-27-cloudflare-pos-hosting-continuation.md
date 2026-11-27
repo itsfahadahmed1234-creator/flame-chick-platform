@@ -1,3 +1,25 @@
+# CURRENT STATUS — POS MANUAL DELIVERY / RECEIPT PRINT UX FIX IN PROGRESS
+
+## Final development / verification checkpoint — 2026-11-27 21:52 Asia/Karachi
+- Current feature branch: `fix/pos-manual-delivery-receipt-print-ux-2026-11-27`.
+- Latest commit: `414810e8a5038d727c899bdd4f81a15e41ec8c30`; base `acaaea765039a7dadd9eb0388136cc0cf6c127e2`.
+- Mocked UI, receipt-contract and QZ diagnostics are green (run `46036952432`, commit `fd84bfe3b6a596f8ef4fab09f7985932f13df016`). The expanded run (`46037102563`) also passed these tests and `node --check` for the QZ signer, but its broader source-hygiene group reports 76/78 due two older assertion mismatches verified against the untouched base source: returned-order filter expression and `PaymentMethod` vs `paymentMethod`. No related implementation was changed.
+- Do not edit these unrelated business rules as part of the current UI fix.
+- No deployment: Worker `flamechickpos` remains version 6. No Production orders, payments or physical print jobs were used.
+- Private R2 archive remains blocked: R2 subscription not enabled; KV/D1 absent; no bucket/object or payment settings were changed. Monthly Standard free limits/overage prices and subscription requirement are recorded in the minutes file.
+
+> Latest checkpoint: \`docs/handoffs/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md\`
+
+- Work is isolated on \`fix/pos-manual-delivery-receipt-print-ux-2026-11-27\`, based on \`work/production-source-audit\` at \`acaaea765039a7dadd9eb0388136cc0cf6c127e2\`.
+- Do not push POS source to \`work/production-source-audit\`; Cloudflare Workers Builds watches that branch and would auto-deploy the live POS.
+- Scope: Manual Delivery Place Order loading/rapid-click guard; receipt modal and print-preview close only after the existing QZ Promise confirms success; failed/cancelled attempts keep the relevant popup open and retryable.
+- Existing QZ-first/browser-fallback routing, receipt content, QZ signer and payment/order logic remain unchanged. Browser \`window.print()\` cannot affirm a completed print; fallback remains available but does not auto-close the popup.
+- Mock regression coverage and a feature-branch-only GitHub Actions workflow are in place; full suite rerun remains pending after the `.mjs` compatibility correction. Read the minutes file above before continuation and record the exact CI result/commit.
+- Production Worker remains \`flamechickpos\` version 6 at https://flamechickpos.itsfahadahmed1234.workers.dev. No deployment is authorized.
+- Private minutes archive is blocked: account R2 is not enabled, KV/D1 are absent, and no billing/plan settings were changed. See the minutes file for the exact Cloudflare error and pending object path.
+
+---
+
 # CURRENT STATUS — POS HOSTING COMPLETE; NEXT TASK IS MANUAL DELIVERY UX (2026-11-27)
 
 > **Read this section first.** The deployment setup instructions in the historical record below have been completed and are superseded by this current status. Do not create another Worker or repeat the hosting migration.

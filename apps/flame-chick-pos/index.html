@@ -605,6 +605,11 @@ html,body{background:var(--bg);overflow:hidden}
  .product-card .price{font-size:13px}
  .product-card .add{padding:6px 8px;font-size:11px}
 }
+.place-order-btn.is-loading{cursor:wait;opacity:1}
+.button-loading-content{display:inline-flex;align-items:center;justify-content:center;gap:10px}
+.button-spinner{display:inline-block;width:17px;height:17px;border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;animation:posButtonSpin .7s linear infinite}
+@keyframes posButtonSpin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.button-spinner{animation-duration:1.5s}}
 </style>
 
 <style>
@@ -1915,22 +1920,63 @@ function printOnlineOrderReceipt(order){
   showPrintPreview(o);
 }
 let _pendingPrintOrder=null;
+let printPreviewInProgress=false;
+let lastReceiptPrintError='';
 function showPrintPreview(o){
   _pendingPrintOrder=o;
   $('printPreviewBody').innerHTML=buildReceiptHtml(o);
   const dests=[];
   if(printSettings.counterEnabled)dests.push(printSettings.counterLabel);
   if(printSettings.kitchenEnabled)dests.push(printSettings.kitchenLabel);
-  $('printPreviewSub').textContent=dests.length?`Printing to: ${dests.join(' + ')}`:'No destinations enabled';
-  $('printPreviewConfirmBtn').onclick=async()=>{closeModal('printPreviewModal');await doPrintOrder(_pendingPrintOrder);_pendingPrintOrder=null;};
+  const status=$('printPreviewSub');
+  status.textContent=dests.length?`Printing to: ${dests.join(' + ')}`:'No destinations enabled';
+  status.classList.remove('receipt-status-error');
+  $('printPreviewConfirmBtn').onclick=confirmPrintPreview;
   openModal('printPreviewModal');
 }
+async function confirmPrintPreview(){
+  if(printPreviewInProgress)return false;
+  printPreviewInProgress=true;
+  const button=$('printPreviewConfirmBtn');
+  const wasDisabled=Boolean(button?.disabled);
+  if(button){
+    button.disabled=true;
+    button.setAttribute('aria-busy','true');
+  }
+  try{
+    const confirmed=await doPrintOrder(_pendingPrintOrder);
+    if(confirmed){
+      closeModal('printPreviewModal');
+      _pendingPrintOrder=null;
+      return true;
+    }
+    setReceiptPrintError(lastReceiptPrintError||'The printer did not confirm completion.','printPreviewSub');
+    return false;
+  }catch(error){
+    setReceiptPrintError(error?.message||'Receipt printing failed.','printPreviewSub');
+    return false;
+  }finally{
+    if(button){
+      button.disabled=wasDisabled;
+      button.removeAttribute('aria-busy');
+    }
+    printPreviewInProgress=false;
+  }
+}
 async function doPrintOrder(o){
-  if(!o)return;
-  let printed=false;
-  if(printSettings.counterEnabled){printed=await printReceiptWithLabel(o,printSettings.counterLabel)||printed;}
-  if(printSettings.kitchenEnabled){printed=await printReceiptWithLabel(o,printSettings.kitchenLabel)||printed;}
-  return printed;
+  if(!o)return false;
+  lastReceiptPrintError='';
+  let attempted=false;
+  let allConfirmed=true;
+  if(printSettings.counterEnabled){
+    attempted=true;
+    if(!await printReceiptWithLabel(o,printSettings.counterLabel))allConfirmed=false;
+  }
+  if(printSettings.kitchenEnabled){
+    attempted=true;
+    if(!await printReceiptWithLabel(o,printSettings.kitchenLabel))allConfirmed=false;
+  }
+  return attempted&&allConfirmed;
 }
 async function printReceiptWithLabel(o,label){
   const receiptHtml=buildReceiptHtml(o);
@@ -1941,13 +1987,17 @@ async function printReceiptWithLabel(o,label){
       await window.FlameChickQZ.printReceipt(o,label,printSettings.qzPrinterName);
       showToast('Receipt sent to '+printSettings.qzPrinterName);
       return true;
-    }catch(error){showToast('Direct print unavailable · opening browser print. '+(error?.message||''));}
+    }catch(error){
+      lastReceiptPrintError=String(error?.message||'Direct QZ printing failed.');
+      showToast('Direct print unavailable · opening browser print. '+lastReceiptPrintError);
+    }
   }
   const area=$('printArea');
   area.innerHTML=receiptHtml;
   window.print();
   setTimeout(()=>{area.innerHTML='';},1000);
-  return true;
+  lastReceiptPrintError=lastReceiptPrintError||'Browser print was opened, but completion cannot be confirmed here.';
+  return false;
 }
 
 function openDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,DB_VERSION);req.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains(STORES.settings))d.createObjectStore(STORES.settings,{keyPath:'key'});if(!d.objectStoreNames.contains(STORES.menu))d.createObjectStore(STORES.menu,{keyPath:'ID'});if(!d.objectStoreNames.contains(STORES.categories))d.createObjectStore(STORES.categories,{keyPath:'ID'});if(!d.objectStoreNames.contains(STORES.deliveryAreas))d.createObjectStore(STORES.deliveryAreas,{keyPath:'ID'});if(!d.objectStoreNames.contains(STORES.orders))d.createObjectStore(STORES.orders,{keyPath:'localOrderId'});if(!d.objectStoreNames.contains(STORES.queue))d.createObjectStore(STORES.queue,{keyPath:'localOrderId'});if(!d.objectStoreNames.contains(STORES.statusQueue))d.createObjectStore(STORES.statusQueue,{keyPath:'key'});if(!d.objectStoreNames.contains(STORES.tables))d.createObjectStore(STORES.tables,{keyPath:'id'});if(!d.objectStoreNames.contains(STORES.catalog))d.createObjectStore(STORES.catalog,{keyPath:'key'});};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)} )}
@@ -2544,7 +2594,37 @@ function openOrderDetails(orderId){
   $('orderDetailBody').querySelectorAll('[data-detail-print]').forEach(btn=>btn.onclick=()=>{const o=inboxOrders.get(btn.dataset.detailPrint);if(o){closeModal('orderDetailModal');printOnlineOrderReceipt(o);}});
   openModal('orderDetailModal');
 }
-async function guardedOrderAction(buttonId,handler){if(orderActionInProgress)return;orderActionInProgress=true;const btn=$(buttonId);const original=btn?.textContent||'';if(btn){btn.disabled=true;btn.setAttribute('aria-busy','true')}try{return await handler()}catch(e){console.error('order action failed',e);showToast(e?.message||'Order action failed')}finally{if(btn){btn.disabled=false;btn.removeAttribute('aria-busy');if(buttonId==='placeBtn')btn.textContent=original||'PLACE ORDER';}orderActionInProgress=false}}
+async function guardedOrderAction(buttonId,handler){
+  if(orderActionInProgress)return false;
+  orderActionInProgress=true;
+  const btn=$(buttonId);
+  const originalHTML=btn?.innerHTML||'';
+  const wasDisabled=Boolean(btn?.disabled);
+  const showDeliverySpinner=buttonId==='placeBtn'&&String($('orderType')?.value||'').toLowerCase()==='delivery';
+  if(btn){
+    btn.disabled=true;
+    btn.setAttribute('aria-busy','true');
+    if(showDeliverySpinner){
+      btn.classList.add('is-loading');
+      btn.innerHTML='<span class="button-loading-content"><span class="button-spinner" role="status" aria-label="Placing order"></span><span>PLACING ORDER…</span></span>';
+    }
+  }
+  try{
+    return await handler();
+  }catch(error){
+    console.error('order action failed',error);
+    showToast(error?.message||'Order action failed');
+    return false;
+  }finally{
+    if(btn){
+      btn.disabled=wasDisabled;
+      btn.removeAttribute('aria-busy');
+      btn.classList.remove('is-loading');
+      if(showDeliverySpinner)btn.innerHTML=originalHTML;
+    }
+    orderActionInProgress=false;
+  }
+}
 
 function setupCashierControls(){
   const initialType=$('orderType')?.value||'Delivery';
@@ -4756,6 +4836,29 @@ function buildReceiptHtml(order){
     (notes?'<div class="receipt-notes"><strong>Note:</strong> '+esc(notes)+'</div>':'')+
   '</div>';
 }
+function setReceiptPrintError(message,statusId='receiptStatusText'){
+  const detail=String(message||'The printer did not confirm completion.').trim();
+  const status=$(statusId);
+  if(status){
+    status.textContent='PRINT NOT CONFIRMED · '+detail+' · Check the printer and retry.';
+    status.classList.add('receipt-status-error');
+  }
+  showToast(detail);
+}
+async function printReceiptFromModal(order){
+  try{
+    const confirmed=await printThermalReceipt(order);
+    if(confirmed){
+      closeModal('receiptModal');
+      return true;
+    }
+    setReceiptPrintError(lastReceiptPrintError||'The printer did not confirm completion.','receiptStatusText');
+    return false;
+  }catch(error){
+    setReceiptPrintError(error?.message||'Receipt printing failed.','receiptStatusText');
+    return false;
+  }
+}
 function openLocalReceipt(order,options={}){
   if(!order)return;
   const isDelivery=String(order.fulfillmentType||'').toLowerCase()==='delivery';
@@ -4772,7 +4875,7 @@ function openLocalReceipt(order,options={}){
   receiptStatus.classList.toggle('receipt-status-error',Boolean(isDelivery&&sendError&&!alreadySubmitted));
   $('backToOrderBtn').style.display=options.editable?'inline-flex':'none';
   $('printThermalBtn').textContent=options.editable?(isDelivery?'Send to Online Orders & Print':'Print & Complete'):'Print Thermal Receipt';
-  $('printThermalBtn').onclick=()=>guardedOrderAction('printThermalBtn',()=>options.editable?finalizeReceiptOrder(order):printThermalReceipt(order));
+  $('printThermalBtn').onclick=()=>guardedOrderAction('printThermalBtn',()=>options.editable?finalizeReceiptOrder(order):printReceiptFromModal(order));
   $('backToOrderBtn').onclick=()=>returnReceiptToOrder();
   openModal('receiptModal');
   requestAnimationFrame(()=>fitReceiptToViewport());
@@ -4912,8 +5015,11 @@ async function finalizeReceiptOrder(order){
   if(!current){showToast('Order not found locally');return false;}
   const type=String(current.fulfillmentType||'').toLowerCase();
   if(current.serverOrderId&&!current.checkoutPending&&!current.pendingPayment){
-    const printOpened=printThermalReceipt(current);
-    if(!printOpened){showToast('Unable to open the receipt for printing.');return false;}
+    const printOpened=await printThermalReceipt(current);
+    if(!printOpened){
+      setReceiptPrintError(lastReceiptPrintError||'The printer did not confirm completion.','receiptStatusText');
+      return false;
+    }
     closeModal('receiptModal');resetNewOrderMode();return true;
   }
   // Use one immutable request ID for the payment + order command. A lost
@@ -4938,12 +5044,15 @@ async function finalizeReceiptOrder(order){
   }
   await put(STORES.orders,current);
   await put(STORES.queue,current);
-  const printOpened=printThermalReceipt({
+  const printOpened=await printThermalReceipt({
     ...current,
     paymentStatus:current.pendingPayment?'Paid':'Unpaid',
     status:current.pendingPayment?'Completed':current.status
   });
-  if(!printOpened){showToast('Unable to open the receipt. The order remains safely queued on this device.');return false;}
+  if(!printOpened){
+    setReceiptPrintError(lastReceiptPrintError||'The order remains safely queued on this device.','receiptStatusText');
+    return false;
+  }
   closeModal('receiptModal');
   window.editingLocalOrderId='';receiptEditContext=null;resetNewOrderMode();
   if(navigator.onLine&&flameChickStaffSession?.access_token)await syncPending();
@@ -4964,6 +5073,7 @@ async function finalizeReceiptOrder(order){
   return true;
 }
 async function printThermalReceipt(order){
+  lastReceiptPrintError='';
   order=normalizeReceiptOrder(order);
   const items=getLocalOrderItems(order);
   const receiptOrder={...order,items,serverOrderNumber:order.serverOrderNumber||order.serverOrderId||order.localOrderId};
@@ -4975,13 +5085,17 @@ async function printThermalReceipt(order){
       await window.FlameChickQZ.printReceipt(receiptOrder,'Counter Receipt',printSettings.qzPrinterName);
       showToast('Receipt sent to '+printSettings.qzPrinterName);
       return true;
-    }catch(error){showToast('Direct print unavailable · opening browser print. '+(error?.message||''));}
+    }catch(error){
+      lastReceiptPrintError=String(error?.message||'Direct QZ printing failed.');
+      showToast('Direct print unavailable · opening browser print. '+lastReceiptPrintError);
+    }
   }
   const area=$('printArea');
   area.innerHTML=receiptHtml;
   window.print();
   setTimeout(()=>{area.innerHTML='';},1000);
-  return true;
+  lastReceiptPrintError=lastReceiptPrintError||'Browser print was opened, but completion cannot be confirmed here.';
+  return false;
 }
 async function openLocalOrderDetails(localOrderId){
   const order=await get(STORES.orders,localOrderId);if(!order)return;

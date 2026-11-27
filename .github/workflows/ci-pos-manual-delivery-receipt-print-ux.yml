@@ -1,0 +1,38 @@
+name: Flame Chick POS Manual Delivery and Receipt UX Regression
+
+on:
+  push:
+    branches:
+      - fix/pos-manual-delivery-receipt-print-ux-2026-11-27
+    paths:
+      - "apps/flame-chick-pos/**"
+      - ".github/workflows/ci-pos-manual-delivery-receipt-print-ux.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  mocked-pos-regressions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: Run mocked UI and existing receipt contract tests
+        run: |
+          node --test apps/flame-chick-pos/tests/pos-manual-delivery-receipt-ux.test.cjs
+          node --test apps/flame-chick-pos/tests/pos-receipt-print-contract.test.mjs
+      - name: Run existing QZ adapter diagnostics (no printer dispatch)
+        run: node --test apps/flame-chick-pos/tests/qz-printing-diagnostics.test.js
+
+      - name: Run existing POS business-contract regression checks
+        run: |
+          node --check apps/flame-chick-pos/api/qz/sign.js
+          node --test tests/pos-payment-collection.test.mjs tests/pos-catalog-v3-adapter.test.mjs tests/pos-unified-sync-v3.test.mjs
+
