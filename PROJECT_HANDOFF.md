@@ -5401,3 +5401,14 @@ Working branch `work/production-source-audit` final source/test commit: `72ef877
 Production remains unchanged: `flamechick-pos.vercel.app` still routes to READY deployment `dpl_6VuqJfbd89a7f1V6TTV6L6n2CEjP` on SHA `f6ce0ea49aeb165fec382280dcc3f90c4747a706`. No database rows, migrations, Edge Functions or aliases were changed.
 
 Important: the Preview browser origin has a separate IndexedDB, but the app uses the shared Production Supabase backend. Do not create QA customer orders or payments from Preview. A safe end-to-end transaction rehearsal needs an approved isolated test backend or separately approved Production test plan. FC-261127-0007 remains `new/unpaid` for PKR 4,647 with no payment; the user's local PKR 5,346 pending order is still only in the original Production browser's IndexedDB and must not be recreated.
+
+
+## Dine-in incremental Save Table and final payment lifecycle — verified in automated QA (2026-11-27)
+
+Confirmed intended workflow: a cashier may repeatedly open the same Dine-in table, add items and Save Table. Each save updates the same check (stable local/server order identity, next content revision) and leaves it open/unpaid. The final Complete Payment step attaches an idempotent payment request to the latest accepted revision; only a confirmed paid/completed response releases the table.
+
+A full lifecycle regression was added to `tests/ops-source-hygiene.test.mjs`: three Save Table rounds → revisions 1, 2, 3 → one retained check and occupied table → payment on revision 3 → completed/paid → one payment ledger record → queue drained/table released → finalization replay does not duplicate payment. GitHub Actions POS/Rider Static Checks run `45938023376`, job `140305632811`: 86 passed, 0 failed.
+
+Preview: `https://flame-chick-pos-development-keghy8uq6-faha-d.vercel.app`, deployment `dpl_TSCPgDhiZm4pokMgWB2RRd5cv2Ru`, READY, branch `work/production-source-audit`, source `e385d3246276847395330cb064e3471072b62cff`. This Preview contains the latest Dine-in checkout source repair; the latest change was QA-only. Vercel's original Ignored Build Step has been restored to `exit 0`.
+
+No Production deployment, DB changes, migrations, Edge Function changes, alias switch, or order/payment writes were made. Simulated lifecycle QA does not replace safe end-to-end transaction rehearsal with an isolated test backend.
