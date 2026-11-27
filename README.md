@@ -7,7 +7,8 @@ Source repository for the Flame Chick customer Website, POS, Admin panel, Rider 
 1. Read [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md) for the project-wide history, decisions, Supabase state and safety rules. It is a large historical handoff; use its headings and search to find the latest relevant checkpoints.
 2. Read the [Website context index](docs/handoffs/WEBSITE_PARALLEL_CONTEXT_INDEX.md).
 3. Read the latest [new FahaD Website Production environment handoff](docs/operations/2026-11-26-new-vercel-website-production-handoff.md).
-4. Read the complete [Website parallel-development audit](docs/handoffs/2026-11-25-website-parallel-audit.md) before editing Website code.
+4. Read the current [27 November Website UI reliability continuation handoff](docs/handoffs/2026-11-27-website-ui-reliability-next-session.md), including the completed OpenCode Playwright findings and exact pending correction plan.
+5. Read the complete [Website parallel-development audit](docs/handoffs/2026-11-25-website-parallel-audit.md) before editing Website code.
 
 The 26 November new-environment handoff supersedes older Website Vercel project IDs, hostnames and Preview-only deployment instructions. The earlier [one-step checkout addendum](docs/operations/2026-11-26-website-preview-one-step-checkout.md) remains historical context, not the current hosting configuration. The earlier [local-preview fixture checkpoint](docs/operations/2026-11-23-local-preview-fixture-checkpoint.md) remains relevant only to its synthetic local test harness.
 
