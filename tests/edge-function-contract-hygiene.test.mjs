@@ -293,7 +293,7 @@ test("Website create route uses stable request identity, HMAC phone privacy and 
   assert.match(route,/phone_digest:phoneDigest/);
   assert.match(route,/flame_chick_create_website_order/);
   assert.doesNotMatch(route,/client_ip|x-forwarded-for|cf-connecting-ip/);
-  assert.match(source,/FLAME_CHICK_ORDER_PHONE_HMAC_SECRET/);
+  assert.match(sources["flame-chick-order-api"],/FLAME_CHICK_ORDER_PHONE_HMAC_SECRET/);
 });
 
 test("Legacy Website create payload fails closed and does not enter the V2 order creation path", () => {
