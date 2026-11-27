@@ -5385,3 +5385,10 @@ Latest source fix commit: `76b1b7980b36f5c8e6ee0d0729c1a5ac0cb36e72`. POS/Rider 
 Production is unchanged: `flamechick-pos.vercel.app` still aliases READY deployment `dpl_6VuqJfbd89a7f1V6TTV6L6n2CEjP`, SHA `f6ce0ea49aeb165fec382280dcc3f90c4747a706`. No Supabase production rows, migrations or Edge Functions were mutated/deployed.
 
 The Preview has a separate browser origin and separate IndexedDB; it cannot see pending local queue records from the Production hostname. Do not recreate the reported orders to copy them. Recovery of the two local orders on the originating browser requires the reviewed fix to be released to Production under a separate explicit approval.
+
+
+## Dine-in revision/content repair — pending CI and Preview
+
+Production FC-261127-0007, correlated with the user's PKR 5,346 local check, remains PKR 4,647 on Table 3, `new/unpaid`, revision 1, with no payment ledger entry. The POS reused revision 1 after local cart content changed.
+
+Working-branch repair fingerprints accepted content, compares older orders against Production read-only, bumps revisions for changed editable checks, preserves revision/catalog for unchanged served payment-only closes, and blocks item edits after server advancement. Receipt success now requires synced + paid + completed. CI/Preview pending; Production untouched.
