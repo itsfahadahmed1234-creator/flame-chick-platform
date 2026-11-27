@@ -1424,7 +1424,7 @@
       }
       state.loaded = true;
       if ($('publication-meta')) $('publication-meta').hidden = true;
-      var previewReadOnly = applyPreviewReadOnlyMode();
+      applyPreviewReadOnlyMode();
       renderCatalog();
       renderCart();
       syncFulfilmentControls();
