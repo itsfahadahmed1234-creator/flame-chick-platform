@@ -13,7 +13,7 @@ Static administration app.
 
 ## Deployment gates
 
-The Staff Admin Edge Function is not deployed by this source update. Before enabling this app in production:
+The Staff Admin Edge Function is already deployed to Production. The canonical Cloudflare Pages Admin origin is now pinned in its exact-origin CORS allowlist, while the existing Vercel origin and approved preview hosts remain preserved. Before enabling staff invitations and other live Admin workflows:
 1. Configure `FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS` with the exact HTTPS Admin app origin(s).
 2. Configure `FLAME_CHICK_STAFF_INVITE_REDIRECT_URL` to an HTTPS invitation-acceptance page on an allowed origin.
 3. Deploy the Staff Admin function and set/verify its required publishable and secret key environment variables.
