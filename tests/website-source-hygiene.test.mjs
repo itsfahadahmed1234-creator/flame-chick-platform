@@ -93,6 +93,7 @@ test("homepage checkout prices the cart from the loaded V3 catalog and submits o
   assert.match(order, /cardPrice\(pricing\.subtotalMinor\)/);
   assert.match(order, /cardPrice\(pricing\.deliveryFeeMinor\)/);
   assert.match(order, /state\.checkoutBody\.request_id = state\.checkoutRequestId/);
+  assert.ok(order.includes("phone.replace(/\\D/g, '')"));
   assert.doesNotMatch(order, /quote_website_order|create_website_order|quote_token|unit_price_snapshot\s*:|line_total\s*:|delivery_fee\s*:/);
   assert.match(html, /id="cart-subtotal"/);
   assert.match(html, /id="cart-delivery-fee"/);

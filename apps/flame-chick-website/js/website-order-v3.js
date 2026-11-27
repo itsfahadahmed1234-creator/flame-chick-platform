@@ -581,7 +581,7 @@
 
     var name = $('customer-name').value.trim();
     var phone = $('customer-phone').value.trim();
-    var phoneDigits = phone.replace(/\\D/g, '');
+    var phoneDigits = phone.replace(/\D/g, '');
     var email = $('customer-email').value.trim();
     if (!name) errors['customer-name'] = 'Enter your full name.';
     if (!phone) errors['customer-phone'] = 'Enter your phone number.';
