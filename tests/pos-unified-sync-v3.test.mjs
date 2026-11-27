@@ -139,3 +139,27 @@ test('POS synchronizes customer-selected Chicken Burgers variants with repeat ca
     item.product_variant_id === IDS.injectorVariant));
   assert.equal(payload.items[0].component_groups.find(group => group.component_group_id === IDS.drinkComponentGroup).components.length, 1);
 });
+
+
+test('content signature ignores local revision/payment request but detects content changes',()=>{
+  const s=snapshot(),order=baseOrder({fulfillmentType:'Dine-in',phone:'',tableId:'T3',tableNumber:'Table 3'});
+  const first=sync.orderContentSignature(order,s,IDS.branch,{contract,dealView});
+  const paymentRetry=sync.orderContentSignature({...order,localRevision:2,pendingPayment:{requestId:PAYMENT,amount:550,method:'cash'}},s,IDS.branch,{contract,dealView});
+  const edited=sync.orderContentSignature({...order,items:[{...order.items[0],quantity:2}]},s,IDS.branch,{contract,dealView});
+  assert.equal(paymentRetry,first);
+  assert.notEqual(edited,first);
+});
+
+test('server Dine-in comparison detects changed product variant, quantity and total',()=>{
+  const s=snapshot(),order=baseOrder({fulfillmentType:'Dine-in',phone:'',tableId:'T3',tableNumber:'Table 3'});
+  const payload=sync.buildSyncPayload(order,s,IDS.branch,{contract,dealView});
+  const server={total:550,raw:{
+    fulfillment_type:'dine_in',table_reference:'T3',table_label_snapshot:'Table 3',
+    customer_name:'QA Counter',customer_phone:null,notes:null,total:550,
+    order_items:[{line_kind:'product',product_id:IDS.product,product_variant_id:IDS.variant,
+      quantity:1,item_notes:null,order_item_modifiers:[]}]
+  }};
+  assert.equal(sync.serverOrderMatchesSyncPayload(order,payload,server),true);
+  assert.equal(sync.serverOrderMatchesSyncPayload(order,{...payload,items:[{...payload.items[0],quantity:2}]},server),false);
+  assert.equal(sync.serverOrderMatchesSyncPayload({...order,total:551},payload,server),false);
+});
