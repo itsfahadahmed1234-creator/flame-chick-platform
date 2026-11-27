@@ -213,3 +213,19 @@ The Rider portal now has its own Cloudflare Pages project and canonical Pages ho
 - Production currently has no active Rider profile/role according to the historical read-only checkpoint; verify current staff provisioning before interpreting a login rejection as a hosting fault.
 - The Rider app calls the existing Supabase Auth and `flame-chick-delivery-api` endpoints directly. The checked source currently shows wildcard CORS in that Edge Function; do not modify shared backend or Edge Function as part of this hosting-only task. If restricting CORS, separately update and verify all intended Website/POS/Admin/Rider origins with the backend owner.
 - `FLAME_CHICK_RIDER_PORTAL_URL` is a Supabase Function secret used for invitation redirects and push notification click URLs. Its current configured value was not read or changed. Review it separately before relying on push notification deep links to use the new Pages hostname.
+
+
+## Admin sign-in CORS fix — 27 November 2026
+
+User reported they could not enter the Admin panel at `https://flamechickadmin.pages.dev/`. Investigation found repeated HTTP 403 OPTIONS preflight responses from the Production `flame-chick-staff-admin` Edge Function for requests initiated while using the Cloudflare Pages Admin deployment. The function was still ACTIVE at version 7; its exact-origin policy pinned the old Vercel Admin production origin and three explicit Vercel preview origins, but not the new Cloudflare Pages origin. Auth logs also show a successful password-token exchange from the old Vercel Admin origin, so the immediate failure was the following Staff Admin CORS preflight, not evidence of a bad password.
+
+Fix deployed to Supabase Production project `adkrxfnawdiljhjaavnj`:
+- Edge Function: `flame-chick-staff-admin`, now ACTIVE version 8, `verify_jwt=true` preserved.
+- Added exact origin `https://flamechickadmin.pages.dev` to the tested origin policy.
+- Preserved `https://flamechicadmin.vercel.app` and all three pinned preview origins.
+- Added regression coverage that both Cloudflare and Vercel production origins are allowed, malicious lookalike origins are rejected, and invitation callback URLs are accepted only on the exact allowed origin and path.
+- No wildcard CORS, no change to auth/RLS/role rules, no key/secret rotation, no table/schema changes, no order changes, no changes to Website, Rider or POS hosting.
+
+Code branch: `cloudflare/admin-production`; fix commit `0e05d3b395188d62e759c310ff3f555e19aa59b2`. Function deployed from this branch's `index.ts`, `origin-policy.mjs` and `catalog-actions.mjs`.
+
+Verification: Supabase reports function version 8 ACTIVE with JWT verification still enabled. No post-deploy browser request has yet appeared in the five-minute function log query, so the user must refresh the Cloudflare Admin tab and try sign-in again to confirm browser preflight and Admin context bootstrap. If it now gets past sign-in but invitation sending fails, separately inspect `FLAME_CHICK_STAFF_INVITE_REDIRECT_URL` and Supabase Auth redirect allowlist; those settings were not changed here.

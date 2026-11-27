@@ -97,3 +97,8 @@ The OpenCode audit completed read-only on 27 November 2026. Its full findings an
 ## Rider Cloudflare deployment checkpoint — 27 November 2026
 
 Rider is now deployed independently to Cloudflare Pages at https://flamechickrider.pages.dev/ (project `flamechickrider`, ID `633e764f-ecb3-4b42-8657-2506171aa9c4`; canonical deployment `ec0e1201-6bb4-4494-a9e6-8da9dc154be6`, branch `cloudflare/rider-production`, commit `4e5161e56b25609ef2484e792952db69507b5c0d`). See the Rider section in the Cloudflare hosting transition handoff for build settings, Vercel fallback, and functional QA boundaries. Admin hosting remains pending. POS is managed separately.
+
+
+## Admin sign-in CORS fix — 27 November 2026
+
+User reported inability to enter Admin. Investigation found 403 OPTIONS preflights to `flame-chick-staff-admin` because `https://flamechickadmin.pages.dev` was absent from the exact-origin allowlist. Added it while preserving the Vercel production and three pinned preview origins; deployed Staff Admin Edge Function v8 with `verify_jwt=true`. Commit `0e05d3b395188d62e759c310ff3f555e19aa59b2` on `cloudflare/admin-production`. Function ACTIVE; post-deploy browser retry remains pending. Invitation redirect configuration was not changed.
