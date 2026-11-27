@@ -126,6 +126,27 @@ function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, value => value.toString(16).padStart(2,"0")).join("");
 }
 
+function logWebsiteOrderStageFailure(stage: string, requestId: string, error: unknown): void {
+  const errorName = error instanceof Error && error.name ? error.name.slice(0, 64) : "NonError";
+  console.error("[website-order-stage-failure]", JSON.stringify({
+    stage,
+    request_id: requestId,
+    error_name: errorName
+  }));
+}
+
+function logWebsiteOrderDecision(
+  stage: string,
+  requestId: string,
+  details: Record<string, string | number | boolean>
+): void {
+  console.error("[website-order-stage-failure]", JSON.stringify({
+    stage,
+    request_id: requestId,
+    ...details
+  }));
+}
+
 async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));
   return toHex(new Uint8Array(digest));
@@ -145,12 +166,31 @@ function normalizeCustomerPhone(value: unknown): string | null {
 }
 
 async function hmacPhoneDigest(normalizedPhone: string): Promise<string | null> {
-  const secret = Deno.env.get("FLAME_CHICK_ORDER_PHONE_HMAC_SECRET") ?? "";
-  if (secret.length < 32) return null;
-  const key = await crypto.subtle.importKey(
-    "raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]
+  // Derive a purpose-specific phone-digest key from the existing server-only
+  // service credential. HKDF keeps this key separate from the credential's
+  // other uses and removes the fragile extra Edge Function secret dependency.
+  const masterSecret = SERVICE_KEY;
+  const encoder = new TextEncoder();
+  const masterBytes = encoder.encode(masterSecret);
+  if (masterBytes.byteLength < 32) return null;
+  const masterKey = await crypto.subtle.importKey(
+    "raw", masterBytes, "HKDF", false, ["deriveKey"]
   );
-  const signed = await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(normalizedPhone));
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: encoder.encode("flame-chick/production/privacy/v1"),
+      info: encoder.encode("website-order-phone-digest"),
+    },
+    masterKey,
+    { name: "HMAC", hash: "SHA-256", length: 256 },
+    false,
+    ["sign"]
+  );
+  const signed = await crypto.subtle.sign(
+    "HMAC", key, encoder.encode(normalizedPhone)
+  );
   return toHex(new Uint8Array(signed));
 }
 
@@ -1028,7 +1068,7 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
     },200);
   }
 
-  if(action==="create_website_order"){
+  if(action==="create_website_order"||action==="place_website_order"){
     const requestId=typeof body.request_id==="string"?body.request_id.trim():
       typeof body.idempotency_key==="string"?body.idempotency_key.trim():"";
     if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)){
@@ -1057,23 +1097,52 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
       },200);
     }
 
-    const quote=await buildWebsiteOrderQuote(body);
-    if(!quote.ok)return response(quote.body,quote.status);
-    const quoteCheck=await verifyWebsiteOrderQuoteToken({
-      token:typeof body.quote_token==="string"?body.quote_token:"",
-      canonical:quote.quote.canonical,
-      databaseNow:quote.quote.databaseNow,
-      secret:WEBSITE_QUOTE_SECRET
-    });
-    if(!quoteCheck.ok){
-      const status=quoteCheck.code==="WEBSITE_ORDER_QUOTE_SIGNING_UNAVAILABLE"?503:409;
-      const message=quoteCheck.code==="WEBSITE_ORDER_QUOTE_EXPIRED"
-        ?"Your quote expired. Request a new verified total before placing the order."
-        :"The order details or delivery fee changed after the quote. Review a fresh verified total before placing the order.";
-      return response({ok:false,error:{code:quoteCheck.code,message}},status);
+    let quote: Awaited<ReturnType<typeof buildWebsiteOrderQuote>>;
+    try {
+      quote = await buildWebsiteOrderQuote(body);
+    } catch (error) {
+      logWebsiteOrderStageFailure("quote_build", requestId, error);
+      return response({ok:false,error:{code:"WEBSITE_ORDER_QUOTE_UNAVAILABLE",message:"The order could not be verified. Please retry using the same checkout request."}},503);
     }
-    const phoneDigest=await hmacPhoneDigest(normalizedPhone);
+    if(!quote.ok){
+      const quoteError=isObject(quote.body.error)?quote.body.error:{};
+      logWebsiteOrderDecision("quote_rejected",requestId,{
+        status:quote.status,
+        code:String(quoteError.code??"QUOTE_REJECTED")
+      });
+      return response(quote.body,quote.status);
+    }
+    // Legacy two-step clients must present the signed quote. The customer Website
+    // uses place_website_order: this request freshly prices the cart and commits it
+    // immediately, so a browser-held quote token is neither needed nor accepted.
+    if(action==="create_website_order"){
+      const quoteCheck=await verifyWebsiteOrderQuoteToken({
+        token:typeof body.quote_token==="string"?body.quote_token:"",
+        canonical:quote.quote.canonical,
+        databaseNow:quote.quote.databaseNow,
+        secret:WEBSITE_QUOTE_SECRET
+      });
+      if(!quoteCheck.ok){
+        const status=quoteCheck.code==="WEBSITE_ORDER_QUOTE_SIGNING_UNAVAILABLE"?503:409;
+        const message=quoteCheck.code==="WEBSITE_ORDER_QUOTE_EXPIRED"
+          ?"Your quote expired. Request a fresh order before submitting."
+          :"The order details or delivery fee changed. Review your cart and submit again.";
+        return response({ok:false,error:{code:quoteCheck.code,message}},status);
+      }
+    }
+    let phoneDigest: string | null;
+    try {
+      phoneDigest = await hmacPhoneDigest(normalizedPhone);
+    } catch (error) {
+      logWebsiteOrderStageFailure("phone_hmac", requestId, error);
+      return response({ok:false,error:{code:"WEBSITE_ORDER_PRIVACY_PROCESSING_FAILED",message:"Online ordering is temporarily unavailable. Please try again shortly."}},503);
+    }
     if(!phoneDigest){
+      const serviceKeyBytes=new TextEncoder().encode(SERVICE_KEY);
+      logWebsiteOrderDecision("phone_digest_key_unavailable",requestId,{
+        service_key_configured:SERVICE_KEY.length>0,
+        meets_minimum_length:serviceKeyBytes.byteLength>=32
+      });
       return response({ok:false,error:{code:"WEBSITE_ORDER_PRIVACY_CONFIG_MISSING",message:"Online ordering is temporarily unavailable. Please try again shortly."}},503);
     }
     const payload={
@@ -1082,8 +1151,21 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
       request_hash:requestHash,
       phone_digest:phoneDigest
     };
-    const result=await callRpc("flame_chick_create_website_order",payload);
-    if(!result.ok)return response({ok:false,error:{code:"WEBSITE_ORDER_COMMIT_UNAVAILABLE",message:"Your order could not be safely confirmed. Please retry using the same checkout request."}},503);
+    let result: Awaited<ReturnType<typeof callRpc>>;
+    try {
+      result = await callRpc("flame_chick_create_website_order",payload);
+    } catch (error) {
+      logWebsiteOrderStageFailure("order_commit_transport", requestId, error);
+      return response({ok:false,error:{code:"WEBSITE_ORDER_COMMIT_UNAVAILABLE",message:"Your order could not be safely confirmed. Please retry using the same checkout request."}},503);
+    }
+    if(!result.ok){
+      const commitError=isObject(result.body.error)?result.body.error:{};
+      logWebsiteOrderDecision("order_commit_rejected",requestId,{
+        status:result.status,
+        code:String(commitError.code??"COMMIT_REJECTED")
+      });
+      return response({ok:false,error:{code:"WEBSITE_ORDER_COMMIT_UNAVAILABLE",message:"Your order could not be safely confirmed. Please retry using the same checkout request."}},503);
+    }
     if(isObject(result.data)&&result.data.ok===false){
       const err=isObject(result.data.error)?result.data.error:{};
       const code=String(err.code??"WEBSITE_ORDER_CREATE_FAILED");
@@ -1253,9 +1335,16 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
     return response(result.data, 200);
   }
 
-  return response({ ok: false, error: { code: "ACTION_NOT_FOUND", message: "Supported actions are website_context (GET), quote_website_order, create_website_order, sync_pos_order, collect_payment, update_status, cancel and reject." } }, 404);
+  return response({ ok: false, error: { code: "ACTION_NOT_FOUND", message: "Supported actions are website_context (GET), quote_website_order, create_website_order, place_website_order, sync_pos_order, collect_payment, update_status, cancel and reject." } }, 404);
 }
 
 if (import.meta.main) {
-  Deno.serve(handleOrderApiRequest);
+  Deno.serve(async (req: Request) => {
+    try {
+      return await handleOrderApiRequest(req);
+    } catch (error) {
+      logWebsiteOrderStageFailure("handler_unhandled", "unavailable", error);
+      return response({ok:false,error:{code:"ORDER_API_UNEXPECTED_ERROR",message:"The order request could not be completed safely. Please retry using the same checkout request."}},503);
+    }
+  });
 }
