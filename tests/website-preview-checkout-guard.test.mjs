@@ -8,6 +8,7 @@ const stableProductionAliases = [
 ];
 const rehearsalUrl = 'flame-chick-website-production-p6r1gdef2-fahad-7455.vercel.app';
 const rehearsalAlias = 'flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455.vercel.app';
+const currentReviewAlias = 'flame-chick-website-production-git-work-website-r-07b9f9-faha-d.vercel.app';
 
 test('allows order writes only on canonical Production and stable FahaD project aliases', () => {
   const allowedProductionHosts = ['flamechick.vercel.app', 'FLAMECHICK.VERCEL.APP.', ...stableProductionAliases];
@@ -22,7 +23,14 @@ test('allows order writes only on canonical Production and stable FahaD project 
   ]);
 });
 
-test('keeps only the two previously approved rehearsal Preview hosts separately recognized', () => {
+test('allows the exact current review branch Preview to use tagged Production test checkout', () => {
+  assert.equal(guard.canSubmitOrders(currentReviewAlias), true);
+  assert.equal(guard.isTestCheckoutPreview(currentReviewAlias), true);
+  assert.equal(guard.shouldBlockOrderApiWrite('POST', currentReviewAlias), false);
+  assert.equal(guard.canSubmitOrders(currentReviewAlias + '.attacker.invalid'), false);
+});
+
+test('keeps the previously approved rehearsal Preview hosts separately recognized', () => {
   assert.equal(guard.canSubmitOrders(rehearsalUrl), true);
   assert.equal(guard.canSubmitOrders(rehearsalAlias), true);
   assert.equal(guard.isTestCheckoutPreview(rehearsalUrl), true);

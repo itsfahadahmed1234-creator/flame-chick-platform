@@ -20,7 +20,8 @@
   ]);
   var TEST_CHECKOUT_PREVIEW_HOSTS = Object.freeze([
     'flame-chick-website-production-p6r1gdef2-fahad-7455.vercel.app',
-    'flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455.vercel.app'
+    'flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455.vercel.app',
+    'flame-chick-website-production-git-work-website-r-07b9f9-faha-d.vercel.app'
   ]);
 
   function normalizedHost(hostname) {

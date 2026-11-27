@@ -240,8 +240,12 @@
         var group = variant.groups[g];
         var total = groupQuantity(group);
         if (total < group.minUnits || total > group.maxUnits) {
-          return fail('COMPONENT_GROUP_BOUNDS',
-            'Choose between ' + group.minUnits + ' and ' + group.maxUnits + ' item(s) for ' + group.name + '.');
+          var requirement = group.minUnits === group.maxUnits
+            ? 'Choose exactly ' + group.maxUnits + ' ' + (group.maxUnits === 1 ? 'item' : 'items')
+            : (group.minUnits === 0
+              ? 'Choose up to ' + group.maxUnits + ' ' + (group.maxUnits === 1 ? 'item' : 'items')
+              : 'Choose between ' + group.minUnits + ' and ' + group.maxUnits + ' items');
+          return fail('COMPONENT_GROUP_BOUNDS', requirement + ' for ' + group.name + '.');
         }
         for (var o = 0; o < group.options.length; o++) {
           var option = group.options[o];

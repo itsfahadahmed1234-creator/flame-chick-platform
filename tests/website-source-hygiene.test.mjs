@@ -423,3 +423,35 @@ test("deal cards display published base prices and configurator prices remain es
   assert.ok(payloadStart >= 0 && estimateStart > payloadStart);
   assert.doesNotMatch(configurator.slice(payloadStart, estimateStart), /totalMinor\s*:/);
 });
+
+
+test('checkout action stays clickable with a cart and shows inline validation instead of silently disabling for missing fields', () => {
+  assert.match(order, /function validateCheckoutForm\(\)/);
+  assert.match(order, /function renderCheckoutFieldErrors\(validation\)/);
+  assert.match(order, /Complete the highlighted checkout details before placing your order/);
+  assert.match(order, /state\.checkoutAttempted = true/);
+  assert.match(order, /firstInvalid\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(order, /disabled = !checkoutReady\(\)/);
+  assert.match(html, /id="customer-name-error"/);
+  assert.match(html, /id="customer-phone-error"/);
+  assert.match(html, /id="delivery-area-error"/);
+  assert.match(html, /id="delivery-address-error"/);
+  assert.match(html, /id="not-listed-confirm-error"/);
+});
+
+test('approved review Preview sends tagged test orders through the same Order API', () => {
+  assert.match(order, /TEST CHECKOUT ENABLED/);
+  assert.match(order, /Every test order is tagged \[TEST ORDER - ADMIN DELETE\]/);
+  assert.match(order, /var result = await orderApi\('POST', '', state\.checkoutBody\)/);
+  assert.match(order, /\[TEST ORDER - ADMIN DELETE\]/);
+  assert.match(order, /state\.checkoutBody\.request_id = state\.checkoutRequestId/);
+  assert.doesNotMatch(order, /if \(!confirmProductionRehearsal\(retry\)\)/);
+});
+
+test('product and deal artwork use published images and category-appropriate fallbacks', () => {
+  assert.match(order, /function fallbackArtworkIcon\(value\)/);
+  assert.match(order, /function appendPublishedArtwork\(container, item, fallbackLabel, altText\)/);
+  assert.match(order, /function appendDealArtwork\(container, deal\)/);
+  assert.match(order, /appendDealArtwork\(art, deal\)/);
+  assert.doesNotMatch(order, /flame-chick-burger-2\.png/);
+});
