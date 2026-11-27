@@ -10,7 +10,7 @@ const test = require('node:test');
 const root = path.resolve(__dirname, '..');
 const workerSource = fs.readFileSync(path.join(root, 'worker.mjs'), 'utf8');
 const certificateBundle = fs.readFileSync(path.join(root, 'qz/digital-certificate.txt'), 'utf8');
-const certificatePem = certificateBundle.match(/-----BEGIN CERTIFICATE-----[\\s\\S]+?-----END CERTIFICATE-----/)[0];
+const certificatePem = certificateBundle.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/)[0];
 
 test('public asset build includes only the approved POS browser assets', () => {
   execFileSync(process.execPath, [path.join(root, 'scripts/build-cloudflare.mjs')], { cwd: root });
