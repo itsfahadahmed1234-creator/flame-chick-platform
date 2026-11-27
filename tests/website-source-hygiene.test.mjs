@@ -351,3 +351,25 @@ test("the retired standalone ordering URL redirects into the primary homepage V3
   assert.match(standalone, /location\.replace\('index\.html#menu'\)/);
   assert.equal(standalone.includes('js/website-order-v3.js'), false);
 });
+
+
+test("catalog-model failure clears real V3 containers and leaves a visible recovery message", () => {
+  assert.match(order, /\$\('catsIn'\)\.replaceChildren\(\)/);
+  assert.match(order, /\$\('menuRoot'\)\.replaceChildren\(\)/);
+  assert.match(order, /\$\('products-empty'\)\.hidden = false/);
+  assert.doesNotMatch(order, /\$\('product-catalog'\)|\$\('product-category-nav'\)/);
+});
+
+test("removed V3 no-op/dead helpers and duplicate guard statements stay removed", () => {
+  assert.doesNotMatch(order, /function pageStatus\(|pageStatus\(/);
+  assert.doesNotMatch(order, /function loadWebsiteContext\(/);
+  assert.equal((order.match(/\$\('place-order'\)\.disabled = true;/g) || []).length, 2);
+});
+
+test("production Website Order API uses server-only HKDF phone-key derivation, not the retired secret", () => {
+  const api = readFileSync("supabase/functions/flame-chick-order-api/index.ts", "utf8");
+  assert.match(api, /name: "HKDF"/);
+  assert.match(api, /async function hmacPhoneDigest\(/);
+  assert.match(api, /action==="place_website_order"/);
+  assert.doesNotMatch(api, /FLAME_CHICK_ORDER_PHONE_HMAC_SECRET/);
+});
