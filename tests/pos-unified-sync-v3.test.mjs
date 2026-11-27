@@ -151,7 +151,7 @@ test('content signature ignores local revision/payment request but detects conte
 });
 
 test('server Dine-in comparison detects changed product variant, quantity and total',()=>{
-  const s=snapshot(),order=baseOrder({fulfillmentType:'Dine-in',phone:'',tableId:'T3',tableNumber:'Table 3'});
+  const s=snapshot(),order=baseOrder({fulfillmentType:'Dine-in',phone:'',tableId:'T3',tableNumber:'Table 3',total:550});
   const payload=sync.buildSyncPayload(order,s,IDS.branch,{contract,dealView});
   const server={total:550,raw:{
     fulfillment_type:'dine_in',table_reference:'T3',table_label_snapshot:'Table 3',
