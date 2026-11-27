@@ -1458,7 +1458,8 @@ let pizzaCategoryIds=new Set();
 let posPizzaChoice=null;
 let posModifierChoice=null;
 let posDealChoice=null;
-let syncInProgress=false;
+let syncInProgress=false,syncRequested=false;
+let remoteDineChecksByTable=new Map();
 let orderActionInProgress=false;
 let activeDineCheckId='';
 let selectedTableId='';
@@ -1835,7 +1836,7 @@ function flameChickNormalizeOrder(row){
     return {itemName:name+variant+(mods.length?' — '+mods.join(', '):''),quantity:Number(it.quantity)||1,price:Number(it.unit_price_snapshot)||0,lineTotal:Number(it.line_total)||0,description:[...mods,...comps].join(', '),contents:[...mods,...comps]};
   });
   const statusMap={new:'Pending',accepted:'Accepted',preparing:'Preparing',ready:'Ready','out_for_delivery':'Out for Delivery',delivered:'Delivered',collected:'Collected',served:'Served',completed:'Completed',rejected:'Rejected',cancelled:'Cancelled'};
-  return {OrderID:row.id,OrderNumber:row.order_number,DateTime:row.created_at||row.placed_at,UpdatedAt:row.updated_at,OrderSource:row.source,LocalOrderID:row.local_order_id||'',Status:statusMap[row.status]||row.status,CustomerName:row.customer_name,Phone:row.customer_phone,Address:row.delivery_address||'',Area:row.delivery_area_name_snapshot||'',FulfillmentType:row.fulfillment_type==='delivery'?'Delivery':row.fulfillment_type==='dine_in'?'Dine-in':'Takeaway',PaymentMethod:row.payment_method_summary,PaymentStatus:row.payment_status||'unpaid',PaidAmount:Number(row.paid_amount)||0,BalanceDue:row.balance_due===null||row.balance_due===undefined?Math.max(0,(Number(row.total)||0)-(Number(row.paid_amount)||0)):Number(row.balance_due),Notes:row.notes,Subtotal:Number(row.subtotal)||0,DeliveryFee:Number(row.delivery_fee)||0,Total:Number(row.total)||0,items,itemsReady:true,raw:row};
+  return {OrderID:row.id,OrderNumber:row.order_number,DateTime:row.created_at||row.placed_at,UpdatedAt:row.updated_at,OrderSource:row.source,LocalOrderID:row.local_order_id||'',TableID:row.table_reference||'',TableNumber:row.table_label_snapshot||row.table_reference||'',Status:statusMap[row.status]||row.status,CustomerName:row.customer_name,Phone:row.customer_phone,Address:row.delivery_address||'',Area:row.delivery_area_name_snapshot||'',FulfillmentType:row.fulfillment_type==='delivery'?'Delivery':row.fulfillment_type==='dine_in'?'Dine-in':'Takeaway',PaymentMethod:row.payment_method_summary,PaymentStatus:row.payment_status||'unpaid',PaidAmount:Number(row.paid_amount)||0,BalanceDue:row.balance_due===null||row.balance_due===undefined?Math.max(0,(Number(row.total)||0)-(Number(row.paid_amount)||0)):Number(row.balance_due),Notes:row.notes,Subtotal:Number(row.subtotal)||0,DeliveryFee:Number(row.delivery_fee)||0,Total:Number(row.total)||0,items,itemsReady:true,raw:row};
 }
 
 let recoveryInFlight=new Set();
@@ -3905,45 +3906,68 @@ async function sendScheduledToKitchenNow(localOrderId){
 }
 async function renderTablesModal(){
   const orders=await all(STORES.orders);
-  const openByTable=new Map();
-  for(const o of orders){
-    if(o.fulfillmentType==='Dine-in' && String(o.paymentStatus||'Unpaid').toLowerCase()!=='paid'){
-      const status=String(o.status||'').toLowerCase();
-      if(status==='completed' || status==='cancelled' || status==='merged' || status==='scheduled' || !o.tableNumber) continue;
-      const key=String(o.tableId||o.tableNumber); openByTable.set(key,o);
+  remoteDineChecksByTable=new Map();
+  if(FLAME_CHICK_ORDER_API_READY&&flameChickStaffSession?.access_token){
+    try{
+      const serverRows=await fetchServerHistory('POS',100);
+      for(const remote of serverRows){
+        if(String(remote.fulfillmentType||'').toLowerCase()!=='dine-in')continue;
+        const status=String(remote.status||'').toLowerCase();
+        if(['completed','cancelled','rejected','returned'].includes(status))continue;
+        const localMatch=orders.some(local=>
+          (!!local.serverOrderId&&String(local.serverOrderId)===String(remote.serverOrderId||''))||
+          String(local.syncOrderId||'')===String(remote.localOrderId||''));
+        if(localMatch)continue;
+        const tableId=String(remote.TableID||'').trim();
+        const tableLabel=String(remote.TableNumber||'').trim();
+        if(tableId)remoteDineChecksByTable.set(tableId,remote);
+        if(tableLabel)remoteDineChecksByTable.set(tableLabel,remote);
+      }
+    }catch(error){
+      console.warn('Server Dine-in table occupancy refresh failed; local table records remain available.',error);
     }
   }
+  const openByTable=new Map();
+  for(const o of orders){
+    if(o.fulfillmentType==='Dine-in'){
+      const status=String(o.status||'').toLowerCase();
+      if(['completed','cancelled','merged','scheduled','rejected','returned'].includes(status)||!o.tableNumber)continue;
+      openByTable.set(String(o.tableId||o.tableNumber),o);
+    }
+  }
+  for(const [key,remote] of remoteDineChecksByTable)if(!openByTable.has(key))openByTable.set(key,remote);
   const moving=!!activeDineCheckId && $('orderType')?.value==='Dine-in';
   $('tablesModalTitle').textContent=moving?'Move Table':'Open Tables';
-  $('tablesModalHint').textContent=moving?'Select an available table to move this open check. The order and all items will stay the same.':'Open checks stay active until payment is completed.';
+  $('tablesModalHint').textContent=moving?'Select an available table to move this open check. The order and all items will stay the same.':'Open checks include Production records from all signed-in POS devices.';
   $('manageTablesBtn').style.display=moving?'none':'';
   const current=findTable(selectedTableId);
   const tiles=activeTables().map(t=>{
-    const o=openByTable.get(String(t.id)) || openByTable.get(String(t.name));
-    const isCurrent=current && String(current.id)===String(t.id);
+    const o=openByTable.get(String(t.id))||openByTable.get(String(t.name));
+    const isCurrent=current&&String(current.id)===String(t.id);
     const state=isCurrent?'CURRENT':(o?'OPEN':'AVAILABLE');
-    const disabled=moving && (isCurrent || !!o);
-    return `<button type=\"button\" class=\"table-tile ${o?'open':''} ${isCurrent?'current':''} ${disabled?'disabled':''}\" data-open-table=\"${esc(t.id)}\" ${disabled?'aria-disabled=\"true\"':''}><div class=\"table-name\">${esc(t.name)}</div><div class=\"table-state\">${state}</div>${o?`<div class=\"table-open-total\">Rs. ${money(o.total)}</div><div class=\"table-open-meta\">${(o.items||[]).reduce((n,x)=>n+(Number(x.quantity)||1),0)} items · ${new Date(o.createdAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>`:'<div class=\"table-open-meta\">Tap to start a check</div>'}</button>`;
+    const disabled=moving&&(isCurrent||!!o);
+    return `<button type="button" class="table-tile ${o?'open':''} ${isCurrent?'current':''} ${disabled?'disabled':''}" data-open-table="${esc(t.id)}" ${disabled?'aria-disabled="true"':''}><div class="table-name">${esc(t.name)}</div><div class="table-state">${state}</div>${o?`<div class="table-open-total">Rs. ${money(o.total??o.Total)}</div><div class="table-open-meta">${(o.items||[]).reduce((n,x)=>n+(Number(x.quantity)||1),0)} items · ${new Date(o.createdAt||o.DateTime||Date.now()).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>`:'<div class="table-open-meta">Tap to start a check</div>'}</button>`;
   }).join('');
   $('tablesBody').innerHTML=tiles||'<div class="empty">No active tables. Use Manage Tables to add one.</div>';
   $('tablesMeta').textContent=moving?`Moving ${current?.name||'open check'} · ${activeTables().length} active tables`:`${activeTables().length} active tables`;
   $('tablesBody').querySelectorAll('[data-open-table]').forEach(btn=>btn.onclick=async()=>{
-    if(btn.classList.contains('disabled')){
-      const t=findTable(btn.dataset.openTable);
-      if(current && t && String(current.id)===String(t.id)){showToast('This check is already on '+t.name);}
-      else if(t){showToast(t.name+' is already occupied');}
+    const target=findTable(btn.dataset.openTable);
+    const remote=remoteDineChecksByTable.get(String(btn.dataset.openTable))||(target?remoteDineChecksByTable.get(String(target.name)):null);
+    if(remote&&target&&!await getOpenDineCheckForTable_(target)){
+      showToast(`${target.name} already has active Production check ${remote.OrderNumber||remote.serverOrderNumber||remote.serverOrderId||remote.OrderID||''}. Choose another available table; the existing order has not been changed.`);
       return;
     }
-    if(activeDineCheckId && $('orderType')?.value==='Dine-in'){
-      await transferActiveDineCheckToTable(btn.dataset.openTable);
-    }else{
-      await openOrStartTable(btn.dataset.openTable);
+    if(btn.classList.contains('disabled')){
+      if(current&&target&&String(current.id)===String(target.id))showToast('This check is already on '+target.name);
+      else if(target)showToast(target.name+' is already occupied');
+      return;
     }
+    if(activeDineCheckId&&$('orderType')?.value==='Dine-in')await transferActiveDineCheckToTable(btn.dataset.openTable);
+    else await openOrStartTable(btn.dataset.openTable);
   });
   await renderScheduledOrders();
   openModal('tablesModal');
 }
-
 async function transferActiveDineCheckToTable(tableId){
   const target=findTable(tableId);
   if(!target || target.active===false) return;
@@ -3959,11 +3983,18 @@ async function transferActiveDineCheckToTable(tableId){
   }
   const order=await get(STORES.orders,activeDineCheckId);
   if(!order){showToast('Open check could not be found');return;}
+  const serverOccupied=remoteDineChecksByTable.get(String(target.id))||remoteDineChecksByTable.get(String(target.name));
+  if(serverOccupied&&String(serverOccupied.serverOrderId||'')!==String(order.serverOrderId||'')){
+    showToast(`${target.name} already has active Production check ${serverOccupied.OrderNumber||serverOccupied.serverOrderId||''}. Choose another table.`);
+    return;
+  }
   order.tableId=target.id;
   order.tableNumber=target.name;
   order.updatedAt=new Date().toISOString();
   order.syncStatus='pending';
   order.syncAttempts=0;
+  order.lastSyncError='';
+  order.nextSyncAt=0;
   await put(STORES.orders,order);
   await put(STORES.queue,order);
   selectedTableId=target.id;
@@ -4026,7 +4057,7 @@ async function manageTables(){
 }
 async function takePaymentAndCloseTable(){
   if(!activeDineCheckId){showToast('Open a dine-in table first');return}
-  const order=await get(STORES.orders,activeDineCheckId); if(!order)return;
+  let order=await get(STORES.orders,activeDineCheckId); if(!order)return;
   if(!cart.length){showToast('Add at least one item before payment');return}
 
   const table=findTable(selectedTableId || order.tableId);
@@ -4046,7 +4077,10 @@ async function takePaymentAndCloseTable(){
      This makes Back to Order safe: no premature completion, no lost edits. */
   order.items=cart.map(x=>({...x}));order.subtotal=subtotal;order.deliveryFee=0;order.discount=discount;order.total=total;order.customerName=$('customerName').value.trim()||order.customerName||'Dine-in Customer';order.phone=$('phone').value.trim()||order.phone||'';order.notes=$('notes').value.trim();order.paymentMethod=method;order.paymentStatus='Unpaid';order.status='Open';order.updatedAt=now;order.checkoutPending=true;
   if(table){order.tableId=table.id;order.tableNumber=table.name}
-  order=prepareLocalPosSyncOrder(order,{bumpRevision:true});
+  // This action records payment only. Retain the last server-accepted revision
+  // so the database can replay the unchanged order hash and attach payment
+  // idempotently even after the kitchen has marked a Dine-in check Served.
+  order=prepareLocalPosSyncOrder(order);
   await put(STORES.orders,order);await put(STORES.queue,order);
   receiptOrder.syncOrderId=order.syncOrderId;receiptOrder.localRevision=order.localRevision;
   receiptOrder.catalogPublicationId=order.catalogPublicationId;receiptOrder.catalogVersion=order.catalogVersion;
@@ -4246,8 +4280,54 @@ function prepareLocalPosSyncOrder(order,{bumpRevision=false}={}) {
   next.nextSyncAt=0;
   return next;
 }
+async function reconcileAlreadyPaidPosOrder(order,error){
+  if(error?.code!=='POS_ORDER_NO_LONGER_EDITABLE'||!order?.syncOrderId||!order?.pendingPayment)return false;
+  const rows=await fetchServerHistory('POS',100);
+  const remote=rows.find(row=>String(row.localOrderId||row.LocalOrderID||'')===String(order.syncOrderId));
+  if(!remote)return false;
+  const localTotal=Number(order.total),remoteTotal=Number(remote.total),pending=order.pendingPayment;
+  const expectedMethod=window.FlameChickPosPaymentCollection.normalizeMethod(pending.method);
+  const actualMethod=window.FlameChickPosPaymentCollection.normalizeMethod(remote.paymentMethod);
+  const status=String(remote.status||'').toLowerCase(),paymentStatus=String(remote.paymentStatus||'').toLowerCase();
+  const paidAmount=Number(remote.paidAmount)||0,balanceDue=Number(remote.balanceDue)||0;
+  const localType=window.FlameChickPosSyncV3.normalizeFulfillment(order.fulfillmentType);
+  const remoteType=window.FlameChickPosSyncV3.normalizeFulfillment(remote.fulfillmentType);
+  if(status!=='completed'||paymentStatus!=='paid'||remoteType!==localType||
+     !Number.isFinite(localTotal)||remoteTotal!==localTotal||Number(pending.amount)!==localTotal||
+     paidAmount!==localTotal||balanceDue!==0||!expectedMethod||expectedMethod!==actualMethod)return false;
+  const latest=await get(STORES.orders,order.localOrderId);
+  if(!latest||Number(latest.localRevision||1)!==Number(order.localRevision||1)||
+     String(latest.pendingPayment?.requestId||'')!==String(pending.requestId||''))return false;
+  latest.serverOrderId=remote.serverOrderId||remote.OrderID;
+  latest.serverOrderNumber=remote.orderNumber||remote.OrderNumber||'';
+  latest.serverLocalOrderId=order.syncOrderId;
+  latest.serverStatus='completed';
+  latest.paymentStatus='Paid';latest.paidAmount=paidAmount;latest.balanceDue=0;latest.status='Completed';
+  latest.checkoutPending=false;latest.syncStatus='synced';latest.syncAttempts=0;
+  latest.lastSyncError='';latest.nextSyncAt=0;latest.syncedAt=new Date().toISOString();
+  delete latest.pendingPayment;
+  await put(STORES.orders,latest);
+  await del(STORES.queue,order.localOrderId);
+  return true;
+}
+async function findActiveProductionDineInCheck(order){
+  if(String(order?.fulfillmentType||'').toLowerCase()!=='dine-in')return null;
+  const keys=[order.tableId,order.tableNumber].map(value=>String(value||'').trim()).filter(Boolean);
+  if(!keys.length)return null;
+  const rows=await fetchServerHistory('POS',100);
+  return rows.find(row=>{
+    if(String(row.fulfillmentType||'').toLowerCase()!=='dine-in')return false;
+    const status=String(row.status||'').toLowerCase();
+    if(['completed','cancelled','rejected','returned'].includes(status))return false;
+    const remoteKeys=[row.TableID,row.TableNumber].map(value=>String(value||'').trim()).filter(Boolean);
+    if(!remoteKeys.some(key=>keys.includes(key)))return false;
+    if(String(row.localOrderId||row.LocalOrderID||'')===String(order.syncOrderId||''))return false;
+    if(String(row.serverOrderId||row.OrderID||'')===String(order.serverOrderId||''))return false;
+    return true;
+  })||null;
+}
 async function syncPendingUnifiedPosOrders(){
-  if(syncInProgress)return;
+  if(syncInProgress){syncRequested=true;return;}
   if(!db||!navigator.onLine){await updateSyncBox();if($('syncText'))$('syncText').textContent='Offline · POS orders remain safely stored on this device.';return;}
   if(!flameChickStaffSession?.access_token||!flameChickStaffProfile?.branch_id){
     await updateSyncBox();if($('syncText'))$('syncText').textContent='Sign in to Flame Chick staff access to synchronize POS orders.';return;
@@ -4332,12 +4412,28 @@ async function syncPendingUnifiedPosOrders(){
         sent++;
       }catch(error){
         const latest=await get(STORES.orders,candidate.id)||order;
-        const status=Number(error?.status)||0;
+        if(error?.code==='POS_ORDER_NO_LONGER_EDITABLE'){
+          try{if(await reconcileAlreadyPaidPosOrder(latest,error)){sent++;continue;}}
+          catch(reconcileError){console.warn('Could not verify completed payment; preserving local order.',reconcileError);}
+        }
+        let syncError=error;
+        if(Number(error?.status)===409&&String(latest.fulfillmentType||'').toLowerCase()==='dine-in'){
+          try{
+            const occupied=await findActiveProductionDineInCheck(latest);
+            if(occupied){
+              const tableLabel=String(latest.tableNumber||occupied.TableNumber||latest.tableId||'selected table');
+              const orderLabel=String(occupied.OrderNumber||occupied.serverOrderNumber||occupied.serverOrderId||occupied.OrderID||'an existing order');
+              syncError=new Error(`${tableLabel} already has active Production check ${orderLabel}. Choose another available table or reopen the existing check. This local order and its recovery data are preserved.`);
+              syncError.code='POS_TABLE_ALREADY_OCCUPIED';syncError.status=409;
+            }
+          }catch(lookupError){console.warn('Could not identify active Production Dine-in table after sync conflict.',lookupError);}
+        }
+        const status=Number(syncError?.status)||0;
         const permanent=(status>=400&&status<500&&status!==408&&status!==425&&status!==429)||
-          /^POS_(CATALOG|ITEM|DEAL|MODIFIER|CUSTOMER|DELIVERY|FULFILLMENT|TABLE|PAYMENT|ORDER_FIELDS)/.test(String(error?.code||''));
+          /^POS_(CATALOG|ITEM|DEAL|MODIFIER|CUSTOMER|DELIVERY|FULFILLMENT|TABLE|PAYMENT|ORDER_FIELDS)/.test(String(syncError?.code||''));
         latest.syncStatus=permanent?'needs_review':'failed';
         latest.syncAttempts=(Number(latest.syncAttempts)||0)+1;
-        latest.lastSyncError=String(error?.message||'POS synchronization failed').slice(0,500);
+        latest.lastSyncError=String(syncError?.message||'POS synchronization failed').slice(0,500);
         const delay=Math.min(SYNC_RETRY_MAX_MS,SYNC_RETRY_BASE_MS*Math.pow(2,Math.min(4,Math.max(0,latest.syncAttempts-1))));
         latest.nextSyncAt=permanent?0:new Date(Date.now()+delay).toISOString();
         await put(STORES.orders,latest);await put(STORES.queue,latest);
@@ -4359,7 +4455,13 @@ async function syncPendingUnifiedPosOrders(){
     if($('syncText'))$('syncText').textContent=[
       sent?sent+' synced':'',failed?failed+' waiting to retry':'',review?review+' need review':''
     ].filter(Boolean).join(' · ')||'All POS orders are up to date.';
-  }finally{syncInProgress=false;}
+  }finally{
+    syncInProgress=false;
+    if(syncRequested){
+      syncRequested=false;
+      Promise.resolve().then(()=>syncPendingUnifiedPosOrders()).catch(error=>console.warn('Queued POS sync pass failed.',error));
+    }
+  }
 }
 async function syncPending(){return syncPendingUnifiedPosOrders();}
 
@@ -4396,9 +4498,13 @@ async function showQueue(){
         const st=String(o.syncStatus||'pending').toLowerCase();
         const cls=st==='synced'?'synced':st==='failed'?'failed':'pending';
         const when=o.lastSyncAttemptAt?new Date(o.lastSyncAttemptAt).toLocaleTimeString():'—';
-        const action=FLAME_CHICK_ORDER_API_READY&&!o.serverOrderId
+        const editTable=FLAME_CHICK_ORDER_API_READY&&!o.serverOrderId&&o.fulfillmentType==='Dine-in'&&/active Production check/i.test(String(o.lastSyncError||''))
+          ?'<button type="button" class="btn" data-edit-pos-order="'+esc(o.localOrderId)+'">Change table</button>'
+          :'';
+        const retry=FLAME_CHICK_ORDER_API_READY&&!o.serverOrderId
           ?'<button type="button" class="btn primary" data-retry-pos-delivery="'+esc(o.localOrderId)+'">Retry Production sync</button>'
           :'';
+        const action=editTable+retry;
         return '<tr><td class="mono">'+esc(o.localOrderId)+'</td><td>Rs. '+money(o.total)+'</td><td><span class="pill '+cls+'">'+esc(o.syncStatus||'pending')+'</span></td><td>'+esc(Number(o.syncAttempts)||0)+'</td><td>'+esc(when)+'</td><td>'+esc(o.lastSyncError||'')+'</td><td>'+action+'</td></tr>';
       }).join('')+
       '</tbody></table></div>'
@@ -4409,7 +4515,39 @@ async function showQueue(){
     closeModal('queueModal');
     await retryLocalOrderSync(button.dataset.retryPosDelivery);
   }));
+  $('queueBody').querySelectorAll('[data-edit-pos-order]').forEach(button=>button.addEventListener('click',async()=>{
+    if(button.disabled)return;
+    button.disabled=true;
+    await editQueuedDineInOrder(button.dataset.editPosOrder);
+  }));
   openModal('queueModal');
+}
+async function editQueuedDineInOrder(localOrderId){
+  const order=await get(STORES.orders,localOrderId);
+  if(!order||order.fulfillmentType!=='Dine-in'||order.serverOrderId){
+    showToast('This local Dine-in order cannot be reassigned from the sync queue.');
+    return;
+  }
+  activeDineCheckId=order.localOrderId;
+  selectedTableId=order.tableId||'';
+  window.editingLocalOrderId=order.localOrderId;
+  receiptEditContext=null;
+  $('orderType').value='Dine-in';
+  $('orderTypeButtons').querySelectorAll('.type-btn').forEach(button=>button.classList.toggle('active',button.dataset.type==='Dine-in'));
+  $('customerName').value=order.customerName||'';
+  $('phone').value=order.phone||'';
+  $('notes').value=order.notes||'';
+  const table=findTable(selectedTableId);
+  $('selectedTableBadge').textContent=table?.name||order.tableNumber||'No table';
+  $('selectTableBtn').textContent=table?.name?'Change table':'Select table';
+  cart=(order.items||[]).map(item=>({...item}));
+  updateOrderFieldsByType();
+  renderCart();
+  $('placeBtn').textContent='SAVE TABLE';
+  $('payCloseBtn').style.display='block';
+  closeModal('queueModal');
+  showPage('new');
+  showToast('Choose an available table, then save. The original local order and sync identity are preserved.');
 }
 
 
@@ -4688,27 +4826,21 @@ async function flameChickCreatePosDeliveryOrder(order,options={}){
 }
 
 async function finalizeReceiptOrder(order){
-  const current=await get(STORES.orders,order.localOrderId);
+  let current=await get(STORES.orders,order.localOrderId);
   if(!current){showToast('Order not found locally');return false;}
   const type=String(current.fulfillmentType||'').toLowerCase();
-  if(current.serverOrderId){
+  if(current.serverOrderId&&!current.checkoutPending&&!current.pendingPayment){
     const printOpened=printThermalReceipt(current);
     if(!printOpened){showToast('Unable to open the receipt for printing.');return false;}
     closeModal('receiptModal');resetNewOrderMode();return true;
   }
   // Use one immutable request ID for the payment + order command. A lost
   // response can be retried without creating a second payment ledger entry.
-  if(type!=='delivery'&&String(order.paymentStatus||'').toLowerCase()==='paid'){
-    const method=String(order.paymentMethod||current.paymentMethod||'Cash').toLowerCase();
-    const paymentMethod=method==='card'?'card':method==='online'?'bank':'cash';
-    if(!current.pendingPayment){
-      current.pendingPayment={
-        requestId:crypto.randomUUID(),
-        amount:Number(current.total),
-        method:paymentMethod,
-        createdAt:new Date().toISOString()
-      };
-    }
+  if(type!=='delivery'&&(String(order.paymentStatus||'').toLowerCase()==='paid'||current.pendingPayment)){
+    const method=String(order.paymentMethod||current.paymentMethod||'Cash');
+    current=window.FlameChickPosPaymentCollection.attachPendingPayment(current,{
+      requestId:crypto.randomUUID(),amount:Number(current.total),method
+    });
   }
   current.checkoutPending=false;
   current.updatedAt=new Date().toISOString();

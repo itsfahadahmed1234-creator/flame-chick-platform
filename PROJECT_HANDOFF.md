@@ -13,13 +13,16 @@
 - QZ signing private key is Sensitive and configured for Production; never decrypt/read/expose it.
 - QZ Tray / Windows print queue integration succeeded on the development PC; actual paper output, cut, alignment and restaurant PC are not verified. Kitchen print stays disabled.
 
-## Immediate user-reported bugs — investigate next
+## Verified findings and current POS fix stage — 2026-11-27
 
-1. POS **Takeaway** orders are not syncing to the Supabase database.
-2. POS **Dine-in** orders are not syncing to the Supabase database.
-3. Opening a Dine-in table and clicking **Complete the Payment** throws the exact runtime error: `Assignment to constant variable.`
+- Takeaway remains receipt-gated: sync begins only after the cashier clicks **Print & Complete**, as confirmed by the user.
+- Rs. 1,348 Dine-in attempt: PostgreSQL rejected a duplicate active-table key. Production has active served/unpaid checks on T1 and T2; the original POS table picker relied on local IndexedDB only.
+- Rs. 599 local failure: Production has FC-261127-0002, a PKR 599 Pickup order completed and paid through one successful bank payment. The local-to-server sync UUID mapping is not provable from the legacy display ID alone; do not submit another order/payment.
+- The Dine-in checkout handler reassigned a `const` variable. The receipt finalizer also skipped payment submission for an already-synced check, and table payment unnecessarily advanced the order revision despite the database same-revision payment path.
+- Working-branch fixes add payment-only Dine-in finalization, stable payment request reuse, read-only reconciliation of an exact completed/paid server match, server-aware Dine-in table occupancy and a sync wake-up flag. Takeaway's Print & Complete gate is preserved.
+- Production database rows, migrations, Edge Functions and Vercel configuration remain unchanged. No order or payment was created for diagnosis.
 
-No root cause has yet been established and no fix has been applied for these three reports. Treat Dine-in sync and Takeaway sync as separate paths until proved to share a failure. Trace UI → local persistence → sync queue/retry → network payload → Order Edge Function → DB command → read-only authoritative row check. For the table payment error, inspect the handler/call stack and identify the const binding that is reassigned. Preserve idempotency and local pending receipts/orders; never duplicate or delete records for diagnosis.
+The new POS regression tests and CI must pass before one intentional Preview is prepared. No Production deployment is authorized. Keep Hobby/Free, GST deferred, kitchen printing disabled and physical printer output/cut/alignment unverified.
 
 ## Mandatory first actions in the new chat
 

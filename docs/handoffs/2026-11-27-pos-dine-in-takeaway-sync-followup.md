@@ -40,31 +40,33 @@
 - Keep kitchen printing disabled. Do not claim physical printer readiness. Do not enable unattended / automatic direct printing until the actual printer has been tested.
 - Production-host QZ signing should be smoke-tested with a signed-in authorized staff account after the POS issues are safely resolved. Use synthetic diagnostics only, not real customer orders.
 
-## 4. New user-reported POS bugs — next task
+## 4. Verified requirements and Production findings — 2026-11-27
 
-The user reports these issues on the POS and wants the next session to focus on fixing them.
+The user confirmed that Takeaway remains receipt-gated: sync begins only after the cashier clicks **Print & Complete**. Do not move Takeaway sync to Place Order.
 
-### A. Takeaway orders are not syncing to the database
+### A. Rs. 1,348 — active Dine-in table conflict
 
-- Orders entered as Takeaway in POS are not appearing / syncing to the Supabase database.
-- Do not infer yet whether local save succeeds, the sync queue enqueues, the client sends the request, the Order Edge Function accepts it, or the database insert is rejected.
-- Trace the complete path from UI action → local persistence → sync queue / retry state → HTTP request/payload → Edge Function validation and DB command → authoritative row read-back.
-- Identify how Dine-in / Takeaway are represented (fulfillment_type, source, table fields, payment state, etc.) from actual code/schema, not assumptions.
-- Check idempotency and retries before attempting a second sync. Do not create duplicate orders to test.
+Read-only PostgreSQL logs at 2026-11-27 02:04:05 UTC (07:04:05 Asia/Karachi) show duplicate-key rejection on `orders_one_active_dine_in_check_per_table_idx`. Production currently has active Dine-in checks:
+- FC-261125-0007 — Table 1 / `T1`, `served`, `unpaid`, balance PKR 3,998.
+- FC-261125-0002 — Table 2 / `T2`, `served`, `unpaid`, balance PKR 2,198.
 
-### B. Dine-in orders are not syncing to the database
+The table selector originally checked local IndexedDB only. A server-side check missing locally could appear available and be rejected on sync. The uniqueness constraint is intentional; do not alter either Production row.
 
-- Dine-in orders entered through the POS also are not appearing / syncing to Supabase.
-- Diagnose separately from Takeaway first. They may share a common sync function, or fail for different fulfilment-specific validation or table metadata. Prove which path from source and logs.
-- Verify table number / table identifier and fulfilment fields survive local normalization and the server payload without being lost or mapped into the wrong fields.
+### B. Rs. 599 — matching completed/paid Production order
 
-### C. Dine-in table cannot be completed — JavaScript runtime error
+Production contains POS Pickup FC-261127-0002, created at 2026-11-27 02:06:15 UTC (07:06:15 PKT), total PKR 599, `completed`, `paid`, method `bank`. Exactly one successful PKR 599 payment entry exists.
 
-- User opens a Dine-in table, clicks Complete the Payment, and the UI fails with this exact error: “Assignment to constant variable.”
-- This is a runtime JavaScript assignment-to-const error. Do not guess which variable or rewrite the payment flow without evidence.
-- Inspect the exact click handler and every function it calls. Capture/locate the browser console stack and line number; identify the const binding that is later reassigned. Check for related state mutations and whether the payment action has already partially changed local state before the exception.
-- Fix the narrow root cause, preserve table/order/payment invariants, and add a regression test that reproduces this path.
-- Confirm whether the same broken handler prevents both local completion and cloud synchronization, or whether these are independent defects.
+The supplied local error matches `POS_ORDER_NO_LONGER_EDITABLE`. The timestamp/amount are consistent, but the exact local-to-server mapping cannot be proven from the legacy display ID because the database identity is a separate sync UUID. Do not submit another order or payment. Reconcile only after read-only checks of the sync UUID, fulfilment, completion/payment state, total, amount and method.
+
+### C. Dine-in payment defects
+
+- `takePaymentAndCloseTable()` used `const order` and reassigned it after preparing the sync identity, throwing before persistence.
+- `finalizeReceiptOrder()` returned early for an already-synced order before attaching the payment request or syncing a pending checkout.
+- Table payment also unnecessarily advanced the local revision. The database already supports an idempotent same-revision/same-hash payment request against a served/unpaid Dine-in check. Preserve that revision for payment-only close.
+
+### D. Backend contract
+
+Production `flame-chick-order-api` version 8 is active. The existing unified POS RPC supports Pickup, Dine-in and idempotent payment. The separate collection RPC remains Delivery-only. Production records, migrations and Edge Functions were not changed. No diagnostic orders/payments were created.
 
 ## 5. Important payment semantics — avoid conflating flows
 
@@ -120,3 +122,17 @@ Also inspect README.md, docs/architecture/overview.md, docs/operations/productio
 ## 9. Current status / first action
 
 No source fix for these newly reported Takeaway / Dine-in sync failures or the Dine-in Assignment to constant variable error has been applied in this handoff. No new Preview or Production deployment was created for these issues. The next chat should first read the handoffs and inspect the source / current API contracts, then report the evidenced root cause(s) and a safe fix plan before mutating Production.
+
+
+## 10. Working-branch implementation — validation pending
+
+Changes prepared on `work/production-source-audit`:
+- Keep Takeaway receipt-gated; sync only after **Print & Complete**.
+- Fix the Dine-in const reassignment and already-synced receipt early return.
+- Retain the existing order revision for payment-only close and reuse its payment request UUID.
+- Add read-only reconciliation for an exact server order match that is completed and fully paid.
+- Include active Production Dine-in table checks in the POS table picker; a conflict preserves the local record and offers a change-table action.
+- Drain a new sync request received during an in-progress sync pass rather than dropping it.
+- Add payment helper, receipt workflow, table occupancy, reconciliation and concurrent-sync tests.
+
+CI has not yet run at this handoff point. No Preview or Production deployment was created. No Production database records, migrations, Edge Functions or Vercel settings were changed.

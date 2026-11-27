@@ -387,3 +387,53 @@ test("POS History is a primary page and not a modal that falls back to POS",()=>
   assert.match(html,/historyBackBtn/);
   assert.doesNotMatch(html,/id="historyModal"/);
 });
+
+
+test("POS Takeaway remains receipt-gated and sync begins from Print & Complete",()=>{
+  const html=source[0].html;
+  const saveStart=html.indexOf('async function saveLocalOrder');
+  const saveEnd=html.indexOf('async function reconcileLocalOrderOnServer',saveStart);
+  const save=html.slice(saveStart,saveEnd);
+  const takeaway=save.slice(save.indexOf('// Takeaway waits'));
+  assert.match(takeaway,/await del\(STORES\.queue,order\.localOrderId\)/);
+  assert.match(takeaway,/openLocalReceipt\(order,\{editable:true\}\)/);
+  const finalizeStart=html.indexOf('async function finalizeReceiptOrder');
+  const finalizeEnd=html.indexOf('async function printThermalReceipt',finalizeStart);
+  const finalize=html.slice(finalizeStart,finalizeEnd);
+  assert.match(finalize,/attachPendingPayment/);
+  assert.match(finalize,/await put\(STORES\.queue,current\)/);
+  assert.match(finalize,/await syncPending\(\)/);
+});
+
+test("Dine-in payment is payment-only and retains the server revision",()=>{
+  const html=source[0].html;
+  const start=html.indexOf('async function takePaymentAndCloseTable');
+  const end=html.indexOf('async function saveLocalOrder',start);
+  const handler=html.slice(start,end);
+  assert.match(handler,/let order=await get\(STORES\.orders,activeDineCheckId\)/);
+  assert.match(handler,/prepareLocalPosSyncOrder\(order\)/);
+  assert.doesNotMatch(handler,/prepareLocalPosSyncOrder\(order,\{bumpRevision:true\}\)/);
+  const finalize=html.slice(html.indexOf('async function finalizeReceiptOrder'),html.indexOf('async function printThermalReceipt'));
+  assert.match(finalize,/current\.serverOrderId&&!current.checkoutPending&&!current.pendingPayment/);
+  assert.match(finalize,/FlameChickPosPaymentCollection\.attachPendingPayment/);
+});
+
+test("POS prevents duplicate Dine-in table checks using Production occupancy",()=>{
+  const html=source[0].html;
+  assert.match(html,/remoteDineChecksByTable=new Map\(\)/);
+  assert.match(html,/const serverRows=await fetchServerHistory\('POS',100\)/);
+  assert.match(html,/TableID:row\.table_reference/);
+  assert.match(html,/This local order and its recovery data are preserved/);
+  assert.match(html,/data-edit-pos-order/);
+  assert.match(html,/async function findActiveProductionDineInCheck/);
+});
+
+test("POS safely reconciles a paid server order and drains concurrent sync requests",()=>{
+  const html=source[0].html;
+  assert.match(html,/async function reconcileAlreadyPaidPosOrder/);
+  assert.match(html,/error\?\.code!=='POS_ORDER_NO_LONGER_EDITABLE'/);
+  assert.match(html,/latest\.pendingPayment\?\.requestId/);
+  assert.match(html,/await del\(STORES\.queue,order\.localOrderId\)/);
+  assert.match(html,/if\(syncInProgress\)\{syncRequested=true;return;\}/);
+  assert.match(html,/if\(syncRequested\)\{[\s\S]*syncPendingUnifiedPosOrders\(\)/);
+});

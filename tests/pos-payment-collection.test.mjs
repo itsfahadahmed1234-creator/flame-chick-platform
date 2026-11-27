@@ -34,3 +34,45 @@ test('creates a full-balance idempotent collection request without accepting a p
     orderId:'bad',requestId:REQUEST,balance:1250,method:'card'
   }));
 });
+
+
+test('attaches a payment-only request without changing the server order identity or revision',()=>{
+  const order={localOrderId:'LOCAL-1',syncOrderId:ORDER,localRevision:7,total:599,status:'Open'};
+  const next=payment.attachPendingPayment(order,{
+    requestId:REQUEST,amount:599,method:'Online',createdAt:'2026-11-27T02:00:00.000Z'
+  });
+  assert.equal(next.localOrderId,'LOCAL-1');
+  assert.equal(next.syncOrderId,ORDER);
+  assert.equal(next.localRevision,7);
+  assert.deepEqual(next.pendingPayment,{requestId:REQUEST,amount:599,method:'bank',createdAt:'2026-11-27T02:00:00.000Z'});
+  assert.equal(Object.hasOwn(order,'pendingPayment'),false);
+});
+
+test('retries reuse the existing payment request ID and reject changed amount or method',()=>{
+  const order={syncOrderId:ORDER,localRevision:4,total:599,pendingPayment:{requestId:REQUEST,amount:599,method:'bank',createdAt:'2026-11-27T02:00:00.000Z'}};
+  const retry=payment.attachPendingPayment(order,{requestId:'bb000000-0000-4000-8000-000000000001',amount:599,method:'bank'});
+  assert.equal(retry.pendingPayment.requestId,REQUEST);
+  assert.throws(()=>payment.attachPendingPayment(order,{requestId:REQUEST,amount:600,method:'bank'}),/different payment details/);
+  assert.throws(()=>payment.attachPendingPayment(order,{requestId:REQUEST,amount:599,method:'cash'}),/different payment details/);
+});
+
+
+test('attaches a payment-only request without changing the server order identity or revision',()=>{
+  const order={localOrderId:'LOCAL-1',syncOrderId:ORDER,localRevision:7,total:599,status:'Open'};
+  const next=payment.attachPendingPayment(order,{
+    requestId:REQUEST,amount:599,method:'Online',createdAt:'2026-11-27T02:00:00.000Z'
+  });
+  assert.equal(next.localOrderId,'LOCAL-1');
+  assert.equal(next.syncOrderId,ORDER);
+  assert.equal(next.localRevision,7);
+  assert.deepEqual(next.pendingPayment,{requestId:REQUEST,amount:599,method:'bank',createdAt:'2026-11-27T02:00:00.000Z'});
+  assert.equal(Object.hasOwn(order,'pendingPayment'),false);
+});
+
+test('retries reuse the existing payment request ID and reject changed amount or method',()=>{
+  const order={syncOrderId:ORDER,localRevision:4,total:599,pendingPayment:{requestId:REQUEST,amount:599,method:'bank',createdAt:'2026-11-27T02:00:00.000Z'}};
+  const retry=payment.attachPendingPayment(order,{requestId:'bb000000-0000-4000-8000-000000000001',amount:599,method:'bank'});
+  assert.equal(retry.pendingPayment.requestId,REQUEST);
+  assert.throws(()=>payment.attachPendingPayment(order,{requestId:REQUEST,amount:600,method:'bank'}),/different payment details/);
+  assert.throws(()=>payment.attachPendingPayment(order,{requestId:REQUEST,amount:599,method:'cash'}),/different payment details/);
+});
