@@ -416,7 +416,7 @@ test("deal cards display published base prices and configurator prices remain es
   assert.match(order, /Price unavailable/);
   assert.match(configurator, /function getPriceEstimate\(\)/);
   assert.match(configurator, /fc-deal-price-summary/);
-  assert.match(configurator, /priceEstimate\.complete \? 'Deal total' : 'Current estimate'/);
+  assert.match(configurator, /priceEstimate\.complete \? \('Total for ' \+ priceEstimate\.dealQuantity/);
   assert.match(configurator, /getPriceEstimate: getPriceEstimate/);
   const payloadStart = configurator.indexOf("function toPayload()");
   const estimateStart = configurator.indexOf("function getPriceEstimate()", payloadStart);
