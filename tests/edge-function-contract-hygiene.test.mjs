@@ -286,14 +286,16 @@ test("Website create route uses stable request identity, HMAC phone privacy and 
   const end=source.indexOf('if (action === "create")',start);
   const route=source.slice(start,end);
   assert.ok(start>=0&&end>start);
-  assert.match(route,/websiteRequestFingerprint\(body,normalizedPhone\)/);
+  assert.match(source,/websiteRequestFingerprint\(body,normalizedPhone\)/);
   assert.match(route,/lookupWebsiteOrderRetry\(branchValue,requestId,requestHash\)/);
   assert.ok(route.indexOf("lookupWebsiteOrderRetry")<route.indexOf("buildWebsiteOrderQuote"));
   assert.match(route,/hmacPhoneDigest\(normalizedPhone\)/);
   assert.match(route,/phone_digest:phoneDigest/);
   assert.match(route,/flame_chick_create_website_order/);
   assert.doesNotMatch(route,/client_ip|x-forwarded-for|cf-connecting-ip/);
-  assert.match(sources["flame-chick-order-api"],/FLAME_CHICK_ORDER_PHONE_HMAC_SECRET/);
+  assert.match(sources["flame-chick-order-api"],/const masterSecret = SERVICE_KEY/);
+  assert.match(sources["flame-chick-order-api"],/name: "HKDF"/);
+  assert.match(sources["flame-chick-order-api"],/website-order-phone-digest/);
 });
 
 test("Legacy Website create payload fails closed and does not enter the V2 order creation path", () => {
