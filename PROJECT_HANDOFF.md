@@ -25,7 +25,7 @@
 - Dedicated feature release gate passed on feature commit 49453c21f0e14c38b7d979b67316e37a727ef2b6, GitHub Actions run 46038422599. It passed six mocked UI tests, receipt contract tests, QZ adapter diagnostics, QZ signer syntax, and payment/catalog/sync contracts.
 - The production POS/Rider static workflow run 46038587720 still fails two known stale ops-source-hygiene assertions (returned-order filter expression and PaymentMethod casing). These mismatches were confirmed at the original base commit and were not introduced or changed by this release.
 - Staff Admin Role Boundary QA run 46038587780 passed; Admin static checks run 46038587644 passed.
-- External browser/HTTP smoke testing could not be completed from this execution environment. Cloudflare API checks verified successful deployment, version 7, 100% traffic, required bindings, and secret name. The cashier/operator must hard-refresh the live POS and verify UI rendering.
+- External browser/HTTP smoke testing was unavailable from the execution environment. On 2026-11-27 at 22:14 Asia/Karachi, the user confirmed that the live POS is working after hard-refresh and verification. This user confirmation closes the outstanding live UI verification for this release.
 
 ## Scope and safety
 - Vercel POS remains available as fallback.
@@ -34,8 +34,8 @@
 - No Production orders, payments, IndexedDB clearing, or physical printer jobs were used in QA.
 - Private Cloudflare minutes archive remains unsynchronized. R2 is not enabled; KV/D1 were absent. No subscription, billing, bucket, or payment settings were changed.
 
-## Next task
-Have the cashier/operator hard-refresh the production POS and verify Manual Delivery spinner/failure recovery and successful QZ receipt popup closure. Any real order, payment, or printer test must be explicitly authorized and clearly identified. Keep the two legacy source-hygiene mismatches as a separate cleanup item. R2 archive setup requires explicit account-owner authorization.
+## Verification outcome
+User confirmed on 2026-11-27 at 22:14 Asia/Karachi that the deployed POS changes are working. Treat Manual Delivery submit feedback and receipt popup behavior as user-verified in production. No additional order/payment/print test was requested or performed during this confirmation.
 
 Read docs/handoffs/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md for the chronological record.
 

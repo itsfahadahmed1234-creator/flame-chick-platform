@@ -22,14 +22,14 @@
 - Feature release-gate run 46038422599 passed all six mocked UI tests, receipt contracts, QZ diagnostics, signer syntax, and payment/catalog/sync contracts.
 - Production POS/Rider static run 46038587720 reports two known stale ops-source-hygiene assertion mismatches (76/78). Both were verified against the original base source; no unrelated logic was modified.
 - Staff Admin Role Boundary QA 46038587780 passed; Admin static checks 46038587644 passed.
-- Cloudflare API confirms version 7 deployed with 100% traffic and existing ASSETS/QZ secret bindings. Direct browser/HTTP smoke was unavailable in this environment; cashier/operator must hard-refresh and verify live page rendering and UI behavior.
+- Cloudflare API confirms version 7 deployed with 100% traffic and existing ASSETS/QZ secret bindings. On 2026-11-27 at 22:14 Asia/Karachi, user confirmed the live POS is working after verifying it in production. The live UI verification is complete.
 - No Production orders/payments or physical printer jobs were used for automated QA.
 
 ## Scope and follow-up
 - Vercel POS remains fallback. Website/Admin/Rider, Supabase, DNS, aliases and unrelated Worker resources were not changed.
 - Separate flame-chick-platform preview build 3ab9ce07-f8c5-4fc1-a92d-41c751c09c9a failed on its root-level preview command but created no deployment; this is not the POS Worker.
 - Private Cloudflare archive is pending. R2 not enabled, KV/D1 absent, no billing changes. Do not enable R2 without account-owner authorization.
-- Next: cashier/operator hard-refresh and verify Place Order spinner/retry plus successful QZ receipt popup auto-close. Record any live verification. Keep stale hygiene assertions as separate task.
+- Live POS verification completed: user confirmed on 2026-11-27 at 22:14 Asia/Karachi that the released changes are working. No additional production operations were triggered. Keep stale hygiene assertions as separate task.
 
 ---
 

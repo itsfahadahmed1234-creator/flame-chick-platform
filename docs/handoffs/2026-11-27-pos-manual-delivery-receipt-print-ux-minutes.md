@@ -97,3 +97,11 @@
 - Never deploy without explicit approval.
 - Do not touch Website, Admin, Rider, Supabase, Vercel aliases, DNS or unrelated Cloudflare resources.
 - No real orders, payments or physical printer jobs for QA.
+
+
+### Post-deployment live verification — 2026-11-27 22:14 Asia/Karachi
+- User confirmed that the deployed POS changes are working in production.
+- This closes the previously outstanding operator/browser verification for the Manual Delivery Place Order loading/double-click/recovery behavior and the receipt popup's QZ success/failure handling.
+- The confirmation is recorded as user-reported live verification; no extra real order, payment, or print job was executed by the assistant during this confirmation.
+- Production Worker remains flamechickpos version 7, ID ab9b5ed4-e5d0-4093-bc8b-8e3602906c7e, at 100% traffic. No new deployment occurred.
+- Exact next task: continue with the next POS request when supplied; keep the two unrelated legacy source-hygiene mismatches separate. Private R2 archive still requires explicit owner authorization and has not been created.
