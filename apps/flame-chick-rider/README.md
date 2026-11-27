@@ -11,3 +11,5 @@ No service-role or secret keys belong in browser code. Rider workflow must be te
 
 
 Cloudflare Pages production hosting is configured separately as `flamechickrider.pages.dev`. This branch is the isolated Rider hosting release line; the Rider application source is unchanged from the reviewed production-source-audit baseline.
+
+Cloudflare Pages production branch: `cloudflare/rider-production`.
