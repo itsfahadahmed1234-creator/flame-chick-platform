@@ -185,3 +185,31 @@ The new Cloudflare deployment is API-verified as canonical and successful. The f
 The user reports they personally tested the Cloudflare Production Website at https://flamechick.pages.dev/, confirmed that its interactions work, and confirmed that submitted Website orders reach the POS. Record this as **user-verified Website-to-POS operational behaviour**. This supersedes the earlier statement that signed-in interaction and order handoff had not yet been checked.
 
 The verification is user-reported in chat; the assistant did not independently open POS order records or inspect order IDs. Do not describe this as an independently reproduced test. No additional test order, Retry, schema change, Edge Function change, DNS change or Vercel cutover is implied by this confirmation. Keep Vercel C57 intact as fallback until the user approves any cutover.
+
+
+## Rider Cloudflare Pages Production deployment — 27 November 2026
+
+The Rider portal now has its own Cloudflare Pages project and canonical Pages hostname.
+
+- Cloudflare account ID: 831422f51dea96c387ae8917d451a6bf.
+- Project: `flamechickrider`; project ID: `633e764f-ecb3-4b42-8657-2506171aa9c4`.
+- Canonical Production hostname: https://flamechickrider.pages.dev/.
+- Immutable successful deployment URL: https://ec0e1201.flamechickrider.pages.dev/.
+- Deployment ID: `ec0e1201-6bb4-4494-a9e6-8da9dc154be6`; environment Production; queued, initialize, clone_repo, build and deploy stages all SUCCESS; listed as canonical deployment.
+- GitHub repository: `itsfahadahmed1234-creator/flame-chick-platform`.
+- Isolated Rider production branch: `cloudflare/rider-production`.
+- Exact deployment commit: `4e5161e56b25609ef2484e792952db69507b5c0d`.
+- Parent Rider source baseline: `work/production-source-audit` at `12f0a5c6a4fb8fd879167e750055e6adaacbec78`. Rider app source is unchanged from that reviewed baseline; the branch adds only Rider hosting documentation in the app README.
+- Build root: `apps/flame-chick-rider`; build command blank; output directory `.`; plain static HTML/CSS/JS/PWA assets.
+- GitHub path filter: `apps/flame-chick-rider/*`; Production auto-deploy enabled; Preview deployments disabled.
+- Cloudflare Pages environment variables: none. The Rider static app embeds only the Supabase Production URL and public publishable key; no service-role/secret key is in browser code.
+- Rider PWA files included in deployment: `index.html`, `manifest.webmanifest`, `sw.js`, `icon.svg`.
+
+### Preserved fallback and operational boundaries
+
+- Existing Vercel Rider project/domain remains untouched as fallback. Historical READY Vercel Rider deployment: `dpl_AoAJvNZQLsBamhBGNWEspcvv3hRU`; canonical alias previously repaired to `https://flamechickrider.vercel.app`. Do not remove it or change DNS without explicit approval.
+- Customer Website project `flamechick`, POS Worker/project in the other conversation, Admin project, and shared Supabase Production were not changed by this Rider hosting setup.
+- This is a successful static hosting deployment, not a full Rider workflow verification. The user still needs to verify login using an active Rider account/profile, own-offer isolation, offer accept/reject/expiry, pickup, delivery completion, failure/return reporting, manager confirmation, push notification clicks and Realtime/fallback refresh.
+- Production currently has no active Rider profile/role according to the historical read-only checkpoint; verify current staff provisioning before interpreting a login rejection as a hosting fault.
+- The Rider app calls the existing Supabase Auth and `flame-chick-delivery-api` endpoints directly. The checked source currently shows wildcard CORS in that Edge Function; do not modify shared backend or Edge Function as part of this hosting-only task. If restricting CORS, separately update and verify all intended Website/POS/Admin/Rider origins with the backend owner.
+- `FLAME_CHICK_RIDER_PORTAL_URL` is a Supabase Function secret used for invitation redirects and push notification click URLs. Its current configured value was not read or changed. Review it separately before relying on push notification deep links to use the new Pages hostname.

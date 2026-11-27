@@ -92,3 +92,8 @@ The Place Order button must behave correctly on the selected URL; the UI must ex
 The user uses OpenCode + DeepSeek 4.1 Flash with Playwright/Chrome because ChatGPT Work mode is not available in their Free-mode setup. Use OpenCode for active browser interaction and return screenshots, JSON evidence, console/network results and exact reproduction steps. ChatGPT should read the evidence, inspect current repository source, guide changes and verify that tests match the intended behaviours. Do not tell the user to switch to Work mode.
 
 The OpenCode audit completed read-only on 27 November 2026. Its full findings and test matrix are in [the current Website continuation handoff](2026-11-27-website-ui-reliability-next-session.md). No application code corrections from C1–C10 have been implemented just by recording that handoff.
+
+
+## Rider Cloudflare deployment checkpoint — 27 November 2026
+
+Rider is now deployed independently to Cloudflare Pages at https://flamechickrider.pages.dev/ (project `flamechickrider`, ID `633e764f-ecb3-4b42-8657-2506171aa9c4`; canonical deployment `ec0e1201-6bb4-4494-a9e6-8da9dc154be6`, branch `cloudflare/rider-production`, commit `4e5161e56b25609ef2484e792952db69507b5c0d`). See the Rider section in the Cloudflare hosting transition handoff for build settings, Vercel fallback, and functional QA boundaries. Admin hosting remains pending. POS is managed separately.
