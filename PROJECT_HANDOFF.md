@@ -5392,3 +5392,12 @@ The Preview has a separate browser origin and separate IndexedDB; it cannot see 
 Production FC-261127-0007, correlated with the user's PKR 5,346 local check, remains PKR 4,647 on Table 3, `new/unpaid`, revision 1, with no payment ledger entry. The POS reused revision 1 after local cart content changed.
 
 Working-branch repair fingerprints accepted content, compares older orders against Production read-only, bumps revisions for changed editable checks, preserves revision/catalog for unchanged served payment-only closes, and blocks item edits after server advancement. Receipt success now requires synced + paid + completed. CI/Preview pending; Production untouched.
+
+
+## Dine-in payment revision fix — CI and Preview ready (2026-11-27)
+
+Working branch `work/production-source-audit` final source/test commit: `72ef877cc9c5956b15395bc7f65234db8d2f7d51`. POS/Rider Static Checks run `45936014733` passed. One READY Vercel Preview is available at https://flame-chick-pos-development-xvmiukqrq-faha-d.vercel.app (deployment `dpl_HTgEAgGjMPBnZkzthV5hLcXDUKAo`), built from that exact SHA. The project Ignored Build Step was restored to `exit 0`.
+
+Production remains unchanged: `flamechick-pos.vercel.app` still routes to READY deployment `dpl_6VuqJfbd89a7f1V6TTV6L6n2CEjP` on SHA `f6ce0ea49aeb165fec382280dcc3f90c4747a706`. No database rows, migrations, Edge Functions or aliases were changed.
+
+Important: the Preview browser origin has a separate IndexedDB, but the app uses the shared Production Supabase backend. Do not create QA customer orders or payments from Preview. A safe end-to-end transaction rehearsal needs an approved isolated test backend or separately approved Production test plan. FC-261127-0007 remains `new/unpaid` for PKR 4,647 with no payment; the user's local PKR 5,346 pending order is still only in the original Production browser's IndexedDB and must not be recreated.
