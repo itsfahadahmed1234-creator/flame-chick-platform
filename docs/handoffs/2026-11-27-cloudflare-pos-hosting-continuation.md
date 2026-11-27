@@ -1,11 +1,12 @@
 # CURRENT STATUS — POS MANUAL DELIVERY / RECEIPT PRINT UX FIX IN PROGRESS
 
-## CI correction checkpoint — 2026-11-27
-- Run 1: commit `6970a386ea7dcece9467be464ab5ef6bd9762a6a`, 5/6 new mocked tests passed; the last failure was a mock error-prefix mismatch.
-- Run 2: commit `58d38516a67b54c86aef00a3009cfc87d8589ffa`, all 6 new mocked UI tests passed; the receipt contract test failed at startup because `.mjs` incorrectly used `require()`.
-- Run 3: commit `fd84bfe3b6a596f8ef4fab09f7985932f13df016`, six mocked UI tests, receipt contract tests and QZ adapter diagnostics all passed. A final source/static POS suite is being added to CI before review.
-- R2 pricing checked: Standard free monthly usage is 10 GB-month, 1M Class A, 10M Class B and free egress. Overage is billable; activating R2 requires subscription checkout. R2 remains disabled, with no subscription or bucket created.
-
+## Final development / verification checkpoint — 2026-11-27 21:52 Asia/Karachi
+- Current feature branch: `fix/pos-manual-delivery-receipt-print-ux-2026-11-27`.
+- Latest commit: `414810e8a5038d727c899bdd4f81a15e41ec8c30`; base `acaaea765039a7dadd9eb0388136cc0cf6c127e2`.
+- Mocked UI, receipt-contract and QZ diagnostics are green (run `46036952432`, commit `fd84bfe3b6a596f8ef4fab09f7985932f13df016`). The expanded run (`46037102563`) also passed these tests and `node --check` for the QZ signer, but its broader source-hygiene group reports 76/78 due two older assertion mismatches verified against the untouched base source: returned-order filter expression and `PaymentMethod` vs `paymentMethod`. No related implementation was changed.
+- Do not edit these unrelated business rules as part of the current UI fix.
+- No deployment: Worker `flamechickpos` remains version 6. No Production orders, payments or physical print jobs were used.
+- Private R2 archive remains blocked: R2 subscription not enabled; KV/D1 absent; no bucket/object or payment settings were changed. Monthly Standard free limits/overage prices and subscription requirement are recorded in the minutes file.
 
 > Latest checkpoint: \`docs/handoffs/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md\`
 

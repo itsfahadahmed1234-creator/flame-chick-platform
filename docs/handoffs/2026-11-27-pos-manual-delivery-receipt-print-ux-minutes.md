@@ -1,7 +1,7 @@
 # Flame Chick POS — project minutes
 ## 2026-11-27 — Manual Delivery and receipt-print UX fixes
 
-**Date/time:** 2026-11-27 21:03 Asia/Karachi  
+**Date/time:** 2026-11-27 21:52 Asia/Karachi (session close)  
 **Repository:** \`itsfahadahmed1234-creator/flame-chick-platform\`  
 **Base branch:** \`work/production-source-audit\`  
 **Base commit:** \`acaaea765039a7dadd9eb0388136cc0cf6c127e2\`  
@@ -33,13 +33,21 @@
 - \`docs/handoffs/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md\` — this dated minutes entry.
 
 ### Tests and results
-- Full focused UI/receipt/QZ run passed on commit `fd84bfe3b6a596f8ef4fab09f7985932f13df016`, GitHub Actions run `46036952432`: six mocked UI tests, receipt-print contract tests and existing QZ adapter diagnostics succeeded. The log download endpoint returned 404 after completion, but GitHub reports the workflow job and both test steps as success.
-- A final source-level pass is being added to the feature-branch workflow, matching existing POS CI: QZ Node syntax check plus ops-source-hygiene, POS payment collection, catalog adapter and unified sync tests. Await this final check before release review.
-- First Actions run: commit `6970a386ea7dcece9467be464ab5ef6bd9762a6a`, run `46036547793`, failed in the new preview test after 5/6 mocked UI tests passed. The assertion expected the full UI prefix but its test double only displayed the raw message; this was a fixture mismatch, not an application behavior failure. The QZ diagnostic step was skipped because the test command stopped early. The mock is corrected to match the real status helper; rerun pending.
-- Added mocked regressions for one submission on rapid clicks, immediate spinner/disabled state, success/failure recovery, receipt popup closure only after print completion, failures/cancellation remaining open and retryable, and duplicate print suppression.
-- Second Actions run: commit `58d38516a67b54c86aef00a3009cfc87d8589ffa`, run `46036779500`; all 6 new mocked UI tests passed. The existing `.mjs` receipt contract test then failed to load because its pre-existing header used CommonJS `require()` although `.mjs` is ES module. QZ diagnostics were skipped as the workflow stopped at that failure. The receipt contract test is being corrected to ES module imports; a full rerun, including QZ diagnostics, remains pending.
-- No Production Supabase calls, order creation, payment, IndexedDB clearing or physical print job was used.
-- Do not claim tests passed until the workflow result is read back.
+- Feature-branch run 1: commit `6970a386ea7dcece9467be464ab5ef6bd9762a6a`, run `46036547793`. Five of six new mocked UI tests passed; the last assertion expected the full error prefix but the test double only displayed the raw message.
+- Feature-branch run 2: commit `58d38516a67b54c86aef00a3009cfc87d8589ffa`, run `46036779500`. All six new mocked UI tests passed. The existing receipt contract test then failed to load because its `.mjs` file used CommonJS `require()`; it was converted to ESM imports.
+- Feature-branch run 3: commit `fd84bfe3b6a596f8ef4fab09f7985932f13df016`, run `46036952432`. Six mocked UI tests, the receipt-print contract tests and QZ adapter diagnostics all passed.
+- Feature-branch run 4: commit `414810e8a5038d727c899bdd4f81a15e41ec8c30`, run `46037102563`. The six mocked UI tests, receipt contract tests and QZ adapter diagnostics passed. The QZ signer `node --check` also passed. The broader `ops-source-hygiene` suite reported 76/78 passing, with two failures in pre-existing source expectations:
+  1. `POS routes physically returned orders into the Cancelled Orders history tab` expects an older exact filter expression.
+  2. `Unpaid Delivery payment preference is separate from actual payment collection` expects `PaymentMethod:` (uppercase), whereas the existing POS source uses `paymentMethod:`.
+- Verified both underlying source sections are unchanged relative to base commit `acaaea765039a7dadd9eb0388136cc0cf6c127e2`; neither failing assertion concerns this UI fix. No unrelated POS logic or test was changed to suppress these findings.
+- All automated checks used mocks/read-only source tests. No Production Supabase calls, order creation, payment, IndexedDB clearing or physical print job was used.
+- No live Preview/browser/printer rehearsal has been performed.
+
+### Commits
+- `6970a386ea7dcece9467be464ab5ef6bd9762a6a` — POS UI implementation and initial mocked coverage.
+- `58d38516a67b54c86aef00a3009cfc87d8589ffa` — align mock error text with the actual UI error helper.
+- `fd84bfe3b6a596f8ef4fab09f7985932f13df016` — fix existing receipt contract test to use ESM imports.
+- `414810e8a5038d727c899bdd4f81a15e41ec8c30` — add existing POS source/static checks to the feature workflow and update project records.
 
 ### Deployment
 - No deployment performed or authorized.
@@ -58,15 +66,14 @@
 - Last successful Cloudflare archive synchronization: **none**. Never put these notes in POS Worker assets or runtime.
 
 ### Unresolved
-- Await feature-branch regression workflow and record its exact result/commit.
+- Two pre-existing `ops-source-hygiene` assertions remain inconsistent with current POS source; retain as a separate cleanup/reconciliation item, not part of this UI fix.
 - Private Cloudflare R2 archive cannot yet be provisioned/read-back verified because R2 is not enabled. No paid action is authorized.
 - No live browser UI rehearsal has been performed; user should validate Preview only after separate release authorization.
 
 ### Exact next task
-1. Await the newly added existing POS source/static checks and record their exact result/commit.
-2. Inspect and repair any failing test without weakening existing checks.
-3. Present changed files and test results. Do **not** merge or deploy until explicit release approval.
-4. Once Cloudflare R2 is enabled by the account owner with a no-charge/free-only setup, create the private archive bucket, upload this minutes file, read it back and record the actual bucket/object path and synchronization time.
+1. Have the user review the isolated feature branch and the two pre-existing static-check mismatches.
+2. Only after explicit approval, prepare a reviewed release from this branch; do not merge or deploy as part of this work session.
+3. Once the account owner explicitly authorizes R2 subscription activation on a no-charge/free-only basis, create a private archive bucket, upload this minutes file, read it back and record the actual bucket/object path and synchronization time.
 
 ### Warnings
 - Never push POS application source to \`work/production-source-audit\` during development; it auto-deploys the live POS.
