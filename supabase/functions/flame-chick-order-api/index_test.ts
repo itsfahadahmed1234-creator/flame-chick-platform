@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 
 Deno.env.set("SUPABASE_URL", "https://flame-chick-disposable.supabase.co");
 Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", JSON.stringify({ test: "fc-public-test-key" }));
-Deno.env.set("SUPABASE_SECRET_KEYS", JSON.stringify({ default: "fc-private-test-value" }));
+Deno.env.set("SUPABASE_SECRET_KEYS", JSON.stringify({ default: "fc-private-test-value-long-enough-for-hkdf-privacy-tests" }));
 Deno.env.set("FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET", "local-test-quote-hmac-value-longer-than-32-bytes");
 Deno.env.set("FLAME_CHICK_ORDER_PHONE_HMAC_SECRET", "local-test-phone-hmac-value-longer-than-32-bytes");
 
@@ -54,10 +54,12 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       ? json({id:"aa000000-0000-4000-8000-000000000001"})
       : json({message:"Unauthorized"},401);
   }
-  if (pathName.endsWith("/rpc/flame_chick_get_staff_role_rows") && method === "POST") {
-    return json([{
-      restaurant_id:restaurantId,role_key:"cashier",branch_id:branchId,is_active:true
-    }]);
+  if (pathName.endsWith("/rpc/flame_chick_get_staff_context") && method === "POST") {
+    return json({
+      restaurant_id:restaurantId,
+      role_rows:[{restaurant_id:restaurantId,role_key:"cashier",branch_id:branchId,is_active:true}],
+      branches:[{id:branchId,branch_code:"main",is_active:true}]
+    });
   }
   if (pathName.endsWith("/rpc/flame_chick_catalog_public_read") && method === "POST") {
     return json({
@@ -229,8 +231,12 @@ Deno.test("authenticated POS sync prices from V3, derives trusted identity and f
     if (pathName.endsWith("/auth/v1/user")) {
       return new Response(JSON.stringify({id:"aa000000-0000-4000-8000-000000000001"}),{status:200});
     }
-    if (pathName.endsWith("/rpc/flame_chick_get_staff_role_rows")) {
-      return new Response(JSON.stringify([{restaurant_id:restaurantId,role_key:"cashier",branch_id:branchId,is_active:true}]),{status:200});
+    if (pathName.endsWith("/rpc/flame_chick_get_staff_context")) {
+      return new Response(JSON.stringify({
+        restaurant_id:restaurantId,
+        role_rows:[{restaurant_id:restaurantId,role_key:"cashier",branch_id:branchId,is_active:true}],
+        branches:[{id:branchId,branch_code:"main",is_active:true}]
+      }),{status:200});
     }
     if (pathName.endsWith("/rpc/flame_chick_catalog_public_read")) {
       return new Response(JSON.stringify({
@@ -369,8 +375,12 @@ Deno.test("authenticated POS Delivery sync accepts category-driven Chicken Burge
     if (pathName.endsWith("/auth/v1/user") && method === "GET") {
       return json({ id: "aa000000-0000-4000-8000-000000000001" });
     }
-    if (pathName.endsWith("/rpc/flame_chick_get_staff_role_rows")) {
-      return json([{ restaurant_id: restaurantId, role_key: "cashier", branch_id: branchId, is_active: true }]);
+    if (pathName.endsWith("/rpc/flame_chick_get_staff_context")) {
+      return json({
+        restaurant_id:restaurantId,
+        role_rows:[{restaurant_id:restaurantId,role_key:"cashier",branch_id:branchId,is_active:true}],
+        branches:[{id:branchId,branch_code:"main",is_active:true}]
+      });
     }
     if (pathName.endsWith("/rpc/flame_chick_catalog_public_read")) {
       return json({
