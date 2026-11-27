@@ -197,7 +197,36 @@ Deno.test("actual Website Order API commits to disposable local Postgres and saf
       throw new Error("The actual local Postgres idempotency conflict was not rejected: " + JSON.stringify(conflict));
     }
 
-    console.log("Real local Order API → PostgREST → PostgreSQL: stale fee, tamper, commit, replay and conflict checks passed.");
+    // Verify Website context uses overlapping PostgREST reads for its
+    // independent catalogue, restaurant and branch delivery configuration.
+    const originalFetch=globalThis.fetch;
+    let inFlight=0;
+    let maxInFlight=0;
+    globalThis.fetch=(async (input:RequestInfo|URL,init?:RequestInit)=>{
+      inFlight++;
+      maxInFlight=Math.max(maxInFlight,inFlight);
+      try{return await originalFetch(input,init);}
+      finally{inFlight--;}
+    }) as typeof fetch;
+    try{
+      const contextResponse=await handleOrderApiRequest(new Request(
+        new URL("/functions/v1/flame-chick-order-api?view=website_context",apiUrl),
+        {method:"GET",headers:{apikey:publishableKey}}
+      ));
+      const contextBody=await contextResponse.json() as Record<string,any>;
+      const branches=Array.isArray(contextBody.data?.branches)?contextBody.data.branches:[];
+      const selectedBranch=branches.find((row:any)=>row?.id===IDS.branch);
+      if(contextResponse.status!==200||contextBody.ok!==true||!selectedBranch||
+         !Array.isArray(selectedBranch.deliveryAreas)||
+         !selectedBranch.deliveryAreas.some((row:any)=>row?.id===areaId)){
+        throw new Error("Website context did not preserve the local branch delivery configuration: "+JSON.stringify(contextBody));
+      }
+      if(maxInFlight<2)throw new Error("Website context reads did not overlap; expected at least two concurrent PostgREST requests.");
+    }finally{
+      globalThis.fetch=originalFetch;
+    }
+
+    console.log("Real local Order API: quote safety, stale fee, tamper, commit, replay, conflict, and parallel Website context passed.");
   } finally {
     if (deliveryFeeChanged) await updateDeliveryFee(50);
   }

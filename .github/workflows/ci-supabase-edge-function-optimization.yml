@@ -1,0 +1,106 @@
+name: Supabase Edge Function Optimization Regression
+
+on:
+  push:
+    branches:
+      - supabase-edge-optimization-2026-11-27
+    paths:
+      - "supabase/config.toml"
+      - "supabase/functions/**"
+      - "tests/supabase-edge-optimization-contract.test.mjs"
+      - "tests/supabase-staff-dashboard-actions.test.mjs"
+      - ".github/workflows/ci-supabase-edge-function-optimization.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-edge-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: Set up Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: "2.x"
+      - name: Run source contracts and dashboard RPC validator tests
+        run: node --test tests/supabase-edge-optimization-contract.test.mjs tests/supabase-staff-dashboard-actions.test.mjs
+      - name: Run Delivery API handler regression tests without external requests
+        run: deno test --allow-env supabase/functions/flame-chick-delivery-api/index_test.ts
+
+  local-order-api-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: Set up Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: "2.x"
+      - name: Install pinned Supabase CLI
+        run: |
+          npm install --global "supabase@3.2.0"
+          supabase --version
+      - name: Start disposable Supabase without remote credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          parked="$RUNNER_TEMP/flame-chick-migrations"
+          mv supabase/migrations "$parked"
+          mkdir -p supabase/migrations
+          restore_migrations() { rm -rf supabase/migrations; mv "$parked" supabase/migrations; }
+          trap restore_migrations EXIT
+          supabase start -x studio,imgproxy,logflare,vector
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" --set ON_ERROR_STOP=1 <<'SQL'
+          DO $bootstrap$
+          BEGIN
+            IF to_regprocedure('public.rls_auto_enable()') IS NULL THEN
+              EXECUTE $ddl$
+                CREATE FUNCTION public.rls_auto_enable()
+                RETURNS event_trigger LANGUAGE plpgsql AS $function$
+                BEGIN RETURN; END;
+                $function$
+              $ddl$;
+            END IF;
+          END
+          $bootstrap$;
+          SQL
+          restore_migrations
+          trap - EXIT
+      - name: Replay all committed migrations into the disposable database
+        run: supabase migration up --local
+      - name: Export local-only keys to job environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase status -o env > "$RUNNER_TEMP/flame-chick-local.env"
+          set -a
+          . "$RUNNER_TEMP/flame-chick-local.env"
+          set +a
+          echo "SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "DB_URL=$DB_URL" >> "$GITHUB_ENV"
+          echo "SUPABASE_PUBLISHABLE_KEYS=$(node -e 'const key=process.env.PUBLISHABLE_KEY || process.env.ANON_KEY; if(!key)process.exit(2); process.stdout.write(JSON.stringify({local:key}));')" >> "$GITHUB_ENV"
+          echo "SUPABASE_SECRET_KEYS=$(node -e 'if(!process.env.SERVICE_ROLE_KEY)process.exit(2); process.stdout.write(JSON.stringify({default:process.env.SERVICE_ROLE_KEY}));')" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=\${ANON_KEY:-}" >> "$GITHUB_ENV"
+          echo "FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET=disposable-local-website-quote-hmac-secret-32-bytes-min" >> "$GITHUB_ENV"
+          echo "FLAME_CHICK_ORDER_PHONE_HMAC_SECRET=disposable-local-order-phone-hmac-secret-32-bytes-min" >> "$GITHUB_ENV"
+      - name: Exercise Website Order quote, idempotency and parallel context reads
+        run: deno test --allow-env --allow-read --allow-net=127.0.0.1,localhost --allow-run=psql supabase/functions/flame-chick-order-api/index_local_test.ts
+      - name: Stop disposable Supabase
+        if: always()
+        run: supabase stop --no-backup
