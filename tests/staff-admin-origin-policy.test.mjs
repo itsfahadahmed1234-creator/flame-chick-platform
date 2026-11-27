@@ -73,8 +73,8 @@ test("the production Edge Function imports and enforces the tested origin policy
 
 test("production Admin and pinned preview origins remain allowed when optional env allowlist is unset", () => {
   const configured = parseStaffAdminOrigins("");
-  assert.deepEqual([...configured], [PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS]);
-  for (const origin of [PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS]) {
+  assert.deepEqual([...configured], [CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN, PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS]);
+  for (const origin of [CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN, PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS]) {
     assert.equal(isAllowedRequestOrigin(origin, configured), true);
     assert.equal(staffCorsHeaders(origin, configured)["Access-Control-Allow-Origin"], origin);
   }
