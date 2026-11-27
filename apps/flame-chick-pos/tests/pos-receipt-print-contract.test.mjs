@@ -45,3 +45,24 @@ test('QZ Tray is the preferred receipt route by default and browser fallback rem
   assert.match(source, /async function printThermalReceipt\(order\)[\s\S]*?window\.print\(\)/);
   assert.match(source, /async function printReceiptWithLabel\(o,label\)[\s\S]*?window\.print\(\)/);
 });
+
+
+test('receipt popups close only after a confirmed QZ print completion', function () {
+  assert.match(source, /async function printReceiptFromModal\(order\)[\s\S]*?const confirmed=await printThermalReceipt\(order\)[\s\S]*?if\(confirmed\)\{[\s\S]*?closeModal\('receiptModal'\)/);
+  assert.match(source, /async function confirmPrintPreview\(\)[\s\S]*?await doPrintOrder\(_pendingPrintOrder\)[\s\S]*?if\(confirmed\)\{[\s\S]*?closeModal\('printPreviewModal'\)/);
+  assert.match(source, /await window\.FlameChickQZ\.printReceipt\(receiptOrder,'Counter Receipt',printSettings\.qzPrinterName\)/);
+  assert.match(source, /await window\.FlameChickQZ\.printReceipt\(o,label,printSettings\.qzPrinterName\)/);
+});
+
+test('browser print remains the fallback route but is not mistaken for confirmed QZ completion', function () {
+  assert.match(source, /area\.innerHTML=receiptHtml;\s*window\.print\(\);[\s\S]*?return false;/);
+  assert.match(source, /lastReceiptPrintError=lastReceiptPrintError\|\|'Browser print was opened, but completion cannot be confirmed here\.'/);
+});
+
+test('the manual Delivery button has a synchronous re-entrancy guard, spinner and disabled state', function () {
+  assert.match(source, /if\(orderActionInProgress\)return false/);
+  assert.match(source, /orderActionInProgress=true/);
+  assert.match(source, /showDeliverySpinner[\s\S]*?btn\.disabled=true/);
+  assert.match(source, /button-spinner/);
+  assert.match(source, /finally\{[\s\S]*?btn\.disabled=wasDisabled/);
+});

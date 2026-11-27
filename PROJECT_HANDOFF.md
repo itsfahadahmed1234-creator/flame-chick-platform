@@ -1,3 +1,15 @@
+# CURRENT POS UI FIX — 2026-11-27
+
+The current isolated POS UI task is tracked on branch \`fix/pos-manual-delivery-receipt-print-ux-2026-11-27\` (base \`acaaea765039a7dadd9eb0388136cc0cf6c127e2\`). Read \`docs/handoffs/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md\` and \`docs/handoffs/2026-11-27-cloudflare-pos-hosting-continuation.md\` first.
+
+- Do not push POS source to \`work/production-source-audit\`; it is wired to auto-deploy the live Worker.
+- Fixes: Manual Delivery spinner + double-click guard; await QZ print completion before closing receipt popups; keep failures/cancellations open and retryable.
+- Keep existing QZ routing/signing, receipt content, order/payment logic and browser fallback.
+- No Production orders/payments or physical print jobs during QA. Do not clear IndexedDB/browser storage.
+- No deployment without explicit user approval. Live Worker remains version 6.
+
+---
+
 # NEW-CHAT EXECUTION DIRECTIVE — POS CLOUDFARE DEPLOYMENT
 
 **This is the next task. Continue the existing Flame Chick POS work; do not restart the project.**

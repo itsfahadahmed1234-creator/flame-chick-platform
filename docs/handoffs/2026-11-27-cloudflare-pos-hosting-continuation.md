@@ -1,3 +1,17 @@
+# CURRENT STATUS — POS MANUAL DELIVERY / RECEIPT PRINT UX FIX IN PROGRESS
+
+> Latest checkpoint: \`docs/handoffs/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md\`
+
+- Work is isolated on \`fix/pos-manual-delivery-receipt-print-ux-2026-11-27\`, based on \`work/production-source-audit\` at \`acaaea765039a7dadd9eb0388136cc0cf6c127e2\`.
+- Do not push POS source to \`work/production-source-audit\`; Cloudflare Workers Builds watches that branch and would auto-deploy the live POS.
+- Scope: Manual Delivery Place Order loading/rapid-click guard; receipt modal and print-preview close only after the existing QZ Promise confirms success; failed/cancelled attempts keep the relevant popup open and retryable.
+- Existing QZ-first/browser-fallback routing, receipt content, QZ signer and payment/order logic remain unchanged. Browser \`window.print()\` cannot affirm a completed print; fallback remains available but does not auto-close the popup.
+- Mock regression coverage and a feature-branch-only GitHub Actions workflow are being added. Read the minutes file above before continuation and record the exact CI result/commit.
+- Production Worker remains \`flamechickpos\` version 6 at https://flamechickpos.itsfahadahmed1234.workers.dev. No deployment is authorized.
+- Private minutes archive is blocked: account R2 is not enabled, KV/D1 are absent, and no billing/plan settings were changed. See the minutes file for the exact Cloudflare error and pending object path.
+
+---
+
 # CURRENT STATUS — POS HOSTING COMPLETE; NEXT TASK IS MANUAL DELIVERY UX (2026-11-27)
 
 > **Read this section first.** The deployment setup instructions in the historical record below have been completed and are superseded by this current status. Do not create another Worker or repeat the hosting migration.
