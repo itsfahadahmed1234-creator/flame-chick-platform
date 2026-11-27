@@ -321,7 +321,7 @@ test("optional customer email validation accepts standard addresses in both chec
   const validator = new RegExp(pattern.slice(1, lastSlash), pattern.slice(lastSlash + 1));
   assert.equal(validator.test("customer@example.com"), true);
   assert.equal(validator.test("not-an-email"), false);
-  assert.match(order, /if \(!isValidEmail\(email\)\) return false;/);
+  assert.match(order, /if \(!isValidEmail\(email\)\) errors\['customer-email'\] =/);
   assert.match(order, /if \(!isValidEmail\(email\)\) throw new Error\('Enter a valid email address\.'\);/);
 });
 

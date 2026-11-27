@@ -346,6 +346,7 @@ test('display estimate fails closed for unsafe published values', () => {
 
 test('fixed component group requirements use exact quantity wording rather than a confusing range', () => {
   const ui = create();
+  assert.equal(ui.selectVariant(IDS.dealVariant).ok, true);
   const result = ui.validate();
   assert.equal(result.ok, false);
   assert.match(result.message, /Choose exactly 1 item for Choose your burger/);
