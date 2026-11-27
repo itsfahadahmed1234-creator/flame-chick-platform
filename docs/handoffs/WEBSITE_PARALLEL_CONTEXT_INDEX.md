@@ -2,6 +2,14 @@
 
 > Entry point for continuing the customer Website. Read the linked handoffs and establish an overview before editing code.
 
+## Latest hosting checkpoint — 27 November 2026 — Cloudflare Git connection verified; Pages setup pending
+
+Read [Cloudflare hosting transition handoff](../operations/2026-11-27-cloudflare-hosting-transition-handoff.md) first for the exact connection state and next steps. Cloudflare is authenticated to the expected account and has confirmed the GitHub repository connection through a Workers Build configuration. That first resource is a Worker, not Pages, and its build failed because Wrangler could not find a static assets directory at the repository root. The Pages project inventory remains empty. Create four separate Pages projects for the Website, POS, Admin and Rider apps; do not repeat the root-level Worker deployment setup.
+
+Latest verified Vercel Website Production remains deployment `dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy`, READY / Production, branch `work/website-parallel-development`, commit `c57be50d1674e597693117d1f39867c4c042f43a`. A newer project-level `latestDeployment` is only a Preview from `work/production-source-audit`; it is not Production. Keep Vercel available until all four Cloudflare Pages apps are built, smoke-tested and the user approves cutover.
+
+A newer Website reliability candidate exists on `work/website-reliability-phase1-review` at `9bd5f81ca59d80da7192c96d6aa8e694bfbb03e5`; matching Website CI passed, but the candidate is not live Vercel Production and must be compared/reconciled before Cloudflare Production release. Do not blindly deploy `main`, C57 or unrelated POS/production-source-audit work.
+
 ## Latest status — 27 November 2026 — UI audit completed; corrections pending
 
 The live customer Website was tested by OpenCode with Playwright/Chrome at 1440×900, 390×844, 360×800 and 320×568. The production snapshot used for the audit is commit `c57be50d1674e597693117d1f39867c4c042f43a` and deployment URL `https://flame-chick-website-production.vercel.app`. The audit confirmed 10 UI defects (C1–C10), while catalogue selection, cart calculations, fulfilment switching and delivery-fee calculations passed. No source files, cookies/storage or Production data were changed; no Place Order/Retry action or non-GET request occurred. Read the new [27 November Website UI reliability continuation handoff](2026-11-27-website-ui-reliability-next-session.md) for exact findings, source causes, test coverage and the phased correction plan. The prior [source/catalogue/API audit](../audits/FLAME_CHICK_WEBSITE_AUDIT_2026-11-27.md) remains complementary background.
@@ -10,12 +18,13 @@ The current Website source branch checkpoint for the handoff is `6fccc8c958463cc
 
 ## Read-first sequence
 
-1. Read the repository root [PROJECT_HANDOFF.md](../../PROJECT_HANDOFF.md). It is a large historical record; search its current checkpoints and project-wide decisions instead of treating old statements as current.
-2. Read this index.
-3. Read the current [26 November FahaD Website Production environment handoff](../operations/2026-11-26-new-vercel-website-production-handoff.md).
-4. Read the complete [25 November Website parallel-development audit](2026-11-25-website-parallel-audit.md) for the Website architecture and file map.
-5. Read the [27 November Website UI reliability continuation handoff](2026-11-27-website-ui-reliability-next-session.md) for current Playwright findings and the pending source-fix sequence.
-6. Use the earlier [Preview/one-step checkout addendum](../operations/2026-11-26-website-preview-one-step-checkout.md) as historical context only; its Vercel project/team/host details are superseded.
+1. Read the repository root [PROJECT_HANDOFF.md](../../PROJECT_HANDOFF.md) and repository [README](../../README.md).
+2. Read the latest [Cloudflare hosting transition handoff](../operations/2026-11-27-cloudflare-hosting-transition-handoff.md).
+3. Read this Website context index.
+4. Read the [27 November Website UI reliability continuation handoff](2026-11-27-website-ui-reliability-next-session.md) for current Playwright findings and pending fixes.
+5. Read the [26 November FahaD Website Production environment handoff](../operations/2026-11-26-new-vercel-website-production-handoff.md) for prior environment history, using the newer Cloudflare handoff for current deployment identities.
+6. Read the complete [25 November Website parallel-development audit](2026-11-25-website-parallel-audit.md) for the Website architecture and file map.
+7. Use the earlier [Preview/one-step checkout addendum](../operations/2026-11-26-website-preview-one-step-checkout.md) as historical context only; its Vercel project/team/host details are superseded.
 
 **Before making changes:** provide the user with a concise, evidence-based project overview, state which exact deployment and branch are active, identify relevant dependencies and unresolved risks, and confirm the proposed Place Order fix scope. Do not start by rebuilding the Website or making speculative edits.
 
