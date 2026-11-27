@@ -31,7 +31,7 @@
 
   var state = {
     snapshot: null, databaseNow: null, websiteContext: null,
-    branchSelection: null, preview: null, cart: [],
+    branchSelection: null, cart: [],
     deliveryAreasBranchId: null,
     checkoutRequestId: null, checkoutBody: null, checkoutUncertain: false,
     productDialog: null, dealConfigurator: null,
@@ -53,10 +53,6 @@
     var node = $('order-status');
     node.textContent = message;
     node.className = 'order-status' + (kind ? ' ' + kind : '');
-  }
-
-  function pageStatus() {
-    /* Catalog status UI intentionally removed; failures remain visible in the menu/cart context. */
   }
 
   function orderWritesAllowed() {
@@ -102,7 +98,6 @@
     if (preview) {
       $('fc-preview-checkout-notice').textContent =
         'Preview mode: menu prices and delivery fees are shown from Supabase. Live order submission is disabled on this Preview.';
-      $('place-order').disabled = true;
       $('place-order').disabled = true;
       $('retry-order').disabled = true;
     }
@@ -154,17 +149,6 @@
     } finally {
       if (timer) clearTimeout(timer);
     }
-  }
-
-  async function loadWebsiteContext() {
-    var result = await orderApi('GET', 'view=website_context');
-    if (!result.data || result.data.schemaVersion !== 3 ||
-        !Array.isArray(result.data.branches) || !result.data.branches.length ||
-        typeof result.data.publicationId !== 'string' || typeof result.data.versionId !== 'string' ||
-        typeof result.data.databaseNow !== 'string') {
-      throw new Error('Branch ordering context is incomplete.');
-    }
-    return result.data;
   }
 
   function overlayCurrentBranches(snapshot, context) {
@@ -564,8 +548,13 @@
     );
     if (!model || model.ok !== true) {
       status(model?.message || 'The published product menu could not be built.', 'error');
-      $('product-catalog').replaceChildren();
-      $('product-category-nav').replaceChildren();
+      $('catsIn').replaceChildren();
+      $('menuRoot').replaceChildren();
+      $('products-empty').hidden = false;
+      $('products-empty').textContent = model?.message || 'The published product menu is unavailable.';
+      $('deal-catalog').replaceChildren();
+      $('deals-empty').hidden = false;
+      $('deals-empty').textContent = 'Published deals are unavailable because the product menu could not be built.';
       return;
     }
     state.productModel = model;
@@ -1400,7 +1389,6 @@
   }
 
   async function start() {
-    pageStatus('Loading and verifying published menu…', 'loading');
     status('Checking the published menu and current branch settings…');
     try {
       var results = await Promise.all([
@@ -1437,14 +1425,10 @@
       state.loaded = true;
       if ($('publication-meta')) $('publication-meta').hidden = true;
       var previewReadOnly = applyPreviewReadOnlyMode();
-      pageStatus(previewReadOnly
-        ? 'Published menu verified · Website Preview only · checkout disabled.'
-        : 'Published menu verified.', 'ready');
       renderCatalog();
       renderCart();
       syncFulfilmentControls();
     } catch (error) {
-      pageStatus(error.message || 'Online ordering is unavailable. No order has been submitted.', 'error');
       status(error.message || 'Could not load the published menu.', 'error');
     }
   }
