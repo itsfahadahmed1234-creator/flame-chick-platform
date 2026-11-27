@@ -43,10 +43,11 @@ jobs:
           cache-dependency-path: apps/flame-chick-pos/package.json
       - name: Install pinned Wrangler
         run: npm install --no-audit --no-fund
-      - name: Test Worker and build public assets
+      - name: Test Worker, build public assets, and validate Wrangler bundle
         run: |
           npm run test:cloudflare
           npm run build
+          npx wrangler deploy --dry-run --outdir /tmp/flamechickpos-dry-run --config wrangler.jsonc
       - name: Configure Cloudflare Builds and trigger POS deployment
         shell: bash
         run: |
