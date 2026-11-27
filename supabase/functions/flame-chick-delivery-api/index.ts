@@ -266,18 +266,22 @@ async function isActiveRider(userId: string, token: string, apiKey: string) {
     return { ok:false as const, status:403, body:{ ok:false, error:{ code:"RIDER_BRANCH_SELECTION_REQUIRED", message:"Your rider account is assigned to multiple branches. Ask the administrator to configure a single Rider branch before signing in." } } };
   }
   const riderRole = riderRoles[0];
+  const riderBranchId = typeof riderRole.branch_id === "string" ? riderRole.branch_id : "";
+  if (!riderBranchId) {
+    return { ok:false as const, status:403, body:{ ok:false, error:{ code:"RIDER_ROLE_REQUIRED", message:"This account does not have an active Flame Chick rider role for a branch." } } };
+  }
   const profileQuery = new URLSearchParams();
   profileQuery.set("select", "user_id,branch_id,is_active");
   profileQuery.set("user_id", "eq." + userId);
-  profileQuery.set("branch_id", "eq." + riderRole.branch_id);
+  profileQuery.set("branch_id", "eq." + riderBranchId);
   profileQuery.set("is_active", "eq.true");
   const profileResult = await readAsService("rider_profiles?" + profileQuery.toString());
   if (!profileResult.ok) return { ok:false as const, status:profileResult.status, body:profileResult.body };
   const profiles = Array.isArray(profileResult.data) ? profileResult.data : [];
-  if (!profiles.some((row) => isObject(row) && row.user_id === userId && row.branch_id === riderRole.branch_id && row.is_active === true)) {
+  if (!profiles.some((row) => isObject(row) && row.user_id === userId && row.branch_id === riderBranchId && row.is_active === true)) {
     return { ok:false as const, status:403, body:{ ok:false, error:{ code:"RIDER_PROFILE_REQUIRED", message:"Your active rider profile is missing for this branch." } } };
   }
-  return { ok:true as const, branchId:riderRole.branch_id };
+  return { ok:true as const, branchId:riderBranchId };
 }
 
 export async function handleDeliveryApiRequest(req: Request): Promise<Response> {
