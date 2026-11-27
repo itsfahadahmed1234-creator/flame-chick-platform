@@ -207,4 +207,11 @@ The Customer Website is now deployed to Cloudflare Pages Production at https://f
 - Pages environment variables: none. Browser config uses the existing Supabase Production URL and public publishable key only.
 - Previous Pages project is preserved as flamechick-legacy at flame-chick-website.pages.dev; automatic production/preview builds are disabled. Vercel C57 is still online and unchanged as fallback.
 
-This is a static release/hosting checkpoint, not completion of all runtime QA. The new Pages deployment passed Cloudflare's API stages. Read-only connected-browser catalogue inspection previously used the former hostname; the new hostname still requires its own interaction walk-through and signed-in API checks. Do not submit Place Order or Retry on Production. No Supabase data, schema, functions, Realtime, orders, payments, DNS, Vercel aliases or projects were modified. POS is controlled by the separate conversation; Admin/Rider hosting are pending.
+The new Pages deployment passed Cloudflare's API stages. The user subsequently confirmed that flamechick.pages.dev interactions work and that submitted Website orders reach POS. This is user-reported operational verification; the assistant did not independently inspect POS order records. No further test order is needed for this checkpoint. No Supabase data, schema, functions, Realtime, orders, payments, DNS, Vercel aliases or projects were modified. POS is controlled by the separate conversation; Admin/Rider hosting are pending.
+
+
+## User-confirmed live Website-to-POS verification — 27 November 2026
+
+The user reports they personally tested the Cloudflare Production Website at https://flamechick.pages.dev/, confirmed that its interactions work, and confirmed that submitted Website orders reach the POS. Record this as **user-verified Website-to-POS operational behaviour**. This supersedes the earlier statement that signed-in interaction and order handoff had not yet been checked.
+
+The verification is user-reported in chat; the assistant did not independently open POS order records or inspect order IDs. Do not describe this as an independently reproduced test. No additional test order, Retry, schema change, Edge Function change, DNS change or Vercel cutover is implied by this confirmation. Keep Vercel C57 intact as fallback until the user approves any cutover.

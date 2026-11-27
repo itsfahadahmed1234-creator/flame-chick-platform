@@ -178,3 +178,10 @@ The Customer Website is deployed under the exact requested Cloudflare hostname.
 ### Verification limits and scope
 
 The new Cloudflare deployment is API-verified as canonical and successful. The former Pages hostname previously rendered the catalogue and deals in the connected browser; the new flamechick.pages.dev hostname still needs its own full interactive smoke test. No Place Order/Retry was clicked. Supabase Production was unchanged. POS belongs to the other conversation; Admin/Rider remain pending.
+
+
+## User-confirmed live Website-to-POS verification — 27 November 2026
+
+The user reports they personally tested the Cloudflare Production Website at https://flamechick.pages.dev/, confirmed that its interactions work, and confirmed that submitted Website orders reach the POS. Record this as **user-verified Website-to-POS operational behaviour**. This supersedes the earlier statement that signed-in interaction and order handoff had not yet been checked.
+
+The verification is user-reported in chat; the assistant did not independently open POS order records or inspect order IDs. Do not describe this as an independently reproduced test. No additional test order, Retry, schema change, Edge Function change, DNS change or Vercel cutover is implied by this confirmation. Keep Vercel C57 intact as fallback until the user approves any cutover.

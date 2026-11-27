@@ -31,7 +31,7 @@ The top-level Production handoff records the seven operational migrations as app
 - **Deployment:** 07297e8b-e79d-46ae-9696-78be7f28c7f8 (READY; all Cloudflare stages successful)
 - **Vercel fallback:** project flame-chick-website-production; unchanged Production deployment dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy, commit c57be50d1674e597693117d1f39867c4c042f43a.
 
-The new Pages hostname has an exact allowlist entry for Website order writes; arbitrary Pages previews/deployment hostnames remain blocked. Static assets and the published catalogue were verified on the earlier Pages hostname. The new hostname's full interactive and signed-in API smoke test remains pending. Do not submit Place Order or Retry against Production without a separately approved safe test procedure. No DNS/domain cutover has occurred.
+The new Pages hostname has an exact allowlist entry for Website order writes; arbitrary Pages previews/deployment hostnames remain blocked. The user has confirmed that the live Website interactions work and that submitted Website orders reach POS. Treat this as user-verified operational behaviour; the assistant has not independently inspected POS order records. Do not submit Place Order or Retry against Production without a separately approved safe test procedure. No DNS/domain cutover has occurred.
 
 ## Repository layout
 

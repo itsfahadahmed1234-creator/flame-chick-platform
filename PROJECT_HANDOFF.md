@@ -5269,3 +5269,10 @@ The previous Pages project ID de453d35-d86f-4c42-8f68-737f2bd77ab9 has been rena
 - POS remains owned by the separate conversation. Admin and Rider Cloudflare deployment remain pending.
 
 **Current next action:** complete read-only functional smoke testing of flamechick.pages.dev while preserving Vercel and flamechick-legacy. Do not perform domain/DNS cutover without explicit approval.
+
+
+## User-confirmed live Website-to-POS verification — 27 November 2026
+
+The user reports they personally tested the Cloudflare Production Website at https://flamechick.pages.dev/, confirmed that its interactions work, and confirmed that submitted Website orders reach the POS. Record this as **user-verified Website-to-POS operational behaviour**. This supersedes the earlier statement that signed-in interaction and order handoff had not yet been checked.
+
+The verification is user-reported in chat; the assistant did not independently open POS order records or inspect order IDs. Do not describe this as an independently reproduced test. No additional test order, Retry, schema change, Edge Function change, DNS change or Vercel cutover is implied by this confirmation. Keep Vercel C57 intact as fallback until the user approves any cutover.

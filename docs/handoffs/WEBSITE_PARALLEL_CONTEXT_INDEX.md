@@ -14,7 +14,7 @@ Customer Website Cloudflare Pages Production is now READY:
 - Matching Website Static Checks run 45981432738 passed.
 - Exact flamechick.pages.dev hostname is allowed by the strict checkout guard; arbitrary Pages previews stay blocked.
 - The old Pages URL remains preserved under flamechick-legacy, with automatic deployments disabled. Vercel C57 remains unchanged fallback.
-- Cloudflare API deployment stages all passed. The earlier Pages hostname rendered the catalogue in-browser; full interactive testing of the new hostname and checkout/API connectivity remain pending. Do not click Place Order/Retry on Production without a separately approved procedure.
+- Cloudflare API deployment stages all passed. The user has confirmed the new flamechick.pages.dev Website interactions work and that submitted Website orders reach POS. This is user-reported end-to-end verification; the assistant did not independently inspect POS order records.
 - POS is handled in another conversation. Admin/Rider remain pending. Supabase and DNS/Vercel are unchanged.
 
 ## Historical hosting checkpoint — 27 November 2026 — initial Cloudflare Git connection and Pages plan

@@ -62,5 +62,12 @@ The read-only Playwright/Chrome customer journey test is complete. It covered 14
 - Source branch work/website-reliability-phase1-review; exact deployed commit 2a63046e1e5d81ced272acc08b17c1a3021b779d. Static Checks run 45981432738 passed.
 - Exact flamechick.pages.dev was added to the strict checkout host allowlist. The previous hostname flame-chick-website.pages.dev stays allowed during transition; unrecognized Pages previews/deployment hosts stay blocked.
 - Old Pages project is preserved as flamechick-legacy at flame-chick-website.pages.dev; its automatic Production/Preview deployments are disabled. Vercel C57 remains untouched as a fallback.
-- The new hostname's complete interactive/cart/checkout API walkthrough remains pending. Do not create a real order by clicking Place Order or Retry.
+- The user subsequently confirmed that interactions on flamechick.pages.dev work and that submitted Website orders reach POS. This is user-reported verification; the assistant did not independently inspect POS order records. Do not create further Production orders just to repeat this confirmation.
 - POS migration is managed by a separate conversation. Admin/Rider still pending. Supabase Production and DNS were not changed.
+
+
+## User-confirmed live Website-to-POS verification — 27 November 2026
+
+The user reports they personally tested the Cloudflare Production Website at https://flamechick.pages.dev/, confirmed that its interactions work, and confirmed that submitted Website orders reach the POS. Record this as **user-verified Website-to-POS operational behaviour**. This supersedes the earlier statement that signed-in interaction and order handoff had not yet been checked.
+
+The verification is user-reported in chat; the assistant did not independently open POS order records or inspect order IDs. Do not describe this as an independently reproduced test. No additional test order, Retry, schema change, Edge Function change, DNS change or Vercel cutover is implied by this confirmation. Keep Vercel C57 intact as fallback until the user approves any cutover.
