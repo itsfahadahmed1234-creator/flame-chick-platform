@@ -87,11 +87,11 @@
           <article class="surface"><div class="surface-head"><div><h3>Order mix</h3><p class="muted">Today's fulfilment types</p></div></div><div class="mix-list" id="todayMix"><div class="empty-state">Loading order mix…</div></div></article>
         </div>
         <div class="surface sales-overview-card">
-          <div class="sales-overview-head"><div><span class="eyebrow">SALES OVERVIEW</span><h3>Order value performance</h3><p class="muted" id="salesRangeCaption">Last 7 days</p></div>
-            <div class="range-switch dashboard-range-switch" id="rangeSwitch"><button data-range="today">Today</button><button data-range="7" class="selected">7 Days</button><button data-range="14">14 Days</button><button data-range="30">30 Days</button><button data-range="this_month">This Month</button><button data-range="previous_month">Previous Month</button><button data-range="month">Month</button><input type="month" id="dashboardMonth" aria-label="Select dashboard month" hidden></div>
+          <div class="sales-overview-head"><div><span class="eyebrow">SALES OVERVIEW</span><h3>Order value performance</h3><p class="muted" id="salesRangeCaption">Today</p><p class="muted" id="historyLoadHint">Today only · choose a longer period to load history.</p></div>
+            <div class="range-switch dashboard-range-switch" id="rangeSwitch"><button data-range="today" class="selected">Today</button><button data-range="7">7 Days</button><button data-range="14">14 Days</button><button data-range="30">30 Days</button><button data-range="this_month">This Month</button><button data-range="previous_month">Previous Month</button><button data-range="month">Month</button><input type="month" id="dashboardMonth" aria-label="Select dashboard month" hidden></div>
           </div>
           <div class="sales-kpis"><div><small>Period total</small><b id="periodSales">—</b></div><div><small>Orders</small><b id="periodOrders">—</b></div><div><small>Daily average</small><b id="periodAverage">—</b></div><div><small>Best day</small><b id="periodBestDay">—</b></div></div>
-          <div class="sales-chart-legend"><span><i></i> Daily order value</span><span id="periodComparison">vs previous period</span></div><div id="trendChart" class="trend-chart dashboard-sales-chart"><div class="empty-state">Loading sales…</div></div>
+          <div class="sales-chart-legend"><span><i></i> Daily order value</span><span id="periodComparison">History not loaded</span></div><div id="trendChart" class="trend-chart dashboard-sales-chart"><div class="empty-state">Loading sales…</div></div>
         </div>
         <div class="surface rush-card">
           <div class="rush-head"><div><span class="eyebrow">RUSH HOURS</span><h3>Hourly activity</h3><p class="muted" id="rushCaption">Orders by hour · 11 AM → 12 AM</p></div>
@@ -99,8 +99,8 @@
           </div>
           <div class="rush-summary" id="rushSummary"><div class="empty-state">Loading hourly activity…</div></div><div class="rush-chart" id="rushChart"><div class="empty-state">Loading hourly activity…</div></div><div class="rush-foot" id="rushFoot">Hourly activity is calculated from actual placed orders.</div>
         </div>
-        <div class="dashboard-section-head weekly-section-head"><div><h3>Weekly performance</h3><p class="muted" id="weekCaption">Current week</p></div></div>
-        <div class="metric-grid weekly-metric-grid">
+        <div id="weeklyHistoryHeading" class="dashboard-section-head weekly-section-head" hidden><div><h3>Weekly performance</h3><p class="muted" id="weekCaption">Current week</p></div></div>
+        <div id="weeklyHistoryMetrics" class="metric-grid weekly-metric-grid" hidden>
           <article class="metric-card"><div class="metric-top"><span>TOTAL ORDERS</span><span class="metric-icon red">▤</span></div><div class="metric-value" id="weekOrders">—</div><div class="metric-foot">This week</div></article>
           <article class="metric-card"><div class="metric-top"><span>TOTAL SALES</span><span class="metric-icon gold">₨</span></div><div class="metric-value" id="weekSales">—</div><div class="metric-foot">Valid order value</div></article>
           <article class="metric-card"><div class="metric-top"><span>AVG ORDER VALUE</span><span class="metric-icon green">↗</span></div><div class="metric-value" id="weekAov">—</div><div class="metric-foot">This week</div></article>
@@ -109,7 +109,7 @@
           <article class="metric-card"><div class="metric-top"><span>DINE-IN ORDERS</span><span class="metric-icon purple">▦</span></div><div class="metric-value" id="weekDineIn">—</div><div class="metric-foot" id="weekDineInCaption">Dine-in orders</div></article>
         </div>
         <div class="dashboard-grid dashboard-bottom-grid">
-          <article class="surface comparison-card"><div class="surface-head"><div><h3>This week vs last week</h3><p class="muted">Like-for-like weekly comparison</p></div></div><div id="weekComparison" class="comparison-list"><div class="empty-state">Loading weekly comparison…</div></div></article>
+          <article id="weeklyComparisonCard" class="surface comparison-card" hidden><div class="surface-head"><div><h3>This week vs last week</h3><p class="muted">Like-for-like weekly comparison</p></div></div><div id="weekComparison" class="comparison-list"><div class="empty-state">Loading weekly comparison…</div></div></article>
           <article class="surface watch-card"><div class="surface-head"><div><h3>Operational watch</h3><p class="muted">Latest order and oldest active orders</p></div><span class="watch-count" id="watchCount">0</span></div><div id="latestOrder" class="latest-order"><div class="empty-state">Loading latest order…</div></div><div class="attention-title">Oldest active orders <span id="attentionCount">0</span></div><div id="watchList" class="watch-list"><div class="empty-state">Checking delayed orders…</div></div></article>
         </div>
         <article class="surface recent-card dashboard-recent-card"><div class="surface-head"><div><h3>Recent orders</h3><p class="muted">Newest first · latest 8</p></div><span class="small-label">LIVE BRANCH DATA</span></div><div class="table-wrap"><table><thead><tr><th>ORDER ID</th><th>CUSTOMER</th><th>FULFILMENT</th><th>TOTAL</th><th>STATUS</th><th>TIME</th></tr></thead><tbody id="recentOrders"><tr><td colspan="6" class="empty-cell">Loading recent orders…</td></tr></tbody></table></div></article>
