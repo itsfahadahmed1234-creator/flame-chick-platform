@@ -1,3 +1,15 @@
+# CURRENT WEBSITE CONTINUATION — 2026-11-27
+
+**Read this first for the current Website task:** [27 November Website UI reliability handoff](docs/handoffs/2026-11-27-website-ui-reliability-next-session.md). Then read [Website context index](docs/handoffs/WEBSITE_PARALLEL_CONTEXT_INDEX.md), [current Website environment handoff](docs/operations/2026-11-26-new-vercel-website-production-handoff.md), [Website parallel-development audit](docs/handoffs/2026-11-25-website-parallel-audit.md), and [Website source/catalogue/API audit](docs/audits/FLAME_CHICK_WEBSITE_AUDIT_2026-11-27.md).
+
+The OpenCode Playwright audit of the live customer Website is complete (27 Nov 2026): desktop 1440×900 and mobile 390×844, 360×800, 320×568. It confirmed ten UI defects (C1–C10), while product/cart/deal calculations and Delivery/Takeaway/delivery-fee switching passed. No source files, browser storage, Production data or orders were changed; Place Order/Retry was not clicked and no non-GET request was observed. The current task is to fix those UI findings on `work/website-parallel-development`, starting with legacy page-load errors, cart focus management, status lifecycle/styling and deal-price visibility. The live site C57 snapshot remains the evidence baseline; compare the current branch source before editing because cleanup source and deployed source are not identical.
+
+**User environment:** ChatGPT Web Free (no Work mode available); user has OpenCode + DeepSeek 4.1 Flash and Playwright/Chrome for interactive browser work. Do not tell the user to switch to Work mode; use OpenCode evidence and continue collaborating step by step.
+
+**Hard boundaries:** no Production deployments/promotions/alias changes, order submissions, Supabase writes/migrations, Edge Function changes/secrets, catalog publication changes or cross-app POS/Admin/Rider changes without explicit user approval. Never click Place Order/Retry during QA on the order-writable customer hostname. GST remains deferred. This handoff is documentation only; C1–C10 corrections have not yet been implemented.
+
+---
+
 # PRODUCTION OPERATIONAL MIGRATIONS — APPLIED
 **Updated:** 2026-11-24 08:35 PKT
 **Production project:** adkrxfnawdiljhjaavnj (Flame Chick Production, ap-south-1, Free)
