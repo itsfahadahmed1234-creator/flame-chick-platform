@@ -5530,3 +5530,20 @@ No Production deployment, DB changes, migrations, Edge Function changes, alias s
 - Log-load source changes use the private staff-context projection, 15-second warm-isolate cache, and coalesced branch expiry sweep. Auth user validation still occurs for every request; the rider offer expiry deadline and Realtime fallback schedule are unchanged.
 - A control-flow error in the Order API context cache was caught during review and repaired in commit `43cf1b579801b8395aad7ab103e2a7780a3c4d18`. The cache now stores a constructed `StaffContext` before returning it.
 - These changes remain source-only. No migration has been applied, no Edge Function deployed, no Production order/payment created, and no Vercel Production deployment performed. Do not use the current Production backend to functionally test Preview until the migration and both Edge Functions are separately approved and deployed.
+
+
+---
+
+## Admin dashboard summary — database installed, API/Pages rollout pending (2026-11-27)
+
+- Work is isolated on `work/admin-dashboard-release`; source integration commit before this checkpoint: `18382fac91048c284066a4403d4f8e1a2ecbf0d5`. Do not treat this branch as the live Pages production branch.
+- Applied Supabase Production migration `20261127164728_flame_chick_admin_dashboard_summary_v1` to project `adkrxfnawdiljhjaavnj` (Mumbai, Free). Migration adds only:
+  - `app_private.flame_chick_admin_dashboard_internal(jsonb)`: narrowly scoped `SECURITY DEFINER` aggregate implementation with empty search path, JWT actor derivation using `auth.uid()`, global active Admin/Owner check, active Flame Chick tenant and active branch validation.
+  - `public.flame_chick_admin_dashboard(jsonb)`: `SECURITY INVOKER` API wrapper.
+- Execute privileges: `authenticated` only. `anon` cannot execute either function. No broad table grants, order-row REST access, new tables, indexes, service-role browser use or new secrets were introduced.
+- The request accepts exactly 13 named branch/time fields. Database validates JSON shape, UUID, UTC timestamp syntax, ordered/bounded date ranges (daily <=2 days, period/rush <=366 days, weekly <=8 days), then derives actor/tenant/branch from trusted DB state.
+- Metrics: order counts include every status; order value and AOV exclude `cancelled` and `rejected`; daily/hourly grouping uses `Asia/Karachi`; fulfilment counts recognize canonical `delivery`, `pickup`, `dine_in`; oldest active queue includes `new`, `accepted`, `preparing`, `ready`, `out_for_delivery`, sorted oldest-first and limited to six while `attention_count` counts all. The UI label is **Oldest active orders**, not a delay/SLA claim.
+- SQL smoke test was executed using the active Flame Chick Admin identity and Main branch. Response shape matched the dashboard UI: 22 orders / PKR 67,691 order value today; 35 orders / PKR 93,618 over the selected 7-day window; 13 rush-hour buckets; eight recent-order slots; attention count 14. These are point-in-time order-value metrics, not payment settlement data. Test was read-only; no customer orders/payments were inserted or updated.
+- A Rider-authenticated negative check failed as designed with `ADMIN_DASHBOARD_ADMIN_REQUIRED`. Privilege audit confirmed invoker wrapper, definer private helper, authenticated grants, and anon revocation.
+- The Admin frontend and finite `dashboard_summary` Staff Admin route are committed on the isolated work branch. The Edge Function has **not yet been deployed**, and Cloudflare Pages has **not yet been deployed** from this branch. The live Pages source remains `cloudflare/admin-production`; avoid triggering preview or intermediate Pages builds.
+- Next gates: sync this migration and handoff into the branch; run Admin and Edge Function CI; deploy Staff Admin Edge Function with `verify_jwt=true` and caller JWT forwarding; verify deployed function; then perform the one consolidated Admin Pages production promotion/deployment and verify the live dashboard. Keep Vercel fallbacks and all POS/Website/Rider/Worker behaviour untouched.

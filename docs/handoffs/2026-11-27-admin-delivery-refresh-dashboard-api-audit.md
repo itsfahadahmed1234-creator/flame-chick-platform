@@ -83,3 +83,41 @@ A read-only Production catalog scan of database functions across schemas found n
 - App change: editor-specific refresh callback for Delivery Areas only.
 - No Supabase SQL, grants, RLS, Edge Function, Auth setting, secret, POS, Rider or Website changes.
 - CI and Cloudflare deployment results are recorded in the follow-up completion section once available.
+
+
+---
+
+## Implementation checkpoint — database function installed (2026-11-27)
+
+The earlier section records the pre-implementation investigation. The design is now implemented in Supabase Production and the Admin app/Edge route is prepared on isolated branch `work/admin-dashboard-release`.
+
+### Database implementation
+
+Migration: `20261127164728_flame_chick_admin_dashboard_summary_v1` on Production project `adkrxfnawdiljhjaavnj`.
+
+- `app_private.flame_chick_admin_dashboard_internal(jsonb)` is `SECURITY DEFINER`, fixed empty search path. It derives the actor only from `auth.uid()`; requires an active profile/Auth user and an active restaurant-wide `admin` or `owner` role for the Flame Chick tenant; validates the requested active branch belongs to that tenant.
+- `public.flame_chick_admin_dashboard(jsonb)` is `SECURITY INVOKER`. Execute is granted only to `authenticated`; execute is revoked from `PUBLIC`, `anon` and `service_role`. The private helper is not directly API exposed.
+- No table SELECT grants, RLS policy changes, table/index additions or data writes were made.
+- Exactly 13 payload keys are required. Additional keys (including caller-supplied actor/role fields) are rejected. Database validates UUID/timestamps and bounded ordered windows.
+- The function returns a minimal DTO matching the Admin dashboard renderer: today/status/order mix, selected-period and previous-period totals, Karachi-local daily series, weekly/previous-week metrics, 11:00–23:00 rush buckets, latest eight orders, and six oldest operationally active orders plus a total count.
+- Counts include all order statuses; order value and average order value exclude `cancelled` and `rejected`. "Sales" here means order value from `orders.total`, not actual collection/settlement. GST and tax logic remain deferred. Fulfilment values are canonical `delivery`, `pickup`, `dine_in`.
+- The active-order queue uses status values `new`, `accepted`, `preparing`, `ready`, `out_for_delivery`; it carries no delay threshold and is correctly titled **Oldest active orders**.
+
+### Verification
+
+- Authenticated Admin smoke test succeeded against the Production Main branch and returned the full expected JSON shape (today: 22 orders / PKR 67,691 order value; selected seven-day period: 35 orders / PKR 93,618).
+- Rider negative check was rejected by the database with `ADMIN_DASHBOARD_ADMIN_REQUIRED`.
+- Privilege audit confirmed `authenticated` execution allowed, `anon` execution denied for both functions; public wrapper is invoker and private aggregate function is definer.
+- No test orders/payments were created, updated or cancelled. Smoke checks were read-only and used a transaction rollback.
+- These are a database/API contract validation, not a browser end-to-end check.
+
+### Remaining rollout
+
+1. Repository migration and handoff sync on `work/admin-dashboard-release` (this checkpoint).
+2. Run Admin Static Checks and Edge Function Static Checks; do not claim pass until the run is reported.
+3. Deploy `flame-chick-staff-admin` with `verify_jwt=true`, its new `dashboard-actions.mjs` dependency, exact existing CORS policy and caller Bearer JWT forwarding. No service-role key is used for dashboard requests.
+4. Test deployed Staff Admin route without exposing order tables.
+5. Promote only the Admin changes to the Pages production branch and perform **one consolidated Cloudflare Pages build/deployment**. No intermediate Pages deployments or previews: preserve deployment minutes.
+6. Verify login and dashboard at `https://flamechickadmin.pages.dev`. Until verified, retain the existing Vercel fallback and keep other Admin modules gated.
+
+Do not modify POS, QZ signing Worker, Website, Rider, shared order lifecycle, Supabase tenant configuration, payment logic, GST/tax logic, or unrelated Cloudflare projects as part of this Admin dashboard rollout.
