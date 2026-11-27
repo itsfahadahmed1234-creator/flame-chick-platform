@@ -121,3 +121,27 @@ Migration: `20261127164728_flame_chick_admin_dashboard_summary_v1` on Production
 6. Verify login and dashboard at `https://flamechickadmin.pages.dev`. Until verified, retain the existing Vercel fallback and keep other Admin modules gated.
 
 Do not modify POS, QZ signing Worker, Website, Rider, shared order lifecycle, Supabase tenant configuration, payment logic, GST/tax logic, or unrelated Cloudflare projects as part of this Admin dashboard rollout.
+
+
+---
+
+## Latest rollout checkpoint — Staff Admin v9 deployed; Pages promotion pending (2026-11-27)
+
+### Confirmed
+
+- Supabase Production `flame-chick-staff-admin` deployed as **version 9**, with `verify_jwt=true`. The deployed bundle was inspected and contains the `dashboard_summary` POST dispatch, the fixed dashboard RPC helper module, existing CORS origin policy, and catalog RPC helper.
+- Dashboard handler forwards only the caller's bearer JWT + public key to the fixed RPC; secret/service-role credentials are not used for dashboard summaries. Invitation flows continue to use their existing server-only secret path.
+- Admin Static Checks pass on `5cdf47149200d36be12fcaf2d718cf235f94e6a2`, GitHub Actions run `46037397206`. The earlier two test failures were fixed by updating the navigation allowlist expectation to include Dashboard and the default exact-origin test to include Cloudflare Pages.
+- Edge Function Static Checks pass on `18382fac91048c284066a4403d4f8e1a2ecbf0d5`, run `46026633659`; the Edge Function sources are unchanged since this pass.
+- Database authenticated Admin smoke test and Rider-denial test passed (described in the previous section); grants remain authenticated-only and the public wrapper remains invoker.
+- Cloudflare Pages project configuration was inspected: production branch `cloudflare/admin-production`, root `apps/flame-chick-admin`, no build command, output `.`, and preview deployments disabled. The current canonical production deployment still corresponds to `0c843a981bda180dc8a5dae1bb085a23b4aeafdd`. Work-branch pushes show as skipped due production-only/path rules and do not represent Pages builds.
+
+### Remaining — one production Pages deployment
+
+- Confirm `cloudflare/admin-production` is still at `0c843a981bda180dc8a5dae1bb085a23b4aeafdd`, then fast-forward it to the final `work/admin-dashboard-release` head. This should trigger the single intended Admin production Pages deployment; do not change the Pages project configuration, root, path filters, preview settings, or create a direct upload.
+- Verify that Cloudflare reports the new production deployment on the promoted SHA and all five stages succeeded, then inspect `https://flamechickadmin.pages.dev` and confirm the live assets load. A full signed-in browser check still requires the user's active session; SQL role-context testing is not a substitute for that final UI confirmation.
+- Leave Vercel fallback in place. Do not deploy POS, Rider, Website, Workers, or unrelated Cloudflare projects. GST/tax remains deferred.
+
+### Separate pre-existing Supabase security advisor notes
+
+The post-migration security advisor still reports 51 informational `rls_enabled_no_policy` findings and one warning for disabled leaked-password protection. Those are pre-existing project posture findings, not created by this migration. No RLS policies, broad table grants, or Auth settings were changed as part of this dashboard work; assess these separately.
