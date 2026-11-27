@@ -619,40 +619,37 @@ async function resolveStaffContext(userId: string): Promise<StaffContext | null>
     isObject(row)&&typeof row.id==="string"&&row.is_active===true
   ): [];
   if(!roleRows.length||!branches.length)return null;
-  const globalRoles = roleRows.filter((row) => row.branch_id === null);
-  const branchScopedRoles = roleRows.filter((row) => typeof row.branch_id === "string");
-  const validBranchRoles = branchScopedRoles.filter((row) => branches.some((branch) => branch.id === row.branch_id));
-  const scopedBranchIds = [...new Set(validBranchRoles.map((row) => String(row.branch_id)))];
-  const scopedRoleKeys = [...new Set(validBranchRoles.map((row) => String(row.role_key)))];
-  if (globalRoles.length && (globalRoles.length !== 1 || branchScopedRoles.length > 0)) return null;
-  if (!globalRoles.length && (scopedBranchIds.length !== 1 || scopedRoleKeys.length !== 1)) return null;
-  const usableRoles = [...globalRoles, ...validBranchRoles];
-  if (!usableRoles.length) return null;
+
+  const globalRoles=roleRows.filter(row=>row.branch_id===null);
+  const branchScopedRoles=roleRows.filter(row=>typeof row.branch_id==="string");
+  const validBranchRoles=branchScopedRoles.filter(row=>branches.some(branch=>branch.id===row.branch_id));
+  const scopedBranchIds=[...new Set(validBranchRoles.map(row=>String(row.branch_id)))];
+  const scopedRoleKeys=[...new Set(validBranchRoles.map(row=>String(row.role_key)))];
+  if(globalRoles.length&&(globalRoles.length!==1||branchScopedRoles.length>0))return null;
+  if(!globalRoles.length&&(scopedBranchIds.length!==1||scopedRoleKeys.length!==1))return null;
+  const usableRoles=[...globalRoles,...validBranchRoles];
+  if(!usableRoles.length)return null;
 
   // This first release is single-branch. Refuse to guess if a global role would
-  // need to choose between multiple active branches; branch selection is a later
-  // explicit UI feature, not a silent cross-branch default.
-  if (globalRoles.length && branches.length !== 1) return null;
-  const priority: Record<string, number> = { owner: 1, admin: 2, manager: 3, cashier: 4, rider: 5 };
-  usableRoles.sort((a, b) => (priority[String(a.role_key)] ?? 99) - (priority[String(b.role_key)] ?? 99));
-  const selected = usableRoles[0];
-  const branchId = typeof selected.branch_id === "string" ? selected.branch_id : String(branches[0].id);
-  if (!branches.some((branch) => branch.id === branchId)) return null;
+  // need to choose between multiple active branches.
+  if(globalRoles.length&&branches.length!==1)return null;
+  const priority:Record<string,number>={owner:1,admin:2,manager:3,cashier:4,rider:5};
+  usableRoles.sort((a,b)=>(priority[String(a.role_key)]??99)-(priority[String(b.role_key)]??99));
+  const selected=usableRoles[0];
+  const branchId=typeof selected.branch_id==="string"?selected.branch_id:String(branches[0].id);
+  if(!branches.some(branch=>branch.id===branchId))return null;
 
-  return {
-    user_id: userId,
-    role: String(selected.role_key),
-    branch_id: branchId,
-    restaurant_id: restaurantId,
-    roles: usableRoles.map((row) => ({
-      role: String(row.role_key),
-      branch_id: typeof row.branch_id === "string" ? row.branch_id : null,
-    })),
+  const context:StaffContext={
+    user_id:userId,
+    role:String(selected.role_key),
+    branch_id:branchId,
+    restaurant_id:restaurantId,
+    roles:usableRoles.map(row=>({role:String(row.role_key),branch_id:typeof row.branch_id==="string"?row.branch_id:null})),
   };
   staffContextCache.set(userId,{expiresAt:Date.now()+STAFF_CONTEXT_CACHE_TTL_MS,value:context});
   if(staffContextCache.size>128)staffContextCache.delete(staffContextCache.keys().next().value as string);
   return context;
-
+}
 
 async function verifyStaffRole(
   userId: string,
