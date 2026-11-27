@@ -2,7 +2,8 @@
 
 ## CI correction checkpoint — 2026-11-27
 - Run 1: commit `6970a386ea7dcece9467be464ab5ef6bd9762a6a`, 5/6 new mocked tests passed; the last failure was a mock error-prefix mismatch.
-- Run 2: commit `58d38516a67b54c86aef00a3009cfc87d8589ffa`, all 6 new mocked UI tests passed; the receipt contract test failed at startup because `.mjs` incorrectly used `require()`. QZ diagnostics were skipped. The `.mjs` test is being converted to valid ESM imports; full rerun required.
+- Run 2: commit `58d38516a67b54c86aef00a3009cfc87d8589ffa`, all 6 new mocked UI tests passed; the receipt contract test failed at startup because `.mjs` incorrectly used `require()`.
+- Run 3: commit `fd84bfe3b6a596f8ef4fab09f7985932f13df016`, six mocked UI tests, receipt contract tests and QZ adapter diagnostics all passed. A final source/static POS suite is being added to CI before review.
 - R2 pricing checked: Standard free monthly usage is 10 GB-month, 1M Class A, 10M Class B and free egress. Overage is billable; activating R2 requires subscription checkout. R2 remains disabled, with no subscription or bucket created.
 
 

@@ -33,6 +33,8 @@
 - \`docs/handoffs/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md\` — this dated minutes entry.
 
 ### Tests and results
+- Full focused UI/receipt/QZ run passed on commit `fd84bfe3b6a596f8ef4fab09f7985932f13df016`, GitHub Actions run `46036952432`: six mocked UI tests, receipt-print contract tests and existing QZ adapter diagnostics succeeded. The log download endpoint returned 404 after completion, but GitHub reports the workflow job and both test steps as success.
+- A final source-level pass is being added to the feature-branch workflow, matching existing POS CI: QZ Node syntax check plus ops-source-hygiene, POS payment collection, catalog adapter and unified sync tests. Await this final check before release review.
 - First Actions run: commit `6970a386ea7dcece9467be464ab5ef6bd9762a6a`, run `46036547793`, failed in the new preview test after 5/6 mocked UI tests passed. The assertion expected the full UI prefix but its test double only displayed the raw message; this was a fixture mismatch, not an application behavior failure. The QZ diagnostic step was skipped because the test command stopped early. The mock is corrected to match the real status helper; rerun pending.
 - Added mocked regressions for one submission on rapid clicks, immediate spinner/disabled state, success/failure recovery, receipt popup closure only after print completion, failures/cancellation remaining open and retryable, and duplicate print suppression.
 - Second Actions run: commit `58d38516a67b54c86aef00a3009cfc87d8589ffa`, run `46036779500`; all 6 new mocked UI tests passed. The existing `.mjs` receipt contract test then failed to load because its pre-existing header used CommonJS `require()` although `.mjs` is ES module. QZ diagnostics were skipped as the workflow stopped at that failure. The receipt contract test is being corrected to ES module imports; a full rerun, including QZ diagnostics, remains pending.
@@ -61,7 +63,7 @@
 - No live browser UI rehearsal has been performed; user should validate Preview only after separate release authorization.
 
 ### Exact next task
-1. Read back the feature-branch commit and GitHub Actions regression workflow.
+1. Await the newly added existing POS source/static checks and record their exact result/commit.
 2. Inspect and repair any failing test without weakening existing checks.
 3. Present changed files and test results. Do **not** merge or deploy until explicit release approval.
 4. Once Cloudflare R2 is enabled by the account owner with a no-charge/free-only setup, create the private archive bucket, upload this minutes file, read it back and record the actual bucket/object path and synchronization time.
