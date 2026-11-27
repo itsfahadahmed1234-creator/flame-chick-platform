@@ -1,3 +1,38 @@
+# PRODUCTION RELEASE CHECKPOINT — 2026-11-27 (backend deployed; POS frontend quota-blocked)
+
+**This checkpoint supersedes earlier release-gate statements below that say no Production migration or Edge Function deployment has occurred.** The Production backend rollout was explicitly approved by the user and is complete. The Vercel POS frontend release remains blocked by the Free-plan daily deployment API quota.
+
+## Approved Production backend rollout — completed
+
+- Production Supabase project: `adkrxfnawdiljhjaavnj` (Flame Chick Production, Mumbai `ap-south-1`, ACTIVE_HEALTHY, Free).
+- Migration `flame_chick_delivery_payment_preference_v1` applied successfully; Supabase assigned remote version `20261127090208`.
+- Verified `orders.proposed_payment_method` exists and `flame_chick_get_staff_context(uuid)` exists. Context RPC is postgres-owned, SECURITY DEFINER with empty search_path, executable by service_role only; anon/authenticated cannot execute it.
+- Order sync RPC retains the original privileged boundary: postgres owner, SECURITY DEFINER, empty search_path, service_role execute only.
+- Production Edge Functions now active: `flame-chick-order-api` **v12** (was v11) and `flame-chick-delivery-api` **v4** (was v3). `flame-chick-catalog` remains v4; `flame-chick-staff-admin` remains v7. Existing verify_jwt settings were preserved.
+- Required local dependencies were included in the Order API bundle. Delivery API has no local static imports.
+- Post-deploy logs for the Order API and Delivery API show successful GET 200 responses during the check window. No synthetic or real order/payment was submitted for this release.
+- Production rows remained unchanged: **25 orders, 14 payments**, zero populated proposed payment preferences. No order, payment, refund, or customer record was created/updated by this rollout.
+
+## POS frontend Production release — blocked, not live
+
+- Intended source: `work/production-source-audit` commit `41c8aea80febd434048e50c352b386c01b02e7d4`.
+- Vercel project: `flame-chick-pos-development`, project ID `prj_oWxuLLIJBMutlBzVX4Ko5N4jBWEw`, team `faha-d` (Hobby/Free), Production domain `flamechick-pos.vercel.app`.
+- First deployment record `dpl_e6m7PKSdzBi45QsETHtJaHJje8zH` was immediately CANCELED by the project's Ignored Build Step; it did not go live.
+- One direct retry with the Ignored Build Step temporarily set to `exit 1` was rejected by Vercel HTTP 402: `api-deployments-free-per-day`, more than 100 deployments, retry after 86400 seconds. This is the daily API deployment quota, not the separate hourly build quota. No paid upgrade was made and no bypass attempted.
+- The Ignored Build Step was restored to `exit 0` immediately afterward. Preserve this guard and do not trigger another Vercel deployment until the daily API deployment quota has reset.
+- Verified current production alias: `flamechick-pos.vercel.app` still points to `dpl_6VuqJfbd89a7f1V6TTVL6L6n2CEjP`, built from older commit `f6ce0ea49aeb165fec382280dcc3f90c4747a706`. The new POS frontend changes are **not** visible on the live domain yet.
+- The user explicitly approved continuing the POS Production release. No further approval is required for the same intended release once the Vercel quota permits it. Do not switch target/team/project or change plan.
+
+## Source validation and remaining work
+
+- Source commit `41c8aea80febd434048e50c352b386c01b02e7d4`: Edge Function Static Checks passed (run `45966924938`); Admin/POS/Rider static checks passed (run `45966924959`); full disposable role/payment/delivery/website/order/concurrency QA passed on `09bbf49c22ca74df62ea25f93ecc4f5a206382a9` (run `45966592721`). Subsequent changes before `41c8aea` were test/fixture-only.
+- The new POS includes History paging and Delivery payment-preference UI; backend contracts for the new code are deployed, but frontend release is still outstanding.
+- After quota reset: re-check current branch HEAD and exact Vercel daily quota; restore/use a single intentional Production build for the reviewed branch/commit; verify deployment READY; assign/read back `flamechick-pos.vercel.app`; run non-writing production smoke checks for sign-in, History read, order board and Rider dispatch. Do not create a real order or payment merely to validate deployment.
+- Keep Free plan, GST deferred, kitchen printing disabled, and Flame Chick in pre-launch state until the remaining role/physical-printer/backup and full operational rehearsal gates are completed.
+- Existing Supabase advisor findings remain: 51 INFO `rls_enabled_no_policy`, one WARN `auth_leaked_password_protection`, plus performance advisor findings (41 unindexed foreign keys and 23 unused indexes). These are recorded as project-wide existing findings, not attributed to this migration. Do not claim a clean advisor baseline.
+
+---
+
 # CURRENT TASK — 2026-11-27 — POS DINE-IN / TAKEAWAY SYNC + TABLE PAYMENT ERROR
 
 **Next task handoff:** `docs/handoffs/2026-11-27-pos-dine-in-takeaway-sync-followup.md`
