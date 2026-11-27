@@ -4059,38 +4059,98 @@ async function takePaymentAndCloseTable(){
   if(!activeDineCheckId){showToast('Open a dine-in table first');return}
   let order=await get(STORES.orders,activeDineCheckId); if(!order)return;
   if(!cart.length){showToast('Add at least one item before payment');return}
-
-  const table=findTable(selectedTableId || order.tableId);
+  const table=findTable(selectedTableId||order.tableId);
   const method=$('paymentMethod').value||order.paymentMethod||'Cash';
   const subtotal=cart.reduce((a,x)=>a+(Number(x.price)||0)*(Number(x.quantity)||1),0);
   const discount=Number(order.discount)||0;
   const total=Math.max(0,subtotal-discount);
   const now=new Date().toISOString();
-  const receiptOrder=JSON.parse(JSON.stringify({
-    ...order,
-    items:cart.map(x=>({...x})),subtotal,deliveryFee:0,discount,total,paymentMethod:method,
-    paymentStatus:'Paid',status:'Completed',updatedAt:now,
-    checkoutPending:true
-  }));
+  const draftOrder={
+    ...order,items:cart.map(x=>({...x})),subtotal,deliveryFee:0,discount,total,
+    customerName:$('customerName').value.trim()||order.customerName||'Dine-in Customer',
+    phone:$('phone').value.trim()||order.phone||'',notes:$('notes').value.trim(),
+    paymentMethod:method,paymentStatus:'Unpaid',status:'Open',updatedAt:now,checkoutPending:true
+  };
+  if(table){draftOrder.tableId=table.id;draftOrder.tableNumber=table.name}
 
-  /* Keep the table OPEN locally until the cashier confirms the receipt.
-     This makes Back to Order safe: no premature completion, no lost edits. */
-  order.items=cart.map(x=>({...x}));order.subtotal=subtotal;order.deliveryFee=0;order.discount=discount;order.total=total;order.customerName=$('customerName').value.trim()||order.customerName||'Dine-in Customer';order.phone=$('phone').value.trim()||order.phone||'';order.notes=$('notes').value.trim();order.paymentMethod=method;order.paymentStatus='Unpaid';order.status='Open';order.updatedAt=now;order.checkoutPending=true;
-  if(table){order.tableId=table.id;order.tableNumber=table.name}
-  // This action records payment only. Retain the last server-accepted revision
-  // so the database can replay the unchanged order hash and attach payment
-  // idempotently even after the kitchen has marked a Dine-in check Served.
-  order=prepareLocalPosSyncOrder(order);
+  let draftPayload=null,draftSignature='';
+  if(catalogSnapshot?.schemaVersion===3&&window.FlameChickPosSyncV3&&flameChickStaffProfile?.branch_id){
+    try{
+      const signatureOrder={...draftOrder,catalogPublicationId:catalogSnapshot.publicationId,catalogVersion:catalogSnapshot.publicationNumber};
+      draftPayload=window.FlameChickPosSyncV3.buildSyncPayload(
+        signatureOrder,catalogSnapshot,flameChickStaffProfile.branch_id,
+        {contract:window.FlameChickCatalogV3,dealView:window.FlameChickCatalogV3DealView}
+      );
+      draftSignature=window.FlameChickPosSyncV3.syncPayloadContentSignature(draftPayload);
+    }catch(error){showToast(error?.message||'The Dine-in order could not be checked against the published menu.');return;}
+  }
+
+  let remote=null;
+  if(order.syncOrderId&&navigator.onLine&&flameChickStaffSession?.access_token){
+    try{
+      const rows=await fetchServerHistory('POS',100);
+      remote=rows.find(row=>
+        (order.serverOrderId&&String(row.serverOrderId||'')===String(order.serverOrderId))||
+        String(row.localOrderId||'')===String(order.syncOrderId)
+      )||null;
+    }catch(error){
+      if(order.serverOrderId){showToast('Could not verify the current Production check. Nothing was changed; reconnect and retry payment.');return;}
+      console.warn('Dine-in baseline lookup failed before initial server acknowledgement.',error);
+    }
+  }
+
+  let contentChanged=false;
+  if(draftPayload){
+    if(order.serverSyncContentSignature)contentChanged=order.serverSyncContentSignature!==draftSignature;
+    else if(remote)contentChanged=!window.FlameChickPosSyncV3.serverOrderMatchesSyncPayload(draftOrder,draftPayload,remote);
+    else{
+      try{
+        const previous=window.FlameChickPosSyncV3.buildSyncPayload(
+          order,catalogSnapshot,flameChickStaffProfile.branch_id,
+          {contract:window.FlameChickCatalogV3,dealView:window.FlameChickCatalogV3DealView}
+        );
+        contentChanged=window.FlameChickPosSyncV3.syncPayloadContentSignature(previous)!==draftSignature;
+      }catch(error){contentChanged=true;}
+    }
+  }else{
+    contentChanged=JSON.stringify(order.items||[])!==JSON.stringify(draftOrder.items||[])||
+      Number(order.total)!==Number(draftOrder.total)||
+      String(order.customerName||'')!==String(draftOrder.customerName||'')||
+      String(order.phone||'')!==String(draftOrder.phone||'')||
+      String(order.notes||'')!==String(draftOrder.notes||'');
+  }
+
+  let remoteStatus=String(order.serverStatus||'').toLowerCase();
+  if(remote){
+    remoteStatus=String(remote.raw?.status||remote.status||'').toLowerCase();
+    draftOrder.serverOrderId=remote.serverOrderId||draftOrder.serverOrderId||'';
+    draftOrder.serverOrderNumber=remote.orderNumber||remote.OrderNumber||draftOrder.serverOrderNumber||'';
+    draftOrder.serverStatus=remoteStatus||draftOrder.serverStatus||'';
+    if(Number.isSafeInteger(Number(remote.raw?.local_revision)))draftOrder.serverLocalRevision=Number(remote.raw.local_revision);
+  }else if(order.serverOrderId&&navigator.onLine&&flameChickStaffSession?.access_token){
+    showToast('The existing Production check could not be found. Nothing was changed; refresh Order History before taking payment.');
+    return;
+  }
+
+  if(contentChanged&&remote&&!['new','needs_confirmation'].includes(remoteStatus)){
+    showToast('Production has already moved this check forward. The cart differs from the accepted order; restore the saved items before taking payment.');
+    return;
+  }
+  if(contentChanged&&draftOrder.serverOrderId&&!remote&&!['new','needs_confirmation'].includes(remoteStatus)){
+    showToast('This check has moved forward on Production. Its saved items cannot be changed while closing the table.');
+    return;
+  }
+
+  order=prepareLocalPosSyncOrder(draftOrder,{bumpRevision:contentChanged,preserveCatalog:!contentChanged});
+  const receiptOrder=JSON.parse(JSON.stringify({
+    ...order,items:cart.map(x=>({...x})),subtotal,deliveryFee:0,discount,total,
+    paymentMethod:method,paymentStatus:'Paid',status:'Completed',updatedAt:now,checkoutPending:true
+  }));
   await put(STORES.orders,order);await put(STORES.queue,order);
   receiptOrder.syncOrderId=order.syncOrderId;receiptOrder.localRevision=order.localRevision;
   receiptOrder.catalogPublicationId=order.catalogPublicationId;receiptOrder.catalogVersion=order.catalogVersion;
-
   window.editingLocalOrderId=order.localOrderId;receiptEditContext={localOrderId:order.localOrderId,order:receiptOrder};
-  /* Keep the live order/cart visible underneath the receipt overlay.
-     Do not clear the working order here; finalization is the only point
-     that should reset the POS screen. */
-  renderCart();
-  openLocalReceipt(receiptOrder,{editable:true});
+  renderCart();openLocalReceipt(receiptOrder,{editable:true});
 }
 async function saveLocalOrder(){
   if(!cart.length){showToast('Add at least one item');return;}
@@ -4265,12 +4325,12 @@ async function reconcileLocalOrderByLegacyFingerprint(order){
   }
 }
 
-function prepareLocalPosSyncOrder(order,{bumpRevision=false}={}) {
+function prepareLocalPosSyncOrder(order,{bumpRevision=false,preserveCatalog=false}={}) {
   if(!window.FlameChickPosSyncV3)throw new Error('The V3 POS synchronization module is unavailable.');
   const previous=order||{};
   const next=window.FlameChickPosSyncV3.ensureIdentity(previous);
   if(bumpRevision)next.localRevision=window.FlameChickPosSyncV3.nextRevision(previous,previous);
-  if(catalogSnapshot?.schemaVersion===3){
+  if(catalogSnapshot?.schemaVersion===3&&!preserveCatalog){
     next.catalogPublicationId=catalogSnapshot.publicationId;
     next.catalogVersion=catalogSnapshot.publicationNumber;
   }
@@ -4392,6 +4452,7 @@ async function syncPendingUnifiedPosOrders(){
         const latest=await get(STORES.orders,candidate.id)||order;
         latest.serverOrderId=response.order_id;latest.serverOrderNumber=response.order_number||'';
         latest.serverLocalOrderId=response.local_order_id;latest.serverLocalRevision=response.local_revision;
+        latest.serverSyncContentSignature=window.FlameChickPosSyncV3.syncPayloadContentSignature(payload);
         latest.serverStatus=response.status;latest.paymentStatus=String(response.payment_status||latest.paymentStatus||'unpaid').toLowerCase()==='paid'?'Paid':'Unpaid';
         latest.paidAmount=Number(response.paid_amount)||0;latest.balanceDue=Number(response.balance_due)||0;
         if(response.status==='completed')latest.status='Completed';
@@ -4866,12 +4927,17 @@ async function finalizeReceiptOrder(order){
   window.editingLocalOrderId='';receiptEditContext=null;resetNewOrderMode();
   if(navigator.onLine&&flameChickStaffSession?.access_token)await syncPending();
   const latest=await get(STORES.orders,current.localOrderId)||current;
-  if(latest.serverOrderId){
-    showToast(latest.serverStatus==='completed'
-      ?'Payment confirmed. Order completed and moved to Order History.'
-      :'Order synchronized to Production · '+(latest.serverOrderNumber||latest.serverOrderId));
+  const synced=latest.syncStatus==='synced'&&!!latest.serverOrderId;
+  const paid=String(latest.paymentStatus||'').toLowerCase()==='paid'&&
+    String(latest.serverStatus||'').toLowerCase()==='completed'&&!latest.pendingPayment;
+  if(type==='dine-in'){
+    if(synced&&paid)showToast('Payment confirmed. Table closed and moved to Order History.');
+    else if(latest.syncStatus==='needs_review')showToast('Payment was NOT confirmed. The table remains open: '+(latest.lastSyncError||'Production needs review.'));
+    else showToast('Payment is awaiting Production confirmation. The table remains open until payment is confirmed.');
+  }else if(synced){
+    showToast('Order synchronized to Production · '+(latest.serverOrderNumber||latest.serverOrderId));
   }else{
-    showToast('Receipt saved · order remains in the offline sync queue and will sync after reconnection/sign-in.');
+    showToast(latest.lastSyncError||'Receipt saved · order remains in the offline sync queue.');
   }
   await updateSyncBox();
   return true;
