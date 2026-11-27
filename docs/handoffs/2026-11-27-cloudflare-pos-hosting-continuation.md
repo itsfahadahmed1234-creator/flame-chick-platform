@@ -20,6 +20,17 @@
 
 Do not mix these into the immediate POS host task. Once `flamechickpos` is deployed and verified, review the remaining Admin and Rider work and any remaining POS fixes, then plan each app's hosting/deployment as a separate scoped phase. The Website remains owned by the other ChatGPT conversation. Preserve the same shared-account resource isolation and do not create a combined multi-app Worker without explicit design approval.
 
+## 2026-11-27 — QZ signer isolate-local key cache optimization
+
+- Reviewed the deployed POS Worker and its current GitHub/Cloudflare build configuration before editing. Existing Worker remains flamechickpos; no separate Worker or Pages project is introduced.
+- Optimized worker.mjs so the first authorized signing request in a running Worker isolate loads the public leaf certificate, parses its SPKI, and imports the private/public RSA-SHA512 CryptoKey objects once. The imported private key remains non-extractable (extractable: false).
+- Subsequent requests in the same isolate reuse those prepared key objects. Every request still performs Origin validation, rate limiting, body validation, Supabase Auth user verification, staff role/branch verification, signing, and signature verification. Only certificate loading/parsing and key import are cached.
+- Concurrent first requests share one initialization promise. Failed initialization clears the promise so a later request can retry; missing secret/certificate keeps the existing 503 behavior. The cache is isolate-local and temporary; a fresh isolate initializes again.
+- Added a focused source regression test for isolate-local cache initialization, retry-after-failure, and preservation of per-request sign/verify operations.
+- This is a CPU optimization hypothesis, not proof that the QZ path is below the Free plan 10 ms CPU limit. Need measure Cloudflare $workers.cpuTimeMs for /api/qz/sign after real authorized signer calls. Do not submit print jobs; a direct signer request can validate a signature without sending it to QZ Tray.
+- No private key value was read or changed; no Supabase schema/data/functions, Website resources, POS business logic, Vercel deployment/alias, order, payment, or physical printer output was touched.
+- Deployment and runtime verification status must be appended after CI/Cloudflare build and read-only post-deploy checks.
+
 # Flame Chick POS — Cloudflare hosting continuation handoff
 
 **Date:** 2026-11-27 (Asia/Karachi)  

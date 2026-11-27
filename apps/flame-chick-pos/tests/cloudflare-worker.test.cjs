@@ -44,6 +44,16 @@ test('Worker uses the exact POS signing route and current production Supabase ba
   assert.match(workerSource, /flame-chick-order-api\?view=staff_context/);
 });
 
+test('Worker caches signer keys per isolate and retries failed initialization', () => {
+  assert.match(workerSource, /let signerMaterialPromise = null/);
+  assert.match(workerSource, /if \(!signerMaterialPromise\)/);
+  assert.match(workerSource, /Promise\.all\(\[/);
+  assert.match(workerSource, /signerMaterialPromise = null;\s*throw error/);
+  assert.match(workerSource, /getSignerMaterial\(env, request\)/);
+  assert.match(workerSource, /signerMaterial\.privateKey/);
+  assert.match(workerSource, /signerMaterial\.publicKey/);
+});
+
 test('Worker preserves all authorized POS roles, branch validation, RSA-SHA512 and certificate verification', () => {
   ['admin', 'owner', 'manager', 'cashier'].forEach((role) => assert.ok(workerSource.includes("'" + role + "'")));
   assert.match(workerSource, /staff\.branch_id/);

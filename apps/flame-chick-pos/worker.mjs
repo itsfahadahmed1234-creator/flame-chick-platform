@@ -133,6 +133,49 @@ function privatePkcs8(pem) {
   if (!match) throw new Error('QZ signing key must be PKCS#8 PEM');
   return fromBase64(match[1]);
 }
+
+// Cache only prepared, non-extractable CryptoKeys in this Worker isolate.
+// Clear a rejected initialization so later requests can retry.
+let signerMaterialPromise = null;
+async function getSignerMaterial(env, request) {
+  if (!signerMaterialPromise) {
+    signerMaterialPromise = (async () => {
+      const keyPem = String(env.QZ_SIGNING_PRIVATE_KEY || '');
+      if (!keyPem.includes('BEGIN PRIVATE KEY')) {
+        const error = new Error('QZ signing key is not configured');
+        error.code = 'SIGNING_KEY_MISSING';
+        throw error;
+      }
+      const certResponse = await env.ASSETS.fetch(new Request(
+        new URL(CERTIFICATE_PATH, request.url),
+        { headers: { Accept: 'text/plain' } }
+      ));
+      if (!certResponse.ok) {
+        const error = new Error('QZ public certificate is unavailable');
+        error.code = 'CERTIFICATE_UNAVAILABLE';
+        throw error;
+      }
+      const certificate = leafPem(await certResponse.text());
+      if (!certificate) {
+        const error = new Error('QZ public certificate is invalid');
+        error.code = 'CERTIFICATE_UNAVAILABLE';
+        throw error;
+      }
+      const algorithm = { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' };
+      const [privateKey, publicKey] = await Promise.all([
+        crypto.subtle.importKey('pkcs8', privatePkcs8(keyPem), algorithm, false, ['sign']),
+        crypto.subtle.importKey('spki', certificateSpki(certificate), algorithm, false, ['verify'])
+      ]);
+      return { privateKey, publicKey };
+    })();
+  }
+  try {
+    return await signerMaterialPromise;
+  } catch (error) {
+    signerMaterialPromise = null;
+    throw error;
+  }
+}
 async function sign(request, env) {
   const origin = String(request.headers.get('Origin') || '');
   if (!isAllowedOrigin(origin)) return response('Origin is not allowed.', 403);
@@ -164,18 +207,21 @@ async function sign(request, env) {
         typeof staff.branch_id !== 'string' || !staff.branch_id) {
       return response('This account does not have active Flame Chick POS access.', 403, origin);
     }
-    const keyPem = String(env.QZ_SIGNING_PRIVATE_KEY || '');
-    if (!keyPem.includes('BEGIN PRIVATE KEY')) return response('The QZ signing key is not configured on the POS server.', 503, origin);
-    const certResponse = await env.ASSETS.fetch(new Request(new URL(CERTIFICATE_PATH, request.url), { headers: { Accept: 'text/plain' } }));
-    if (!certResponse.ok) return response('The public QZ signing certificate is unavailable on the POS server.', 503, origin);
-    const certificate = leafPem(await certResponse.text());
-    if (!certificate) return response('The public QZ signing certificate is unavailable on the POS server.', 503, origin);
-    const algorithm = { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' };
-    const privateKey = await crypto.subtle.importKey('pkcs8', privatePkcs8(keyPem), algorithm, false, ['sign']);
-    const publicKey = await crypto.subtle.importKey('spki', certificateSpki(certificate), algorithm, false, ['verify']);
+    let signerMaterial;
+    try {
+      signerMaterial = await getSignerMaterial(env, request);
+    } catch (error) {
+      if (error?.code === 'SIGNING_KEY_MISSING') {
+        return response('The QZ signing key is not configured on the POS server.', 503, origin);
+      }
+      if (error?.code === 'CERTIFICATE_UNAVAILABLE') {
+        return response('The public QZ signing certificate is unavailable on the POS server.', 503, origin);
+      }
+      throw error;
+    }
     const bytes = utf8.encode(text);
-    const signature = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', privateKey, bytes));
-    if (!await crypto.subtle.verify('RSASSA-PKCS1-v1_5', publicKey, signature, bytes)) {
+    const signature = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', signerMaterial.privateKey, bytes));
+    if (!await crypto.subtle.verify('RSASSA-PKCS1-v1_5', signerMaterial.publicKey, signature, bytes)) {
       console.error('QZ signer key/certificate mismatch.');
       return response('The configured QZ signing key does not match the public signing certificate.', 503, origin);
     }
