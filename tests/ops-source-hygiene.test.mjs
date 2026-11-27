@@ -439,46 +439,81 @@ test("POS safely reconciles a paid server order and drains concurrent sync reque
 });
 
 
-test("Dine-in Complete the Payment handler executes and persists the updated check",async()=>{
+test("Dine-in payment preserves unchanged served revision, advances changed New check and blocks changed Served check",async()=>{
   const html=source[0].html;
   const start=html.indexOf('async function takePaymentAndCloseTable');
   const end=html.indexOf('async function saveLocalOrder',start);
-  assert.ok(start>=0&&end>start,'Dine-in payment function boundaries must exist');
+  assert.ok(start>=0&&end>start);
   const fn=html.slice(start,end);
-  const writes=[];
-  let opened=null,prepareOptions=null;
-  const stored={
+  const base={
     localOrderId:'LOCAL-DINE-1',syncOrderId:'99000000-0000-4000-8000-000000000001',
+    serverOrderId:'99000000-0000-4000-8000-000000000002',serverStatus:'served',serverLocalRevision:8,
     localRevision:8,fulfillmentType:'Dine-in',tableId:'T1',tableNumber:'Table 1',
-    total:599,discount:0,items:[{itemName:'QA Burger',price:599,quantity:1}]
+    customerName:'Walk-in',phone:'',notes:'',catalogPublicationId:'pub',catalogVersion:1,
+    total:599,subtotal:599,discount:0,items:[{itemName:'QA Burger',price:599,quantity:1,productId:'p1',variantId:'v1'}]
   };
-  const elements={
-    paymentMethod:{value:'Card'},customerName:{value:'Walk-in'},phone:{value:''},notes:{value:''}
-  };
-  const context={
-    activeDineCheckId:'LOCAL-DINE-1',selectedTableId:'T1',cart:[{itemName:'QA Burger',price:599,quantity:1}],
-    STORES:{orders:'orders',queue:'queue'},
-    get:async(store,id)=>store==='orders'&&id==='LOCAL-DINE-1'?{...stored}:null,
-    put:async(store,order)=>writes.push({store,order:{...order}}),
-    findTable:()=>({id:'T1',name:'Table 1'}),
-    $:id=>elements[id],
-    prepareLocalPosSyncOrder:(order,options)=>{prepareOptions=options;return {...order,syncOrderId:stored.syncOrderId,localRevision:stored.localRevision};},
-    renderCart:()=>{},
-    openLocalReceipt:(order,options)=>{opened={order,options};},
-    window:{editingLocalOrderId:''},
-    receiptEditContext:null,
-    JSON,Date,Math,Number,String,Array,Object,console,
-  };
-  const vmContext=vm.createContext(context);
-  new vm.Script(fn+'\ntakePaymentAndCloseTable();',{filename:'takePaymentAndCloseTable.regression.js'}).runInContext(vmContext);
-  await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(writes.length,2);
-  assert.deepEqual(writes.map(x=>x.store),['orders','queue']);
-  assert.equal(writes[0].order.localRevision,8);
-  assert.equal(writes[0].order.paymentStatus,'Unpaid');
-  assert.equal(writes[0].order.status,'Open');
-  assert.equal(prepareOptions?.bumpRevision,undefined);
-  assert.equal(opened?.options.editable,true);
-  assert.equal(opened?.order.paymentStatus,'Paid');
-  assert.equal(context.window.editingLocalOrderId,'LOCAL-DINE-1');
+  async function run({status='served',changed=false}={}){
+    const writes=[],toasts=[];let opened=null,options=null;
+    const cart=changed?[{itemName:'Updated Burger',price:5346,quantity:1,productId:'p2',variantId:'v2'}]:
+      [{itemName:'QA Burger',price:599,quantity:1,productId:'p1',variantId:'v1'}];
+    const syncApi={
+      buildSyncPayload:order=>({action:'sync_pos_order',local_order_id:order.syncOrderId,local_revision:order.localRevision,
+        fulfillment_type:'dine_in',customer:{name:order.customerName,phone:order.phone||null},notes:order.notes||'',
+        items:(order.items||[]).map(item=>({kind:'product',product_id:item.productId,product_variant_id:item.variantId,
+          quantity:item.quantity,notes:'',modifiers:[]})),table_reference:order.tableId,table_label_snapshot:order.tableNumber}),
+      syncPayloadContentSignature:payload=>JSON.stringify(payload.items),
+      serverOrderMatchesSyncPayload:()=>!changed
+    };
+    const context={
+      activeDineCheckId:base.localOrderId,selectedTableId:'T1',cart,
+      STORES:{orders:'orders',queue:'queue'},catalogSnapshot:{schemaVersion:3,publicationId:'pub',publicationNumber:1},
+      flameChickStaffProfile:{branch_id:'branch'},flameChickStaffSession:{access_token:'token'},navigator:{onLine:true},
+      window:{editingLocalOrderId:'',FlameChickPosSyncV3:syncApi},
+      FlameChickCatalogV3:{},FlameChickCatalogV3DealView:{},
+      fetchServerHistory:async()=>[{serverOrderId:base.serverOrderId,serverOrderNumber:'FC-QA',localOrderId:base.syncOrderId,
+        fulfillmentType:'Dine-in',status:status==='new'?'Pending':'Served',total:base.total,raw:{status,local_revision:base.serverLocalRevision}}],
+      get:async(store,id)=>store==='orders'&&id===base.localOrderId?{...base}:null,
+      put:async(store,order)=>writes.push({store,order:{...order}}),
+      findTable:()=>({id:'T1',name:'Table 1'}),
+      $:id=>({paymentMethod:{value:'Card'},customerName:{value:'Walk-in'},phone:{value:''},notes:{value:''}}[id]),
+      prepareLocalPosSyncOrder:(order,opts)=>{options=opts;return {...order,localRevision:opts.bumpRevision?9:8};},
+      renderCart:()=>{},openLocalReceipt:(order,opts)=>{opened={order,opts};},receiptEditContext:null,
+      JSON,Date,Math,Number,String,Array,Object,console,showToast:message=>toasts.push(message)
+    };
+    const vmContext=vm.createContext(context);
+    new vm.Script(fn+'\ntakePaymentAndCloseTable();',{filename:'takePaymentAndCloseTable.regression.js'}).runInContext(vmContext);
+    await new Promise(resolve=>setImmediate(resolve));
+    return {writes,options,opened,toasts};
+  }
+  const unchanged=await run({status:'served',changed:false});
+  assert.equal(unchanged.writes.length,2);
+  assert.equal(unchanged.options?.bumpRevision,false);
+  assert.equal(unchanged.options?.preserveCatalog,true);
+  assert.equal(unchanged.writes[0].order.localRevision,8);
+  assert.equal(unchanged.opened?.order.paymentStatus,'Paid');
+  const editedNew=await run({status:'new',changed:true});
+  assert.equal(editedNew.options?.bumpRevision,true);
+  assert.equal(editedNew.writes[0].order.localRevision,9);
+  assert.equal(editedNew.opened?.order.localRevision,9);
+  const editedServed=await run({status:'served',changed:true});
+  assert.equal(editedServed.writes.length,0);
+  assert.equal(editedServed.opened,null);
+  assert.ok(editedServed.toasts.some(message=>message.includes('Production has already moved this check forward')));
+});
+
+
+test("Dine-in checkout stores accepted content fingerprints and reports payment only after sync",()=>{
+  const html=source[0].html;
+  const start=html.indexOf('async function takePaymentAndCloseTable');
+  const end=html.indexOf('async function saveLocalOrder',start);
+  const checkout=html.slice(start,end);
+  assert.match(checkout,/serverSyncContentSignature/);
+  assert.match(checkout,/serverOrderMatchesSyncPayload/);
+  assert.match(checkout,/bumpRevision:contentChanged/);
+  assert.match(checkout,/preserveCatalog:!contentChanged/);
+  assert.match(checkout,/Production has already moved this check forward/);
+  assert.match(html,/serverSyncContentSignature=window\.FlameChickPosSyncV3\.syncPayloadContentSignature\(payload\)/);
+  const a=html.indexOf('async function finalizeReceiptOrder');
+  const b=html.indexOf('async function printThermalReceipt',a);
+  assert.match(html.slice(a,b),/Payment was NOT confirmed/);
 });
