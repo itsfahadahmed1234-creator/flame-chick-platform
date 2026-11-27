@@ -1,3 +1,25 @@
+# NEW-CHAT EXECUTION DIRECTIVE — POS CLOUDFARE DEPLOYMENT
+
+**This is the next task. Continue the existing Flame Chick POS work; do not restart the project.**
+
+1. Take the POS changes already prepared on the Vercel-bound working branch and deploy them to the newly connected Cloudflare account instead. The Vercel Free-plan daily deployment API quota was exhausted, so the new chat must not attempt another Vercel deployment or upgrade/bypass its limit.
+2. The latest validated POS application source is already pushed to GitHub at commit **`41c8aea80febd434048e50c352b386c01b02e7d4`**, branch `work/production-source-audit`, app root `apps/flame-chick-pos`. This is the exact source candidate for the new POS host. Later commits in this branch are handoff/documentation updates only; verify the current branch and POS app tree before packaging. Do not deploy `main`.
+3. Create a separate Cloudflare Workers + Workers Static Assets project/Worker named exactly **`flamechickpos`** in the already-connected Cloudflare account. Deploy and validate the POS on its Workers hostname. The expected hostname is `https://flamechickpos.itsfahadahmed1234.workers.dev`; verify the actual hostname after project creation. There is no verified custom domain/zone on this account, so do not invent a domain suffix or change DNS.
+4. Build/upload only the public POS UI and required public browser assets. Implement the Worker-side `/api/qz/sign` endpoint as part of this same hosting task. Keep the QZ private signing key in an encrypted Cloudflare Worker secret; never put it in the public asset bundle, source, chat or logs. Preserve existing Supabase staff authentication, role checks, RSA-SHA512 signing, certificate match, CORS, payload-size limits and throttling.
+5. Do not touch the separate Website work. Another ChatGPT conversation owns the Website source, hosting and deployment. Do not edit or deploy `apps/flame-chick-website`, its Cloudflare Worker/Pages project, domain, DNS, settings, secrets or build. Create only the isolated POS project `flamechickpos`. Leave the existing unrelated `flame-chick-platform` Worker untouched.
+6. Do not change the Production Supabase schema/data/functions for hosting-only work. The required backend is already live: migration `20261127090208`, Order API v12, Delivery API v4, Catalog API v4 and Staff Admin v7. Reuse it.
+7. Keep the existing Vercel POS Production URL and its deployment as fallback until Cloudflare is verified. Do not switch aliases, delete Vercel projects or claim a DNS cutover.
+8. After deployment, perform read-only/synthetic checks for POS loading, static assets, sign-in/session, History/order-board/dispatch reads, and QZ signer 401/authorized signature behavior. Never create customer/test orders or payments, clear browser local storage, or enable kitchen/automatic printing.
+9. Once the POS host is deployed and verified, update all handoffs with its actual Worker version, hostname, source SHA and test results. **Only then** move to the next work phase: review what remains for the Admin app, Rider portal and any further POS fixes, and plan their hosting separately. Do not deploy Admin/Rider as part of this POS task.
+
+**Success means:** the latest validated POS changes—not the old Vercel production build—are live and smoke-tested on the isolated Cloudflare Worker `flamechickpos`, while Website hosting and existing Vercel fallback remain untouched.
+
+---
+
+## After the POS Cloudflare deployment — later work phase
+
+Do not mix these into the immediate POS host task. Once `flamechickpos` is deployed and verified, review the remaining Admin and Rider work and any remaining POS fixes, then plan each app's hosting/deployment as a separate scoped phase. The Website remains owned by the other ChatGPT conversation. Preserve the same shared-account resource isolation and do not create a combined multi-app Worker without explicit design approval.
+
 # Flame Chick POS — Cloudflare hosting continuation handoff
 
 **Date:** 2026-11-27 (Asia/Karachi)  
