@@ -8,7 +8,7 @@
 - Branch: `work/production-source-audit`
 - Validated POS source pin: `41c8aea80febd434048e50c352b386c01b02e7d4`
 - POS root: `apps/flame-chick-pos`
-- The next documentation-only branch update does not alter the POS code: all 20 POS app files were verified identical between `41c8aea` and branch HEAD `7a8188607b4d08f25e9d005b2acf0bf9ea2cd906`. Re-check before upload.
+- The later hosting-handoff commits changed documentation only, apart from `apps/flame-chick-pos/README.md`, which now records the Cloudflare hosting direction. The latest complete-tree comparison confirms that all **19 POS code/static-asset inputs (excluding README.md)** remain byte-for-byte identical to validated source pin `41c8aea80febd434048e50c352b386c01b02e7d4`. The current branch head is `f6a9496cb792847cc2d7db475353c0dda11f7c75`. Re-check before upload; do not include README.md, tests or the Node signer source in public assets.
 - This is the latest validated **source candidate**, not a Cloudflare deployment. No Cloudflare POS project/deployment exists yet.
 
 ## Connected Cloudflare account / target
@@ -16,7 +16,7 @@
 - Account: `Itsfahadahmed1234@gmail.com's Account`, connected identity `itsfahadahmed1234@gmail.com`.
 - Workers subdomain: `itsfahadahmed1234`.
 - Exact requested new POS Worker/project name: `flamechickpos`.
-- Expected initial verification hostname: `flamechickpos.itsfahamed1234.workers.dev`; this is not yet the final business-critical custom domain.
+- Expected initial verification hostname: `flamechickpos.itsfahadahmed1234.workers.dev`; this is not yet the final business-critical custom domain.
 - The account had no zones at the read-only check. Full custom domain/TLD is unknown; do not invent a suffix, buy a domain, add a zone or change DNS. Cloudflare recommends a custom domain/route rather than workers.dev for business-critical production; the workers.dev hostname is for initial validation.
 - A separate existing Worker named `flame-chick-platform` is present; leave it untouched.
 - Use a separate Workers + Workers Static Assets project for the POS, with a Worker route for QZ signing. Keep Supabase as the backend and use the existing Production project/API.
@@ -642,8 +642,8 @@ The Cashier must later physically receive and record payment as **Collected**, w
 
 - [Run 45197859536](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45197859536) passed complete disposable migration replay, staff ACL/RLS and role authorization, operational-schema constraints/security, the delivery lifecycle/expiry fixture (including new assertions that Rider delivery and staff-confirmed return remain unpaid and without `completed_at`), all four real concurrent delivery races, and disposable Supabase teardown.
 - [Run 45198081185](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45198081185) passed Deno type-check for all Edge Functions and the Edge contract tests, including dispatch Rider heartbeat fields and delivered/returned board statuses.
-- [Run 45198567593](https://github.com/itsfahamed1234-creator/flame-chick-platform/actions/runs/45198567593) passed POS/Rider inline JavaScript parsing and source-hygiene/integration assertions.
-- [Run 45198568180](https://github.com/itsfahamed1234-creator/flame-chick-platform/actions/runs/45198568180) passed Admin static checks.
+- [Run 45198567593](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45198567593) passed POS/Rider inline JavaScript parsing and source-hygiene/integration assertions.
+- [Run 45198568180](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45198568180) passed Admin static checks.
 - Preview deployments were skipped by their workflows. These apps/functions are **not deployed from this work**.
 
 ## Next — order-processing and payment collection
@@ -754,7 +754,7 @@ This correction supersedes any earlier wording that could imply an active restau
 ## Current verified state
 
 - Delivery command migration remains source-only.
-- Expiry clock helper and exact 60-second boundary tests passed on disposable Supabase in [workflow run 45182331625](https://github.com/itsfahamed1234-creator/flame-chick-platform/actions/runs/45182331625).
+- Expiry clock helper and exact 60-second boundary tests passed on disposable Supabase in [workflow run 45182331625](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/45182331625).
 - Existing delivery lifecycle behavior also passed: targeted Rider assignment, wrong-Rider denial, accept/idempotency, pickup, delivered/idempotency, failed delivery, return report, Rider cannot confirm physical return, Cashier can confirm, and payment ledger unchanged.
 - Full migration replay, staff role boundaries, operational schema constraints/security, fixture rollback, and local stack cleanup passed.
 
