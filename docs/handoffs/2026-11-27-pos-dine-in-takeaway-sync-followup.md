@@ -150,3 +150,12 @@ CI has not yet run at this handoff point. No Preview or Production deployment wa
 ### Preview test boundary
 
 The Preview is on a different origin from `flamechick-pos.vercel.app`, so its browser IndexedDB is separate. It will not show the two pending local queue rows saved under the Production hostname. Do not create duplicate rows to transfer them. Test the corrected interaction using the Preview and explicitly disposable QA data only; the existing local orders require safe recovery on the originating browser after a separately approved Production release.
+
+
+## 13. Dine-in revision/content repair — validation pending
+
+The second Preview test correlated with Production FC-261127-0007: local amount PKR 5,346 versus server amount PKR 4,647 on Table 3. Production remains `new/unpaid`, local revision 1, with no payment ledger entry. The local checkout copied changed cart details while reusing the already-accepted revision, so PostgreSQL correctly returned `POS_ORDER_REVISION_CONFLICT`.
+
+Working-branch repair stores canonical sync-content fingerprints, compares legacy local orders to the read-only Production order, bumps the revision only when an editable check's content changed, and preserves the accepted revision/catalog for unchanged payment-only closure. Changed carts are blocked after Production advances the order. The receipt no longer reports success unless the order is actually synced, paid and completed.
+
+CI and Preview validation remain pending. No Production rows, migrations, Edge Functions or deployment settings changed.
