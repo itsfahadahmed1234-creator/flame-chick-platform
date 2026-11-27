@@ -32,3 +32,6 @@ The static invitation acceptance page is `/accept-invitation.html`.
 - The Staff Admin database command remains responsible for invitation expiry, issuer authority, role conflict checks, branch assignments and audit. The browser does not assign roles.
 - The function must have the final Admin origin in `FLAME_CHICK_STAFF_ADMIN_ALLOWED_ORIGINS` and the exact HTTPS acceptance URL in `FLAME_CHICK_STAFF_INVITE_REDIRECT_URL`. Add that URL to Supabase Auth's allowed redirect URLs. Do this only after the final Admin domain is selected.
 - Before live use, verify the Supabase Invite User email template still uses the standard confirmation link flow, then test a new email and an already-existing confirmed account. No secrets belong in this page.
+
+
+Cloudflare Pages production hosting is configured separately as `flamechickadmin.pages.dev`. This branch is the isolated Admin hosting release line; the Admin application source is unchanged from the reviewed `work/production-source-audit` baseline.
