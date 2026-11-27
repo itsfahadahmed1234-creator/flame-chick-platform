@@ -893,7 +893,7 @@ async function buildStaffPosSyncPayload(
 
   const proposedPaymentRaw=typeof body.proposed_payment_method==="string"?body.proposed_payment_method.trim().toLowerCase():"";
   const proposedPaymentMethod=fulfillmentType==="delivery"?(proposedPaymentRaw||null):null;
-  if((proposedPaymentMethod!==null&&!['cod','cash','card','online'].includes(proposedPaymentMethod))||(fulfillmentType!==="delivery"&&proposedPaymentRaw)){
+  if((proposedPaymentMethod!==null&&!['cod','cash','card','online'].includes(proposedPaymentMethod))||(fulfillmentType!=="delivery"&&proposedPaymentRaw)){
     return websiteError("POS_DELIVERY_PAYMENT_PREFERENCE_INVALID","Delivery payment preference must be COD, Cash, Card or Online and is not valid for other order types.",400);
   }
   const tableReference = typeof body.table_reference === "string" ? body.table_reference.trim() || null : null;
