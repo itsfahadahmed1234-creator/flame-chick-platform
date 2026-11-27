@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - work/production-source-audit
+      - work/admin-dashboard-release
     paths:
       - "supabase/functions/**"
       - "apps/flame-chick-website/js/catalog-v3.js"

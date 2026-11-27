@@ -103,12 +103,12 @@ async function bootstrap(){
  $("profileBadge").textContent=(u.email||"FC").slice(0,2).toUpperCase();
  showAuth(false);
  document.querySelectorAll(".nav-item[data-page]").forEach(button=>{
-  const allowed=["staff","catalog-v3","delivery"].includes(button.dataset.page);
+  const allowed=["dashboard","staff","catalog-v3","delivery"].includes(button.dataset.page);
   button.disabled=!allowed;
   if(!allowed){button.title="This module will be enabled after its secure production API is completed.";button.setAttribute("aria-disabled","true");}
  });
  const old=$("tenantGate");if(old)old.remove();
- nav("staff");
+ nav("dashboard");
 }
 
 async function loadAll(){
@@ -443,7 +443,7 @@ async function loadDashboard(){
  try{
   const today=parts(new Date()),period=dateRangeFor(S.range,S.dashboardMonth),week=currentWeekRange(),rush=dateRangeFor(S.rushRange,S.rushMonth);
   const body={p_branch_id:S.branch.id,p_today_start:karachiMidnight(today),p_today_end:karachiMidnight(localDayShift(today,1)),p_period_start:period.start,p_period_end:period.end,p_previous_period_start:period.previousStart,p_previous_period_end:period.previousEnd,p_week_start:week.start,p_week_end:week.end,p_previous_week_start:week.previousStart,p_previous_week_end:week.previousEnd,p_rush_start:rush.start,p_rush_end:rush.end};
-  S.dashboardData=await db("rpc/flame_chick_admin_dashboard",{method:"POST",body});renderDashboard();
+  const response=await staffApi("POST",null,{action:"dashboard_summary",payload:body});if(!response||response.ok!==true||!response.dashboard)throw Error("Dashboard response was incomplete.");S.dashboardData=response.dashboard;renderDashboard();
  }catch(e){if($("dashboardUpdated"))$("dashboardUpdated").textContent="Could not refresh";if(!S.dashboardData)toast("Dashboard: "+e.message,true);}
  finally{S.dashboardBusy=false;}
 }
@@ -467,7 +467,7 @@ function renderDashboard(){
  const comps=[["Sales",w.sales,pw.sales,true],["Orders",w.orders,pw.orders,false],["Avg order value",w.average_order_value,pw.average_order_value,true]];$("weekComparison").innerHTML=comps.map(([l,c,pr,m])=>'<div class="comparison-row"><span>'+l+'</span><b>'+(m?cash(c):Number(c)||0)+'</b><span class="comparison-versus">vs '+(m?cash(pr):Number(pr)||0)+'</span><strong class="'+(percentChange(c,pr).startsWith("-")?"negative":"positive")+'">'+percentChange(c,pr)+'</strong></div>').join("");
  const recent=d.recent_orders||[];$("recentOrders").innerHTML=recent.map(o=>'<tr><td><div class="order-code">'+esc(o.order_number)+'</div></td><td><div class="order-name">'+esc(o.customer_name||"Customer")+'</div></td><td>'+esc(fulfilmentLabel(o.fulfillment_type))+'</td><td><b>'+cash(o.total)+'</b></td><td><span class="status-chip '+esc(o.status)+'">'+esc(labels[o.status]||o.status)+'</span></td><td>'+esc(time(new Date(o.placed_at)))+'</td></tr>').join("")||'<tr><td colspan="6" class="empty-cell">No orders placed yet.</td></tr>';
  const latest=recent[0];$("latestOrder").innerHTML=latest?'<div class="latest-order-copy"><small>JUST PLACED</small><b>'+esc(latest.order_number)+' · '+esc(latest.customer_name||"Customer")+'</b><span>'+esc(fulfilmentLabel(latest.fulfillment_type))+' · '+esc(time(new Date(latest.placed_at)))+' ('+esc(ago(latest.placed_at))+')</span></div><div class="latest-order-side"><b>'+cash(latest.total)+'</b><span class="status-chip '+esc(latest.status)+'">'+esc(labels[latest.status]||latest.status)+'</span></div>':'<div class="empty-state">No orders yet.</div>';
- const att=d.attention_orders||[];set("watchCount",att.length);set("attentionCount",att.length);$("watchList").innerHTML=att.map(o=>'<div class="watch-item"><div class="watch-main"><b>'+esc(o.order_number)+' · '+esc(o.customer_name||"Customer")+'</b><span>'+esc(fulfilmentLabel(o.fulfillment_type))+' · '+esc(labels[o.status]||o.status)+'</span></div><span class="watch-age">'+num(o,"age_minutes")+'m</span></div>').join("")||'<div class="empty-state">No delayed orders need attention.</div>';
+ const att=d.attention_orders||[],activeCount=num(d,"attention_count");set("watchCount",activeCount);set("attentionCount",activeCount);$("watchList").innerHTML=att.map(o=>'<div class="watch-item"><div class="watch-main"><b>'+esc(o.order_number)+' · '+esc(o.customer_name||"Customer")+'</b><span>'+esc(fulfilmentLabel(o.fulfillment_type))+' · '+esc(labels[o.status]||o.status)+'</span></div><span class="watch-age">'+num(o,"age_minutes")+'m</span></div>').join("")||'<div class="empty-state">No delayed orders need attention.</div>';
  renderRushHours();
 }
 function renderRushHours(){
