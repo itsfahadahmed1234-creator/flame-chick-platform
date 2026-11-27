@@ -5530,3 +5530,30 @@ No Production deployment, DB changes, migrations, Edge Function changes, alias s
 - Log-load source changes use the private staff-context projection, 15-second warm-isolate cache, and coalesced branch expiry sweep. Auth user validation still occurs for every request; the rider offer expiry deadline and Realtime fallback schedule are unchanged.
 - A control-flow error in the Order API context cache was caught during review and repaired in commit `43cf1b579801b8395aad7ab103e2a7780a3c4d18`. The cache now stores a constructed `StaffContext` before returning it.
 - These changes remain source-only. No migration has been applied, no Edge Function deployed, no Production order/payment created, and no Vercel Production deployment performed. Do not use the current Production backend to functionally test Preview until the migration and both Edge Functions are separately approved and deployed.
+
+
+## Flame Chick POS — Cloudflare live verification and next UI task (2026-11-27)
+
+**Current hosting state**
+- POS login was successfully tested by the user on the Cloudflare-hosted POS.
+- User confirmed a takeaway receipt print request reached the printer. The print popup did not close automatically after the print request and required the user to click its X; this is the next UI fix.
+- POS Worker: `flamechickpos`; live URL: https://flamechickpos.itsfahadahmed1234.workers.dev.
+- Active Cloudflare Worker version: **6**, version ID `a3999f9d-65fc-48a3-9f89-0c26ac45c940`, 100% traffic. QZ signer isolate-cache source commit: `136c8fe8a5dcaa9d47968b6b6e4e663f2a874914`. Successful exact-source push build: `5e6997c3-fad4-4c1d-b6f7-d9addfcc36ea` (version 5); subsequent successful manual build: `18002a21-c249-4f2d-a5a2-a0fb309d48f6` (version 6).
+- The QZ signing private key remains stored as Cloudflare Worker secret `QZ_SIGNING_PRIVATE_KEY`; it was not exposed, read or rotated.
+- Keep the existing Vercel POS URL as fallback. No DNS or alias cutover is authorized.
+
+**QZ signer CPU measurements**
+- From 19 complete user-supplied Cloudflare invocation log entries for `POST /api/qz/sign` after version 6 became active: average displayed CPU time approximately **2.42 ms**, median **2 ms**, maximum **7 ms**; no complete sample exceeded the 10 ms Workers Free allowance. A separate 16-row batch averaged approximately **2.06 ms**, maximum **4 ms**. A truncated final row was excluded.
+- These are encouraging sample observations, not a guaranteed maximum or a full distribution. Wall time was materially higher (approximately 117 ms–1.09 s in the supplied rows) because it includes elapsed network/service waiting and is not equivalent to CPU time. Continue watching CPU, especially after isolate restarts; no further signer optimization is presently justified by the sample.
+- User's successful physical receipt print confirms the existing QZ request reached the printer. It does not mean the print popup lifecycle is correct; automatic close after successful printing remains a defect.
+
+**Next task — Manual Delivery and receipt popup UX**
+- Work on the existing POS source in `itsfahadahmed1234-creator/flame-chick-platform`, branch `work/production-source-audit`, app root `apps/flame-chick-pos`. Read the current source and all relevant handoffs/tests before editing.
+- Manual Delivery's **Place Order** button currently has no circular loading animation when clicked and allows a risk of rapid double-click submission. Fix by showing loading while the existing async order creation is pending, disabling the control immediately, and guarding the handler against re-entrant/rapid duplicate calls. Preserve current order/idempotency/payment preference and validation behavior; restore the control on failure.
+- The receipt print popup successfully sends the print request, but stays open after success. Close it automatically only when the existing QZ print operation reports successful completion. On failure/cancellation keep it open and display error feedback. Guard against repeated print clicks while a print is pending. Do not change receipt contents, QZ crypto contract or printer route.
+- Create a separate feature branch from the latest `work/production-source-audit` commit before changing POS source. This production branch is configured in Cloudflare Workers Builds with path filtering on `apps/flame-chick-pos/**`; pushing POS source changes to it can immediately deploy to the live Worker. Do not push source changes to the production branch until reviewed, focused tests pass, and the user explicitly approves release.
+- Add mocked regression tests for one-submit-only under rapid clicks, loading/disabled/recovery behavior, popup auto-close on successful print, popup remaining open on failure, and one print dispatch per in-flight attempt.
+- Do not create additional real Production orders/payments or send more physical print jobs during QA. Use mocked/synthetic tests; do not clear local IndexedDB/browser storage. No Supabase, Website, Admin, Rider, Vercel, DNS, or unrelated Cloudflare resource changes.
+- Do not deploy during development. Report files changed and test results first; deploy only after explicit release approval.
+
+See `docs/handoffs/2026-11-27-cloudflare-pos-hosting-continuation.md` for the detailed current continuation instructions and historical deployment record.
