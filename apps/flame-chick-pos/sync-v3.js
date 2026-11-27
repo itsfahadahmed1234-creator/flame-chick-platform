@@ -275,6 +275,57 @@
     }
     return payload;
   }
+  function stableJson(value) {
+    if (Array.isArray(value)) return "[" + value.map(stableJson).join(",") + "]";
+    if (isRecord(value)) return "{" + Object.keys(value).sort().map(key => JSON.stringify(key) + ":" + stableJson(value[key])).join(",") + "}";
+    return JSON.stringify(value) ?? "null";
+  }
+  function syncPayloadContentSignature(payload) {
+    if (!isRecord(payload)) throw fail("A POS sync payload is required for content comparison.");
+    const content={...payload};
+    delete content.action; delete content.local_order_id; delete content.local_revision; delete content.payment;
+    return stableJson(content);
+  }
+  function orderContentSignature(order,snapshot,branchId,dependencies) {
+    return syncPayloadContentSignature(buildSyncPayload(order,snapshot,branchId,dependencies));
+  }
+  function serverOrderMatchesSyncPayload(order,payload,serverOrder) {
+    if (!isRecord(order)||!isRecord(payload)||!isRecord(serverOrder)) return false;
+    const raw=isRecord(serverOrder.raw)?serverOrder.raw:serverOrder;
+    const fulfillment=String(raw.fulfillment_type||serverOrder.fulfillmentType||"").toLowerCase();
+    const table=String(raw.table_reference||serverOrder.TableID||"").trim();
+    const tableLabel=String(raw.table_label_snapshot||serverOrder.TableNumber||"").trim();
+    const name=String(raw.customer_name??serverOrder.customerName??"").trim();
+    const phone=String(raw.customer_phone??serverOrder.phone??"").trim();
+    const notes=String(raw.notes??serverOrder.notes??"").trim();
+    if(fulfillment!==payload.fulfillment_type||table!==String(payload.table_reference||"").trim()||
+       tableLabel!==String(payload.table_label_snapshot||"").trim()||name!==String(payload.customer?.name||"").trim()||
+       phone!==String(payload.customer?.phone||"").trim()||notes!==String(payload.notes||"").trim()||
+       Number(serverOrder.total??raw.total)!==Number(order.total)) return false;
+    const remoteItems=Array.isArray(raw.order_items)?raw.order_items:null;
+    if(!remoteItems||remoteItems.length!==payload.items.length)return false;
+    for(let i=0;i<payload.items.length;i++){
+      const local=payload.items[i],remote=remoteItems[i];
+      if(local.kind!=="product"||remote.line_kind!=="product")return false;
+      const localModifiers=[];
+      for(const group of (Array.isArray(local.modifiers)?local.modifiers:[]))
+        for(const id of (Array.isArray(group.modifier_ids)?group.modifier_ids:[]))
+          localModifiers.push(String(group.modifier_group_id)+":"+String(id));
+      const remoteModifiers=[];
+      for(const modifier of (Array.isArray(remote.order_item_modifiers)?remote.order_item_modifiers:[])){
+        if(modifier.order_item_component_id||!modifier.modifier_group_id||!modifier.modifier_id)continue;
+        for(let n=0;n<Math.max(1,Number(modifier.quantity)||1);n++)
+          remoteModifiers.push(String(modifier.modifier_group_id)+":"+String(modifier.modifier_id));
+      }
+      localModifiers.sort();remoteModifiers.sort();
+      if(String(local.product_id||"")!==String(remote.product_id||"")||
+         String(local.product_variant_id||"")!==String(remote.product_variant_id||"")||
+         Number(local.quantity)!==Number(remote.quantity)||
+         String(local.notes||"").trim()!==String(remote.item_notes||"").trim()||
+         stableJson(localModifiers)!==stableJson(remoteModifiers))return false;
+    }
+    return true;
+  }
   function acknowledgementMatches(request, response) {
     return !!response && response.ok === true &&
       String(response.local_order_id || '') === String(request.local_order_id || '') &&
@@ -288,6 +339,7 @@
 
   return Object.freeze({
     UUID_RE, ensureIdentity, nextRevision, normalizeFulfillment,
-    buildSyncPayload, acknowledgementMatches, isRecoverableHttpStatus
+    buildSyncPayload, syncPayloadContentSignature, orderContentSignature,
+    serverOrderMatchesSyncPayload, acknowledgementMatches, isRecoverableHttpStatus
   });
 });
