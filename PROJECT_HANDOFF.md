@@ -1,5 +1,7 @@
 # CURRENT POS UI FIX — 2026-11-27
 
+Initial CI run at `6970a386ea7dcece9467be464ab5ef6bd9762a6a` passed 5/6 mocked regressions; the failure was a test double missing the UI's `PRINT NOT CONFIRMED` prefix. The fixture is corrected in the follow-up commit; rerun required before release. See project minutes.
+
 The current isolated POS UI task is tracked on branch \`fix/pos-manual-delivery-receipt-print-ux-2026-11-27\` (base \`acaaea765039a7dadd9eb0388136cc0cf6c127e2\`). Read \`docs/handoffs/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md\` and \`docs/handoffs/2026-11-27-cloudflare-pos-hosting-continuation.md\` first.
 
 - Do not push POS source to \`work/production-source-audit\`; it is wired to auto-deploy the live Worker.

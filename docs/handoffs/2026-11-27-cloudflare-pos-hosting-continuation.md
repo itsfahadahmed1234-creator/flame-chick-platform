@@ -1,5 +1,10 @@
 # CURRENT STATUS — POS MANUAL DELIVERY / RECEIPT PRINT UX FIX IN PROGRESS
 
+## CI correction checkpoint — 2026-11-27
+- Initial run for commit `6970a386ea7dcece9467be464ab5ef6bd9762a6a` failed because one preview test mock omitted the application's `PRINT NOT CONFIRMED` prefix. Five of six mocked UI tests passed; QZ diagnostics were skipped after the failure. The fixture is being corrected and must be rerun before considering this complete.
+- R2 pricing checked: Standard free monthly usage is 10 GB-month, 1M Class A, 10M Class B and free egress. Overage is billable; activating R2 requires subscription checkout. R2 remains disabled, with no subscription or bucket created.
+
+
 > Latest checkpoint: \`docs/handoffs/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md\`
 
 - Work is isolated on \`fix/pos-manual-delivery-receipt-print-ux-2026-11-27\`, based on \`work/production-source-audit\` at \`acaaea765039a7dadd9eb0388136cc0cf6c127e2\`.

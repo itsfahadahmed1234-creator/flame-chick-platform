@@ -112,7 +112,7 @@ test('non-editable receipt closes only after the mocked QZ print promise confirm
     $: (id) => id === 'receiptStatusText' ? status : null,
     printThermalReceipt: async () => { printCalls += 1; return pending.promise; },
     closeModal: (id) => { assert.equal(id, 'receiptModal'); closeCalls += 1; },
-    setReceiptPrintError: (message) => { status.textContent = message; },
+    setReceiptPrintError: (message) => { status.textContent = 'PRINT NOT CONFIRMED · ' + message; },
     lastReceiptPrintError: '',
     showToast() {}
   };
@@ -141,7 +141,7 @@ test('failed or cancelled receipt printing leaves the popup open and permits a d
       return true;
     },
     closeModal: () => { closeCalls += 1; },
-    setReceiptPrintError: (message) => { status.textContent = message; },
+    setReceiptPrintError: (message) => { status.textContent = 'PRINT NOT CONFIRMED · ' + message; },
     lastReceiptPrintError: '',
     showToast() {}
   };
@@ -186,7 +186,7 @@ test('print preview stays open while pending, closes on confirmation, and remain
     _pendingPrintOrder: { localOrderId: 'MOCK' },
     doPrintOrder: () => { calls += 1; return pending.promise; },
     closeModal: (id) => { assert.equal(id, 'printPreviewModal'); closeCalls += 1; },
-    setReceiptPrintError: (message) => { status.textContent = message; },
+    setReceiptPrintError: (message) => { status.textContent = 'PRINT NOT CONFIRMED · ' + message; },
     lastReceiptPrintError: '',
     showToast() {}
   };

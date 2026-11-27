@@ -33,6 +33,7 @@
 - \`docs/handoffs/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md\` — this dated minutes entry.
 
 ### Tests and results
+- First Actions run: commit `6970a386ea7dcece9467be464ab5ef6bd9762a6a`, run `46036547793`, failed in the new preview test after 5/6 mocked UI tests passed. The assertion expected the full UI prefix but its test double only displayed the raw message; this was a fixture mismatch, not an application behavior failure. The QZ diagnostic step was skipped because the test command stopped early. The mock is corrected to match the real status helper; rerun pending.
 - Added mocked regressions for one submission on rapid clicks, immediate spinner/disabled state, success/failure recovery, receipt popup closure only after print completion, failures/cancellation remaining open and retryable, and duplicate print suppression.
 - Tests are pending feature-branch GitHub Actions. No Production Supabase calls, order creation, payment, IndexedDB clearing or physical print job was used.
 - Do not claim tests passed until the workflow result is read back.
@@ -44,6 +45,8 @@
 - Vercel POS remains the fallback. No Worker version change.
 
 ### Private Cloudflare archive status
+- Official Cloudflare R2 pricing checked 2026-11-27: Standard monthly free allowance is 10 GB-month, 1 million Class A operations, 10 million Class B operations and free egress. Standard overage rates: $0.015/GB-month, $4.50/million Class A, $0.36/million Class B. Standard has no retrieval-processing fee. Infrequent Access is not free-tier eligible and has retrieval fees. Usage is rounded up to billing units. Sources: https://developers.cloudflare.com/r2/pricing/ and https://developers.cloudflare.com/r2/get-started/
+- R2 bucket creation requires an R2 subscription/checkout activation even when planned usage fits the monthly Standard free allowance; Cloudflare's getting-started flow says activation may require a billing profile/payment method. This is not approved. Do not activate R2, alter/attach payment details, or create a bucket without explicit approval.
 - Connected account checked read-only: \`831422f51dea96c387ae8917d451a6bf\`.
 - R2 bucket listing is not enabled for this account and returned Cloudflare error 10042 asking to enable R2 in the Dashboard.
 - Workers KV namespaces: none. D1 databases: none.
