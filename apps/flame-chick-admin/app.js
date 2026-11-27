@@ -516,9 +516,9 @@ function wireSliderManager(box){box.querySelectorAll("[data-slide-restore]").for
 
 function setting(key){return S.settings.find(s=>s.setting_key===key);}
 function renderSettings(){[["settingRestaurantName","restaurant_name"],["settingPhoneDisplay","wa_phone_display"],["settingPhone","wa_phone"],["settingAddress","address"],["settingFooter","footer_text_en"]].forEach(x=>{let s=setting(x[1]);$(x[0]).value=s?String(s.value_json):"";});}
-function openEditor(title,eyebrow,html,save){
+function openEditor(title,eyebrow,html,save,refreshAfterSave=loadAll){
  $("editorTitle").textContent=title;$("editorEyebrow").textContent=eyebrow;$("editorBody").innerHTML=html;let dlg=$("editorDialog"),form=$("editorForm");
- form.onsubmit=async e=>{e.preventDefault();let b=$("saveEditor");b.disabled=true;b.textContent="Saving…";try{await save(new FormData(form));dlg.close();await loadAll();toast("Changes saved to Flame Chick.");}catch(err){toast(err.message,true);}finally{b.disabled=false;b.textContent="Save changes";}};
+ form.onsubmit=async e=>{e.preventDefault();let b=$("saveEditor");b.disabled=true;b.textContent="Saving…";try{await save(new FormData(form));dlg.close();await refreshAfterSave();toast("Changes saved to Flame Chick.");}catch(err){toast(err.message,true);}finally{b.disabled=false;b.textContent="Save changes";}};
  dlg.showModal();
 }
 function closeEditor(){if($("editorDialog").open)$("editorDialog").close();}
@@ -774,7 +774,7 @@ function editArea(id){
   const payload={branch_id:S.branch.id,area_id:area?area.id:null,name:String(fd.get("name")||"").trim(),name_ur:String(fd.get("name_ur")||"").trim()||null,delivery_fee:Number(fd.get("fee")),sort_order:Number(fd.get("sort")||0),is_active:fd.has("active")};
   if(!payload.name||!Number.isFinite(payload.delivery_fee)||payload.delivery_fee<0)throw Error("Enter a valid area name and fee.");
   await deliveryConfigCommand("area_upsert",payload);
- }); 
+ },loadDeliveryConfig);
 }
 async function saveSettings(e){
  e.preventDefault();let pairs=[["restaurant_name","settingRestaurantName"],["wa_phone_display","settingPhoneDisplay"],["wa_phone","settingPhone"],["address","settingAddress"],["footer_text_en","settingFooter"]];

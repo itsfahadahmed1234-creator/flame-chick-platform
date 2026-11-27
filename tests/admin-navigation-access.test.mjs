@@ -20,3 +20,22 @@ test("unfinished Admin modules remain gated rather than being exposed by the Del
     assert.ok(!["staff", "catalog-v3", "delivery"].includes(page), page + " remains disabled until its secure API is complete");
   }
 });
+
+test("delivery-area editor refreshes only delivery configuration after its protected save", () => {
+  const editorStart = adminSource.indexOf("function openEditor(");
+  const editorEnd = adminSource.indexOf("\\nfunction closeEditor", editorStart);
+  const areaStart = adminSource.indexOf("function editArea(id)");
+  const areaEnd = adminSource.indexOf("\\nasync function saveSettings", areaStart);
+  assert.ok(editorStart >= 0 && editorEnd > editorStart, "shared editor block must exist");
+  assert.ok(areaStart >= 0 && areaEnd > areaStart, "delivery-area editor block must exist");
+
+  const editor = adminSource.slice(editorStart, editorEnd);
+  const area = adminSource.slice(areaStart, areaEnd);
+  assert.match(editor, /refreshAfterSave=loadAll/, "other editors retain their existing default refresh");
+  assert.match(editor, /await refreshAfterSave\\(\\);/, "the editor awaits its selected refresh");
+  assert.match(area, /deliveryConfigCommand\\("area_upsert",payload\\)/, "area creation/update still uses the existing command RPC");
+  assert.match(area, /\\},loadDeliveryConfig\\);/, "area editor reloads only the protected delivery configuration");
+  assert.doesNotMatch(area, /loadAll/, "area save must not trigger unrelated legacy table reads");
+  assert.match(area, /branch_id:S\\.branch\\.id/, "the active branch remains part of the area command");
+  assert.match(area, /delivery_fee:Number\\(fd\\.get\\("fee"\\)\\)/, "the entered delivery fee is unchanged");
+});

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - work/production-source-audit
+      - cloudflare/admin-production
     paths:
       - "apps/flame-chick-admin/**"
       - "apps/flame-chick-pos/**"
