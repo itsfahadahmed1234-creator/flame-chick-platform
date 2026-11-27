@@ -1,9 +1,9 @@
 /* Accessible Flame Chick V3 deal configurator.
  *
  * Renders explicit deal-variant, component and per-component modifier choices.
- * It emits identifiers and quantities only. No browser-side deal/cart total is
- * calculated or treated as authoritative. The caller sends the resulting
- * selection to a future trusted quote/order API.
+ * A display-only estimate may be calculated from the same published price
+ * fields used by the cart. Estimates never enter the ID-only payload and are
+ * never authoritative; the server validates and calculates the order total.
  */
 (function (root) {
   'use strict';
@@ -304,6 +304,83 @@
       };
     }
 
+
+    function getPriceEstimate() {
+      var variant = selectedVariant();
+      if (!variant) return fail('DEAL_VARIANT_REQUIRED', 'Choose a deal option to see its price.');
+      if (!Number.isSafeInteger(variant.basePriceMinor) || variant.basePriceMinor < 0) {
+        return fail('DEAL_PRICE_UNAVAILABLE', 'The published base price is unavailable.');
+      }
+
+      var componentTotalMinor = 0;
+      for (var g = 0; g < variant.groups.length; g++) {
+        var group = variant.groups[g];
+        for (var o = 0; o < group.options.length; o++) {
+          var option = group.options[o];
+          var count = selectedCount(group, option);
+          if (!count) continue;
+
+          var contributionMinor;
+          if (option.pricingTreatment === 'INCLUDED') {
+            contributionMinor = 0;
+          } else if (option.pricingTreatment === 'SURCHARGE') {
+            contributionMinor = option.surchargeMinor;
+          } else if (option.pricingTreatment === 'STANDALONE' &&
+                     variant.pricingMode === 'BASE_PLUS_SELECTED_ITEMS') {
+            contributionMinor = option.standalonePriceMinor;
+          } else {
+            return fail('DEAL_PRICE_UNAVAILABLE', 'A selected deal component has an unsupported price.');
+          }
+          if (!Number.isSafeInteger(contributionMinor) || contributionMinor < 0) {
+            return fail('DEAL_PRICE_UNAVAILABLE', 'A selected deal component price is unavailable.');
+          }
+
+          for (var unit = 0; unit < count; unit++) {
+            var componentUnitMinor = contributionMinor;
+            for (var mg = 0; mg < option.modifierGroups.length; mg++) {
+              var modifierGroup = option.modifierGroups[mg];
+              var selectedModifierIds = currentModifierSelection(group.id, option.id, unit, modifierGroup.id);
+              for (var mi = 0; mi < selectedModifierIds.length; mi++) {
+                var modifier = modifierGroup.modifiers.find(function (item) {
+                  return item.id === selectedModifierIds[mi];
+                });
+                if (!modifier || !Number.isSafeInteger(modifier.priceMinor) || modifier.priceMinor < 0) {
+                  return fail('DEAL_PRICE_UNAVAILABLE', 'A selected modifier price is unavailable.');
+                }
+                componentUnitMinor += modifier.priceMinor;
+                if (!Number.isSafeInteger(componentUnitMinor)) {
+                  return fail('DEAL_PRICE_UNAVAILABLE', 'The deal estimate exceeds the supported amount.');
+                }
+              }
+            }
+            componentTotalMinor += componentUnitMinor;
+            if (!Number.isSafeInteger(componentTotalMinor)) {
+              return fail('DEAL_PRICE_UNAVAILABLE', 'The deal estimate exceeds the supported amount.');
+            }
+          }
+        }
+      }
+
+      var unitMinor = variant.basePriceMinor + componentTotalMinor;
+      var totalMinor = unitMinor * dealQuantity;
+      if (!Number.isSafeInteger(unitMinor) || !Number.isSafeInteger(totalMinor) ||
+          unitMinor < 0 || totalMinor < 0) {
+        return fail('DEAL_PRICE_UNAVAILABLE', 'The deal estimate exceeds the supported amount.');
+      }
+      var validation = validate();
+      return {
+        ok: true,
+        complete: validation.ok === true,
+        validation: validation,
+        basePriceMinor: variant.basePriceMinor,
+        componentTotalMinor: componentTotalMinor,
+        unitMinor: unitMinor,
+        dealQuantity: dealQuantity,
+        totalMinor: totalMinor,
+        currencyCode: viewModel.currencyCode
+      };
+    }
+
     function getState() {
       var variant = selectedVariant();
       var groupState = Object.create(null);
@@ -321,6 +398,7 @@
         dealQuantity: dealQuantity,
         quantities: groupState,
         validation: validate(),
+        priceEstimate: getPriceEstimate(),
         lastError: lastError
       };
     }
@@ -663,6 +741,42 @@
       dealQuantityRow.appendChild(dealQuantityStepper);
       fragment.appendChild(dealQuantityRow);
 
+      var priceEstimate = getPriceEstimate();
+      var priceSummary = makeElement(doc, 'div', 'fc-deal-price-summary');
+      if (priceEstimate.ok) {
+        var basePriceRow = makeElement(doc, 'div', 'fc-deal-price-row');
+        basePriceRow.appendChild(makeElement(doc, 'span', '', 'Base deal price'));
+        basePriceRow.appendChild(makeElement(doc, 'strong', '', formatAmount(
+          priceEstimate.basePriceMinor, viewModel.currencyCode, options.formatMoney
+        )));
+        priceSummary.appendChild(basePriceRow);
+
+        if (priceEstimate.componentTotalMinor > 0) {
+          var additionsRow = makeElement(doc, 'div', 'fc-deal-price-row');
+          additionsRow.appendChild(makeElement(doc, 'span', '', 'Selected additions'));
+          additionsRow.appendChild(makeElement(doc, 'strong', '', formatAmount(
+            priceEstimate.componentTotalMinor, viewModel.currencyCode, options.formatMoney
+          )));
+          priceSummary.appendChild(additionsRow);
+        }
+
+        var totalRow = makeElement(doc, 'div', 'fc-deal-price-row is-total');
+        totalRow.appendChild(makeElement(doc, 'span', '', priceEstimate.complete ? 'Deal total' : 'Current estimate'));
+        totalRow.appendChild(makeElement(doc, 'strong', '', formatAmount(
+          priceEstimate.totalMinor, viewModel.currencyCode, options.formatMoney
+        )));
+        priceSummary.appendChild(totalRow);
+
+        if (!priceEstimate.complete) {
+          priceSummary.appendChild(makeElement(doc, 'p', 'fc-deal-price-note',
+            'This is a partial estimate. Complete all required choices to confirm the deal total.'));
+        }
+      } else {
+        priceSummary.appendChild(makeElement(doc, 'p', 'fc-deal-price-note',
+          priceEstimate.message || 'Choose a deal option to see its price.'));
+      }
+      fragment.appendChild(priceSummary);
+
       validation = validate();
       var status = makeElement(doc, 'p', 'fc-deal-config-status', lastError
         ? lastError.message
@@ -701,6 +815,7 @@
       setDealQuantity: setDealQuantity,
       setOptionQuantity: setOptionQuantity,
       setModifierSelection: setModifierSelection,
+      getPriceEstimate: getPriceEstimate,
       validate: validate,
       toPayload: toPayload,
       getState: getState,

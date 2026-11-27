@@ -5,6 +5,7 @@ on:
     branches:
       - work/production-source-audit
       - work/website-parallel-development
+      - work/website-reliability-phase1-review
     paths:
       - "apps/flame-chick-website/**"
       - "supabase/functions/flame-chick-order-api/**"

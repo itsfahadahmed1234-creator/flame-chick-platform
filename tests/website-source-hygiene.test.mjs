@@ -373,3 +373,50 @@ test("production Website Order API uses server-only HKDF phone-key derivation, n
   assert.match(api, /action==="place_website_order"/);
   assert.doesNotMatch(api, /FLAME_CHICK_ORDER_PHONE_HMAC_SECRET/);
 });
+
+
+test("legacy V2 homepage code safely no-ops when retired cart and category elements are absent", () => {
+  assert.match(html, /if \(!el\.cbCount \|\| !el\.cbTotal\) return;/);
+  assert.match(html, /if \(!menuEl \|\| !chipsEl \|\| !chips\.length \|\| !secs\.length\) return;/);
+  assert.match(html, /if \(s && typeof s\.getBoundingClientRect === 'function'/);
+  assert.match(html, /idx >= 0 && chips\[idx\] && typeof chipsEl\.scrollTo === 'function'/);
+});
+
+test("cart drawer traps focus, isolates the background and restores the actual opener", () => {
+  assert.match(html, /id="fc-v3-cart-drawer"[^>]*tabindex="-1"/);
+  assert.match(html, /id="fc-v3-cartbar-open"[^>]*aria-controls="fc-v3-cart-drawer"[^>]*aria-expanded="false"/);
+  assert.match(order, /var cartDrawerOpener = null/);
+  assert.match(order, /event && event\.currentTarget/);
+  assert.match(order, /function cartDrawerFocusableElements\(\)/);
+  assert.match(order, /function setCartDrawerBackgroundInert\(shouldInert\)/);
+  assert.match(order, /entry\.element\.inert = true/);
+  assert.match(order, /entry\.element\.inert = entry\.wasInert/);
+  assert.match(order, /function handleCartDrawerKeydown\(event\)/);
+  assert.match(order, /event\.shiftKey/);
+  assert.match(order, /function keepCartDrawerFocusInside\(event\)/);
+  assert.match(order, /document\.addEventListener\('focusin', keepCartDrawerFocusInside\)/);
+  assert.match(order, /restoreTarget\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(order, /cartDrawerIsOpen = false/);
+});
+
+test("order status preserves the visual base class and exits the loading state after successful initialization", () => {
+  assert.match(order, /node\.className = 'fc-home-order-status' \+ \(kind \? ' ' \+ kind : ''\)/);
+  assert.match(order, /status\('Menu loaded\. Add items to start your order\.'\)/);
+  assert.match(html, /\.fc-home-order-status\.success/);
+  assert.match(html, /\.fc-home-order-status\.error/);
+});
+
+test("deal cards display published base prices and configurator prices remain estimates outside the payload", () => {
+  const configurator = readFileSync(join(root, "js/catalog-v3-deal-configurator.js"), "utf8");
+  assert.match(order, /fc-deal-base-price/);
+  assert.match(order, /Number\.isSafeInteger\(variant\.basePriceMinor\)/);
+  assert.match(order, /Price unavailable/);
+  assert.match(configurator, /function getPriceEstimate\(\)/);
+  assert.match(configurator, /fc-deal-price-summary/);
+  assert.match(configurator, /priceEstimate\.complete \? 'Deal total' : 'Current estimate'/);
+  assert.match(configurator, /getPriceEstimate: getPriceEstimate/);
+  const payloadStart = configurator.indexOf("function toPayload()");
+  const estimateStart = configurator.indexOf("function getPriceEstimate()", payloadStart);
+  assert.ok(payloadStart >= 0 && estimateStart > payloadStart);
+  assert.doesNotMatch(configurator.slice(payloadStart, estimateStart), /totalMinor\s*:/);
+});

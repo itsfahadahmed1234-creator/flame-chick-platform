@@ -466,7 +466,7 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
 
 
 <div class="scrim fc-v3-cart-scrim" id="fc-v3-cart-scrim" aria-hidden="true"></div>
-<aside class="drawer fc-v3-cart-drawer" id="fc-v3-cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-heading" aria-hidden="true" inert>
+<aside class="drawer fc-v3-cart-drawer" id="fc-v3-cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-heading" aria-hidden="true" tabindex="-1" inert>
   <section id="fc-cart-panel" class="fc-home-cart" aria-labelledby="cart-heading">
     <div class="fc-home-cart-inner">
       <div class="fc-v3-cart-heading">
@@ -535,7 +535,7 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
 </aside>
 <div class="fc-v3-cartbar" id="fc-v3-cartbar" hidden>
   <div class="fc-v3-cartbar-copy"><strong id="fc-v3-cartbar-count">0 items</strong><small>Your order is ready to review</small></div>
-  <button id="fc-v3-cartbar-open" type="button">View cart</button>
+  <button id="fc-v3-cartbar-open" type="button" aria-controls="fc-v3-cart-drawer" aria-expanded="false">View cart</button>
 </div>
 
 <div class="cartbar" id="cartbar">
@@ -1034,6 +1034,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
   }
 
   function renderCart() {
+    // The V2 cart markup is retired on the V3 storefront. Keep its script dormant
+    // when its legacy summary elements are absent instead of throwing at boot.
+    if (!el.cbCount || !el.cbTotal) return;
     var t = C.totals(cart), ls = C.lines(cart);
     var activeArea = selectedDeliveryArea();
     var isTakeaway = mode() === 'Takeaway';
@@ -1550,15 +1553,20 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
   var menuEl = $('#menu'), curChip = -1, spyTick = false;
   function spy() {
     spyTick = false;
+    // The V3 category navigation is rendered dynamically. The legacy V2 spy
+    // must no-op if its old menu sections/chips are not present.
+    if (!menuEl || !chipsEl || !chips.length || !secs.length) return;
     var mr = menuEl.getBoundingClientRect(), idx = -1;
     if (mr.top < 200 && mr.bottom > 160) {
       idx = 0;
-      secs.forEach(function (s, i) { if (s.getBoundingClientRect().top <= 140) idx = i; });
+      secs.forEach(function (s, i) {
+        if (s && typeof s.getBoundingClientRect === 'function' && s.getBoundingClientRect().top <= 140) idx = i;
+      });
     }
     if (idx === curChip) return;
     curChip = idx;
     chips.forEach(function (c, i) { if (i === idx) c.setAttribute('aria-current', 'true'); else c.removeAttribute('aria-current'); });
-    if (idx >= 0) {
+    if (idx >= 0 && chips[idx] && typeof chipsEl.scrollTo === 'function') {
       var c = chips[idx];
       chipsEl.scrollTo({ left: c.offsetLeft - chipsEl.clientWidth / 2 + c.offsetWidth / 2, behavior: reduce ? 'auto' : 'smooth' });
     }
@@ -2546,6 +2554,16 @@ body.fc-catalog-dialog-open .ana-sticky{
 .fc-home-quote-total{padding-top:9px;border-top:1px solid var(--rule);font-size:15px;font-weight:900}
 .fc-home-quote-detail{margin:9px 0 0;color:var(--muted);font:500 11px/1.5 var(--f-body)}
 .fc-home-cart-actions #place-order[disabled],.fc-home-cart-actions #place-order[disabled]{opacity:.5;cursor:not-allowed}
+
+/* Phase 1: published deal base prices and live, non-authoritative estimates. */
+.fc-home-deal-card .fc-deal-base-price{margin:7px 0 0;color:var(--red);font:800 17px/1.1 var(--f-ui)}
+.fc-home-deal-dialog .fc-deal-price-summary{display:grid;gap:5px;padding:9px 11px;border:1px solid var(--rule);border-radius:10px;background:#fff;color:var(--ink)}
+.fc-home-deal-dialog .fc-deal-price-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font:500 12px/1.3 var(--f-body)}
+.fc-home-deal-dialog .fc-deal-price-row strong{font:700 14px/1.2 var(--f-ui);text-align:right}
+.fc-home-deal-dialog .fc-deal-price-row.is-total{padding-top:5px;border-top:1px solid var(--rule);font-weight:700}
+.fc-home-deal-dialog .fc-deal-price-row.is-total strong{color:var(--red);font-size:20px}
+.fc-home-deal-dialog .fc-deal-price-note{margin:0;color:var(--muted);font:500 10px/1.3 var(--f-body)}
+
 </style>
 <script src="js/catalog-v3.js"></script>
 <script src="js/catalog-v3-client.js"></script>

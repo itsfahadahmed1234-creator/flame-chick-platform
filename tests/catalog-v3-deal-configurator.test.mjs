@@ -261,3 +261,84 @@ test('deal choice labels hide Regular when a product has only one available opti
   assert.match(source, /productVariants\.length > 1 && option\.variantLabel/);
   assert.match(source, /productOptionLabel\(group, option\)/);
 });
+
+
+test('display estimate uses published base price, modifier prices and deal quantity without changing the ID-only payload', () => {
+  const ui = create();
+  assert.equal(ui.getPriceEstimate().code, 'DEAL_VARIANT_REQUIRED');
+  assert.equal(ui.selectVariant(IDS.dealVariant).ok, true);
+
+  const baseMinor = contract.minorUnits(750);
+  let estimate = ui.getPriceEstimate();
+  assert.equal(estimate.ok, true);
+  assert.equal(estimate.complete, true);
+  assert.equal(estimate.basePriceMinor, baseMinor);
+  assert.equal(estimate.componentTotalMinor, 0);
+  assert.equal(estimate.unitMinor, baseMinor);
+  assert.equal(estimate.totalMinor, baseMinor);
+
+  assert.equal(ui.setModifierSelection(
+    IDS.componentGroup, IDS.componentOption, 0, IDS.modifierGroup, [IDS.modifier]
+  ).ok, true);
+  estimate = ui.getPriceEstimate();
+  assert.equal(estimate.componentTotalMinor, contract.minorUnits(80));
+  assert.equal(estimate.unitMinor, baseMinor + contract.minorUnits(80));
+
+  assert.equal(ui.setDealQuantity(3).ok, true);
+  estimate = ui.getPriceEstimate();
+  assert.equal(estimate.totalMinor, estimate.unitMinor * 3);
+  assert.equal(estimate.dealQuantity, 3);
+  assert.equal(Object.hasOwn(ui.toPayload(), 'totalMinor'), false);
+  assert.equal(Object.hasOwn(ui.toPayload(), 'unitMinor'), false);
+});
+
+test('display estimate includes published surcharges and standalone components only in base-plus-selected-items deals', () => {
+  const snapshot = createSnapshot();
+  snapshot.dealVariants[0].pricingMode = 'BASE_PLUS_SELECTED_ITEMS';
+  snapshot.dealVariantComponentOptions[0].pricingTreatment = 'SURCHARGE';
+  snapshot.dealVariantComponentOptions[0].unitSurcharge = 25;
+  snapshot.dealVariantComponentOptions[1].pricingTreatment = 'STANDALONE';
+
+  const view = createView(snapshot);
+  assert.equal(view.ok, true);
+  const ui = create(view);
+  assert.equal(ui.selectVariant(IDS.dealVariant).ok, true);
+
+  const estimate = ui.getPriceEstimate();
+  const expected = contract.minorUnits(750) +
+    contract.minorUnits(25) +
+    contract.minorUnits(150);
+  assert.equal(estimate.ok, true);
+  assert.equal(estimate.complete, true);
+  assert.equal(estimate.unitMinor, expected);
+  assert.equal(estimate.componentTotalMinor, expected - contract.minorUnits(750));
+});
+
+test('display estimate is explicitly incomplete while required component choices are missing', () => {
+  const snapshot = createSnapshot();
+  snapshot.dealComponentGroups[0].minUnits = 1;
+  snapshot.dealComponentGroups[0].maxUnits = 2;
+  snapshot.dealComponentGroups[0].allowRepeatOption = true;
+  snapshot.dealVariantComponentOptions[0].maxQuantityPerDeal = 2;
+
+  const ui = create(createView(snapshot));
+  assert.equal(ui.selectVariant(IDS.dealVariant).ok, true);
+  let estimate = ui.getPriceEstimate();
+  assert.equal(estimate.ok, true);
+  assert.equal(estimate.complete, false);
+  assert.equal(estimate.totalMinor, contract.minorUnits(750));
+  assert.equal(estimate.validation.code, 'COMPONENT_GROUP_BOUNDS');
+
+  assert.equal(ui.setOptionQuantity(IDS.componentGroup, IDS.componentOption, 1).ok, true);
+  estimate = ui.getPriceEstimate();
+  assert.equal(estimate.ok, true);
+  assert.equal(estimate.complete, true);
+});
+
+test('display estimate fails closed for unsafe published values', () => {
+  const view = createView();
+  view.collections[0].deals[0].variants[0].basePriceMinor = Number.MAX_SAFE_INTEGER + 1;
+  const ui = create(view);
+  assert.equal(ui.selectVariant(IDS.dealVariant).ok, true);
+  assert.equal(ui.getPriceEstimate().code, 'DEAL_PRICE_UNAVAILABLE');
+});
