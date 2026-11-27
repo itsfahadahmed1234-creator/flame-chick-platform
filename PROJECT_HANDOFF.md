@@ -1,19 +1,45 @@
-# CURRENT POS UI FIX — 2026-11-27
+# CURRENT STATUS — POS MANUAL DELIVERY AND RECEIPT PRINT FIX DEPLOYED
 
-**Latest feature branch commit:** `414810e8a5038d727c899bdd4f81a15e41ec8c30`.
+**Release completed:** 2026-11-27 22:04 Asia/Karachi
 
-- Targeted mocked UI tests, receipt contracts and QZ adapter diagnostics pass. The expanded POS source-hygiene suite has two unrelated pre-existing assertion mismatches (76/78); see the dated minutes for exact test names and base-commit verification.
-- No deployment is authorized or performed. Production Worker stays at version 6.
-- Private Cloudflare R2 minutes mirror is not created: R2 is not enabled and activation requires subscription checkout; no billing changes were made.
-The current isolated POS UI task is tracked on branch \`fix/pos-manual-delivery-receipt-print-ux-2026-11-27\` (base \`acaaea765039a7dadd9eb0388136cc0cf6c127e2\`). Read \`docs/handoffs/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md\` and \`docs/handoffs/2026-11-27-cloudflare-pos-hosting-continuation.md\` first.
+- Repository: itsfahadahmed1234-creator/flame-chick-platform
+- Production branch: work/production-source-audit
+- Release commit: 1fc02ec433d8e8c8d82b0a8d0ef101e34b1aaf50
+- Pull request: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/pull/1 (merged)
+- POS app: apps/flame-chick-pos
+- Cloudflare Worker: flamechickpos
+- Live URL: https://flamechickpos.itsfahadahmed1234.workers.dev
+- Active Worker version: 7
+- Active version ID: ab9b5ed4-e5d0-4093-bc8b-8e3602906c7e
+- Active deployment ID: 814e7823-a2bc-44f0-9112-bc8d876f38e3
+- Traffic allocation: version 7 receives 100%
+- Cloudflare Workers Build ID: f13cee5b-17ed-438c-b774-a55aebd85627 (successful)
 
-- Do not push POS source to \`work/production-source-audit\`; it is wired to auto-deploy the live Worker.
-- Fixes: Manual Delivery spinner + double-click guard; await QZ print completion before closing receipt popups; keep failures/cancellations open and retryable.
-- Keep existing QZ routing/signing, receipt content, order/payment logic and browser fallback.
-- No Production orders/payments or physical print jobs during QA. Do not clear IndexedDB/browser storage.
-- No deployment without explicit user approval. Live Worker remains version 6.
+## Deployed behavior
+- Manual Delivery Place Order shows an immediate circular spinner, disables the button, blocks rapid duplicate clicks, and restores the original button markup/state after completion or failure.
+- Receipt modal and print preview now wait for the existing QZ print promise. Confirmed success closes the popup. Failed/cancelled attempts keep it open with an error and allow retry.
+- Existing order creation, validation, idempotency, payment preference, receipt content, QZ signing, printer routing, and browser fallback were preserved.
+- The existing QZ_SIGNING_PRIVATE_KEY remains an encrypted Worker secret binding. Its value was not read or changed. The ASSETS binding and worker-first /api/qz/sign path remain configured.
 
----
+## Verification
+- Dedicated feature release gate passed on feature commit 49453c21f0e14c38b7d979b67316e37a727ef2b6, GitHub Actions run 46038422599. It passed six mocked UI tests, receipt contract tests, QZ adapter diagnostics, QZ signer syntax, and payment/catalog/sync contracts.
+- The production POS/Rider static workflow run 46038587720 still fails two known stale ops-source-hygiene assertions (returned-order filter expression and PaymentMethod casing). These mismatches were confirmed at the original base commit and were not introduced or changed by this release.
+- Staff Admin Role Boundary QA run 46038587780 passed; Admin static checks run 46038587644 passed.
+- External browser/HTTP smoke testing could not be completed from this execution environment. Cloudflare API checks verified successful deployment, version 7, 100% traffic, required bindings, and secret name. The cashier/operator must hard-refresh the live POS and verify UI rendering.
+
+## Scope and safety
+- Vercel POS remains available as fallback.
+- No Website, Admin, Rider, Supabase schema/data/functions, Vercel aliases, DNS, or unrelated Cloudflare Worker was changed by this POS release.
+- A separate feature-preview build for Worker flame-chick-platform failed on its own preview trigger and created no deployment; that Worker remains otherwise unchanged.
+- No Production orders, payments, IndexedDB clearing, or physical printer jobs were used in QA.
+- Private Cloudflare minutes archive remains unsynchronized. R2 is not enabled; KV/D1 were absent. No subscription, billing, bucket, or payment settings were changed.
+
+## Next task
+Have the cashier/operator hard-refresh the production POS and verify Manual Delivery spinner/failure recovery and successful QZ receipt popup closure. Any real order, payment, or printer test must be explicitly authorized and clearly identified. Keep the two legacy source-hygiene mismatches as a separate cleanup item. R2 archive setup requires explicit account-owner authorization.
+
+Read docs/handoffs/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md for the chronological record.
+
+# HISTORICAL — INITIAL POS CLOUDFLARE HOSTING INSTRUCTIONS (COMPLETED)
 
 # NEW-CHAT EXECUTION DIRECTIVE — POS CLOUDFARE DEPLOYMENT
 

@@ -1,12 +1,39 @@
-# CURRENT STATUS — POS MANUAL DELIVERY / RECEIPT PRINT UX FIX IN PROGRESS
+# CURRENT STATUS — POS MANUAL DELIVERY / RECEIPT PRINT FIX DEPLOYED
 
-## Final development / verification checkpoint — 2026-11-27 21:52 Asia/Karachi
-- Current feature branch: `fix/pos-manual-delivery-receipt-print-ux-2026-11-27`.
-- Latest commit: `414810e8a5038d727c899bdd4f81a15e41ec8c30`; base `acaaea765039a7dadd9eb0388136cc0cf6c127e2`.
-- Mocked UI, receipt-contract and QZ diagnostics are green (run `46036952432`, commit `fd84bfe3b6a596f8ef4fab09f7985932f13df016`). The expanded run (`46037102563`) also passed these tests and `node --check` for the QZ signer, but its broader source-hygiene group reports 76/78 due two older assertion mismatches verified against the untouched base source: returned-order filter expression and `PaymentMethod` vs `paymentMethod`. No related implementation was changed.
-- Do not edit these unrelated business rules as part of the current UI fix.
-- No deployment: Worker `flamechickpos` remains version 6. No Production orders, payments or physical print jobs were used.
-- Private R2 archive remains blocked: R2 subscription not enabled; KV/D1 absent; no bucket/object or payment settings were changed. Monthly Standard free limits/overage prices and subscription requirement are recorded in the minutes file.
+**Completed:** 2026-11-27 22:04 Asia/Karachi
+
+- Production repo branch: work/production-source-audit
+- Production commit: 1fc02ec433d8e8c8d82b0a8d0ef101e34b1aaf50
+- Merged PR: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/pull/1
+- POS Worker: flamechickpos
+- Live URL: https://flamechickpos.itsfahadahmed1234.workers.dev
+- Active version: 7 (ab9b5ed4-e5d0-4093-bc8b-8e3602906c7e), 100% traffic
+- Deployment ID: 814e7823-a2bc-44f0-9112-bc8d876f38e3
+- Cloudflare Build ID: f13cee5b-17ed-438c-b774-a55aebd85627; outcome success.
+
+## Deployed changes
+- Manual Delivery Place Order has an immediate spinner, disabled state, synchronous double-click guard, and original button-state restoration.
+- Receipt popup and print preview close only after the existing QZ operation confirms success. Failure/cancellation leaves the relevant popup open with an error and allows retry.
+- Existing order/payment logic, idempotency, validation, receipt layout, QZ signing and printer routing remain unchanged.
+- Existing QZ_SIGNING_PRIVATE_KEY secret remains configured; its value was never read or modified.
+- Production build root /apps/flame-chick-pos; npm run build and npx wrangler deploy --config wrangler.jsonc. Prepared 10 allowlisted public assets; one changed HTML file uploaded, nine already current.
+
+## Checks and caveats
+- Feature release-gate run 46038422599 passed all six mocked UI tests, receipt contracts, QZ diagnostics, signer syntax, and payment/catalog/sync contracts.
+- Production POS/Rider static run 46038587720 reports two known stale ops-source-hygiene assertion mismatches (76/78). Both were verified against the original base source; no unrelated logic was modified.
+- Staff Admin Role Boundary QA 46038587780 passed; Admin static checks 46038587644 passed.
+- Cloudflare API confirms version 7 deployed with 100% traffic and existing ASSETS/QZ secret bindings. Direct browser/HTTP smoke was unavailable in this environment; cashier/operator must hard-refresh and verify live page rendering and UI behavior.
+- No Production orders/payments or physical printer jobs were used for automated QA.
+
+## Scope and follow-up
+- Vercel POS remains fallback. Website/Admin/Rider, Supabase, DNS, aliases and unrelated Worker resources were not changed.
+- Separate flame-chick-platform preview build 3ab9ce07-f8c5-4fc1-a92d-41c751c09c9a failed on its root-level preview command but created no deployment; this is not the POS Worker.
+- Private Cloudflare archive is pending. R2 not enabled, KV/D1 absent, no billing changes. Do not enable R2 without account-owner authorization.
+- Next: cashier/operator hard-refresh and verify Place Order spinner/retry plus successful QZ receipt popup auto-close. Record any live verification. Keep stale hygiene assertions as separate task.
+
+---
+
+# DEVELOPMENT HISTORY — prior checkpoints (superseded by deployed status above)
 
 > Latest checkpoint: \`docs/handoffs/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md\`
 
