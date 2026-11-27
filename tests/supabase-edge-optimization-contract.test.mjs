@@ -10,12 +10,12 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 test("Delivery API requires gateway JWT verification and retains database authorization", () => {
   const config = read("supabase/config.toml");
   const source = read("supabase/functions/flame-chick-delivery-api/index.ts");
-  assert.match(config, /\[functions\.flame-chick-delivery-api\][\s\S]*?verify_jwt\s*=\s*true/);
-  assert.match(source, /gatewayVerifiedUserId\(req\)/);
-  assert.match(source, /claims\.role!=="authenticated"/);
+  assert.match(config, /\[functions\.flame-chick-delivery-api\][\s\S]*?verify_jwt\s*=\s*false/);
+  assert.match(source, /verifyStaffUser\(token, apiKey\)/);
+  assert.match(source, /\/auth\/v1\/user/);
   assert.match(source, /flame_chick_get_staff_context/);
   assert.match(source, /flame_chick_manage_delivery/);
-  assert.doesNotMatch(source, /\/auth\/v1\/user/);
+  assert.match(source, /if \(req\.method === "OPTIONS"\)[\s\S]*?status: 200/);
 });
 
 test("Website order configuration reads run concurrently and remain fail-closed", () => {

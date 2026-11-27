@@ -50,27 +50,16 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-const AUTH_USER_ID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-// This function is configured with verify_jwt=true. The Supabase Edge Gateway
-// verifies JWT signature and expiry before this handler runs. Decode only the
-// signed subject here; branch/role checks remain enforced by database RPCs.
-function gatewayVerifiedUserId(req:Request):string|null{
-  const authorization=req.headers.get("authorization")??"";
-  if(!/^Bearer\s+/i.test(authorization))return null;
-  const token=authorization.replace(/^Bearer\s+/i,"").trim();
-  const parts=token.split(".");
-  if(parts.length!==3||!parts[1])return null;
-  try{
-    const base64=parts[1].replace(/-/g,"+").replace(/_/g,"/");
-    const padded=base64+"=".repeat((4-base64.length%4)%4);
-    const binary=atob(padded);
-    const bytes=Uint8Array.from(binary,char=>char.charCodeAt(0));
-    const claims:unknown=JSON.parse(new TextDecoder().decode(bytes));
-    if(!isObject(claims)||claims.role!=="authenticated"||
-       typeof claims.sub!=="string"||!AUTH_USER_ID_RE.test(claims.sub))return null;
-    return claims.sub;
-  }catch{return null;}
+async function verifyStaffUser(token: string, apiKey: string): Promise<{ id: string } | null> {
+  if (!token || !apiKey || !SUPABASE_URL) return null;
+  const res = await fetch(SUPABASE_URL + "/auth/v1/user", {
+    method: "GET",
+    headers: { apikey: apiKey, Authorization: "Bearer " + token, Accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const user = await res.json();
+  return isObject(user) && typeof user.id === "string" ? { id: user.id } : null;
 }
 
 async function readAsService(path: string) {
@@ -319,9 +308,10 @@ export async function handleDeliveryApiRequest(req: Request): Promise<Response> 
     return response({ ok: false, error: { code: "API_KEY_INVALID", message: "A valid Flame Chick publishable API key is required." } }, 401);
   }
 
-  const userId=gatewayVerifiedUserId(req);
-  if (!userId) return response({ ok: false, error: { code: "STAFF_AUTH_REQUIRED", message: "Sign in with an Flame Chick staff account to access delivery dispatch." } }, 401);
-  const user={id:userId};
+  const authorization = req.headers.get("authorization") ?? "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  const user = await verifyStaffUser(token, apiKey);
+  if (!user) return response({ ok: false, error: { code: "STAFF_AUTH_REQUIRED", message: "Sign in with an Flame Chick staff account to access delivery dispatch." } }, 401);
 
   if (req.method === "GET") {
     const url = new URL(req.url);
