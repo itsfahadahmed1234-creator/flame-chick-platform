@@ -238,6 +238,12 @@
     const kitchenTiming = fulfillment_type === 'dine_in'
       ? (String(identity.kitchenTiming || '').toLowerCase() === 'schedule' ? 'schedule' : 'now')
       : null;
+    const proposedPaymentMethod = fulfillment_type === 'delivery'
+      ? String(identity.proposedPaymentMethod || identity.paymentMethod || 'COD').trim().toLowerCase()
+      : null;
+    if (proposedPaymentMethod !== null && !['cod', 'cash', 'card', 'online'].includes(proposedPaymentMethod)) {
+      throw fail('Choose COD, Cash, Card or Online as the customer\'s preferred Delivery payment method.', 'POS_DELIVERY_PAYMENT_PREFERENCE_INVALID');
+    }
     const payload = {
       action: 'sync_pos_order',
       local_order_id: identity.syncOrderId,
@@ -247,6 +253,7 @@
       fulfillment_type,
       customer: { name: customerName, phone: customerPhone || null },
       notes: String(identity.notes || '').trim(),
+      ...(proposedPaymentMethod ? { proposed_payment_method: proposedPaymentMethod } : {}),
       items
     };
     if (isRecord(identity.pendingPayment)) {
@@ -301,6 +308,7 @@
     if(fulfillment!==payload.fulfillment_type||table!==String(payload.table_reference||"").trim()||
        tableLabel!==String(payload.table_label_snapshot||"").trim()||name!==String(payload.customer?.name||"").trim()||
        phone!==String(payload.customer?.phone||"").trim()||notes!==String(payload.notes||"").trim()||
+       String(raw.proposed_payment_method||"")!==String(payload.proposed_payment_method||"")||
        Number(serverOrder.total??raw.total)!==Number(order.total)) return false;
     const remoteItems=Array.isArray(raw.order_items)?raw.order_items:null;
     if(!remoteItems||remoteItems.length!==payload.items.length)return false;

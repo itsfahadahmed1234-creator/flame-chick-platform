@@ -251,7 +251,9 @@ async function readPublishedV3Catalog(): Promise<
   return {ok:true,snapshot};
 }
 
+let flameChickRestaurantCache:{expiresAt:number;value:{id:string;currencyCode:string;timezone:string}}|null=null;
 async function readFlameChickRestaurant(): Promise<{id:string;currencyCode:string;timezone:string}|null> {
+  if(flameChickRestaurantCache&&flameChickRestaurantCache.expiresAt>Date.now())return flameChickRestaurantCache.value;
   const query = new URLSearchParams();
   query.set("select","id,currency_code,timezone");
   query.set("slug","eq.flame-chick");
@@ -261,7 +263,9 @@ async function readFlameChickRestaurant(): Promise<{id:string;currencyCode:strin
   if(!result.ok||!Array.isArray(result.data)||result.data.length!==1)return null;
   const row = result.data[0];
   if(!isObject(row)||typeof row.id!=="string"||typeof row.currency_code!=="string"||typeof row.timezone!=="string")return null;
-  return {id:row.id,currencyCode:row.currency_code,timezone:row.timezone};
+  const value={id:row.id,currencyCode:row.currency_code,timezone:row.timezone};
+  flameChickRestaurantCache={expiresAt:Date.now()+15_000,value};
+  return value;
 }
 
 async function readActiveWebsiteBranches(restaurantId:string, branchId?:string): Promise<{ok:true;branches:Array<Record<string,unknown>>}|{ok:false}> {
@@ -586,55 +590,35 @@ type StaffContext = {
   roles: Array<{ role: string; branch_id: string | null }>;
 };
 
+const STAFF_CONTEXT_CACHE_TTL_MS=15_000;
+const staffContextCache=new Map<string,{expiresAt:number;value:StaffContext}>();
 async function resolveStaffContext(userId: string): Promise<StaffContext | null> {
   if (!userId || !SUPABASE_URL || !SERVICE_KEY) return null;
+  const cached=staffContextCache.get(userId);
+  if(cached&&cached.expiresAt>Date.now())return cached.value;
+  if(cached)staffContextCache.delete(userId);
 
-  const restaurantQuery = new URLSearchParams();
-  restaurantQuery.set("select", "id");
-  restaurantQuery.set("slug", "eq.flame-chick");
-  restaurantQuery.set("is_active", "eq.true");
-  restaurantQuery.set("limit", "2");
-  const restaurantResult = await readAsService("restaurants?" + restaurantQuery.toString());
-  if (!restaurantResult.ok || !Array.isArray(restaurantResult.data) || restaurantResult.data.length !== 1) return null;
-  const restaurant = restaurantResult.data[0];
-  if (!isObject(restaurant) || typeof restaurant.id !== "string") return null;
-
-  const roleResult = await fetch(SUPABASE_URL + "/rest/v1/rpc/flame_chick_get_staff_role_rows", {
-    method: "POST",
-    headers: { apikey: SERVICE_KEY, Authorization: "Bearer " + SERVICE_KEY, "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ p_user_id: userId }),
-    cache: "no-store",
+  // Auth user validation remains per request. This private RPC returns the
+  // restaurant, active role rows and active branches in one PostgREST call.
+  const projectionResponse=await fetch(SUPABASE_URL+"/rest/v1/rpc/flame_chick_get_staff_context",{
+    method:"POST",
+    headers:{apikey:SERVICE_KEY,Authorization:"Bearer "+SERVICE_KEY,"Content-Type":"application/json",Accept:"application/json"},
+    body:JSON.stringify({p_user_id:userId}),
+    cache:"no-store",
   });
-  if (!roleResult.ok) return null;
-  const roleData: unknown = await roleResult.json().catch(() => null);
-  if (!Array.isArray(roleData)) return null;
-  const roleRows = roleData.filter((row): row is Record<string, unknown> =>
-    isObject(row) &&
-    row.restaurant_id === restaurant.id &&
-    typeof row.role_key === "string" &&
-    ["owner", "admin", "manager", "cashier", "rider"].includes(row.role_key) &&
-    row.is_active === true &&
-    (row.branch_id === null || typeof row.branch_id === "string")
-  );
-  if (!roleRows.length) return null;
-
-  const branchIds = [...new Set(roleRows.map((row) => typeof row.branch_id === "string" ? row.branch_id : null).filter((id): id is string => !!id))];
-  const branchQuery = new URLSearchParams();
-  branchQuery.set("select", "id,branch_code,is_active");
-  branchQuery.set("restaurant_id", "eq." + restaurant.id);
-  branchQuery.set("is_active", "eq.true");
-  branchQuery.set("order", "branch_code.asc");
-  branchQuery.set("limit", "100");
-  if (branchIds.length && roleRows.every((row) => row.branch_id !== null)) {
-    branchQuery.set("id", "in.(" + branchIds.join(",") + ")");
-  }
-  const branchResult = await readAsService("branches?" + branchQuery.toString());
-  if (!branchResult.ok || !Array.isArray(branchResult.data)) return null;
-  const branches = branchResult.data.filter((row): row is Record<string, unknown> =>
-    isObject(row) && typeof row.id === "string" && row.is_active === true
-  );
-  if (!branches.length) return null;
-
+  if(!projectionResponse.ok)return null;
+  const projection:unknown=await projectionResponse.json().catch(()=>null);
+  if(!isObject(projection)||typeof projection.restaurant_id!=="string")return null;
+  const restaurantId=projection.restaurant_id;
+  const roleRows=Array.isArray(projection.role_rows)?projection.role_rows.filter((row):row is Record<string,unknown> =>
+    isObject(row)&&row.restaurant_id===restaurantId&&typeof row.role_key==="string"&&
+    ["owner","admin","manager","cashier","rider"].includes(row.role_key)&&row.is_active===true&&
+    (row.branch_id===null||typeof row.branch_id==="string")
+  ): [];
+  const branches=Array.isArray(projection.branches)?projection.branches.filter((row):row is Record<string,unknown> =>
+    isObject(row)&&typeof row.id==="string"&&row.is_active===true
+  ): [];
+  if(!roleRows.length||!branches.length)return null;
   const globalRoles = roleRows.filter((row) => row.branch_id === null);
   const branchScopedRoles = roleRows.filter((row) => typeof row.branch_id === "string");
   const validBranchRoles = branchScopedRoles.filter((row) => branches.some((branch) => branch.id === row.branch_id));
@@ -659,13 +643,16 @@ async function resolveStaffContext(userId: string): Promise<StaffContext | null>
     user_id: userId,
     role: String(selected.role_key),
     branch_id: branchId,
-    restaurant_id: String(restaurant.id),
+    restaurant_id: restaurantId,
     roles: usableRoles.map((row) => ({
       role: String(row.role_key),
       branch_id: typeof row.branch_id === "string" ? row.branch_id : null,
     })),
   };
-}
+  staffContextCache.set(userId,{expiresAt:Date.now()+STAFF_CONTEXT_CACHE_TTL_MS,value:context});
+  if(staffContextCache.size>128)staffContextCache.delete(staffContextCache.keys().next().value as string);
+  return context;
+
 
 async function verifyStaffRole(
   userId: string,
@@ -727,7 +714,7 @@ async function readOrderBoard(board: string, limit: number, branchId: string, fi
   const query = new URLSearchParams();
   query.set(
     "select",
-    "id,branch_id,order_number,local_order_id,source,source_reference,fulfillment_type,status,customer_name,customer_phone,customer_email,delivery_address,delivery_area_id,delivery_area_name_snapshot,delivery_area_fee_snapshot,delivery_instructions,table_reference,table_label_snapshot,subtotal,discount_amount,delivery_fee,total,paid_amount,balance_due,currency_code,payment_status,payment_method_summary,notes,internal_notes,placed_at,created_at,updated_at,accepted_at,preparing_at,ready_at,out_for_delivery_at,delivered_at,collected_at,served_at,completed_at,rejected_at,cancelled_at,rejection_reason,cancellation_reason,cashier_id,pos_device_id,register_session_id,last_status_changed_by,last_status_actor_type,last_status_change_reason,order_items(id,line_number,product_id,product_variant_id,deal_id,quantity,product_name_snapshot,variant_label_snapshot,deal_title_snapshot,unit_price_snapshot,discount_amount,line_total,item_notes,item_snapshot,order_item_modifiers(id,order_item_component_id,modifier_group_id,modifier_id,quantity,modifier_group_name_snapshot,modifier_name_snapshot,unit_price_snapshot,total_price_snapshot,modifier_snapshot),order_item_components(id,deal_component_id,component_type,selected_product_id,selected_variant_id,selected_drink_option_id,quantity,name_snapshot,variant_snapshot,volume_snapshot,unit_price_snapshot,component_snapshot,order_item_modifiers(id,modifier_group_id,modifier_id,quantity,modifier_group_name_snapshot,modifier_name_snapshot,unit_price_snapshot,total_price_snapshot,modifier_snapshot))),delivery_tasks(id,status,recipient_name_snapshot,recipient_phone_snapshot,address_snapshot,area_name_snapshot,delivery_fee_snapshot,delivery_instructions_snapshot,dispatch_started_at,assigned_at,picked_up_at,out_for_delivery_at,delivered_at,failed_at,failure_reason)"
+    "id,branch_id,order_number,local_order_id,source,source_reference,fulfillment_type,status,customer_name,customer_phone,customer_email,delivery_address,delivery_area_id,delivery_area_name_snapshot,delivery_area_fee_snapshot,delivery_instructions,table_reference,table_label_snapshot,subtotal,discount_amount,delivery_fee,total,paid_amount,balance_due,currency_code,payment_status,payment_method_summary,proposed_payment_method,notes,internal_notes,placed_at,created_at,updated_at,accepted_at,preparing_at,ready_at,out_for_delivery_at,delivered_at,collected_at,served_at,completed_at,rejected_at,cancelled_at,rejection_reason,cancellation_reason,cashier_id,pos_device_id,register_session_id,last_status_changed_by,last_status_actor_type,last_status_change_reason,order_items(id,line_number,product_id,product_variant_id,deal_id,quantity,product_name_snapshot,variant_label_snapshot,deal_title_snapshot,unit_price_snapshot,discount_amount,line_total,item_notes,item_snapshot,order_item_modifiers(id,order_item_component_id,modifier_group_id,modifier_id,quantity,modifier_group_name_snapshot,modifier_name_snapshot,unit_price_snapshot,total_price_snapshot,modifier_snapshot),order_item_components(id,deal_component_id,component_type,selected_product_id,selected_variant_id,selected_drink_option_id,quantity,name_snapshot,variant_snapshot,volume_snapshot,unit_price_snapshot,component_snapshot,order_item_modifiers(id,modifier_group_id,modifier_id,quantity,modifier_group_name_snapshot,modifier_name_snapshot,unit_price_snapshot,total_price_snapshot,modifier_snapshot))),delivery_tasks(id,status,recipient_name_snapshot,recipient_phone_snapshot,address_snapshot,area_name_snapshot,delivery_fee_snapshot,delivery_instructions_snapshot,dispatch_started_at,assigned_at,picked_up_at,out_for_delivery_at,delivered_at,failed_at,failure_reason)"
   );
   query.set("branch_id", "eq." + branchId);
   query.set("status", "in.(" + statuses.join(",") + ")");
@@ -752,6 +739,36 @@ async function readOrderBoard(board: string, limit: number, branchId: string, fi
     return { ok:false as const, status:500, body:{ok:false,error:{code:"ORDER_READ_FAILED",message:msg}} };
   }
   return { ok:true as const, data:result.data };
+}
+ 
+async function readOrderHistory(branchId:string,limit:number,filters:{source?:string;cancelled?:boolean;beforeCreatedAt?:string;beforeId?:string}={}) {
+  const pageSize=Math.max(1,Math.min(Math.trunc(limit)||15,15));
+  const query=new URLSearchParams();
+  // Summary only: no item/modifier/component/task nesting on a History list request.
+  query.set("select","id,branch_id,order_number,local_order_id,source,fulfillment_type,status,customer_name,customer_phone,delivery_address,delivery_area_name_snapshot,table_reference,table_label_snapshot,subtotal,discount_amount,delivery_fee,total,paid_amount,balance_due,currency_code,payment_status,payment_method_summary,proposed_payment_method,notes,placed_at,created_at,updated_at");
+  query.set("branch_id","eq."+branchId);
+  if(filters.source){
+    if(!["pos","website"].includes(filters.source))return {ok:false as const,status:400,body:{ok:false,error:{code:"HISTORY_SOURCE_INVALID",message:"Choose POS, Website or All orders."}}};
+    query.set("source","eq."+filters.source);
+  }
+  if(filters.cancelled)query.set("status","in.(cancelled,returned)");
+  if(filters.beforeCreatedAt||filters.beforeId){
+    const time=Date.parse(filters.beforeCreatedAt||"");
+    if(!Number.isFinite(time)||!filters.beforeId||!POS_ID_RE.test(filters.beforeId))
+      return {ok:false as const,status:400,body:{ok:false,error:{code:"HISTORY_CURSOR_INVALID",message:"The History page cursor is invalid. Refresh the list and try again."}}};
+    const iso=new Date(time).toISOString();
+    query.set("or","(created_at.lt."+iso+",and(created_at.eq."+iso+",id.lt."+filters.beforeId+"))");
+  }
+  query.set("order","created_at.desc,id.desc");
+  query.set("limit",String(pageSize));
+  const result=await readAsService("orders?"+query.toString());
+  if(!result.ok||!Array.isArray(result.data)){
+    const err=isObject(result.data)?result.data:{};
+    return {ok:false as const,status:500,body:{ok:false,error:{code:"HISTORY_READ_FAILED",message:String(err.message??"Unable to load Flame Chick order history.")}}};
+  }
+  const rows=result.data.filter(isObject);
+  const last=rows.length?rows[rows.length-1]:null;
+  return {ok:true as const,data:rows,hasMore:rows.length===pageSize,nextCursor:last?{created_at:String(last.created_at??""),id:String(last.id??"")}:null};
 }
 
 export 
@@ -877,6 +894,11 @@ async function buildStaffPosSyncPayload(
     return websiteError("POS_ORDER_TOTAL_INVALID","The server-calculated order total is invalid.",400);
   }
 
+  const proposedPaymentRaw=typeof body.proposed_payment_method==="string"?body.proposed_payment_method.trim().toLowerCase():"";
+  const proposedPaymentMethod=fulfillmentType==="delivery"?(proposedPaymentRaw||null):null;
+  if((proposedPaymentMethod!==null&&!['cod','cash','card','online'].includes(proposedPaymentMethod))||(fulfillmentType!==="delivery"&&proposedPaymentRaw)){
+    return websiteError("POS_DELIVERY_PAYMENT_PREFERENCE_INVALID","Delivery payment preference must be COD, Cash, Card or Online and is not valid for other order types.",400);
+  }
   const tableReference = typeof body.table_reference === "string" ? body.table_reference.trim() || null : null;
   const tableLabel = typeof body.table_label_snapshot === "string" ? body.table_label_snapshot.trim() || null : null;
   const kitchenTiming = typeof body.kitchen_timing === "string" ? body.kitchen_timing.trim().toLowerCase() || null : null;
@@ -921,6 +943,7 @@ async function buildStaffPosSyncPayload(
     customer_phone:customerPhone || null,
     notes:typeof body.notes === "string" ? body.notes.trim() || null : null,
     payment_method_summary:null,
+    ...(proposedPaymentMethod?{proposed_payment_method:proposedPaymentMethod}:{}),
     table_reference:tableReference,
     table_label_snapshot:tableLabel,
     scheduled_for:scheduledFor,
@@ -944,6 +967,7 @@ async function buildStaffPosSyncPayload(
       local_order_id:localOrderId,
       local_revision:Number(revision),
       fulfillment_type:fulfillmentType,
+      ...(proposedPaymentMethod?{proposed_payment_method:proposedPaymentMethod}:{}),
       branch_id:context.branch_id,
       publication_id:snapshot.publicationId,
       catalog_version:snapshot.publicationNumber,
@@ -986,8 +1010,6 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
       if (!context) return response({ ok: false, error: { code: "STAFF_ROLE_OR_BRANCH_REQUIRED", message: "Your account needs an active Flame Chick staff role and a single authorized branch." } }, 403);
       return response({ ok: true, staff: context });
     }
-    const canReadBoard = await verifyStaffRole(user.id, token, apiKey, ["owner", "admin", "manager", "cashier"]);
-    if (!canReadBoard) return response({ ok: false, error: { code: "STAFF_ROLE_REQUIRED", message: "An active Flame Chick Admin, Owner, Manager or Cashier role is required to view the order board." } }, 403);
     const context = await resolveStaffContext(user.id);
     if (!context || !["owner", "admin", "manager", "cashier"].includes(context.role)) {
       return response({ ok: false, error: { code: "STAFF_ROLE_REQUIRED", message: "An active Flame Chick POS role is required to view incoming orders." } }, 403);
@@ -1012,6 +1034,14 @@ export async function handleOrderApiRequest(req: Request): Promise<Response> {
     const orderId = (url.searchParams.get("order_id") ?? "").trim();
     const source = (url.searchParams.get("source") ?? "").trim().toLowerCase();
     const fulfillmentType = (url.searchParams.get("fulfillment_type") ?? "").trim().toLowerCase();
+    if(board==="history"){
+      const cancelled=url.searchParams.get("cancelled")==="true";
+      const beforeCreatedAt=(url.searchParams.get("before_created_at")??"").trim();
+      const beforeId=(url.searchParams.get("before_id")??"").trim();
+      const page=await readOrderHistory(context.branch_id,limit,{...(source?{source}:{}),cancelled,...(beforeCreatedAt?{beforeCreatedAt}:{}),...(beforeId?{beforeId}:{})});
+      if(!page.ok)return response(page.body,page.status);
+      return response({ok:true,data:page.data,has_more:page.hasMore,next_cursor:page.nextCursor});
+    }
     const result = await readOrderBoard(board, limit, context.branch_id, {
       ...(orderId ? {orderId} : {}),
       ...(source ? {source} : {}),

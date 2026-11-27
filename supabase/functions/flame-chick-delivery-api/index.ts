@@ -2,6 +2,9 @@
 // Separate function for Flame Chick rider dispatch and delivery lifecycle.
 // All writes go through service-role-only public.flame_chick_manage_delivery(jsonb).
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const staffProjectionCache=new Map<string,{expiresAt:number;value:{restaurantId:string;roleRows:Record<string,unknown>[];branches:Record<string,unknown>[]}}>();
+const deliveryExpirySweepByBranch=new Map<string,number>();
+const deliveryExpirySweepInFlight=new Map<string,ReturnType<typeof callServiceRpc>>();
 
 function readKeyMap(name: string): Record<string, string> {
   const raw = Deno.env.get(name);
@@ -202,43 +205,37 @@ async function callServiceRpc(name: string, args: Record<string, unknown> = {}) 
   return { ok:true as const, data };
 }
 
-async function flameChickRestaurantId(): Promise<string | null> {
-  const query = new URLSearchParams();
-  query.set("select", "id");
-  query.set("slug", "eq.flame-chick");
-  query.set("is_active", "eq.true");
-  query.set("limit", "2");
-  const result = await readAsService("restaurants?" + query.toString());
-  if (!result.ok || !Array.isArray(result.data) || result.data.length !== 1) return null;
-  const row = result.data[0];
-  return isObject(row) && typeof row.id === "string" ? row.id : null;
+async function readStaffContextProjection(userId:string):Promise<{restaurantId:string;roleRows:Record<string,unknown>[];branches:Record<string,unknown>[]} | null> {
+  const cached=staffProjectionCache.get(userId);
+  if(cached&&cached.expiresAt>Date.now())return cached.value;
+  if(cached)staffProjectionCache.delete(userId);
+  const result=await callServiceRpc("flame_chick_get_staff_context",{p_user_id:userId});
+  if(!result.ok||!isObject(result.data)||typeof result.data.restaurant_id!=="string")return null;
+  const restaurantId=result.data.restaurant_id;
+  const roleRows=Array.isArray(result.data.role_rows)?result.data.role_rows.filter((row):row is Record<string,unknown> =>
+    isObject(row)&&row.restaurant_id===restaurantId&&typeof row.role_key==="string"&&row.is_active===true&&
+    (row.branch_id===null||typeof row.branch_id==="string")
+  ): [];
+  const branches=Array.isArray(result.data.branches)?result.data.branches.filter((row):row is Record<string,unknown> =>
+    isObject(row)&&typeof row.id==="string"&&row.is_active===true
+  ): [];
+  if(!roleRows.length||!branches.length)return null;
+  const value={restaurantId,roleRows,branches};
+  staffProjectionCache.set(userId,{expiresAt:Date.now()+15_000,value});
+  if(staffProjectionCache.size>128)staffProjectionCache.delete(staffProjectionCache.keys().next().value as string);
+  return value;
 }
 
 async function resolveDispatchContext(userId: string): Promise<{
   ok: true; role: string; branchId: string;
 } | { ok: false }> {
-  const restaurantId = await flameChickRestaurantId();
-  if (!restaurantId) return { ok:false };
-  const roleResult = await callServiceRpc("flame_chick_get_staff_role_rows", { p_user_id:userId });
-  if (!roleResult.ok || !Array.isArray(roleResult.data)) return { ok:false };
-  const roleRows = roleResult.data.filter((row): row is Record<string, unknown> =>
-    isObject(row) && row.restaurant_id === restaurantId &&
-    ["owner","admin","manager","cashier"].includes(String(row.role_key)) &&
-    row.is_active === true && (row.branch_id === null || typeof row.branch_id === "string")
+  const projection=await readStaffContextProjection(userId);
+  if(!projection)return {ok:false};
+  const roleRows=projection.roleRows.filter(row=>
+    ["owner","admin","manager","cashier"].includes(String(row.role_key))&&row.is_active===true&&
+    (row.branch_id===null||typeof row.branch_id==="string")
   );
-  if (!roleRows.length) return { ok:false };
-  const branchQuery = new URLSearchParams();
-  branchQuery.set("select", "id,is_active");
-  branchQuery.set("restaurant_id", "eq." + restaurantId);
-  branchQuery.set("is_active", "eq.true");
-  branchQuery.set("limit", "100");
-  const scopedIds = [...new Set(roleRows.map(row=>typeof row.branch_id==="string"?row.branch_id:null).filter((id):id is string=>!!id))];
-  if (scopedIds.length && roleRows.every(row=>row.branch_id!==null)) branchQuery.set("id","in.("+scopedIds.join(",")+")");
-  const branchResult = await readAsService("branches?" + branchQuery.toString());
-  if (!branchResult.ok || !Array.isArray(branchResult.data)) return { ok:false };
-  const branches = branchResult.data.filter((row): row is Record<string, unknown> =>
-    isObject(row) && typeof row.id==="string" && row.is_active===true
-  );
+  const branches=projection.branches;
   const globalRoles = roleRows.filter(row=>row.branch_id===null);
   const scopedRoles = roleRows.filter(row=>typeof row.branch_id==="string" && branches.some(branch=>branch.id===row.branch_id));
   const distinctScopedBranches = [...new Set(scopedRoles.map(row=>String(row.branch_id)))];
@@ -256,13 +253,11 @@ async function resolveDispatchContext(userId: string): Promise<{
   return {ok:true,role:String(selected.role_key),branchId};
 }
 
+
 async function isActiveRider(userId: string, token: string, apiKey: string) {
-  const restaurantId = await flameChickRestaurantId();
-  if (!restaurantId) return { ok:false as const, status:503, body:{ok:false,error:{code:"RESTAURANT_CONTEXT_UNAVAILABLE",message:"Flame Chick restaurant context is unavailable."}}};
-  const roleResult = await callServiceRpc("flame_chick_get_staff_role_rows", { p_user_id:userId });
-  if (!roleResult.ok) return { ok:false as const, status:roleResult.status, body:{ok:false,error:{code:"RIDER_ROLE_LOOKUP_FAILED",message:"Could not verify your active Rider role."}} };
-  const roles = Array.isArray(roleResult.data) ? roleResult.data : [];
-  const riderRoles = roles.filter((row) => isObject(row) && row.restaurant_id === restaurantId && row.role_key === "rider" && row.is_active === true && typeof row.branch_id === "string");
+  const projection=await readStaffContextProjection(userId);
+  if(!projection)return { ok:false as const,status:503,body:{ok:false,error:{code:"RIDER_CONTEXT_UNAVAILABLE",message:"Flame Chick Rider context is unavailable."}}};
+  const riderRoles=projection.roleRows.filter(row=>row.restaurant_id===projection.restaurantId&&row.role_key==="rider"&&row.is_active===true&&typeof row.branch_id==="string");
   const riderBranches = [...new Set(riderRoles.map((row) => String(row.branch_id)))];
   if (!riderRoles.length) {
     return { ok:false as const, status:403, body:{ ok:false, error:{ code:"RIDER_ROLE_REQUIRED", message:"This account does not have an active Flame Chick rider role." } } };
@@ -379,8 +374,18 @@ export async function handleDeliveryApiRequest(req: Request): Promise<Response> 
       return response({ok:false,error:{code:"BRANCH_ACCESS_DENIED",message:"You cannot access dispatch data for another branch."}},403);
     }
     const branchId = staffContext.branchId;
-    const expiry = await callServiceRpc("flame_chick_expire_delivery_offers", { p_branch_id:branchId, p_batch_limit:100 });
-    if (!expiry.ok) return response({ok:false,error:{code:"DELIVERY_EXPIRY_SWEEP_FAILED",message:"Could not refresh expired rider offers. Please retry."}},503);
+    // The server command retains the 60-second offer deadline. Coalesce concurrent
+    // refreshes per branch; no background timer or expiry semantics are changed.
+    const expiryNow=Date.now();
+    const lastSweep=deliveryExpirySweepByBranch.get(branchId)||0;
+    if(expiryNow-lastSweep>=15_000){
+      let sweep=deliveryExpirySweepInFlight.get(branchId);
+      if(!sweep){sweep=callServiceRpc("flame_chick_expire_delivery_offers",{p_branch_id:branchId,p_batch_limit:100});deliveryExpirySweepInFlight.set(branchId,sweep);}
+      const expiry=await sweep;
+      if(deliveryExpirySweepInFlight.get(branchId)===sweep)deliveryExpirySweepInFlight.delete(branchId);
+      if(!expiry.ok)return response({ok:false,error:{code:"DELIVERY_EXPIRY_SWEEP_FAILED",message:"Could not refresh expired rider offers. Please retry."}},503);
+      deliveryExpirySweepByBranch.set(branchId,Date.now());
+    }
 
     const taskQuery = new URLSearchParams();
     taskQuery.set("select",
