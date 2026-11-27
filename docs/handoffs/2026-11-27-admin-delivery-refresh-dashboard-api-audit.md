@@ -111,14 +111,14 @@ Migration: `20261127164728_flame_chick_admin_dashboard_summary_v1` on Production
 - No test orders/payments were created, updated or cancelled. Smoke checks were read-only and used a transaction rollback.
 - These are a database/API contract validation, not a browser end-to-end check.
 
-### Rollout gates — completed; see final deployment status below
+### Rollout gates — implementation complete; browser acceptance pending
 
-1. Repository migration and handoff sync on `work/admin-dashboard-release` (this checkpoint).
-2. Run Admin Static Checks and Edge Function Static Checks; do not claim pass until the run is reported.
-3. Deploy `flame-chick-staff-admin` with `verify_jwt=true`, its new `dashboard-actions.mjs` dependency, exact existing CORS policy and caller Bearer JWT forwarding. No service-role key is used for dashboard requests.
-4. Test deployed Staff Admin route without exposing order tables.
-5. Promote only the Admin changes to the Pages production branch and perform **one consolidated Cloudflare Pages build/deployment**. No intermediate Pages deployments or previews: preserve deployment minutes.
-6. Verify login and dashboard at `https://flamechickadmin.pages.dev`. Until verified, retain the existing Vercel fallback and keep other Admin modules gated.
+1. Repository migration and both handoffs are synchronized to the release/production branches.
+2. Admin Static Checks passed (run `46037397206`); Edge Function Static Checks passed (run `46026633659`).
+3. `flame-chick-staff-admin` v9 is deployed with `verify_jwt=true`, its `dashboard-actions.mjs` dependency, exact existing CORS policy and caller Bearer JWT forwarding. Dashboard requests do not use service-role credentials.
+4. Authenticated Admin SQL smoke test passed; Rider negative test was denied as expected.
+5. The Admin-only change was promoted and one consolidated Pages production build/deployment completed successfully (deployment `61a8c7c1`).
+6. A fresh signed-in browser hard-refresh check at `https://flamechickadmin.pages.dev` remains the final acceptance step. Keep the Vercel fallback in place until that is confirmed.
 
 Do not modify POS, QZ signing Worker, Website, Rider, shared order lifecycle, Supabase tenant configuration, payment logic, GST/tax logic, or unrelated Cloudflare projects as part of this Admin dashboard rollout.
 
@@ -138,9 +138,10 @@ Do not modify POS, QZ signing Worker, Website, Rider, shared order lifecycle, Su
 
 ### Production Pages deployment — complete
 
-- Confirm `cloudflare/admin-production` is still at `0c843a981bda180dc8a5dae1bb085a23b4aeafdd`, then fast-forward it to the final `work/admin-dashboard-release` head. This should trigger the single intended Admin production Pages deployment; do not change the Pages project configuration, root, path filters, preview settings, or create a direct upload.
-- Verify that Cloudflare reports the new production deployment on the promoted SHA and all five stages succeeded, then inspect `https://flamechickadmin.pages.dev` and confirm the live assets load. A full signed-in browser check still requires the user's active session; SQL role-context testing is not a substitute for that final UI confirmation.
-- Leave Vercel fallback in place. Do not deploy POS, Rider, Website, Workers, or unrelated Cloudflare projects. GST/tax remains deferred.
+- `cloudflare/admin-production` was verified at the expected base and fast-forwarded to `7a93cebec36a7c1bc248a2df6b325cb110350536`. Cloudflare Pages deployment `61a8c7c1` succeeded on that SHA; queued, initialize, clone_repo, build and deploy stages all succeeded. Canonical host: `https://flamechickadmin.pages.dev`.
+- Pages project configuration, root, path includes and preview setting were not changed. No direct upload or intermediate build was run; skipped preview events did not consume a build.
+- The browser tab available at rollout time predated the release and showed stale DOM. Therefore a fresh signed-in hard refresh and Dashboard data check remains pending; deployment success is confirmed, but UI acceptance is not being claimed.
+- Keep the Vercel fallback. Do not deploy POS, Rider, Website, Workers, or unrelated Cloudflare projects. GST/tax remains deferred.
 
 ### Separate pre-existing Supabase security advisor notes
 
