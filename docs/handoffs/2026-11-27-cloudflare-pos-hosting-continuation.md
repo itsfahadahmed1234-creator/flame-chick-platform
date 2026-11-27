@@ -190,3 +190,23 @@ The product recommendation and limit information above was checked against curre
 6. Keep the Vercel POS URL as fallback. Do not switch aliases, change DNS, or claim a custom-domain cutover. No custom domain has been supplied.
 
 The initial Cloudflare deployment is complete; full browser, staff-session and QZ integration verification remains open. Admin and Rider hosting remain separate later phases.
+
+
+## QZ signer isolate-cache optimization — deployment confirmed (2026-11-27)
+
+- Source commit: `136c8fe8a5dcaa9d47968b6b6e4e663f2a874914` (`perf(pos): cache QZ signer keys per Worker isolate`).
+- Cloudflare Workers Builds push build: `5e6997c3-fad4-4c1d-b6f7-d9addfcc36ea`; source metadata identifies the exact commit above; outcome `success`.
+- The exact-commit build prepared the 10-file public POS allowlist and deployed Worker version 5 (`f62f3449-3b1e-47b1-847c-15c11d8d2fd2`) to the existing hostname.
+- A subsequent manual build from the same configured branch also completed successfully: `18002a21-c249-4f2d-a5a2-a0fb309d48f6`. It deployed Worker version 6 (`a3999f9d-65fc-48a3-9f89-0c26ac45c940`). Cloudflare deployment readback confirms version 6 receives 100% traffic and remains the active deployment.
+- Current hostname remains `https://flamechickpos.itsfahadahmed1234.workers.dev`. Worker settings still show only the expected bindings: `ASSETS` and `QZ_SIGNING_PRIVATE_KEY`; the secret value was not read or changed. `previews_enabled` remains false in Workers Builds configuration.
+- The Worker version 6 deployment is confirmed; this is not proof of authorized browser-session behavior or sub-10-ms CPU usage. CPU measurements for `/api/qz/sign` have not yet been collected.
+- The commit adds a source-level regression test for the isolate cache and retry behavior. The managed Cloudflare build runs `npm run build` (not the test suite); the GitHub Actions test-run result has not been independently retrieved in this session. Do not mark all regression tests passed based only on the deploy build.
+- No order/payment was created, no physical or kitchen print job was sent, no Vercel deployment/alias or DNS change was made, and no Website/Supabase resource was changed.
+
+### Remaining post-deploy checks
+
+1. In the user's browser, open the POS hostname and confirm an existing staff account can sign in.
+2. Verify that read-only History, order-board and dispatch views load. Do not create, modify or pay an order, clear local storage, or send a print job.
+3. Confirm the public QZ certificate and browser JS assets load. The QZ signer can then be tested without submitting a print job: missing bearer token should return 401; an authorized existing staff session should return a signature whose verification header is true.
+4. Measure actual CPU time for authorized `/api/qz/sign` invocations using Cloudflare Worker invocation metrics/logs. Do not assume the isolate cache alone proves compliance with the Free plan's 10 ms CPU allowance.
+5. Keep the existing Vercel POS URL as fallback. Do not switch aliases or DNS until the user explicitly approves a cutover and the browser/session checks pass.
