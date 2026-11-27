@@ -158,3 +158,33 @@ The post-migration security advisor still reports 51 informational `rls_enabled_
 - Admin static CI: pass, run `46037397206`. Edge Function static CI: pass, run `46026633659`. Supabase Staff Admin deployed v9 with JWT verification enabled. Production database Admin/Rider authorization smoke checks passed/denied as expected.
 - The previously open browser tab predated this production deployment. Its displayed state was stale and is not evidence of the newly deployed page. A fresh signed-in hard refresh and Dashboard visual/data acceptance check still remains; do not claim that browser test completed.
 - One consolidated Pages production build/deployment was performed. No direct upload, preview build, POS/Rider/Website build, or Pages configuration change was made.
+
+
+---
+
+## Dashboard load optimization — Today first / history on demand (2026-11-27)
+
+### Implemented and applied
+
+- The Admin Dashboard defaults to Today and sends optional `p_include_period_history=false` on startup; selecting 7/14/30 days or a month changes the flag to true.
+- Production migration `20261127172402_flame_chick_admin_dashboard_on_demand_history_v1` is applied. Old 13-field callers remain compatible (omitting the flag keeps historical summaries enabled).
+- Today mode calculates today's aggregates/status/fulfilment and one daily trend point, while skipping selected-period, previous-period and current/previous-week aggregate queries. It returns no more than eight recent order summaries filtered to today.
+- Selecting a longer sales range loads history and reveals the historical daily/weekly comparison panels. Rush Hours has a separate range and defaults to Today.
+- The unresolved-order watch remains separate from selected history: count all active orders, but return only the six oldest active order summaries across date boundaries so unfinished work is not hidden. This is not a full order history request.
+
+### Production verification
+
+- SQL checks using the active Admin request identity were read-only and rolled back. Today-only returned 24 orders / PKR 69,139 and a null weekly summary; selected seven-day history returned 37 orders / PKR 95,066; the legacy 13-field request still worked.
+- Active Rider identity remains rejected by the Admin-only database guard. Public wrapper is SECURITY INVOKER, private helper is SECURITY DEFINER with empty search path; execute remains authenticated-only, no table grants/RLS policies were changed.
+- The UI is already deployed to Pages as `ee6b4f6f` from commit `acbb050413cc076c3cedc1715e7d1f467ab2f56e`. Staff Admin remains version 9 and still needs the optional boolean accepted by its request mapper; deploy v10 before claiming the new live API path is working.
+- No new Pages build should be required for the Edge Function-only update. The existing Pages canonical deployment must remain unchanged unless a further frontend defect is discovered.
+
+### Remaining
+
+1. Commit the exact applied migration source and regression tests on the isolated release branch.
+2. Run Admin Static Checks and Edge Function Static Checks on the final source branch.
+3. Deploy Staff Admin v10 with `verify_jwt=true`, its existing origin/catalog dependencies and updated dashboard mapper; verify the live version and smoke-test the new flag.
+4. Confirm Pages canonical deployment remains `ee6b4f6f`; do not spend another Pages build on this backend-only change.
+5. Hard-refresh the Admin panel and confirm Today loads first, weekly history cards are hidden, and selecting 7 Days reveals historical data.
+
+POS, Rider, Website, Worker, payment, order-state and GST/tax behavior are outside this change.

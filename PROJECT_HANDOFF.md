@@ -5569,3 +5569,20 @@ No Production deployment, DB changes, migrations, Edge Function changes, alias s
 - Supabase Production database migration is applied, Admin-only access and Rider denial were verified with authenticated SQL contexts, Staff Admin Edge Function v9 is deployed with `verify_jwt=true`, and Admin/Edge static CI checks passed (run IDs `46037397206` and `46026633659` respectively).
 - **Remaining acceptance check:** the connected browser tab available during this rollout was already open before the new deployment, so its page snapshot is stale and was not used as proof of the new UI. A fresh hard refresh of `https://flamechickadmin.pages.dev` and a signed-in check that Dashboard loads its figures is still required. The deployment is confirmed successful; the post-refresh browser check is not being claimed as complete.
 - No POS, Rider, Website, QZ signer, payment, order lifecycle, or GST/tax behavior was changed for this dashboard release.
+
+
+---
+
+## Admin dashboard load optimization — Today first, history on demand (2026-11-27)
+
+- The Dashboard now opens with **Today** selected instead of automatically loading the last seven days.
+- Production migration `20261127172402_flame_chick_admin_dashboard_on_demand_history_v1` is applied. It adds optional boolean `p_include_period_history` while preserving the original 13-field API request for older clients.
+- On first sign-in / Dashboard open, Admin sends `p_include_period_history=false`: the database calculates today's order/status/fulfilment/order-value aggregates and one daily point; it skips selected-period, previous-period and current/previous-week history aggregates. It returns at most **8 recent order summaries from today**.
+- Selecting 7, 14 or 30 days, This Month, Previous Month or a chosen month sends the flag as true and loads historical comparisons then—not at startup.
+- Rush Hours has a separate selector and defaults to Today. Selecting its own historical range does not automatically enable Sales Overview history.
+- The unresolved operational watch remains separate: one aggregate count for all active work plus at most **6 oldest unresolved order summaries across all dates**. This keeps prior-day unfinished orders visible without returning a full historical order list.
+- Sign-in bootstrap does not call the old generic `loadAll()` orders query (which has a 1,000-row limit); that function remains a separate legacy refresh path and is not part of Dashboard startup.
+- Production SQL checks (all read-only and rolled back) using the active Admin claim confirmed: Today-only returned 24 orders / PKR 69,139 and `week=null`; history-on-demand returned 37 orders / PKR 95,066 for the selected seven-day window; the old 13-field request remains compatible. Rider access is rejected by the Admin/Owner guard.
+- Frontend/UI source has already shipped on `cloudflare/admin-production` commit `acbb050413cc076c3cedc1715e7d1f467ab2f56e`, Pages deployment `ee6b4f6f`. The database migration is applied. Staff Admin Edge Function is still v9 at this checkpoint and its request validator does not yet accept the optional flag; Edge Function v10 is required before the new live flow is complete.
+- No further Pages deployment is required for the Edge Function-only change, migration-source file, tests or handoff updates. Do not trigger another Pages build unless a frontend defect is found.
+- POS, Rider, Website, QZ signer, shared order lifecycle, payments, Vercel fallback and GST/tax logic remain untouched.

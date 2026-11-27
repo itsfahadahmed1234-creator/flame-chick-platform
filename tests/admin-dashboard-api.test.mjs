@@ -57,6 +57,21 @@ test("Staff Admin route invokes the dashboard with caller JWT and no service sec
   assert.doesNotMatch(edge.slice(start, end), /SECRET_KEY/);
 });
 
+const onDemandSql = readFileSync("supabase/migrations/20261127172402_flame_chick_admin_dashboard_on_demand_history_v1.sql", "utf8");
+
+test("dashboard opening loads Today only and historical aggregates load on request", () => {
+  assert.match(app, /range:"today",dashboardData:null/);
+  assert.match(app, /p_include_period_history:S\\.range!=="today"/);
+  assert.match(onDemandSql, /IF v_include_period_history THEN/);
+  assert.match(onDemandSql, /v_week := NULL;/);
+  assert.match(onDemandSql, /AND o.created_at >= CASE WHEN v_include_period_history THEN v_period_start ELSE v_today_start END/);
+  assert.match(onDemandSql, /ORDER BY o.created_at DESC LIMIT 8/);
+  assert.match(onDemandSql, /ORDER BY o.created_at ASC LIMIT 6/);
+  const historyEnd = onDemandSql.indexOf("END IF;", onDemandSql.indexOf("IF v_include_period_history THEN"));
+  const activeCount = onDemandSql.indexOf("SELECT pg_catalog.count(*) INTO v_attention_count");
+  assert.ok(historyEnd > 0 && activeCount > historyEnd, "unresolved-order watch stays independent of history");
+});
+
 test("Admin dashboard is enabled and loaded through Staff Admin", () => {
   assert.match(app, /const allowed=\["dashboard","staff","catalog-v3","delivery"\]/);
   assert.match(app, /nav\("dashboard"\)/);
