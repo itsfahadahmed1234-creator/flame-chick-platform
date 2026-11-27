@@ -440,34 +440,63 @@ test("POS safely reconciles a paid server order and drains concurrent sync reque
 });
 
 
-test("Dine-in Save Table can add items across multiple rounds on the same order and keep the table occupied",async()=>{
+test("Dine-in can save multiple item rounds then take one payment and release the table",async()=>{
   const html=source[0].html;
-  const saveStart=html.indexOf('async function saveLocalOrder');
-  const saveEnd=html.indexOf('\nasync function ',saveStart+10);
-  const openStart=html.indexOf('async function getOpenDineCheckForTable_');
-  const openEnd=html.indexOf('\nasync function ',openStart+10);
-  assert.ok(saveStart>=0&&saveEnd>saveStart&&openStart>=0&&openEnd>openStart);
-  const saveFn=html.slice(saveStart,saveEnd);
-  const occupancyFn=html.slice(openStart,openEnd);
-  const orders=new Map(),queue=new Map(),syncCalls=[],toasts=[];
+  const section=(startName,endName)=>{
+    const start=html.indexOf('async function '+startName);
+    const end=html.indexOf('\nasync function '+endName,start+10);
+    assert.ok(start>=0&&end>start,startName+' function boundaries exist');
+    return html.slice(start,end);
+  };
+  const saveFn=section('saveLocalOrder','');
+  const occupancyStart=html.indexOf('async function getOpenDineCheckForTable_');
+  const occupancyEnd=html.indexOf('\nasync function ',occupancyStart+10);
+  const closeFn=section('takePaymentAndCloseTable','saveLocalOrder');
+  const finalFn=section('finalizeReceiptOrder','printThermalReceipt');
+  assert.ok(occupancyStart>=0&&occupancyEnd>occupancyStart);
+
+  const orders=new Map(),queue=new Map(),ledger=new Map(),history=[];
+  const server={id:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    localOrderId:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',revision:0,signature:'',
+    status:'new',total:0,paymentStatus:'unpaid',paidAmount:0,balanceDue:0};
+  const makePayload=order=>({
+    action:'sync_pos_order',local_order_id:order.syncOrderId,local_revision:order.localRevision,
+    publication_id:'pub-test',version_id:'version-test',fulfillment_type:'dine_in',
+    customer:{name:order.customerName,phone:order.phone||null},notes:String(order.notes||'').trim(),
+    items:(order.items||[]).map(item=>({kind:'product',product_id:item.productId,
+      product_variant_id:item.variantId,quantity:item.quantity,notes:'',modifiers:[]})),
+    table_reference:order.tableId,table_label_snapshot:order.tableNumber,kitchen_timing:'now',
+    ...(order.pendingPayment?{payment:{request_id:order.pendingPayment.requestId,
+      amount:order.pendingPayment.amount,payment_method:String(order.pendingPayment.method).toLowerCase()}}:{})
+  });
+  const signature=payload=>{
+    const canonical={...payload};
+    delete canonical.action;delete canonical.local_order_id;delete canonical.local_revision;delete canonical.payment;
+    return JSON.stringify(canonical);
+  };
+  const syncApi={buildSyncPayload:order=>makePayload(order),syncPayloadContentSignature:signature};
   const elements={
     orderType:{value:'Dine-in'},customerName:{value:'Walk-in'},phone:{value:''},area:{value:''},
     notes:{value:''},paymentMethod:{value:'Cash'},selectedTableBadge:{textContent:'No table'},
     selectTableBtn:{textContent:'Select table',focus(){}},placeBtn:{textContent:'SAVE TABLE'},
     payCloseBtn:{style:{display:'none'}}
   };
-  let uuidCall=0;
-  const context={
+  let uuid=0,printed=0,openedReceipt=null;
+  const ctx={
     activeDineCheckId:'',selectedTableId:'T1',
     cart:[{itemName:'First item',price:500,quantity:1,itemId:'v1',variantId:'v1',productId:'p1'}],
-    STORES:{orders:'orders',queue:'queue',tables:'tables'},
-    catalogSnapshot:{schemaVersion:3,publicationId:'pub-test',publicationNumber:1},
-    window:{FlameChickPosSyncV3:{}},navigator:{onLine:true},
-    crypto:{randomUUID:()=>++uuidCall===1
+    STORES:{orders:'orders',queue:'queue'},
+    catalogSnapshot:{schemaVersion:3,publicationId:'pub-test',publicationNumber:1,versionId:'version-test'},
+    window:{FlameChickPosSyncV3:syncApi,FlameChickPosPaymentCollection:{
+      attachPendingPayment:(order,{requestId,amount,method})=>order.pendingPayment?order:
+        {...order,pendingPayment:{requestId,amount,method}}
+    },editingLocalOrderId:''},
+    FlameChickCatalogV3:{},FlameChickCatalogV3DealView:{},
+    flameChickStaffProfile:{branch_id:'branch-test'},flameChickStaffSession:{access_token:'qa-session'},
+    navigator:{onLine:true},crypto:{randomUUID:()=>++uuid===1
       ?'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
       :'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'},
-    $:id=>elements[id]||null,
-    normalizeLookupText:()=>'',computeArrivalISO:()=>null,
+    $:id=>elements[id]||null,normalizeLookupText:()=>'',computeArrivalISO:()=>null,
     findTable:id=>id==='T1'?{id:'T1',name:'Table 1'}:null,
     get:async(store,id)=>store==='orders'?(orders.has(id)?{...orders.get(id)}:null):null,
     put:async(store,order)=>{
@@ -475,86 +504,120 @@ test("Dine-in Save Table can add items across multiple rounds on the same order 
       else if(store==='queue')queue.set(order.localOrderId,{...order});
     },
     del:async(store,id)=>{if(store==='queue')queue.delete(id);},
-    all:async store=>store==='orders'?[...orders.values()].map(x=>({...x})):[],
+    all:async store=>store==='orders'?[...orders.values()].map(row=>({...row})):[],
     prepareLocalPosSyncOrder:(order,{bumpRevision=false,preserveCatalog=false}={})=>{
       const next={...order};
-      if(!next.syncOrderId)next.syncOrderId='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+      if(!next.syncOrderId)next.syncOrderId=server.localOrderId;
       if(!Number(next.localRevision))next.localRevision=1;
-      if(bumpRevision)next.localRevision=Number(next.localRevision)+1;
+      if(bumpRevision)next.localRevision++;
       if(!preserveCatalog){next.catalogPublicationId='pub-test';next.catalogVersion=1;}
       next.syncStatus='pending';next.syncAttempts=Number(next.syncAttempts)||0;
-      next.lastSyncError='';next.nextSyncAt=0;
-      return next;
+      next.lastSyncError='';next.nextSyncAt=0;return next;
     },
+    fetchServerHistory:async()=>[{
+      serverOrderId:server.id,serverOrderNumber:'FC-QA-ROUND-1',localOrderId:server.localOrderId,
+      fulfillmentType:'Dine-in',status:server.status==='completed'?'Completed':'Pending',total:server.total,
+      raw:{status:server.status,local_revision:server.revision}
+    }],
     syncPending:()=>{
       const queued=queue.values().next().value;
       if(!queued)return Promise.resolve();
-      const local=orders.get(queued.localOrderId);
-      syncCalls.push({localOrderId:local.localOrderId,syncOrderId:local.syncOrderId,
-        serverOrderId:local.serverOrderId||'',revision:queued.localRevision,
-        itemCount:queued.items.length,total:queued.total});
-      local.serverOrderId='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
-      local.serverOrderNumber='FC-QA-ROUND-1';
-      local.serverStatus='new';local.serverLocalRevision=queued.localRevision;
-      local.serverSyncContentSignature='accepted-revision-'+queued.localRevision;
-      local.syncStatus='synced';local.lastSyncError='';
-      orders.set(local.localOrderId,local);queue.delete(local.localOrderId);
+      const order=orders.get(queued.localOrderId),payload=makePayload(order);
+      const digest=signature(payload),revision=Number(payload.local_revision);
+      if(revision<server.revision||(revision===server.revision&&server.signature&&digest!==server.signature))
+        throw new Error('Simulated Production same-revision content conflict');
+      if(revision>server.revision){
+        server.revision=revision;server.signature=digest;server.total=order.total;
+        server.status='new';server.paymentStatus='unpaid';server.paidAmount=0;server.balanceDue=order.total;
+      }
+      if(order.pendingPayment){
+        const payment=order.pendingPayment,prior=ledger.get(payment.requestId);
+        if(prior&&(prior.amount!==payment.amount||prior.method!==payment.method))throw new Error('Payment idempotency conflict');
+        if(!prior)ledger.set(payment.requestId,{amount:payment.amount,method:payment.method});
+        server.status='completed';server.paymentStatus='paid';
+        server.paidAmount=payment.amount;server.balanceDue=0;
+      }
+      order.serverOrderId=server.id;order.serverOrderNumber='FC-QA-ROUND-1';
+      order.serverLocalOrderId=server.localOrderId;order.serverLocalRevision=server.revision;
+      order.serverSyncContentSignature=server.signature;order.serverStatus=server.status;
+      order.syncStatus='synced';order.syncAttempts=0;order.lastSyncError='';order.checkoutPending=false;
+      order.paymentStatus=server.paymentStatus==='paid'?'Paid':'Unpaid';
+      order.paidAmount=server.paidAmount;order.balanceDue=server.balanceDue;
+      order.status=server.status==='completed'?'Completed':'Open';
+      if(server.status==='completed')delete order.pendingPayment;
+      orders.set(order.localOrderId,order);queue.delete(order.localOrderId);
+      history.push({revision,digest,hasPayment:!!payload.payment,orderId:order.localOrderId});
       return Promise.resolve();
     },
-    updateSyncBox:async()=>{},resetPreorderState:()=>{},resetMenuToStart:()=>{},
-    renderCart:()=>{},showToast:message=>toasts.push(message),
-    dineInMode:'immediate',kitchenTiming:'now',
+    updateSyncBox:async()=>{},resetPreorderState:()=>{},resetMenuToStart:()=>{},resetNewOrderMode:()=>{},
+    renderCart:()=>{},showToast:()=>{},openLocalReceipt:(order,options)=>{openedReceipt={order,options};},
+    printThermalReceipt:async()=>{printed++;return true;},closeModal:()=>{},receiptEditContext:null,
     Date,Math,Number,String,Array,Object,JSON,console
   };
-  const vmContext=vm.createContext(context);
-  new vm.Script(saveFn+'\n'+occupancyFn+'\n(async()=>{await saveLocalOrder();})()',{
-    filename:'dine-in-save-table.multiple-rounds.regression.js'
-  }).runInContext(vmContext).then(async firstResult=>{
+  const sandbox=vm.createContext(ctx);
+  new vm.Script(saveFn+'\n'+html.slice(occupancyStart,occupancyEnd)+'\n'+closeFn+'\n'+finalFn,{
+    filename:'dine-in-save-multiple-rounds-payment.regression.js'
+  }).runInContext(sandbox);
+
+  await vm.runInContext('saveLocalOrder()',sandbox);
+  const localId=[...orders.keys()][0],stableSyncId=orders.get(localId).syncOrderId;
+  assert.equal(server.revision,1);
+  assert.equal(server.localOrderId,stableSyncId);
+  assert.equal((await vm.runInContext('getOpenDineCheckForTable_({id:"T1",name:"Table 1"})',sandbox)).localOrderId,localId);
+
+  for(const item of [
+    {itemName:'Second item',price:300,quantity:1,itemId:'v2',variantId:'v2',productId:'p2'},
+    {itemName:'Third item',price:250,quantity:2,itemId:'v3',variantId:'v3',productId:'p3'}
+  ]){
+    const before=orders.get(localId);
+    sandbox.activeDineCheckId=localId;sandbox.selectedTableId='T1';
+    sandbox.cart=before.items.map(item=>({...item}));sandbox.cart.push(item);
+    elements.customerName.value='Walk-in';elements.phone.value='';elements.notes.value='';
+    await vm.runInContext('saveLocalOrder()',sandbox);
+    const after=orders.get(localId);
+    assert.equal(after.localOrderId,localId);
+    assert.equal(after.syncOrderId,stableSyncId);
+    assert.equal(after.localRevision,before.localRevision+1);
+    assert.equal(server.revision,after.localRevision);
+    assert.equal(server.status,'new');
+    assert.equal(after.status,'Open');
+    assert.equal(after.paymentStatus,'Unpaid');
     assert.equal(orders.size,1);
     assert.equal(queue.size,0);
-    const initial=[...orders.values()][0];
-    assert.equal(initial.localRevision,1);
-    assert.equal(initial.status,'Open');
-    assert.equal(initial.paymentStatus,'Unpaid');
-    const occupied=await vm.runInContext('getOpenDineCheckForTable_({id:"T1",name:"Table 1"})',vmContext);
-    assert.equal(occupied.localOrderId,initial.localOrderId);
+    const occupied=await vm.runInContext('getOpenDineCheckForTable_({id:"T1",name:"Table 1"})',sandbox);
+    assert.equal(occupied.localOrderId,localId);
+  }
+  assert.equal(orders.get(localId).items.length,3);
+  assert.equal(orders.get(localId).total,1300);
+  assert.deepEqual(history.map(row=>row.revision),[1,2,3]);
+  assert.ok(history.every(row=>row.orderId===localId&&!row.hasPayment));
 
-    // Reopen the same table, append one item and Save Table again — repeat twice.
-    for(const item of [
-      {itemName:'Second item',price:300,quantity:1,itemId:'v2',variantId:'v2',productId:'p2'},
-      {itemName:'Third item',price:250,quantity:2,itemId:'v3',variantId:'v3',productId:'p3'}
-    ]){
-      const existing=orders.get(initial.localOrderId);
-      vmContext.activeDineCheckId=existing.localOrderId;
-      vmContext.selectedTableId='T1';
-      vmContext.cart=existing.items.map(x=>({...x}));
-      vmContext.cart.push(item);
-      elements.customerName.value='Walk-in';elements.phone.value='';elements.notes.value='';
-      await vm.runInContext('(async()=>{await saveLocalOrder();})()',vmContext);
-      const current=orders.get(initial.localOrderId);
-      assert.equal(current.localRevision,existing.localRevision+1);
-      assert.equal(current.serverOrderId,'dddddddd-dddd-4ddd-8ddd-dddddddddddd');
-      assert.equal(current.status,'Open');
-      assert.equal(current.paymentStatus,'Unpaid');
-      assert.equal(orders.size,1,'a repeat Save Table must update the same check, not create another one');
-      assert.equal(queue.size,0,'each successful simulated sync drains only that check revision');
-      const tableCheck=await vm.runInContext('getOpenDineCheckForTable_({id:"T1",name:"Table 1"})',vmContext);
-      assert.equal(tableCheck.localOrderId,initial.localOrderId,'table remains occupied after every saved round');
-    }
-    const final=[...orders.values()][0];
-    assert.equal(final.localOrderId,initial.localOrderId);
-    assert.equal(final.syncOrderId,'cccccccc-cccc-4ccc-8ccc-cccccccccccc');
-    assert.equal(final.localRevision,3);
-    assert.equal(final.items.length,3);
-    assert.equal(final.total,1300);
-    assert.equal(syncCalls.length,3);
-    assert.deepEqual(syncCalls.map(x=>x.revision),[1,2,3]);
-    assert.ok(syncCalls.every(x=>x.syncOrderId===final.syncOrderId));
-    assert.ok(syncCalls.every(x=>x.serverOrderId===''||x.serverOrderId==='dddddddd-dddd-4ddd-8ddd-dddddddddddd'));
-    assert.match(html.slice(html.indexOf('async function openOrStartTable'),html.indexOf('async function manageTables')),/activeDineCheckId=existing\.localOrderId/);
-  });
+  const latest=orders.get(localId);
+  sandbox.activeDineCheckId=localId;sandbox.selectedTableId='T1';
+  sandbox.cart=latest.items.map(item=>({...item}));
+  elements.customerName.value='Walk-in';elements.paymentMethod.value='Cash';
+  await vm.runInContext('takePaymentAndCloseTable()',sandbox);
+  assert.equal(orders.get(localId).localRevision,3,'payment-only close should retain latest saved revision');
+  assert.equal(queue.size,1,'checkout payment request waits in queue before confirmation');
+
+  const receipt={...orders.get(localId),paymentStatus:'Paid',status:'Completed'};
+  await vm.runInContext('finalizeReceiptOrder('+JSON.stringify(receipt)+')',sandbox);
+  const closed=orders.get(localId);
+  assert.equal(server.revision,3);
+  assert.equal(server.status,'completed');
+  assert.equal(server.paymentStatus,'paid');
+  assert.equal(closed.status,'Completed');
+  assert.equal(closed.paymentStatus,'Paid');
+  assert.equal(closed.syncStatus,'synced');
+  assert.equal(closed.balanceDue,0);
+  assert.equal(closed.pendingPayment,undefined);
+  assert.equal(ledger.size,1);
+  assert.equal(queue.size,0);
+  assert.equal(await vm.runInContext('getOpenDineCheckForTable_({id:"T1",name:"Table 1"})',sandbox),null);
+  await vm.runInContext('finalizeReceiptOrder('+JSON.stringify(receipt)+')',sandbox);
+  assert.equal(ledger.size,1,'retrying finalization must not create a duplicate payment');
+  assert.ok(printed>=1);
 });
-
 test("Dine-in payment preserves unchanged served revision, advances changed New check and blocks changed Served check",async()=>{
   const html=source[0].html;
   const start=html.indexOf('async function takePaymentAndCloseTable');
