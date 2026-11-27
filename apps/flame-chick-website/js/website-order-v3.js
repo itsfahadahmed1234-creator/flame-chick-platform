@@ -62,29 +62,6 @@
       guard.canSubmitOrders(root.location && root.location.hostname);
   }
 
-  function isProductionRehearsalPreview() {
-    var guard = root.FlameChickWebsitePreviewGuard;
-    return !!guard && typeof guard.isTestCheckoutPreview === 'function' &&
-      guard.isTestCheckoutPreview(root.location && root.location.hostname);
-  }
-
-  function confirmProductionRehearsal(retry) {
-    if (!isProductionRehearsalPreview()) return true;
-    if (typeof root.confirm !== 'function') {
-      status('The rehearsal confirmation is unavailable. No order was submitted.', 'error');
-      return false;
-    }
-    var action = retry
-      ? 'Retry the exact same order request? The idempotency key will be preserved.'
-      : 'Submit this rehearsal order now?';
-    return root.confirm(
-      'PRODUCTION REHEARSAL ORDER\n\n' +
-      'This is a real order, not a simulation. It will be saved in Production Supabase and sent to the live Flame Chick POS.\n\n' +
-      'The order notes will be tagged [TEST ORDER - ADMIN DELETE]. Admin must manually remove this rehearsal order before the first customer is invited.\n\n' +
-      action
-    );
-  }
-
   function syncCatalogDialogState() {
     var productDialog = $('product-dialog');
     var dealDialog = $('deal-dialog');
@@ -94,17 +71,8 @@
 
   function applyPreviewReadOnlyMode() {
     var readOnlyPreview = !orderWritesAllowed();
-    var rehearsalPreview = isProductionRehearsalPreview();
     document.body.classList.toggle('fc-website-preview-readonly', readOnlyPreview);
-    document.body.classList.toggle('fc-website-test-checkout', rehearsalPreview);
-    $('fc-preview-checkout-notice').hidden = !readOnlyPreview && !rehearsalPreview;
-    $('fc-preview-checkout-notice').classList.toggle('is-live-test', rehearsalPreview);
-    if (rehearsalPreview) {
-      $('fc-preview-checkout-notice').textContent =
-        'TEST CHECKOUT ENABLED: orders use the live Order API and appear in the Flame Chick POS. Every test order is tagged [TEST ORDER - ADMIN DELETE]. Remove these test orders before customer handover.';
-    } else if (readOnlyPreview) {
-      $('fc-preview-checkout-notice').textContent =
-        'This unapproved Preview is read-only. Use the approved Website review Preview for checkout testing.';
+    if (readOnlyPreview) {
       $('place-order').disabled = true;
       $('retry-order').disabled = true;
     }
@@ -122,7 +90,7 @@
 
   async function orderApi(method, query, body) {
     if (String(method || '').toUpperCase() !== 'GET' && !orderWritesAllowed()) {
-      throw new Error('Checkout is disabled on this Website Preview. Your cart and menu are available for review only.');
+      throw new Error('Online ordering is currently unavailable.');
     }
     var config = apiConfig();
     var url = config.orderApiBase + (query ? (config.orderApiBase.indexOf('?') >= 0 ? '&' : '?') + query : '');
@@ -821,7 +789,7 @@
       container.style.fontSize = 'clamp(42px, 10vw, 72px)';
       container.setAttribute('aria-label', label);
     }
-    if (imagePath && base && /^https:\/\/\//i.test(base)) {
+    if (imagePath && base && /^https:\/\//i.test(base)) {
       var safePath = imagePath.split('/').filter(Boolean).map(function (part) {
         return encodeURIComponent(part);
       }).join('/');
@@ -1408,14 +1376,7 @@
       branch_id: context.branchId,
       fulfillment_type: context.fulfilmentType,
       customer: { name:name, phone:phone, email:email || null },
-      notes: (function () {
-        var value = $('order-notes').value.trim();
-        if (isProductionRehearsalPreview()) {
-          var marker = '[TEST ORDER - ADMIN DELETE]';
-          if (value.indexOf(marker) === -1) value = value ? marker + ' ' + value : marker;
-        }
-        return value || null;
-      })(),
+      notes: $('order-notes').value.trim() || null,
       delivery:delivery,
       items:state.cart.map(function (row) {
         var item = clone(row.payload);
@@ -1438,7 +1399,7 @@
   }
 
   async function submitOrder(retry) {
-    if (!orderWritesAllowed()) { status('This Preview is not approved for checkout. No order was submitted.', 'error'); return; }
+    if (!orderWritesAllowed()) { status('Online ordering is currently unavailable.', 'error'); return; }
     if (state.busy) return;
     if (retry && (!state.checkoutUncertain || !state.checkoutBody || !state.checkoutRequestId)) {
       status('There is no pending order request to retry.', 'error');
@@ -1623,7 +1584,7 @@
     }
     resetCheckout(orderWritesAllowed()
       ? 'Order type changed. Your cart total has been recalculated from the loaded menu.'
-      : 'Order type changed. Your cart is updated; order submission is disabled on this Website Preview.');
+      : 'Order type changed. Your cart has been updated.');
     renderCatalog();
     renderCart();
   }

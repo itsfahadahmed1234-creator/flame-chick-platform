@@ -523,7 +523,6 @@ details.pv textarea{width:100%;min-height:190px;border:1px solid var(--rule);bor
       </section>
 
       <footer class="fc-v3-cart-footer">
-        <p id="fc-preview-checkout-notice" class="fc-preview-checkout-notice" hidden role="status">Preview checkout status is being verified.</p>
         <div class="fc-home-cart-actions">
           <button id="place-order" class="btn btn-gold" type="button" disabled hidden>Place order</button>
           <button id="retry-order" class="btn btn-gold" type="button" disabled hidden>Retry order confirmation</button>
@@ -2155,7 +2154,6 @@ if (typeof module !== 'undefined' && module.exports) module.exports = FCCore;
 
 
 /* Visible read-only state for Vercel branch Preview deployments. */
-.fc-preview-checkout-notice{margin:12px 0;padding:12px 14px;border:1px solid #e6c977;border-radius:11px;background:#fff8e5;color:#684d0c;font:600 14px/1.45 var(--f-body)}
 body.fc-website-preview-readonly .fc-home-cart-actions button{opacity:.48;cursor:not-allowed;filter:saturate(.4)}
 
 
@@ -2374,7 +2372,6 @@ body.fc-website-preview-readonly .fc-home-cart-actions button{opacity:.48;cursor
 .fc-v3-cart-drawer .fc-home-cart-actions{display:grid;grid-template-columns:1fr;gap:6px;margin:0}
 .fc-v3-cart-drawer .fc-home-cart-actions .btn{width:100%;min-height:48px;justify-content:center;border-radius:12px;font-size:16px}
 .fc-v3-cart-drawer .fc-home-order-status{margin:5px 0 0;padding:5px 8px;font-size:11px;line-height:1.25}
-.fc-v3-cart-drawer #fc-preview-checkout-notice{margin:0 0 6px;padding:7px 9px;font-size:10px;line-height:1.25}
 .fc-v3-cart-drawer #order-success{margin-bottom:12px}
 .fc-home-product-dialog .fc-home-dialog-content{padding-bottom:0}
 .fc-home-product-dialog .fc-product-popup-add{margin-bottom:0}
@@ -2566,8 +2563,7 @@ body.fc-catalog-dialog-open .ana-sticky{
 .fc-home-deal-dialog .fc-deal-price-note{margin:0;color:var(--muted);font:500 10px/1.3 var(--f-body)}
 
 
-/* Live test-checkout notice and actionable inline validation. */
-.fc-preview-checkout-notice.is-live-test{display:block;margin:0 0 8px;padding:10px 12px;border:1px solid #b8d9c1;border-radius:10px;background:#effaf1;color:#1d6034;font:700 12px/1.45 var(--f-body)}
+/* Checkout field validation. */
 .fc-checkout-field-error{display:block;margin:2px 0 0;color:#b00020;font:700 11px/1.35 var(--f-body)}
 .fc-home-field input[aria-invalid="true"],.fc-home-field textarea[aria-invalid="true"],#delivery-area-search[aria-invalid="true"]{border-color:#b00020!important;outline:2px solid rgba(176,0,32,.12)}
 .fc-home-confirm input[aria-invalid="true"]{outline:2px solid rgba(176,0,32,.16)}

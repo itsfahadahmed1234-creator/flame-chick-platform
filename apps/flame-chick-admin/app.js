@@ -156,7 +156,11 @@ async function openCatalogV3(){
  if(!window.FlameChickAdminCatalogV3||typeof window.FlameChickAdminCatalogV3.createWorkspace!=="function")throw Error("Catalog V3 authoring module is unavailable.");
  if(!S.catalogV3Workspace)S.catalogV3Workspace=window.FlameChickAdminCatalogV3.createWorkspace();
  if(!S.catalogV3Mounted){
-  await S.catalogV3Workspace.mount(root,catalogV3Request);
+  await S.catalogV3Workspace.mount(root,catalogV3Request,{
+    uploadProductImage:(productId,file)=>storageUpload("products",productId,file),
+    removeProductImage:storageRemove,
+    productImageUrl:siteMediaUrl
+  });
   S.catalogV3Mounted=true;
  }else{
   await S.catalogV3Workspace.refresh();

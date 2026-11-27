@@ -289,26 +289,19 @@ test("product and deal dialogs are centered, bounded, scrollable and closed dial
 });
 
 
-test("only stable Production hosts and two explicit rehearsal Preview hosts can submit orders", () => {
+test("checkout host guard retains canonical Production and exact selected review host allow-lists", () => {
   const guardSource = readFileSync(join(root, "js/preview-checkout-guard.js"), "utf8");
   assert.match(guardSource, /PRODUCTION_ORDER_HOSTS = Object\.freeze\(\[/);
   assert.match(guardSource, /'flamechick\.vercel\.app'/);
   assert.match(guardSource, /'flame-chick-website-production\.vercel\.app'/);
   assert.match(guardSource, /'flame-chick-website-production-faha-d\.vercel\.app'/);
-  assert.doesNotMatch(guardSource, /flame-chick-website-production-dsokjzvak-faha-d/);
-  assert.doesNotMatch(guardSource, /flame-chick-website-production-c7mqcl781-faha-d/);
   assert.match(guardSource, /TEST_CHECKOUT_PREVIEW_HOSTS = Object\.freeze\(\[/);
-  assert.match(guardSource, /flame-chick-website-production-p6r1gdef2-fahad-7455\.vercel\.app/);
-  assert.match(guardSource, /flame-chick-website-production-git-work-websi-ecbe0f-fahad-7455\.vercel\.app/);
+  assert.match(guardSource, /flame-chick-website-production-git-work-website-r-07b9f9-faha-d\.vercel\.app/);
   assert.match(guardSource, /function isTestCheckoutPreview\(hostname\)/);
   assert.match(order, /function orderWritesAllowed\(\)/);
-  assert.match(order, /function isProductionRehearsalPreview\(\)/);
-  assert.match(order, /function confirmProductionRehearsal\(retry\)/);
-  assert.match(order, /PRODUCTION REHEARSAL ORDER/);
-  assert.match(order, /\[TEST ORDER - ADMIN DELETE\]/);
   assert.match(order, /if \(String\(method \|\| ''\)\.toUpperCase\(\) !== 'GET' && !orderWritesAllowed\(\)\)/);
-  assert.match(html, /id="fc-preview-checkout-notice"/);
-  assert.doesNotMatch(order, /TEST ORDER SENT TO FLAME CHICK POS|WEBSITE PREVIEW QA TEST/);
+  assert.doesNotMatch(order, /TEST ORDER - ADMIN DELETE|TEST CHECKOUT ENABLED|PRODUCTION REHEARSAL ORDER|confirmProductionRehearsal|isProductionRehearsalPreview/);
+  assert.doesNotMatch(html, /fc-preview-checkout-notice|Preview checkout status/);
 });
 
 test("optional customer email validation accepts standard addresses in both checkout gates", () => {
@@ -440,13 +433,11 @@ test('checkout action stays clickable with a cart and shows inline validation in
   assert.match(html, /id="not-listed-confirm-error"/);
 });
 
-test('approved review Preview sends tagged test orders through the same Order API', () => {
-  assert.match(order, /TEST CHECKOUT ENABLED/);
-  assert.match(order, /Every test order is tagged \[TEST ORDER - ADMIN DELETE\]/);
+test('checkout uses the standard Order API and preserves request idempotency without customer-facing rehearsal copy', () => {
   assert.match(order, /var result = await orderApi\('POST', '', state\.checkoutBody\)/);
-  assert.match(order, /\[TEST ORDER - ADMIN DELETE\]/);
   assert.match(order, /state\.checkoutBody\.request_id = state\.checkoutRequestId/);
-  assert.doesNotMatch(order, /if \(!confirmProductionRehearsal\(retry\)\)/);
+  assert.match(order, /notes: \$\('order-notes'\)\.value\.trim\(\) \|\| null/);
+  assert.doesNotMatch(order, /TEST ORDER - ADMIN DELETE|PRODUCTION REHEARSAL ORDER|TEST CHECKOUT ENABLED/);
 });
 
 test('product and deal artwork use published images and category-appropriate fallbacks', () => {

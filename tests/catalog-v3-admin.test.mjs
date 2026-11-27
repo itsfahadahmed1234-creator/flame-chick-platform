@@ -587,3 +587,14 @@ test('Burger groups use a Chicken Burgers category source and Remove choice bypa
   assert.match(source, /choiceIndex<0\|\|!s\.components\[index\]/);
   assert.match(source, /if\(!group\|\|\/burger\/i\.test\(group\.display_name\)\)/);
 });
+
+
+test('product editor provides upload, preview and previous-image restoration controls', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-admin/catalog-v3-admin.js', import.meta.url), 'utf8');
+  assert.match(source, /function productImagePanel\(p\)/);
+  assert.match(source, /name="image_file" accept="image\/jpeg,image\/png,image\/webp"/);
+  assert.match(source, /data-action="image-restore"/);
+  assert.match(source, /uploadProductImage\(productId,file\)/);
+  assert.match(source, /image_previous_path:current/);
+  assert.match(source, /image_published:true/);
+});

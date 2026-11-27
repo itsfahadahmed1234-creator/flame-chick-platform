@@ -219,7 +219,7 @@
   }
   function checkbox(name,label,checked){return '<label class="fcv3-check"><input type="checkbox" name="'+name+'" data-field="'+name+'"'+(checked?' checked':'')+'> '+label+'</label>';}
   function createWorkspace(){
-    let el=null,request=null;
+    let el=null,request=null,media=null;
     const s={loading:false,saving:false,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,editorLoadingDealId:null,components:[],detail:null,partial:null,importProgress:null};
     async function read(action,args){const r=await request(action,args||{},false);if(!isObj(r)||r.ok===false)throw Error('Catalog read failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
     async function write(action,payload){const r=await request(action,payload,true);if(!isObj(r)||r.ok===false)throw Error('Catalog save failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
@@ -251,6 +251,27 @@
         checkbox('variant_active','Active',v.is_active!==false)+checkbox('variant_available','Available',v.is_available!==false)+
         '<button type="button" class="fcv3-button fcv3-danger" data-action="variant-remove">Remove</button></div></article>').join('');
     }
+    function productImageUrl(path){return media&&typeof media.productImageUrl==='function'?media.productImageUrl(path):'';}
+    function productImagePanel(p){
+      const current=p&&p.image_current_path,previous=p&&p.image_previous_path,url=current?productImageUrl(current):'';
+      return '<section class="fcv3-image-panel"><div><h4>Product image</h4><p>JPG, PNG or WebP · maximum 5 MB. One previous image is retained as backup.</p></div>'+
+        (url?'<img class="fcv3-image-preview" src="'+esc(url)+'" alt="'+esc(p&&p.name_en||'Product image')+'" loading="lazy">':'<div class="fcv3-image-empty">No product image uploaded</div>')+
+        '<label>Upload or replace image<input type="file" name="image_file" accept="image/jpeg,image/png,image/webp"></label>'+
+        (previous?'<div class="fcv3-image-backup"><span>Previous image saved</span><button type="button" class="fcv3-button" data-action="image-restore">Restore previous image</button></div>':'')+
+        '</section>';
+    }
+    async function saveProductImage(productId,file,record){
+      if(!media||typeof media.uploadProductImage!=='function')throw Error('Product image storage is unavailable. Sign in again.');
+      const uploaded=await media.uploadProductImage(productId,file),current=record&&record.image_current_path||null,previous=record&&record.image_previous_path||null;
+      try{await write(WRITE.product,{id:productId,image_current_path:uploaded.path,image_previous_path:current,image_extension:uploaded.ext,image_previous_extension:current?(record.image_extension||null):null,image_published:true});}
+      catch(error){try{if(media.removeProductImage)await media.removeProductImage(uploaded.path);}catch(cleanupError){console.error('New product image cleanup failed',cleanupError);}throw error;}
+      if(previous&&previous!==current&&media.removeProductImage){try{await media.removeProductImage(previous);}catch(error){s.notice='Image saved; older backup cleanup needs attention.';}}
+    }
+    async function restoreProductImage(product){
+      if(!product||!product.id||!product.image_previous_path)throw Error('No previous image is available.');
+      await write(WRITE.product,{id:product.id,image_current_path:product.image_previous_path,image_previous_path:product.image_current_path||null,image_extension:product.image_previous_extension,image_previous_extension:product.image_current_path?(product.image_extension||null):null,image_published:true});
+      await refresh();const latest=s.products.find(item=>item.id===product.id);if(latest)s.editor={type:'product',product:latest};render();
+    }
     function productForm(p){
       return '<form class="fcv3-editor" data-form="product">'+(p&&p.id?'<input type="hidden" name="id" value="'+esc(p.id)+'">':'')+
         '<div class="fcv3-form-grid"><label>Menu category<select name="category_id" required><option value="">Select category</option>'+
@@ -261,6 +282,7 @@
         '<label class="fcv3-wide">Description<textarea name="description_en" maxlength="2000" rows="2">'+esc(p&&p.description_en)+'</textarea></label>'+
         '<label class="fcv3-wide">Urdu description<textarea name="description_ur" maxlength="2000" rows="2">'+esc(p&&p.description_ur)+'</textarea></label></div>'+
         '<div class="fcv3-checks">'+checkbox('featured','Featured',!!(p&&p.featured))+checkbox('is_active','Active',p?p.is_active!==false:true)+checkbox('is_available','Available',p?p.is_available!==false:true)+'</div>'+
+        productImagePanel(p)+
         '<div class="fcv3-subhead"><div><h4>Variants</h4><p>Standalone prices are required; deal-only variant prices may be NULL.</p></div><button type="button" class="fcv3-button" data-action="variant-add">+ Add variant</button></div>'+
         '<div class="fcv3-variants">'+variantRows(p)+'</div><div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">Save product</button></div></form>';
     }
@@ -616,7 +638,9 @@
       }
       if(type==='product'){
         const payload=normalizeProductDraft({id:fd.get('id')||undefined,category_id:fd.get('category_id'),name_en:fd.get('name_en'),name_ur:fd.get('name_ur'),description_en:fd.get('description_en'),description_ur:fd.get('description_ur'),sort_order:Number(fd.get('sort_order')||0),featured:fd.has('featured'),is_active:fd.has('is_active'),is_available:fd.has('is_available'),variants:readVariantRows(form)});
-        await write(WRITE.product,payload);s.editor=null;s.notice='Product and variants saved to catalog draft.';await refresh();return;
+        const saved=await write(WRITE.product,payload),productId=payload.id||saved.entity_id||(saved.record&&saved.record.product&&saved.record.product.id),imageFile=fd.get('image_file');
+        if(imageFile&&imageFile.size){if(!productId)throw Error('Product saved, but its ID was not returned; image was not uploaded.');await saveProductImage(productId,imageFile,payload.id?s.products.find(item=>item.id===payload.id):null);}
+        s.editor=null;s.notice='Product, prices and image details saved to catalog draft.';await refresh();return;
       }
       if(type==='deal'){
         const existing=s.dealDraft&&s.dealDraft.id?s.dealDraft:null;
@@ -681,6 +705,7 @@
           else if(a==='category-edit'){const category=s.categories.find(c=>c.id===b.dataset.id);if(!category)throw Error('Category could not be found.');s.editor={type:'category',category};s.editorRevision=s.revision;render();}
           else if(a==='product-add')openProduct(null);
           else if(a==='product-edit')openProduct(s.products.find(p=>p.id===b.dataset.id));
+          else if(a==='image-restore')await restoreProductImage(s.editor&&s.editor.product);
           else if(a==='deal-add')openDeal();
           else if(a==='variant-add'){if(!s.editor.product)s.editor.product={variants:[]};s.editor.product.variants=s.editor.product.variants||[];s.editor.product.variants.push({size_key:'OPTION_'+(s.editor.product.variants.length+1),size_label:'Option '+(s.editor.product.variants.length+1),price:'',variant_kind:'standard',is_standalone_sellable:true,is_active:true,is_available:true});render();}
           else if(a==='variant-remove'){b.closest('[data-variant-row]')?.remove();}
@@ -746,7 +771,7 @@
         finally{s.saving=false;render();}
       };
     }
-    return {mount:async(element,requestFn)=>{if(!element||typeof requestFn!=='function')throw Error('Catalog V3 workspace requires a root and authenticated request handler.');el=element;request=requestFn;bind();await refresh();},refresh,getState:()=>JSON.parse(JSON.stringify(s))};
+    return {mount:async(element,requestFn,mediaApi)=>{if(!element||typeof requestFn!=='function')throw Error('Catalog V3 workspace requires a root and authenticated request handler.');el=element;request=requestFn;media=mediaApi||null;bind();await refresh();},refresh,getState:()=>JSON.parse(JSON.stringify(s))};
   }
   return {READ,WRITE,normalizeProductDraft,buildFixedComponentGroups,buildIncludedMappings,buildFixedDealEditDraft,isApprovedFlameHourSchedule,assertDealIdentity,eligibleChoiceProducts,verifyFixedDealDetail,createWorkspace};
 });
