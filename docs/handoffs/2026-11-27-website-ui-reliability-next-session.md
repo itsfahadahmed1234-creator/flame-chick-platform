@@ -217,3 +217,50 @@ Wait for the user to review the project overview and confirm the first source-fi
 4. Review the arithmetic against `calculateDealLine(row)` in `website-order-v3.js` for all pricing treatments and modifier quantities. Keep estimates non-authoritative and keep `toPayload()` identifier-only.
 5. Continue with Phase 2 findings C4/C5/C7/C9/C10 only after Phase 1 review is complete. Keep source work on this review branch until an explicitly approved release plan exists.
 6. Do not merge or push to `work/website-parallel-development`: it is linked to the Production deployment. No Vercel promotion, Production alias change, Supabase changes, or real checkout rehearsal without the required explicit approvals.
+
+
+---
+
+## 27 November 2026 — Preview catalogue bootstrap repair and checkout testing alignment
+
+**Status: source fix deployed to the isolated review Preview; automated checks green. Browser refresh/render verification remains outstanding.**
+
+- Review branch: `work/website-reliability-phase1-review`
+- Latest application-code fix: `e27bb4aa158518ea9d9109ba5c9009e4929d619f`
+- Latest branch/test checkpoint before this handoff update: `2dc27df810ef5340e6adeaa8a9f7db93a55a69e0`
+- Preview deployment: `dpl_8XfUX4DR7XYnoFVNcbyQxn1WrVTV`, **READY**, target null. Stable review URL: `https://flame-chick-website-production-git-work-website-r-07b9f9-faha-d.vercel.app/`
+- Public Production remains deployment `dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy`, source `c57be50d1674e597693117d1f39867c4c042f43a`, with the existing Production alias unchanged.
+
+### Root cause and fix
+
+The Website's `website-order-v3.js` contained two malformed, over-escaped regular-expression literals in the published artwork URL helper (trailing-slash cleanup and HTTPS URL validation). Vercel's static deployment was marked READY because it copied the static site, but the browser JavaScript parser could not execute the main order controller. This prevented the catalogue bootstrap from running.
+
+Both expressions were corrected in `e27bb4a...`. The published catalogue, branch availability tables, and Production database were not modified.
+
+### Production data checks (read-only)
+
+- Production Supabase project `adkrxfnawdiljhjaavnj` is ACTIVE_HEALTHY.
+- `flame_chick_catalog_public_read('flame-chick')` returned the current publication (#2) with 25 products, 28 variants, and one published Main branch.
+- 25 products are active/available; 23 variants are active, available, and standalone-sellable.
+- The live Main branch row has website ordering, delivery and pickup enabled. Its `website_context` API returned HTTP 200.
+- `flame-chick-catalog?action=health` and `?action=catalog` returned HTTP 200. The zero branch-product/variant override rows are not the cause; the V3 availability resolver defaults to the published item's availability when no branch override exists.
+
+### Automated validation
+
+GitHub Actions run `45953796619` for `2dc27df...` completed successfully:
+- JavaScript syntax check: pass.
+- Core catalogue/deal regression suite: **151 passed, 0 failed**.
+- Preview regression suite: **25 passed, 0 failed**.
+- Inline Website script parsing: pass.
+
+### Checkout-testing authorization — supersedes earlier restrictions in this handoff
+
+The user explicitly instructed that the Preview checkout should operate like the real Website and authorized real rehearsal/test orders, with the understanding that they write to the Production Supabase database and appear in the live POS. Each test order must carry `[TEST ORDER - ADMIN DELETE]`; the user will manually remove those orders before customer handover. Do not silently revert the approved review Preview to read-only or simulation mode. Continue to preserve server-side price/availability validation and idempotency. No order was submitted during this catalogue diagnosis.
+
+This authorization applies to the configured review Preview test checkout; it does **not** authorize replacing the public Production domain or pushing to `work/website-parallel-development` without an explicit release instruction.
+
+### Remaining verification / next action
+
+- The automated browser connector in this session could inspect the already-open tab but could not reload it. That tab may still contain the pre-fix document.
+- Ask the user to hard-refresh the stable review URL (`Ctrl+Shift+R`) and verify that menu product cards and deals now render. If it remains blank, capture the current visible order-status message and browser console/network error; do not republish the menu or bulk-change availability without evidence.
+- Once the refreshed page renders, continue the Website checkout rehearsal on this review Preview with clearly tagged test orders under the user's authorization. Keep the public Production deployment separate until the release path is explicitly selected.

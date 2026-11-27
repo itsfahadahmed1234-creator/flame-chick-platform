@@ -66,3 +66,15 @@ The Place Order button must behave correctly on the selected URL; the UI must ex
 - Latest checkpoint commit: `a7b3fcb3407b25c06910248b4e11f516da888a05`. Read the Phase 1 section in [27 November Website UI reliability handoff](2026-11-27-website-ui-reliability-next-session.md) before continuing.
 - Production remains on `work/website-parallel-development` commit `c57be50d1674e597693117d1f39867c4c042f43a`, deployment `dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy`. Do not commit or push to that branch: Vercel Git auto-deploys it to Production.
 - One earlier Static Checks run passed; a later run failed on a stale test label, corrected in `a7b3fcb...`. Confirm the latest run before calling Phase 1 validated.
+
+
+## 27 November 2026 — Catalogue bootstrap repair (latest website reliability checkpoint)
+
+- Latest review-branch checkpoint before the handoff-only update: `2dc27df810ef5340e6adeaa8a9f7db93a55a69e0`; application fix is in `e27bb4aa158518ea9d9109ba5c9009e4929d619f`.
+- The stable review Preview URL is `https://flame-chick-website-production-git-work-website-r-07b9f9-faha-d.vercel.app/`; deployment `dpl_8XfUX4DR7XYnoFVNcbyQxn1WrVTV` is READY, target null.
+- Root cause: malformed over-escaped regex literals prevented `website-order-v3.js` from parsing, so catalogue initialization did not run. Both URL helper expressions were corrected.
+- GitHub Actions run `45953796619` passed: 151 core tests, 25 Preview tests, JavaScript syntax and inline-script parsing all green.
+- Production catalogue read checks confirmed publication #2 contains 25 products / 28 variants; 23 variants are standalone-sellable. No DB/menu/availability mutation was made.
+- Public Production is unchanged: deployment `dpl_7EzwXVHFsjG91oGixcWbrfWkFSiy`, source `c57be50d...`.
+- User explicitly authorized real tagged rehearsal orders on the review Preview; preserve `[TEST ORDER - ADMIN DELETE]` and do not switch this Preview back to simulation/read-only. The user will manually delete test orders before customer handover. No order was submitted during catalogue diagnosis.
+- Browser render verification is still pending: the already-open tab may be stale. Hard-refresh the stable review URL before assessing the repaired menu. Read the latest section of [the Website UI reliability handoff](2026-11-27-website-ui-reliability-next-session.md) before continuing.
