@@ -47,18 +47,8 @@ Updated: 2026-11-27
 
 The homepage still contains a legacy, hidden V2 drawer/form and old inline JavaScript, including obsolete cart/customer storage helpers and an unreachable legacy submit block. These are not the V3 checkout path, but removal affects a large inline script and duplicate legacy markup. Keep them untouched until the UI rehearsal confirms the actual live V3 interactions, then remove them in a separate reviewed change. Do not re-enable or extend the V2 order handler.
 
-## Remaining work for OpenCode UI rehearsal
+## OpenCode UI rehearsal — completed 27 November 2026
 
-Use a read-only browser test. Do **not** click the final Place Order/Retry Order button and do not submit a real Production order.
+The read-only Playwright/Chrome customer journey test is complete. It covered 1440×900 desktop and 390×844, 360×800 and 320×568 mobile. No source files, cookies/storage or Production data were changed; no Place Order/Retry action or non-GET request occurred. The audit found confirmed defects C1–C10, including stale/mis-styled status, legacy inline errors, missing images/generic deal art, missing deal prices, silent validation, cart focus escape, 320px clipping and awkward deal copy. The audit also confirmed correct catalogue loading, item/deal/cart calculations, delivery fees and repeated Delivery/Takeaway switching.
 
-1. Load the production website and confirm the V3 catalogue, product names, images/fallbacks, categories, deal cards, and prices.
-2. Test product dialogs: single-variant add, multi-variant choice, quantity stepper, modifier required/optional choices, and close/reopen behaviour.
-3. Test deals: required slots, burger slot switching, repeat limits, substitutions/options, deal quantity, and total display. Confirm Flame Feast choices reflect the *published* revision, not unpublished draft revision 108.
-4. Test cart add/remove/quantity and all line/subtotal/fee/total recalculations.
-5. Switch Delivery ↔ Takeaway repeatedly. Confirm delivery fields appear only for Delivery and cart selections remain stable where applicable.
-6. Test listed area selection (Comsats University, Rs 0), Not Listed (Rs 100 plus locality and explicit confirmation), and Takeaway (Rs 0 delivery fee). Compare the visible fee with the known current DB configuration.
-7. Confirm cash payment instructions follow fulfilment type; confirm mobile viewport, scrolling/sticky cart footer, modal scrolling, keyboard/focus and reduced-motion behaviour.
-8. Refresh/navigate back and verify the cart/customer data behaviour; do not infer successful order creation from local UI state.
-9. Check DevTools console/network errors. Never copy service credentials or customer data into screenshots/logs.
-
-After UI checks, report every mismatch with a screenshot, exact click sequence, selected fulfilment, viewport width, and expected/actual result. Then perform a separate security hardening review of CORS/origin handling and anti-automation/rate limiting; this pass did not change those policies.
+**Do not repeat the old checklist above as pending.** The full findings, exact Playwright evidence references, source causes, pass results, test limitations and prioritized correction phases are in [the 27 November UI reliability continuation handoff](../handoffs/2026-11-27-website-ui-reliability-next-session.md). The live site is order-writable, so automated QA must stop before Place Order/Retry. No fixes to C1–C10 are implied by this audit record; they remain pending source work. Continue on `work/website-parallel-development`, compare current branch files to live C57 snapshot before editing, and obtain explicit approval before any deployment, Production write or real order.
