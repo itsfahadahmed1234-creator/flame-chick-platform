@@ -1,3 +1,11 @@
+# Current hosting direction — 2026-11-27
+
+The primary next hosting task is a new Cloudflare Workers + Workers Static Assets project named `flamechickpos` in the connected Cloudflare account. No Cloudflare POS project/deployment has been created yet. The latest validated POS source candidate is this directory at commit `41c8aea80febd434048e50c352b386c01b02e7d4`; all 20 POS files match the later documentation-only branch checkpoint.
+
+Read [the Cloudflare POS hosting continuation handoff](../../docs/handoffs/2026-11-27-cloudflare-pos-hosting-continuation.md) before configuring hosting. The POS is plain static HTML/JavaScript with a server-side QZ signing endpoint that must be ported to a Worker. Never publish its Node signer source/private key as static assets. Keep the Vercel Production host as a fallback until Cloudflare is fully verified.
+
+---
+
 # Flame Chick POS
 
 Static cashier/POS application.

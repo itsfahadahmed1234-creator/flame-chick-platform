@@ -1,3 +1,16 @@
+# HOSTING DIRECTION UPDATE — 2026-11-27
+
+The immediate next-session task is now the Cloudflare POS host, not another Vercel Preview/Production deployment. Read `docs/handoffs/2026-11-27-cloudflare-pos-hosting-continuation.md` and the current top of `PROJECT_HANDOFF.md` first.
+
+- Latest validated POS app source candidate: commit `41c8aea80febd434048e50c352b386c01b02e7d4`, root `apps/flame-chick-pos`. The later `7a818860` commit only updated docs; all 20 POS app files were identical.
+- Create a new isolated Cloudflare Workers + Workers Static Assets project/Worker named `flamechickpos` in the connected account. No Cloudflare POS project exists yet.
+- The connected Cloudflare account has workers.dev subdomain `itsfahadahmed1234`, no zones, and a separate pre-existing `flame-chick-platform` Worker that must not be touched. Full custom-domain TLD remains unknown.
+- Port `/api/qz/sign` to Workers securely; keep `QZ_SIGNING_PRIVATE_KEY` as a Cloudflare encrypted secret and preserve staff auth / RSA-SHA512 / certificate verification / CORS / rate limit. Do not expose it or ship Node signer sources as assets.
+- Existing Supabase Production migration `20261127090208`, Order API v12 and Delivery API v4 are already deployed. No backend change is required for simple host creation.
+- Keep the current Vercel production alias as fallback until Cloudflare is verified. No Vercel deployment/upgrade/quota bypass, DNS/domain purchase, paid Cloudflare plan change, or unrelated app hosting change is authorized.
+
+---
+
 # Flame Chick POS — next-session handoff: Dine-in / Takeaway sync and table payment error
 
 **Updated:** 2026-11-27 (Asia/Karachi)  

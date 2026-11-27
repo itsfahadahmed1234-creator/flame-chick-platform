@@ -1,3 +1,43 @@
+# NEXT TASK — 2026-11-27 — MOVE POS HOSTING TO THE CONNECTED CLOUDFLARE ACCOUNT
+
+**Read first:** `docs/handoffs/2026-11-27-cloudflare-pos-hosting-continuation.md` (new-chat continuation). This is now the immediate next task. Keep the existing Vercel site as a fallback, but make Cloudflare the new POS host so the POS no longer depends on Vercel.
+
+## Latest POS source to upload
+
+- Repository: `itsfahadahmed1234-creator/flame-chick-platform`
+- Branch: `work/production-source-audit`
+- Validated POS source pin: `41c8aea80febd434048e50c352b386c01b02e7d4`
+- POS root: `apps/flame-chick-pos`
+- The next documentation-only branch update does not alter the POS code: all 20 POS app files were verified identical between `41c8aea` and branch HEAD `7a8188607b4d08f25e9d005b2acf0bf9ea2cd906`. Re-check before upload.
+- This is the latest validated **source candidate**, not a Cloudflare deployment. No Cloudflare POS project/deployment exists yet.
+
+## Connected Cloudflare account / target
+
+- Account: `Itsfahadahmed1234@gmail.com's Account`, connected identity `itsfahadahmed1234@gmail.com`.
+- Workers subdomain: `itsfahadahmed1234`.
+- Exact requested new POS Worker/project name: `flamechickpos`.
+- The account had no zones at the read-only check. Full custom domain/TLD is unknown; do not invent a suffix, buy a domain, add a zone or change DNS.
+- A separate existing Worker named `flame-chick-platform` is present; leave it untouched.
+- Use a separate Workers + Workers Static Assets project for the POS, with a Worker route for QZ signing. Keep Supabase as the backend and use the existing Production project/API.
+
+## Production backend remains deployed
+
+Supabase migration `20261127090208` is applied. Order API v12 and Delivery API v4 are ACTIVE. Do not redeploy them as part of hosting-only work. Existing data counts at rollout were 25 orders and 14 payments, unchanged.
+
+## Hosting and security boundaries
+
+- The current Vercel POS production URL still serves its older commit. The latest new Vercel build is blocked by its daily `api-deployments-free-per-day` quota. Do not try Vercel again, upgrade it, or bypass the cap for this task.
+- Preserve the current Vercel production host as rollback/fallback until Cloudflare's new host is verified; do not delete its project or detach aliases.
+- The POS is plain static HTML/JS with no package.json/build script or Wrangler/Cloudflare config. Inspect and create a deterministic safe assets build.
+- The current Node QZ signer at `api/qz/sign.js` uses Node crypto/fs and `QZ_SIGNING_PRIVATE_KEY`; it must be ported to a supported Workers runtime. Store the private key only as an encrypted Cloudflare Worker secret. Do not retrieve the Vercel secret or expose any key in Git, chat, HTML or logs.
+- Preserve Supabase staff auth, Active Admin/Owner/Manager/Cashier role checks, RSA-SHA512 QZ signature and certificate matching, strict CORS, request limits, and rate limiting.
+- Keep the public leaf QZ certificate served at `/qz/digital-certificate.txt`; never bundle the root CA/private material.
+- Do not upload server-side Node sources, tests, hidden files or secret/config files as public static assets.
+- No unrelated Website/Admin/Rider hosting, DB changes, Edge Function changes, new database/services, new zones, paid plan changes, customer orders, payments, or physical printing changes.
+- GST remains deferred; kitchen/automatic printing stays disabled; keep branch `work/production-source-audit`; never change `main`.
+
+---
+
 # PRODUCTION RELEASE CHECKPOINT — 2026-11-27 (backend deployed; POS frontend quota-blocked)
 
 **This checkpoint supersedes earlier release-gate statements below that say no Production migration or Edge Function deployment has occurred.** The Production backend rollout was explicitly approved by the user and is complete. The Vercel POS frontend release remains blocked by the Free-plan daily deployment API quota.
