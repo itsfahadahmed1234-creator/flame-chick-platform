@@ -1,7 +1,8 @@
 # CURRENT STATUS — POS MANUAL DELIVERY / RECEIPT PRINT UX FIX IN PROGRESS
 
 ## CI correction checkpoint — 2026-11-27
-- Initial run for commit `6970a386ea7dcece9467be464ab5ef6bd9762a6a` failed because one preview test mock omitted the application's `PRINT NOT CONFIRMED` prefix. Five of six mocked UI tests passed; QZ diagnostics were skipped after the failure. The fixture is being corrected and must be rerun before considering this complete.
+- Run 1: commit `6970a386ea7dcece9467be464ab5ef6bd9762a6a`, 5/6 new mocked tests passed; the last failure was a mock error-prefix mismatch.
+- Run 2: commit `58d38516a67b54c86aef00a3009cfc87d8589ffa`, all 6 new mocked UI tests passed; the receipt contract test failed at startup because `.mjs` incorrectly used `require()`. QZ diagnostics were skipped. The `.mjs` test is being converted to valid ESM imports; full rerun required.
 - R2 pricing checked: Standard free monthly usage is 10 GB-month, 1M Class A, 10M Class B and free egress. Overage is billable; activating R2 requires subscription checkout. R2 remains disabled, with no subscription or bucket created.
 
 
@@ -11,7 +12,7 @@
 - Do not push POS source to \`work/production-source-audit\`; Cloudflare Workers Builds watches that branch and would auto-deploy the live POS.
 - Scope: Manual Delivery Place Order loading/rapid-click guard; receipt modal and print-preview close only after the existing QZ Promise confirms success; failed/cancelled attempts keep the relevant popup open and retryable.
 - Existing QZ-first/browser-fallback routing, receipt content, QZ signer and payment/order logic remain unchanged. Browser \`window.print()\` cannot affirm a completed print; fallback remains available but does not auto-close the popup.
-- Mock regression coverage and a feature-branch-only GitHub Actions workflow are being added. Read the minutes file above before continuation and record the exact CI result/commit.
+- Mock regression coverage and a feature-branch-only GitHub Actions workflow are in place; full suite rerun remains pending after the `.mjs` compatibility correction. Read the minutes file above before continuation and record the exact CI result/commit.
 - Production Worker remains \`flamechickpos\` version 6 at https://flamechickpos.itsfahadahmed1234.workers.dev. No deployment is authorized.
 - Private minutes archive is blocked: account R2 is not enabled, KV/D1 are absent, and no billing/plan settings were changed. See the minutes file for the exact Cloudflare error and pending object path.
 

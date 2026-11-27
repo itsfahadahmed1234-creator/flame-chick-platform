@@ -35,7 +35,8 @@
 ### Tests and results
 - First Actions run: commit `6970a386ea7dcece9467be464ab5ef6bd9762a6a`, run `46036547793`, failed in the new preview test after 5/6 mocked UI tests passed. The assertion expected the full UI prefix but its test double only displayed the raw message; this was a fixture mismatch, not an application behavior failure. The QZ diagnostic step was skipped because the test command stopped early. The mock is corrected to match the real status helper; rerun pending.
 - Added mocked regressions for one submission on rapid clicks, immediate spinner/disabled state, success/failure recovery, receipt popup closure only after print completion, failures/cancellation remaining open and retryable, and duplicate print suppression.
-- Tests are pending feature-branch GitHub Actions. No Production Supabase calls, order creation, payment, IndexedDB clearing or physical print job was used.
+- Second Actions run: commit `58d38516a67b54c86aef00a3009cfc87d8589ffa`, run `46036779500`; all 6 new mocked UI tests passed. The existing `.mjs` receipt contract test then failed to load because its pre-existing header used CommonJS `require()` although `.mjs` is ES module. QZ diagnostics were skipped as the workflow stopped at that failure. The receipt contract test is being corrected to ES module imports; a full rerun, including QZ diagnostics, remains pending.
+- No Production Supabase calls, order creation, payment, IndexedDB clearing or physical print job was used.
 - Do not claim tests passed until the workflow result is read back.
 
 ### Deployment
@@ -50,7 +51,7 @@
 - Connected account checked read-only: \`831422f51dea96c387ae8917d451a6bf\`.
 - R2 bucket listing is not enabled for this account and returned Cloudflare error 10042 asking to enable R2 in the Dashboard.
 - Workers KV namespaces: none. D1 databases: none.
-- No bucket/object created and no billing, plan, or Dashboard setting changed. The current R2 allowances/pricing must be confirmed from official Cloudflare documentation before enablement; private Cloudflare mirror is **not yet synchronized**.
+- No bucket/object created and no billing, plan, or Dashboard setting changed. R2 Standard free allowances and overage prices were confirmed from official Cloudflare documentation; private Cloudflare mirror is **not yet synchronized**.
 - Planned object path, pending R2 enablement: \`flamechick-project-minutes/pos/2026/11/2026-11-27-pos-manual-delivery-receipt-print-ux-minutes.md\`.
 - Last successful Cloudflare archive synchronization: **none**. Never put these notes in POS Worker assets or runtime.
 
