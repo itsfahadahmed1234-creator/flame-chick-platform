@@ -821,7 +821,7 @@
       container.style.fontSize = 'clamp(42px, 10vw, 72px)';
       container.setAttribute('aria-label', label);
     }
-    if (imagePath && base && /^https:\\/\\//i.test(base)) {
+    if (imagePath && base && /^https:\/\/\//i.test(base)) {
       var safePath = imagePath.split('/').filter(Boolean).map(function (part) {
         return encodeURIComponent(part);
       }).join('/');
