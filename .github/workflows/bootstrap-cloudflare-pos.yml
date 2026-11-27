@@ -1,0 +1,139 @@
+name: Bootstrap Flame Chick POS Cloudflare Builds
+
+on:
+  push:
+    branches:
+      - work/production-source-audit
+    paths:
+      - 'apps/flame-chick-pos/**'
+      - '.github/workflows/bootstrap-cloudflare-pos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flamechickpos-cloudflare-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/flame-chick-pos
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT_ID: 831422f51dea96c387ae8917d451a6bf
+      CF_SCRIPT_TAG: deb5b80c96ed4d70a051d1276c873b1c
+      CF_BUILD_TOKEN_UUID: 00a29a4f-9290-4762-8dc1-89b457ec9a98
+      CF_REPO_ID: '1464312723'
+      CF_REPO_OWNER_ID: '345370751'
+      CF_REPO_OWNER: itsfahadahmed1234-creator
+      CF_REPO_NAME: flame-chick-platform
+      CF_BRANCH: work/production-source-audit
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/production-source-audit
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/flame-chick-pos/package.json
+      - name: Install pinned Wrangler
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Test Worker and build public assets
+        run: |
+          npm run test:cloudflare
+          npm run build
+      - name: Configure Cloudflare Builds and trigger POS deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN repository secret is missing."
+            exit 1
+          fi
+          API="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID"
+          CONFIG_PATH="$API/builds/workers/$CF_SCRIPT_TAG"
+          CREATE_BODY="$(jq -n \
+            --arg branch "$CF_BRANCH" \
+            --arg owner_id "$CF_REPO_OWNER_ID" \
+            --arg owner "$CF_REPO_OWNER" \
+            --arg repo_id "$CF_REPO_ID" \
+            --arg repo "$CF_REPO_NAME" \
+            --arg tag "$CF_SCRIPT_TAG" \
+            --arg build_token "$CF_BUILD_TOKEN_UUID" \
+            '{
+              script_tag: $tag,
+              git_repository: {
+                branch: $branch,
+                provider_type: "github",
+                provider_account_id: $owner_id,
+                provider_account_name: $owner,
+                repo_id: $repo_id,
+                repo_name: $repo
+              },
+              production_settings: {
+                build_caching_enabled: true,
+                build_command: "npm run build",
+                deploy_command: "npx wrangler deploy --config wrangler.jsonc",
+                build_token_uuid: $build_token,
+                environment_variables: {},
+                path_includes: ["apps/flame-chick-pos/**"],
+                path_excludes: ["**/*.md"],
+                root_directory: "/apps/flame-chick-pos"
+              },
+              previews_enabled: false,
+              previews_base_config: {
+                build_caching_enabled: true,
+                build_command: "npm run build",
+                deploy_command: "npx wrangler versions upload --config wrangler.jsonc",
+                build_token_uuid: $build_token,
+                environment_variables: {},
+                path_includes: ["apps/flame-chick-pos/**"],
+                path_excludes: ["**/*.md"],
+                root_directory: "/apps/flame-chick-pos"
+              }
+            }')"
+          STATUS="$(curl -sS -o /tmp/cf-build-config.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H 'Content-Type: application/json' \
+            "$CONFIG_PATH")"
+          if [ "$STATUS" = "200" ]; then
+            PATCH_BODY="$(jq -n --arg build_token "$CF_BUILD_TOKEN_UUID" '{
+              production_settings: {
+                build_caching_enabled: true,
+                build_command: "npm run build",
+                deploy_command: "npx wrangler deploy --config wrangler.jsonc",
+                build_token_uuid: $build_token,
+                environment_variables: {},
+                path_includes: ["apps/flame-chick-pos/**"],
+                path_excludes: ["**/*.md"],
+                root_directory: "/apps/flame-chick-pos"
+              },
+              previews_enabled: false
+            }')"
+            curl -fsS -X PATCH "$CONFIG_PATH" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H 'Content-Type: application/json' \
+              --data "$PATCH_BODY" > /tmp/cf-build-patch.json
+            jq -e '.success == true' /tmp/cf-build-patch.json >/dev/null
+          elif [ "$STATUS" = "404" ]; then
+            curl -fsS -X POST "$API/builds/workers" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H 'Content-Type: application/json' \
+              --data "$CREATE_BODY" > /tmp/cf-build-create.json
+            jq -e '.success == true' /tmp/cf-build-create.json >/dev/null
+          else
+            echo "::error::Cloudflare Builds configuration lookup returned HTTP $STATUS."
+            jq -c '{success,errors}' /tmp/cf-build-config.json
+            exit 1
+          fi
+          curl -fsS -X POST "$API/builds/workers/$CF_SCRIPT_TAG/builds" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data "$(jq -n --arg branch "$CF_BRANCH" '{branch:$branch}')" > /tmp/cf-build-trigger.json
+          jq -e '.success == true' /tmp/cf-build-trigger.json >/dev/null
+          echo "Cloudflare POS build configuration saved and initial build requested."
