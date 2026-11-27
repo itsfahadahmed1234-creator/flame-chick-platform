@@ -9,6 +9,7 @@ function isLoopbackHost(hostname) {
  * Production entries must be HTTPS origins with no path, query, fragment or credentials.
  * HTTP is accepted only for explicitly named loopback development origins.
  */
+export const CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN = "https://flamechickadmin.pages.dev";
 export const PRODUCTION_STAFF_ADMIN_ORIGIN = "https://flamechicadmin.vercel.app";
 
 /**
@@ -21,13 +22,13 @@ export const PREVIEW_STAFF_ADMIN_ORIGINS = Object.freeze([
 ]);
 
 /**
- * Always include the verified production Admin origin. Keep any explicitly
- * configured exact origins for controlled environments, but never use wildcards.
+ * Always include the canonical Cloudflare Pages Admin origin and preserve the
+ * existing Vercel production fallback. Keep exact configured origins; never wildcard.
  */
 export function parseStaffAdminOrigins(raw) {
   const configured = typeof raw === "string" ? raw.trim() : "";
   return parseAllowedOrigins(
-    [configured, PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS].filter(Boolean).join(",")
+    [configured, CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN, PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS].filter(Boolean).join(",")
   );
 }
 

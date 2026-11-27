@@ -6,8 +6,9 @@ verify_jwt = false
 [functions.flame-chick-order-api]
 verify_jwt = false
 
+# Delivery API is only called by signed-in POS and Rider users.
 [functions.flame-chick-delivery-api]
-verify_jwt = false
+verify_jwt = true
 
 # Require a signed-in user JWT for Staff Admin.
 [functions.flame-chick-staff-admin]

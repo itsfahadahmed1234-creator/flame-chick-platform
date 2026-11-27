@@ -1,6 +1,7 @@
 // Flame Chick Staff Admin API — Batch 4.
 import { isAllowedRequestOrigin, isSafeInviteRedirect, parseStaffAdminOrigins, staffCorsHeaders } from "./origin-policy.mjs";
 import { buildCatalogRpcCall } from "./catalog-actions.mjs";
+import { buildDashboardRpcCall } from "./dashboard-actions.mjs";
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").replace(/\/+$/,"");
 function readKey(jsonName:string,fallback:string[]):string{
  try{const x=JSON.parse(Deno.env.get(jsonName)??"{}");const v=x?.default;if(typeof v==="string"&&v)return Deno.env.get(v)??v;}catch{}
@@ -57,6 +58,16 @@ async function catalogAction(t:string,b:Obj):Promise<Obj>{
  }
  return{ok:true,result:await catalogRpc(t,call)};
 }
+async function dashboardSummary(t:string,b:Obj):Promise<Obj>{
+ let call:{rpc:string;args:Obj};
+ try{call=buildDashboardRpcCall(b);}catch(e){
+  if(e instanceof Error&&e.name==="DashboardRequestError")throw new ApiError("DASHBOARD_REQUEST_INVALID",400,"The dashboard request is invalid.");
+  throw e;
+ }
+ const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/"+call.rpc,{method:"POST",headers:{apikey:PUBLIC_KEY,Authorization:"Bearer "+t,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify(call.args),cache:"no-store"});
+ const x=await body(r);if(!r.ok)throw rpcErr(x);
+ return{ok:true,dashboard:x};
+}
 async function systemRpc(action:string,payload:Obj):Promise<unknown>{
  if(!SECRET_KEY)throw new ApiError("STAFF_ADMIN_NOT_CONFIGURED",503,"Staff invitations are not configured.");
  const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/flame_chick_staff_admin_system_command",{method:"POST",headers:{apikey:SECRET_KEY,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({p_action:action,p_payload:payload}),cache:"no-store"});
@@ -97,6 +108,7 @@ async function post(req:Request,t:string):Promise<Obj>{
  const a=String(b.action??"").trim().toLowerCase();
  if(a.startsWith("catalog_"))return await catalogAction(t,b);
  if(rawBytes>16000)throw new ApiError("REQUEST_TOO_LARGE",413,"The staff request is too large.");
+ if(a==="dashboard_summary")return await dashboardSummary(t,b);
  if(a==="invite")return await invite(t,b);
  if(a==="accept_invitation")return{ok:true,result:await userRpc(t,a,{})};
  if(a==="retry_finalize"){
