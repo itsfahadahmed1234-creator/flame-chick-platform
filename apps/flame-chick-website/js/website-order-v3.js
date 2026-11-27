@@ -811,7 +811,7 @@
   function appendPublishedArtwork(container, item, fallbackLabel, altText) {
     var imagePath = typeof item.imagePath === 'string' ? item.imagePath.trim() : '';
     var config = root.FLAME_CHICK_CONFIG || {};
-    var base = typeof config.imagesBaseUrl === 'string' ? config.imagesBaseUrl.replace(/\\/+$/, '') : '';
+    var base = typeof config.imagesBaseUrl === 'string' ? config.imagesBaseUrl.replace(/\/+$/, '') : '';
     var label = fallbackLabel || item.name || item.title || 'Flame Chick menu item';
     function fallback() {
       container.replaceChildren();
