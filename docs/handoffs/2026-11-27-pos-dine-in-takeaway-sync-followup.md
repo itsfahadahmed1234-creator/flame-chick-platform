@@ -136,3 +136,17 @@ Changes prepared on `work/production-source-audit`:
 - Add payment helper, receipt workflow, table occupancy, reconciliation and concurrent-sync tests.
 
 CI has not yet run at this handoff point. No Preview or Production deployment was created. No Production database records, migrations, Edge Functions or Vercel settings were changed.
+
+
+## 11. CI and Preview verification — 2026-11-27
+
+- Latest source commit: `76b1b7980b36f5c8e6ee0d0729c1a5ac0cb36e72`.
+- GitHub Actions POS/Rider Static Checks run `45931459757`: **success** (job `140284822480`). Includes the new executed Dine-in payment-handler regression.
+- Vercel Preview deployment: `dpl_Hi7thZMHjsPhfr4pjpaka3btfwMz`, URL `https://flame-chick-pos-development-br2jk4hll-faha-d.vercel.app`, state **READY**, exact source SHA `76b1b7980b36f5c8e6ee0d0729c1a5ac0cb36e72`.
+- Vercel build event confirms the Preview-only ignored-build-step condition passed and `vercel build` completed. The original project Ignored Build Step has been restored to `exit 0`.
+- One earlier deployment attempt on the same SHA was canceled because the restored `exit 0` guard took effect before the build step. The final READY deployment above is the one to inspect.
+- Production deployment remains `dpl_6VuqJfbd89a7f1V6TTV6L6n2CEjP`, READY on SHA `f6ce0ea49aeb165fec382280dcc3f90c4747a706`; `flamechick-pos.vercel.app` was not reassigned. No Production deployment, database mutation, migration or Edge Function deployment was made.
+
+### Preview test boundary
+
+The Preview is on a different origin from `flamechick-pos.vercel.app`, so its browser IndexedDB is separate. It will not show the two pending local queue rows saved under the Production hostname. Do not create duplicate rows to transfer them. Test the corrected interaction using the Preview and explicitly disposable QA data only; the existing local orders require safe recovery on the originating browser after a separately approved Production release.

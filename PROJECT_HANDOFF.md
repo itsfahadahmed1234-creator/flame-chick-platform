@@ -5376,3 +5376,12 @@ The leaf certificate key pair and root chain were verified. Sensitive `QZ_SIGNIN
 - Existing Preview workflow `.github/workflows/deploy-flame-chick-pos-preview.yml` remains Preview-only and now is manual-only, gated by repository variables `FLAME_CHICK_POS_PREVIEW_DEPLOY_ENABLED=true` and `FLAME_CHICK_POS_PREVIEW_PROJECT_READY=true`. Do not set PROJECT_READY until the one-time bootstrap has succeeded and the isolated project's first deployment can be read back as READY.
 - This workflow has NOT yet been run. No new Vercel deployment or domain alias change has occurred in this stage. The user must manually open GitHub Actions → `Bootstrap Temporary Isolated Flame Chick POS Deployment`, select branch `work/production-source-audit`, enter the exact confirmation phrase, and run it. Then verify Vercel shows a READY Production deployment on this isolated project before enabling Preview workflow.
 - No HFP project, existing live POS domain/deployment, Supabase configuration/data, or restaurant orders were changed.
+
+
+## POS sync/payment repair — CI and Preview state (2026-11-27)
+
+Latest source fix commit: `76b1b7980b36f5c8e6ee0d0729c1a5ac0cb36e72`. POS/Rider CI run `45931459757` passed. One READY Vercel Preview is available at https://flame-chick-pos-development-br2jk4hll-faha-d.vercel.app (deployment `dpl_Hi7thZMHjsPhfr4pjpaka3btfwMz`), built from that exact SHA. The original Ignored Build Step was restored to `exit 0`.
+
+Production is unchanged: `flamechick-pos.vercel.app` still aliases READY deployment `dpl_6VuqJfbd89a7f1V6TTV6L6n2CEjP`, SHA `f6ce0ea49aeb165fec382280dcc3f90c4747a706`. No Supabase production rows, migrations or Edge Functions were mutated/deployed.
+
+The Preview has a separate browser origin and separate IndexedDB; it cannot see pending local queue records from the Production hostname. Do not recreate the reported orders to copy them. Recovery of the two local orders on the originating browser requires the reviewed fix to be released to Production under a separate explicit approval.
