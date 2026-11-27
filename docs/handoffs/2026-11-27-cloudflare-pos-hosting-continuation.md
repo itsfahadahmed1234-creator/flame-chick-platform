@@ -1,4 +1,4 @@
-# NEW-CHAT EXECUTION DIRECTIVE — POS CLOUDFARE DEPLOYMENT
+# NEW-CHAT EXECUTION DIRECTIVE — POS CLOUDFLARE DEPLOYMENT
 
 **This is the next task. Continue the existing Flame Chick POS work; do not restart the project.**
 
