@@ -4,7 +4,6 @@ Deno.env.set("SUPABASE_URL", "https://flame-chick-disposable.supabase.co");
 Deno.env.set("SUPABASE_PUBLISHABLE_KEYS", JSON.stringify({ test: "fc-public-test-key" }));
 Deno.env.set("SUPABASE_SECRET_KEYS", JSON.stringify({ default: "fc-private-test-value" }));
 Deno.env.set("FLAME_CHICK_WEBSITE_QUOTE_HMAC_SECRET", "local-test-quote-hmac-value-longer-than-32-bytes");
-Deno.env.set("FLAME_CHICK_ORDER_PHONE_HMAC_SECRET", "local-test-phone-hmac-value-longer-than-32-bytes");
 
 const require = createRequire(import.meta.url);
 const fixture = require("../../../tests/fixtures/flame-chick-published-menu-v3-fixture.cjs");
