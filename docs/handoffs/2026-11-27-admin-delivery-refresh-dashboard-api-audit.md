@@ -111,7 +111,7 @@ Migration: `20261127164728_flame_chick_admin_dashboard_summary_v1` on Production
 - No test orders/payments were created, updated or cancelled. Smoke checks were read-only and used a transaction rollback.
 - These are a database/API contract validation, not a browser end-to-end check.
 
-### Remaining rollout
+### Rollout gates — completed; see final deployment status below
 
 1. Repository migration and handoff sync on `work/admin-dashboard-release` (this checkpoint).
 2. Run Admin Static Checks and Edge Function Static Checks; do not claim pass until the run is reported.
@@ -125,7 +125,7 @@ Do not modify POS, QZ signing Worker, Website, Rider, shared order lifecycle, Su
 
 ---
 
-## Latest rollout checkpoint — Staff Admin v9 deployed; Pages promotion pending (2026-11-27)
+## Latest rollout checkpoint — Staff Admin v9 deployed; Pages promotion now complete (2026-11-27)
 
 ### Confirmed
 
@@ -134,9 +134,9 @@ Do not modify POS, QZ signing Worker, Website, Rider, shared order lifecycle, Su
 - Admin Static Checks pass on `5cdf47149200d36be12fcaf2d718cf235f94e6a2`, GitHub Actions run `46037397206`. The earlier two test failures were fixed by updating the navigation allowlist expectation to include Dashboard and the default exact-origin test to include Cloudflare Pages.
 - Edge Function Static Checks pass on `18382fac91048c284066a4403d4f8e1a2ecbf0d5`, run `46026633659`; the Edge Function sources are unchanged since this pass.
 - Database authenticated Admin smoke test and Rider-denial test passed (described in the previous section); grants remain authenticated-only and the public wrapper remains invoker.
-- Cloudflare Pages project configuration was inspected: production branch `cloudflare/admin-production`, root `apps/flame-chick-admin`, no build command, output `.`, and preview deployments disabled. The current canonical production deployment still corresponds to `0c843a981bda180dc8a5dae1bb085a23b4aeafdd`. Work-branch pushes show as skipped due production-only/path rules and do not represent Pages builds.
+- Cloudflare Pages project configuration was inspected: production branch `cloudflare/admin-production`, root `apps/flame-chick-admin`, no build command, output `.`, and preview deployments disabled. The new canonical production deployment is `61a8c7c1` on SHA `7a93cebec36a7c1bc248a2df6b325cb110350536`. Work-branch pushes show as skipped due existing production-only/path rules and do not represent Pages builds.
 
-### Remaining — one production Pages deployment
+### Production Pages deployment — complete
 
 - Confirm `cloudflare/admin-production` is still at `0c843a981bda180dc8a5dae1bb085a23b4aeafdd`, then fast-forward it to the final `work/admin-dashboard-release` head. This should trigger the single intended Admin production Pages deployment; do not change the Pages project configuration, root, path filters, preview settings, or create a direct upload.
 - Verify that Cloudflare reports the new production deployment on the promoted SHA and all five stages succeeded, then inspect `https://flamechickadmin.pages.dev` and confirm the live assets load. A full signed-in browser check still requires the user's active session; SQL role-context testing is not a substitute for that final UI confirmation.
@@ -145,3 +145,15 @@ Do not modify POS, QZ signing Worker, Website, Rider, shared order lifecycle, Su
 ### Separate pre-existing Supabase security advisor notes
 
 The post-migration security advisor still reports 51 informational `rls_enabled_no_policy` findings and one warning for disabled leaked-password protection. Those are pre-existing project posture findings, not created by this migration. No RLS policies, broad table grants, or Auth settings were changed as part of this dashboard work; assess these separately.
+
+
+---
+
+## Final production rollout — completed (2026-11-27)
+
+- Cloudflare Pages project `flamechickadmin` deployed commit `7a93cebec36a7c1bc248a2df6b325cb110350536` from `cloudflare/admin-production`.
+- Production deployment ID/short ID: `61a8c7c1-edfe-4fd0-88ca-286c0cf775cf` / `61a8c7c1`. All stages succeeded: queued, initialize, clone_repo, build, deploy.
+- Canonical production host: `https://flamechickadmin.pages.dev`; deployment-specific host: `https://61a8c7c1.flamechickadmin.pages.dev`.
+- Admin static CI: pass, run `46037397206`. Edge Function static CI: pass, run `46026633659`. Supabase Staff Admin deployed v9 with JWT verification enabled. Production database Admin/Rider authorization smoke checks passed/denied as expected.
+- The previously open browser tab predated this production deployment. Its displayed state was stale and is not evidence of the newly deployed page. A fresh signed-in hard refresh and Dashboard visual/data acceptance check still remains; do not claim that browser test completed.
+- One consolidated Pages production build/deployment was performed. No direct upload, preview build, POS/Rider/Website build, or Pages configuration change was made.
