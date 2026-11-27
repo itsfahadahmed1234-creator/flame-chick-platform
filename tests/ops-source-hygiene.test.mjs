@@ -440,6 +440,121 @@ test("POS safely reconciles a paid server order and drains concurrent sync reque
 });
 
 
+test("Dine-in Save Table can add items across multiple rounds on the same order and keep the table occupied",async()=>{
+  const html=source[0].html;
+  const saveStart=html.indexOf('async function saveLocalOrder');
+  const saveEnd=html.indexOf('\nasync function ',saveStart+10);
+  const openStart=html.indexOf('async function getOpenDineCheckForTable_');
+  const openEnd=html.indexOf('\nasync function ',openStart+10);
+  assert.ok(saveStart>=0&&saveEnd>saveStart&&openStart>=0&&openEnd>openStart);
+  const saveFn=html.slice(saveStart,saveEnd);
+  const occupancyFn=html.slice(openStart,openEnd);
+  const orders=new Map(),queue=new Map(),syncCalls=[],toasts=[];
+  const elements={
+    orderType:{value:'Dine-in'},customerName:{value:'Walk-in'},phone:{value:''},area:{value:''},
+    notes:{value:''},paymentMethod:{value:'Cash'},selectedTableBadge:{textContent:'No table'},
+    selectTableBtn:{textContent:'Select table',focus(){}},placeBtn:{textContent:'SAVE TABLE'},
+    payCloseBtn:{style:{display:'none'}}
+  };
+  let uuidCall=0;
+  const context={
+    activeDineCheckId:'',selectedTableId:'T1',
+    cart:[{itemName:'First item',price:500,quantity:1,itemId:'v1',variantId:'v1',productId:'p1'}],
+    STORES:{orders:'orders',queue:'queue',tables:'tables'},
+    catalogSnapshot:{schemaVersion:3,publicationId:'pub-test',publicationNumber:1},
+    window:{FlameChickPosSyncV3:{}},navigator:{onLine:true},
+    crypto:{randomUUID:()=>++uuidCall===1
+      ?'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+      :'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'},
+    $:id=>elements[id]||null,
+    normalizeLookupText:()=>'',computeArrivalISO:()=>null,
+    findTable:id=>id==='T1'?{id:'T1',name:'Table 1'}:null,
+    get:async(store,id)=>store==='orders'?(orders.has(id)?{...orders.get(id)}:null):null,
+    put:async(store,order)=>{
+      if(store==='orders')orders.set(order.localOrderId,{...order});
+      else if(store==='queue')queue.set(order.localOrderId,{...order});
+    },
+    del:async(store,id)=>{if(store==='queue')queue.delete(id);},
+    all:async store=>store==='orders'?[...orders.values()].map(x=>({...x})):[],
+    prepareLocalPosSyncOrder:(order,{bumpRevision=false,preserveCatalog=false}={})=>{
+      const next={...order};
+      if(!next.syncOrderId)next.syncOrderId='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+      if(!Number(next.localRevision))next.localRevision=1;
+      if(bumpRevision)next.localRevision=Number(next.localRevision)+1;
+      if(!preserveCatalog){next.catalogPublicationId='pub-test';next.catalogVersion=1;}
+      next.syncStatus='pending';next.syncAttempts=Number(next.syncAttempts)||0;
+      next.lastSyncError='';next.nextSyncAt=0;
+      return next;
+    },
+    syncPending:()=>{
+      const queued=queue.values().next().value;
+      if(!queued)return Promise.resolve();
+      const local=orders.get(queued.localOrderId);
+      syncCalls.push({localOrderId:local.localOrderId,syncOrderId:local.syncOrderId,
+        serverOrderId:local.serverOrderId||'',revision:queued.localRevision,
+        itemCount:queued.items.length,total:queued.total});
+      local.serverOrderId='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+      local.serverOrderNumber='FC-QA-ROUND-1';
+      local.serverStatus='new';local.serverLocalRevision=queued.localRevision;
+      local.serverSyncContentSignature='accepted-revision-'+queued.localRevision;
+      local.syncStatus='synced';local.lastSyncError='';
+      orders.set(local.localOrderId,local);queue.delete(local.localOrderId);
+      return Promise.resolve();
+    },
+    updateSyncBox:async()=>{},resetPreorderState:()=>{},resetMenuToStart:()=>{},
+    renderCart:()=>{},showToast:message=>toasts.push(message),
+    dineInMode:'immediate',kitchenTiming:'now',
+    Date,Math,Number,String,Array,Object,JSON,console
+  };
+  const vmContext=vm.createContext(context);
+  new vm.Script(saveFn+'\n'+occupancyFn+'\n(async()=>{await saveLocalOrder();})()',{
+    filename:'dine-in-save-table.multiple-rounds.regression.js'
+  }).runInContext(vmContext).then(async firstResult=>{
+    assert.equal(orders.size,1);
+    assert.equal(queue.size,0);
+    const initial=[...orders.values()][0];
+    assert.equal(initial.localRevision,1);
+    assert.equal(initial.status,'Open');
+    assert.equal(initial.paymentStatus,'Unpaid');
+    const occupied=await vm.runInContext('getOpenDineCheckForTable_({id:"T1",name:"Table 1"})',vmContext);
+    assert.equal(occupied.localOrderId,initial.localOrderId);
+
+    // Reopen the same table, append one item and Save Table again — repeat twice.
+    for(const item of [
+      {itemName:'Second item',price:300,quantity:1,itemId:'v2',variantId:'v2',productId:'p2'},
+      {itemName:'Third item',price:250,quantity:2,itemId:'v3',variantId:'v3',productId:'p3'}
+    ]){
+      const existing=orders.get(initial.localOrderId);
+      vmContext.activeDineCheckId=existing.localOrderId;
+      vmContext.selectedTableId='T1';
+      vmContext.cart=existing.items.map(x=>({...x}));
+      vmContext.cart.push(item);
+      elements.customerName.value='Walk-in';elements.phone.value='';elements.notes.value='';
+      await vm.runInContext('(async()=>{await saveLocalOrder();})()',vmContext);
+      const current=orders.get(initial.localOrderId);
+      assert.equal(current.localRevision,existing.localRevision+1);
+      assert.equal(current.serverOrderId,'dddddddd-dddd-4ddd-8ddd-dddddddddddd');
+      assert.equal(current.status,'Open');
+      assert.equal(current.paymentStatus,'Unpaid');
+      assert.equal(orders.size,1,'a repeat Save Table must update the same check, not create another one');
+      assert.equal(queue.size,0,'each successful simulated sync drains only that check revision');
+      const tableCheck=await vm.runInContext('getOpenDineCheckForTable_({id:"T1",name:"Table 1"})',vmContext);
+      assert.equal(tableCheck.localOrderId,initial.localOrderId,'table remains occupied after every saved round');
+    }
+    const final=[...orders.values()][0];
+    assert.equal(final.localOrderId,initial.localOrderId);
+    assert.equal(final.syncOrderId,'cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+    assert.equal(final.localRevision,3);
+    assert.equal(final.items.length,3);
+    assert.equal(final.total,1300);
+    assert.equal(syncCalls.length,3);
+    assert.deepEqual(syncCalls.map(x=>x.revision),[1,2,3]);
+    assert.ok(syncCalls.every(x=>x.syncOrderId===final.syncOrderId));
+    assert.ok(syncCalls.every(x=>x.serverOrderId===''||x.serverOrderId==='dddddddd-dddd-4ddd-8ddd-dddddddddddd'));
+    assert.match(html.slice(html.indexOf('async function openOrStartTable'),html.indexOf('async function manageTables')),/activeDineCheckId=existing\.localOrderId/);
+  });
+});
+
 test("Dine-in payment preserves unchanged served revision, advances changed New check and blocks changed Served check",async()=>{
   const html=source[0].html;
   const start=html.indexOf('async function takePaymentAndCloseTable');
