@@ -1,3 +1,43 @@
+# ACTIVE ADMIN MEDIA IMPLEMENTATION CHECKPOINT — 2026-11-28
+
+This checkpoint supersedes older statements below that say the category/deal media editor or frontend media workflow has not yet been implemented. It does **not** authorize deployment, real-image upload, catalog publication or any additional Production DB write.
+
+## Current review-branch implementation
+
+- Work remains isolated on `work/admin-catalog-media-review` in `itsfahadahmed1234-creator/flame-chick-platform`.
+- New module: `apps/flame-chick-admin/catalog-v3-media.js`. It uses the existing signed-in Admin/Owner JWT plus the publishable key, the existing `flame-chick-media` bucket and existing Storage RLS policies. It adds no Edge Function, broad table grant, service-role browser key or direct PostgREST table write.
+- The Catalog V3 edit forms now include media panels for existing products, categories and deals: current/backup previews, upload, restore and remove-current-reference controls. Newly created entities must first be saved to obtain their permanent UUID.
+- File validation is client-side and backed by the existing Storage bucket constraints: JPG/JPEG/PNG/WebP, maximum 5 MiB, binary signature check, SHA-256 fingerprint. Uploads use a new UUID object key under `products/{uuid}/`, `categories/{uuid}/` or `deals/{uuid}/`, disable overwrite, and verify the resulting Storage object size/MIME before the catalog metadata command is invoked.
+- Metadata is written only through the existing revisioned/idempotent Catalog V3 commands. Category/deal media uses the four functions changed by `20261128092721_flame_chick_category_deal_media_v1`; product media uses the already-existing product media command.
+- Upload recovery is account-bound in `sessionStorage`. An interrupted upload may be resumed only with the same file fingerprint and the original reserved object path. A confirmed catalog write with failed read-back is recorded as `committed_unverified` and is never blindly replayed with a new request ID. If its exact pending idempotency body is still present, only that body/request ID can be retried.
+- Replacing/restoring/removing metadata never deletes old current/previous Storage objects. The only automated Storage delete is the newly-created orphan object after a definite metadata rejection or a recorded cleanup-required state. Older paths may remain referenced by immutable published snapshots.
+- Product `image_published` meaning was checked against the current Website view: it controls whether the product’s current image path is emitted to the public catalogue DTO. The Admin sets it true when attaching/restoring a current product image and false when the current product image is removed. This is **not** a menu publication command; draft changes remain unpublished until a separate catalog publish.
+- Existing Website view consumes product and deal image paths. The current Website template does **not** render category artwork yet. This limitation is displayed in the category media panel. Website source and deployment were not changed.
+- Media reference changes update only the unpublished Catalog V3 draft. No image change triggers publish/rollback or moves the publication pointer.
+
+## Verification completed
+
+- Admin Static Checks run **`46133225905`** passed on source commit **`f15300e07e3ea6a85bf9e78d2100ef571e0cc309`**.
+- Latest run summary: **144 tests passed, 0 failed**. It includes the media signature/MIME/size checks, Storage API mock tests, same-size/different-content fingerprint rejection, ambiguous upload and object verification cases, account-bound recovery record validation, static Catalog V3/Storage boundary assertions, JavaScript syntax and Admin regression suite.
+- The earlier fingerprint test run `46133082301` failed because its first mock File fixture lacked `arrayBuffer()`; fixture support was added and subsequent runs passed, including the latest run above.
+- Product/deal Website DTO consumption was source-checked; category artwork non-consumption was also source-checked.
+
+## Still not ready for image uploads or release
+
+- No actual image has been uploaded to Production Storage. No live Storage API write/delete was attempted.
+- No end-to-end browser test against the authenticated Admin session and Storage RLS has been run. CI uses mocks/static checks, not a live Storage sandbox.
+- No staff role matrix test against an isolated bucket has been run in this media slice. Existing Storage RLS policies were only read; they were not changed.
+- No real file preview/replacement/restore/failed-upload recovery has been exercised in a browser.
+- The Admin Pages and Staff Admin Edge Function have not been deployed from this branch. The currently deployed Admin cannot show these new media controls until a separately approved release.
+- Do not invite image uploads yet. Before release/first image upload, complete browser acceptance for Admin and Owner, prove Manager/Cashier/Rider and anonymous denial, exercise upload/info/metadata success, interrupted upload resume, definite metadata rejection cleanup, ambiguous commit reconciliation, restore, remove-current-reference and failure to clean up. Keep publication unchanged during those tests.
+- Do not touch Supabase Logs Explorer, the 102 GB log query or Log Ingestion. No POS, Rider or Website deployments/source changes. No Production menu rows, Storage objects, publication pointer, order or payment changes.
+
+## Next controlled step
+
+Continue reviewing the current Admin source and tests on this branch. Only after the media workflow is complete and the browser/role acceptance plan is ready should the user be asked for separate approval to deploy Admin/Staff Admin. Keep the first actual menu image upload as a separate explicit acceptance step.
+
+---
+
 # ACTIVE PRODUCTION MIGRATION CHECKPOINT — 2026-11-28
 
 **This checkpoint supersedes older instructions in this file that prohibit the already-approved category/deal media migration.** The user explicitly approved applying the pending category/deal media database patch because the restaurant is not yet running real production orders.
