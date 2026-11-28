@@ -1,13 +1,14 @@
-# 🚫 MANDATORY NEW-CHAT SAFETY DIRECTIVE — DO NOT REPEAT THE 102 GB SUPABASE LOG QUERY
+# 🚫 MANDATORY NEW-CHAT SAFETY DIRECTIVE — DO NOT TOUCH THE 102 GB SUPABASE LOG QUERY
 
-**This is an explicit user instruction. Read and obey it before carrying out Supabase diagnostics.**
+**This is an explicit user instruction. Read and obey it before carrying out Supabase diagnostics. It supersedes older logging wording in historical notes below.**
 
-- The **Supabase log query** exceeded **102 GB**. Do not rerun, edit, clone, recreate, broaden, optimize, or troubleshoot that specific query, and do not reproduce its workload through Logs Explorer, `query_logs`, an API, CLI, connector, or another interface.
-- **Log ingestion was 0.10 GB out of a 1 GB allowance.** It did not exceed 102 GB. Never conflate query volume with ingestion usage.
-- This restriction is about the expensive query, not a claim that ingestion exceeded its allowance. No ingestion configuration change is implied.
-- If a task appears to require a new Supabase log query, stop and obtain the user's explicit approval first. Prefer source inspection, static analysis, local/disposable testing, and scoped read-only catalog checks. Avoid unnecessary Production test traffic and logging volume.
+- The Supabase log query that exceeded **102 GB** is prohibited. Do not rerun, open, edit, clone, recreate, broaden, sample, filter, optimize, troubleshoot, or reproduce that query or its workload.
+- Do not use Supabase Logs Explorer, `query_logs`, log-query APIs, CLI commands, connectors, SDKs, dashboards, browser interfaces, or alternative/indirect tools to run or retrieve Supabase log queries. Do not attempt a smaller or filtered version.
+- **Log Ingestion is separate and may be accessed read-only when relevant.** The user explicitly permits accessing Log Ingestion data/usage for relevant checks. This does not permit access to the prohibited log query.
+- Historical distinction: Log Ingestion usage was **0.10 GB out of a 1 GB allowance**. The **102 GB** amount was the log query, not Log Ingestion.
+- Do not create/change/disable log drains or alter ingestion configuration, retention, routing, or telemetry without separate explicit user authorization.
+- Do not generate Production traffic to produce telemetry. Prefer source inspection, static analysis, local/disposable tests, scoped non-log metadata reads, and browser-visible errors.
 
----
 ---
 
 # CURRENT CONTINUATION — SUPABASE EDGE FUNCTION OPTIMIZATION (2026-11-28)
@@ -16,50 +17,61 @@
 
 ### Usage evidence supplied by the user
 
-- Supabase Usage displayed **5,915 Edge Function invocations** in the current billing cycle (19 Nov–19 Dec 2026), with 500,000 included on the Free plan and 0 overage.
-- User changed the project selector to Flame Chick Production and confirmed the same total. Treat 5,915 as this project's total, not as a Delivery API-only count.
-- The 28 Nov daily figure was **170 invocations**, and the user confirmed that **no orders had been placed that day**. This is direct evidence that a meaningful portion of invocation volume is background/app traffic, not order lifecycle activity.
-- Dashboard usage refreshes hourly. The 170 figure is the visible daily total at the time of the screenshot and may have been a partial day.
-- Do not use Logs/Logs Explorer to attribute traffic. Do not inspect or access log ingestion/drains either.
+- Supabase Usage displayed **5,915 Edge Function invocations** for the 19 Nov–19 Dec 2026 billing cycle, with 500,000 included on the Free plan and 0 overage.
+- The user changed the project selector to Flame Chick Production and confirmed the same total. Treat 5,915 as this project's total, not a Delivery API-only count.
+- The 28 Nov daily figure displayed **170 invocations**, and the user confirmed that **no orders had been placed that day**. Background/app traffic is therefore a material contributor; the dashboard refreshes hourly, so the visible total may have been a partial day.
+- Do not use the prohibited log-query path to attribute invocation traffic. Log Ingestion data may be read when relevant, subject to the separate access/configuration boundary above.
 
 ### Source-based background traffic estimate
 
-On the existing production-source branch, when Realtime is healthy and one Rider session plus one POS session are left open:
+On the existing production-source code, when Realtime is healthy and one Rider session plus one POS session are left open:
 
-- Rider presence: immediate POST action=presence, then every 120 seconds — about **30 Delivery API invocations/hour**.
-- Rider jobs/offers safety refresh: immediate after Realtime subscription, then every 120 seconds — about **30 Delivery API invocations/hour**.
-- POS Realtime safety refresh: every 120 seconds. Its loadInitialOnlineInbox() already invokes loadDeliveryDispatch(), and the scheduler then calls loadDeliveryDispatch() again — about **60 Delivery API invocations/hour**, plus about 30 Order API requests/hour.
-- Thus a simple one-Rider + one-POS healthy-Realtime example can generate about **120 Delivery API invocations/hour with no orders**, before login/resume/event traffic. This is a source-based estimate, not a measured breakdown. Realtime fallback uses 30-second polling in both apps and can raise the rate.
+- Rider presence sends an immediate `action:"presence"` request and repeats every 120 seconds — about **30 Delivery API invocations/hour**.
+- Rider jobs/offers safety refresh runs immediately after Realtime subscription and then every 120 seconds — about **30 Delivery API invocations/hour**.
+- Before the POS fix, the POS 120-second safety refresh invoked dispatch twice because `loadInitialOnlineInbox()` already calls `loadDeliveryDispatch()` and the scheduler then called dispatch again — about **60 Delivery API invocations/hour**.
+- The isolated POS fix removes that duplicate. The same POS safety refresh now makes one dispatch request per two-minute cycle — about **30 Delivery API invocations/hour**.
+- Updated illustrative total after the POS fix: approximately **90 Delivery API invocations/hour**, plus about **30 Order API requests/hour**, before event-driven requests, login/resume, multiple sessions, and fallback polling. This is a source-based estimate, not a measured endpoint breakdown. When Realtime is unhealthy, 30-second fallback polling can raise the rate.
 
 ### Isolated POS duplicate-refresh fix committed on the feature branch
 
-- Branch: supabase-edge-optimization-2026-11-28
-- Current checkpoint before this handoff update: 393f6f8625a5b84c8a3d07f63d75298b3f7ffa49
-- POS Realtime events are now scoped: orders_changed requests the inbox refresh; delivery_changed requests dispatch refresh.
-- The scheduler no longer runs loadInitialOnlineInbox() and then redundantly calls loadDeliveryDispatch(). The inbox loader already refreshes dispatch once. A delivery-only event refreshes dispatch directly.
-- POS assignment and return-confirmation actions schedule their delivery refresh rather than immediately forcing a full inbox + dispatch reload.
-- Existing 120-second healthy safety refresh and 30-second Realtime fallback have been preserved. Authentication, authorization, branch scoping, offer expiry, delivery state rules and server RPCs are unchanged.
-- Added apps/flame-chick-pos/tests/delivery-refresh-optimization.test.cjs; included it in npm run test:cloudflare and in the POS regression workflow for this branch.
-- GitHub Actions run **46112617777** passed: existing mocked POS/receipt/QZ/business-contract checks and the new delivery refresh optimization regression all completed successfully. Run: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/46112617777
-- This fix is **not deployed**. Production Delivery API and POS remain unchanged. No Production requests, orders, writes, migrations, secrets/Auth changes or log queries were performed for this optimization.
+- Repository: `itsfahadahmed1234-creator/flame-chick-platform`
+- Branch: `supabase-edge-optimization-2026-11-28` (do not continue the diverged `supabase-edge-optimization-2026-11-27` branch).
+- Code commit containing the tested POS fix: `393f6f8625a5b84c8a3d07f63d75298b3f7ffa49`.
+- POS Realtime events are scoped: `orders_changed` requests the inbox refresh; `delivery_changed` requests dispatch refresh.
+- The scheduler no longer runs `loadInitialOnlineInbox()` and then redundantly calls `loadDeliveryDispatch()`. The inbox loader refreshes dispatch once; a delivery-only event refreshes dispatch directly.
+- POS assignment and return-confirmation actions schedule their delivery refresh rather than immediately forcing a full inbox plus dispatch reload.
+- Existing 120-second healthy safety refresh and 30-second Realtime fallback are preserved. Authentication, authorization, branch scoping, offer expiry, delivery state rules, and server RPCs are unchanged.
+- Added `apps/flame-chick-pos/tests/delivery-refresh-optimization.test.cjs`; included it in `npm run test:cloudflare` and the POS regression workflow for this branch.
+- GitHub Actions run **46112617777** passed the existing mocked POS/receipt/QZ/business-contract checks and the new delivery-refresh optimization regression.
+- This fix is **not deployed**. Production Delivery API and POS remain unchanged. No Production requests, orders, writes, migrations, secrets/Auth changes, or customer data changes were performed for this optimization.
+
+### Rider sync design context and safeguards
+
+- Rider app sends presence immediately and every 120 seconds. With healthy Realtime it also refreshes jobs/offers immediately after subscription and then every 120 seconds. If Realtime fails, a 30-second fallback refresh is used.
+- Rider `loadJobs` retrieves active assigned jobs and offers; the Delivery API returns these through separate reads in one Rider view request. State-changing Rider actions currently trigger a follow-up `loadJobs(true)` request.
+- The database availability check rejects a Rider as stale when `last_seen_at` is older than **240 seconds (4 minutes)**, null, or more than 15 seconds in the future. A proposed 5-minute online threshold would conflict with this existing rule; do not adopt it without a reviewed change to the full POS/Rider availability contract.
+- Do not simply lengthen or disable the heartbeat. A safer candidate is a single authenticated Rider sync operation/RPC that uses server time for `last_seen_at`, preserves the rider's availability preference, derives busy/active-task state safely, and returns only that authenticated rider's current jobs/offers.
+- Do not implement a direct browser update to `rider_profiles` or loosen RLS. Preserve current authenticated role checks, single-branch Rider restriction, active task/busy calculation, Rider-only offer visibility, and updates for existing assigned work even when the online preference is off.
+- The 60-second offer expiry remains client-visible, while the server expiry sweep is reached through POS Dispatch view activity. Preserve both safeguards.
+- Keep private Supabase Realtime Broadcast; do not switch to broad `postgres_changes` subscriptions without a separate security/performance review.
+- A Rider POST followed by a GET may be consolidated only if the action response can safely return refreshed jobs/offers or the UI can otherwise reconcile state when Realtime is disconnected. A broadcast alone is not sufficient.
 
 ### Next optimization candidates — assess carefully
 
-1. Reduce Rider periodic request duplication by designing a single authenticated Rider sync operation that can reconcile presence and current jobs/offers in one Edge Function request. Preserve rider-only data isolation, active-task/busy calculation, the user's availability preference, last-seen freshness, offer visibility and the 60-second offer deadline. Prefer one request over simply lengthening heartbeat intervals.
-2. Remove immediate Rider post-action GETs only if the POST response can safely return refreshed jobs/offers or the UI can reconcile immediately without stale state. Do not rely on a broadcast alone when Realtime is disconnected.
-3. Keep the 30-second fallback needed to recover time-limited offers when Realtime is unavailable. Do not blindly lengthen or disable the heartbeat: POS rider availability currently treats last-seen older than 240 seconds as stale.
+1. Design and test a single authenticated Rider sync request/RPC that can reconcile presence and current jobs/offers without exposing other Riders' data. Keep server-set timestamps and the existing four-minute freshness contract unless the entire contract is deliberately redesigned and tested.
+2. Remove immediate post-action Rider GETs only when the response safely supplies refreshed state or an equivalent reliable reconciliation path.
+3. Keep the 30-second fallback needed to recover time-limited offers when Realtime is unavailable. Do not blindly lengthen or disable it.
 4. Keep POS delivery refresh event-scoped and avoid refreshing delivery for unrelated non-delivery order updates when this can be proven safe.
-5. Build mocked request-count tests for an idle POS, an idle Rider, and one complete delivery lifecycle. Report background and per-order budgets separately. The target of 8 or fewer invocations is a goal for a normal completed delivery, not an assumption that every exceptional lifecycle (reassignment, expiry, failed/returned delivery) must fit the same count.
+5. Build mocked request-count tests for an idle POS, an idle Rider, and one complete delivery lifecycle. Report background and per-order budgets separately. The target of 8 or fewer invocations is a goal for a normal completed delivery, not a claim that every exceptional lifecycle (reassignment, expiry, failed/returned delivery) must fit the same count.
 
 ### Ongoing safety boundaries
 
-- No Supabase log queries whatsoever. Do not access Log Ingestion, drains, or logging configuration.
+- **Log-query boundary:** absolutely do not touch the 102 GB query or use Logs Explorer, `query_logs`, or equivalent query surfaces. No tiny, filtered, sampled, or recreated query.
+- **Log Ingestion boundary:** read/access Ingestion data when relevant is permitted by the user. Do not alter drains, retention, routing, telemetry, or ingestion configuration without separate explicit authorization.
 - A separate ChatGPT conversation owns Website and Admin work. Do not edit or deploy Website/Admin app files or shared APIs/RPCs/contracts that can affect them.
 - Continue isolated POS/Rider/Delivery work only on the existing feature branch. Do not merge, rebase, cherry-pick, or deploy without a complete review and explicit user approval.
-- Keep Production on the Free plan. No Production deployment, migration, secret/Auth change, test traffic or order/customer write is authorized.
-- Preserve Delivery API verify_jwt=false, internal Supabase Auth validation and unauthenticated OPTIONS preflight unless a separate full security review supports a change.
-
----
+- Keep Production on the Free plan. No Production deployment, migration, secret/Auth change, test traffic, or order/customer write is authorized.
+- Preserve Delivery API `verify_jwt=false`, internal Supabase Auth validation, and unauthenticated OPTIONS preflight unless a separate full security review supports a change.
 
 Continue the existing Flame Chick Production project. Do not restart, rebuild the project from assumptions, or deploy unreviewed changes.
 
