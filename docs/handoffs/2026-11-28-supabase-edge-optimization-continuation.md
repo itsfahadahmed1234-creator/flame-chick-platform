@@ -70,7 +70,16 @@ Treat these as review candidates, not approved changes. Inspect the current sour
 - Current deployed source versions checked by Edge Function metadata: Order API v12, Delivery API v4, Staff Admin v10. Order API's supporting catalog/pricing/quote modules match deployed v12 byte-for-byte; Delivery API's sole runtime difference is the described concurrency/unused-parameter change; Staff Admin's four files match deployed v10 byte-for-byte.
 - No Edge Function deployment, SQL migration, Production data write, secret/Auth change, or production request was performed. Do not deploy without completing tests and obtaining explicit user approval.
 
+## Catalog API review — 2026-11-28
+
+- Deployed Catalog API v4 is byte-for-byte identical to the repository source. It reads only the current immutable publication and validates its schema/metadata before returning it.
+- The `flame_chick_catalog_public_read(text)` RPC is `SECURITY DEFINER` with an empty search path and execute privilege granted to `service_role` only (not `anon` or `authenticated`).
+- Current published V3 snapshot size observed through a narrow read-only query: **51,548 bytes as JSON text** (15,840 bytes stored as JSONB). The current publication is number 2.
+- `catalog_publications` has BEFORE UPDATE/DELETE and BEFORE TRUNCATE immutability triggers. `service_role` has SELECT only on this table and no INSERT/UPDATE/DELETE privilege; only the database owner can write. The publication table and current-publication pointer have PK/unique/index coverage on the join keys, and restaurants has a unique slug index.
+- Decision: **no Catalog API, checksum, cache, or index change in this stage.** The existing SHA-256 recomputation is an integrity guard; the snapshot is small, publication immutability is already enforced, and no new evidence justifies weakening the integrity check or risking stale menu/pricing data. Do not cache public menu/price/availability responses without a separately designed publication-aware invalidation mechanism.
+- These were read-only schema/metadata checks. No table write, migration, log query, synthetic Production request, or ingestion-setting change was performed.
+
 ## Next concrete step
 
-Re-open the current GitHub branch heads and inspect the optimization branch diff against `work/production-source-audit`. Confirm exactly which changes and tests exist, correct only evidenced issues, and run the relevant tests locally/disposably. **Do not rerun or reproduce the specific 102 GB log query; obtain explicit approval before any new log-query activity.** Report accurately what passed, what failed, and what remains before asking for deployment approval.
+Run the mocked Order API and Delivery API Deno handler tests on `supabase-edge-optimization-2026-11-28` and inspect their actual results. Deno was not installed in the local environment during the 2026-11-28 review, so those tests remain unverified; do not treat the added GitHub Actions workflow as passed without a confirmed run. Then review the Staff Admin RPC and other database call paths for safe, evidence-based improvements. Keep all tests off Production. **Do not rerun or reproduce the specific 102 GB log query; obtain explicit approval before any new log-query activity.** Report accurately what passed, what failed, and what remains before asking for deployment approval.
 
