@@ -230,6 +230,191 @@
       return r;
     }
     async function write(action,payload){const r=await request(action,payload,true);if(!isObj(r)||r.ok===false)throw Error('Catalog save failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
+    let mediaClient=null,mediaRecoveryStore=null,mediaUserId=null;
+    function mediaCurrent(kind,record){return record&&record.image_current_path||null;}
+    function mediaPrevious(kind,record){return record&&record.image_previous_path||null;}
+    function mediaExtension(path){const match=String(path||'').toLowerCase().match(/\\.([a-z0-9]+)$/);return match?match[1]:null;}
+    function mediaAction(kind){return kind==='categories'?WRITE.category:kind==='products'?WRITE.product:WRITE.deal;}
+    function mediaPayload(kind,record,currentPath,previousPath){
+      if(!record||!record.id)throw Error('Save this catalog item before managing its image.');
+      if(kind==='categories')return {id:record.id,category_kind:record.category_kind,name_en:record.name_en,
+        image_current_path:currentPath,image_previous_path:previousPath};
+      if(kind==='deals')return {id:record.id,image_current_path:currentPath,image_previous_path:previousPath};
+      return {id:record.id,image_current_path:currentPath,image_previous_path:previousPath,
+        image_extension:mediaExtension(currentPath),image_previous_extension:mediaExtension(previousPath),
+        image_published:!!currentPath};
+    }
+    function definiteMediaRejection(error){
+      if(!error)return false;
+      if(error.name==='CatalogCommandRejectedError'||error.name==='HttpApplicationError')return true;
+      return error.name==='HttpRequestError'&&[400,403,404,409,413,415,422].includes(Number(error.status));
+    }
+    function mediaEditor(kind,record){
+      if(!record||!record.id)return '<section class="fcv3-media-editor"><strong>Image management</strong><p>Save this item first. You can attach its image after it has a permanent catalog ID.</p></section>';
+      const current=mediaCurrent(kind,record),previous=mediaPrevious(kind,record);
+      const currentUrl=mediaClient&&current?mediaClient.publicUrl(current):null;
+      const previousUrl=mediaClient&&previous?mediaClient.publicUrl(previous):null;
+      const busy=s.mediaBusy||s.pendingMedia&&s.pendingMedia.kind===kind&&s.pendingMedia.entity_id===record.id;
+      return '<section class="fcv3-media-editor" data-media-editor data-kind="'+kind+'" data-id="'+esc(record.id)+'">'+
+        '<div class="fcv3-media-heading"><div><strong>Image and one restore point</strong><small>JPG, PNG or WebP · maximum 5 MB</small></div>'+
+        '<span class="fcv3-media-state">'+(current?'Current image saved':'No current image')+'</span></div>'+
+        '<div class="fcv3-media-preview-grid">'+
+        '<div class="fcv3-media-preview"><span>Current</span>'+(currentUrl?'<img src="'+esc(currentUrl)+'" alt="Current '+kind+' image" loading="lazy">':'<div class="fcv3-media-empty">No current image</div>')+
+        '<small>'+esc(current?current.split('/').pop():'Not set')+'</small></div>'+
+        '<div class="fcv3-media-preview"><span>Backup</span>'+(previousUrl?'<img src="'+esc(previousUrl)+'" alt="Previous '+kind+' image" loading="lazy">':'<div class="fcv3-media-empty">No backup image</div>')+
+        '<small>'+esc(previous?previous.split('/').pop():'Not set')+'</small></div></div>'+
+        '<label class="fcv3-media-upload">Upload a new image<input type="file" accept="image/jpeg,image/png,image/webp" data-media-upload data-kind="'+kind+'" data-id="'+esc(record.id)+'" '+(busy?'disabled':'')+'></label>'+
+        '<div class="fcv3-media-actions">'+
+        (previous?'<button type="button" class="fcv3-button" data-media-action="restore" data-kind="'+kind+'" data-id="'+esc(record.id)+'" '+(busy?'disabled':'')+'>Restore backup</button>':'')+
+        (current?'<button type="button" class="fcv3-button fcv3-danger" data-media-action="remove" data-kind="'+kind+'" data-id="'+esc(record.id)+'" '+(busy?'disabled':'')+'>Remove current image</button>':'')+
+        '</div><small class="fcv3-media-footnote">Replacing or removing an image never deletes Storage objects automatically. Older files may still be referenced by an immutable published menu.</small></section>';
+    }
+    function currentMediaRecord(kind,id){
+      if(kind==='products')return s.products.find(item=>item&&item.id===id)||null;
+      if(kind==='categories')return s.categories.find(item=>item&&item.id===id)||null;
+      if(kind==='deals')return s.dealRecord&&s.dealRecord.id===id?s.dealRecord:null;
+      return null;
+    }
+    function syncMediaRecord(kind,id,record){
+      const target=kind==='products'?s.products:kind==='categories'?s.categories:s.deals;
+      const found=target.find(item=>item&&item.id===id);
+      if(found)Object.assign(found,{image_current_path:record.image_current_path||null,image_previous_path:record.image_previous_path||null,
+        ...(kind==='products'?{image_extension:record.image_extension||null,image_previous_extension:record.image_previous_extension||null,image_published:record.image_published===true}:{})});
+      if(kind==='products'&&s.editor&&s.editor.type==='product'&&s.editor.product&&s.editor.product.id===id)
+        Object.assign(s.editor.product,{image_current_path:record.image_current_path||null,image_previous_path:record.image_previous_path||null,
+          image_extension:record.image_extension||null,image_previous_extension:record.image_previous_extension||null,image_published:record.image_published===true});
+      if(kind==='categories'&&s.editor&&s.editor.type==='category'&&s.editor.category&&s.editor.category.id===id)
+        Object.assign(s.editor.category,{image_current_path:record.image_current_path||null,image_previous_path:record.image_previous_path||null});
+      if(kind==='deals')s.dealRecord=record;
+    }
+    async function verifyMediaRecord(kind,id,result,expectedCurrent,expectedPrevious){
+      let record=null;
+      if(kind==='deals'){
+        const detail=await read(READ.dealDetail,{deal_id:id});
+        record=detail&&detail.deal;
+      }else if(kind==='products')record=result&&result.record&&result.record.product;
+      else record=result&&result.record;
+      if(!record||record.id!==id||record.image_current_path!==(expectedCurrent||null)||record.image_previous_path!==(expectedPrevious||null))
+        throw Error('The image metadata save returned, but its exact current/backup paths could not be verified. Keep the uploaded image; do not upload another image or delete this object.');
+      if(kind==='products'&&(record.image_extension!==(mediaExtension(expectedCurrent)||null)||
+          record.image_previous_extension!==(mediaExtension(expectedPrevious)||null)||record.image_published!==!!expectedCurrent))
+        throw Error('The product image metadata did not pass its complete read-back verification. The uploaded object has been retained.');
+      syncMediaRecord(kind,id,record);
+      return record;
+    }
+    async function finishPendingMedia(pending){
+      if(!mediaClient||!mediaRecoveryStore)throw Error('The secure image service is unavailable. No catalog image reference was changed.');
+      const stored=await mediaClient.info(pending.path);
+      if(!stored)throw Error('The uploaded image is not yet visible in Storage. Its recovery record has been kept; try checking again later.');
+      if(stored.size!==pending.size||stored.mimeType!==pending.mimeType)
+        throw Error('The stored image does not match its recovery record. Its object has not been linked.');
+      pending.stage='linking';mediaRecoveryStore.write(pending);s.pendingMedia=pending;render();
+      let result;
+      try{result=await write(pending.action,pending.payload);}
+      catch(error){
+        if(definiteMediaRejection(error)){
+          pending.stage='cleanup_required';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
+          try{await mediaClient.remove(pending.path);mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;}
+          catch(cleanupError){throw Error(error.message+' The unreferenced new image could not be cleaned up; recovery path: '+pending.path+'. '+cleanupError.message);}
+        }
+        throw error;
+      }
+      await verifyMediaRecord(pending.kind,pending.entity_id,result,pending.path,pending.payload.image_previous_path||null);
+      mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
+      s.notice='Image uploaded, verified and linked to the catalog draft. The previous image remains as the restore point; older Storage objects are retained until publication-safe cleanup is implemented.';
+      return true;
+    }
+    async function uploadMedia(kind,id,file){
+      if(!mediaClient||!mediaRecoveryStore)throw Error('Secure catalog image management is not configured.');
+      if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
+      const record=currentMediaRecord(kind,id);
+      if(!record)throw Error('Refresh and reopen this catalog item before changing its image.');
+      const existing=mediaRecoveryStore.read();
+      if(existing){s.pendingMedia=existing;render();throw Error('A previous image operation needs reconciliation first. Do not start another upload.');}
+      s.mediaBusy=true;s.error=null;s.notice=null;render();
+      let pending=null;
+      try{
+        const plan=await mediaClient.prepareUpload(kind,id,file);
+        const current=mediaCurrent(kind,record);
+        const payload=mediaPayload(kind,record,plan.path,current);
+        pending={version:1,user_id:mediaUserId,kind,entity_id:id,path:plan.path,extension:plan.extension,
+          mimeType:plan.mimeType,size:plan.size,action:mediaAction(kind),payload,stage:'uploading',created_at:Date.now()};
+        mediaRecoveryStore.write(pending);s.pendingMedia=pending;render();
+        await mediaClient.uploadPrepared(plan,file);
+        pending.stage='uploaded';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
+        await finishPendingMedia(pending);
+      }catch(error){
+        if(pending&&error&&error.uncertain){s.pendingMedia=pending;}
+        if(pending&&error&&error.name==='MediaUploadUncertainError'){s.pendingMedia=pending;}
+        s.error=error&&error.message||'Image upload failed.';
+        throw error;
+      }finally{s.mediaBusy=false;render();}
+    }
+    async function recoverPendingMedia(){
+      if(!mediaClient||!mediaRecoveryStore)throw Error('Secure catalog image management is not configured.');
+      if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
+      const pending=mediaRecoveryStore.read();
+      if(!pending){s.pendingMedia=null;render();return;}
+      if(pending.user_id!==mediaUserId)throw Error('This pending image belongs to another signed-in account.');
+      s.mediaBusy=true;s.error=null;render();
+      try{
+        s.pendingMedia=pending;
+        if(pending.stage==='cleanup_required'){
+          await mediaClient.remove(pending.path);mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
+          s.notice='The rejected upload was safely removed. No catalog image reference was changed.';
+          return;
+        }
+        const stored=await mediaClient.info(pending.path);
+        if(!stored){s.pendingMedia=pending;throw Error('Storage has not confirmed this upload yet. The recovery record remains; no catalog write or deletion was attempted.');}
+        if(stored.size!==pending.size||stored.mimeType!==pending.mimeType)
+          throw Error('The pending object does not match its recorded size and MIME type. It was not linked or deleted.');
+        pending.stage='uploaded';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
+        await finishPendingMedia(pending);
+      }catch(error){s.error=error&&error.message||'Image recovery failed.';throw error;}
+      finally{s.mediaBusy=false;render();}
+    }
+    async function changeMediaReference(kind,id,mode){
+      if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
+      const record=currentMediaRecord(kind,id);
+      if(!record)throw Error('Refresh and reopen this catalog item before changing its image.');
+      const current=mediaCurrent(kind,record),previous=mediaPrevious(kind,record);
+      if(mode==='restore'&&!previous)throw Error('No backup image is available.');
+      if(mode==='remove'&&!current)throw Error('There is no current image to remove.');
+      const nextCurrent=mode==='restore'?previous:null;
+      const nextPrevious=mode==='restore'?current:previous;
+      s.mediaBusy=true;s.error=null;s.notice=null;render();
+      try{
+        const payload=mediaPayload(kind,record,nextCurrent,nextPrevious);
+        const result=await write(mediaAction(kind),payload);
+        await verifyMediaRecord(kind,id,result,nextCurrent,nextPrevious);
+        s.notice=mode==='restore'?'Backup restored. The former current image is now the backup. No Storage object was deleted.':'Current image reference removed. The previous image remains available as a backup. No Storage object was deleted.';
+      }finally{s.mediaBusy=false;render();}
+    }
+    async function inspectPendingMedia(reconciliation){
+      if(!mediaRecoveryStore)return;
+      const pending=mediaRecoveryStore.read();s.pendingMedia=pending;
+      if(!pending){render();return;}
+      if(pending.user_id!==mediaUserId)throw Error('A pending image operation belongs to another account.');
+      if(reconciliation&&reconciliation.action===pending.action&&
+         JSON.stringify(reconciliation.payload)===JSON.stringify(pending.payload)){
+        const record=pending.kind==='products'?reconciliation.result&&reconciliation.result.record&&reconciliation.result.record.product:
+          pending.kind==='categories'?reconciliation.result&&reconciliation.result.record:null;
+        if(record&&record.id===pending.entity_id&&record.image_current_path===pending.path&&
+           record.image_previous_path===(pending.payload.image_previous_path||null)&&
+           (pending.kind!=='products'||(record.image_extension===pending.extension&&record.image_previous_extension===(mediaExtension(pending.payload.image_previous_path)||null)&&record.image_published===true))){
+          mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
+          s.notice='A previous image save was safely reconciled and verified.';
+          render();return;
+        }
+      }
+      if(pending.stage==='linking'){
+        const record=currentMediaRecord(pending.kind,pending.entity_id);
+        if(record&&record.image_current_path===pending.path&&record.image_previous_path===(pending.payload.image_previous_path||null)){
+          mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;s.notice='A previous image save was already committed and has been verified.';render();return;
+        }
+      }
+      render();
+    }
     async function refresh(){
       if(!el)return;s.loading=true;s.error=null;render();
       try{
