@@ -604,3 +604,16 @@ test('Catalog V3 exposes cursor pagination for bounded product, category, collec
   assert.match(source, /data-action="load-more" data-kind="deals" data-collection-id=/);
   assert.match(source, /The draft changed while loading another page/);
 });
+
+
+test('Catalog V3 commits pagination only after dependent deal reads share the same revision', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-admin/catalog-v3-admin.js', import.meta.url), 'utf8');
+  assert.match(source, /async function readPage\(action,args\)/);
+  assert.match(source, /The draft changed while the catalog was loading/);
+  assert.match(source, /lists\.some\(x=>x\.draft_revision!==baseRevision\)/);
+  assert.match(source, /const lists=kind==='collections'\?await Promise\.all\(added\.map\(c=>readPage\(READ\.deals/);
+  assert.match(source, /lists\.some\(x=>x\.draft_revision!==revision\)/);
+  assert.match(source, /const target=kind==='categories'\?s\.categories/);
+  assert.match(source, /for\(const item of result\.items\)if\(item&&item\.id&&!seen\.has\(item\.id\)\)/);
+  assert.match(source, /page\.hasMore=result\.has_more===true;page\.cursor=result\.next_cursor\|\|null/);
+});
