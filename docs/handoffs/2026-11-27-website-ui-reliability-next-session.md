@@ -1,3 +1,5 @@
+> **Supabase log-query safety:** The specific Supabase log query exceeded **102 GB** and must not be rerun, edited, cloned, recreated, broadened or troubleshot without the user's explicit approval. Separately, **Log Ingestion usage was 0.10 GB / 1 GB**; it did not exceed 102 GB. Do not confuse query volume with ingestion usage.
+
 # Flame Chick Website — 27 November 2026 UI Reliability Handoff
 
 **Purpose:** Continue the exact Website reliability work after the completed OpenCode Playwright audit. This is a handoff and implementation plan, not permission to deploy or change Production.
