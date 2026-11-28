@@ -224,9 +224,19 @@ BEGIN
   IF v_occurrences <> 1 THEN RAISE EXCEPTION 'CATEGORY_MEDIA_READ_PROJECTION_ANCHOR_MISMATCH'; END IF;
   v_definition := pg_catalog.replace(v_definition, v_original, v_replacement);
 
-  v_original := $old$            'is_active', s.is_active,
+  v_original := $old$            'category_kind', s.category_kind,
+            'legacy_id', s.legacy_id,
+            'name_en', s.name_en,
+            'name_ur', s.name_ur,
+            'sort_order', s.sort_order,
+            'is_active', s.is_active,
             'created_at', s.created_at,$old$;
-  v_replacement := $new$            'is_active', s.is_active,
+  v_replacement := $new$            'category_kind', s.category_kind,
+            'legacy_id', s.legacy_id,
+            'name_en', s.name_en,
+            'name_ur', s.name_ur,
+            'sort_order', s.sort_order,
+            'is_active', s.is_active,
             'image_current_path', s.image_current_path,
             'image_previous_path', s.image_previous_path,
             'created_at', s.created_at,$new$;
