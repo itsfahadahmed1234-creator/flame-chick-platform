@@ -220,7 +220,7 @@
   function checkbox(name,label,checked){return '<label class="fcv3-check"><input type="checkbox" name="'+name+'" data-field="'+name+'"'+(checked?' checked':'')+'> '+label+'</label>';}
   function createWorkspace(){
     let el=null,request=null;
-    const s={loading:false,saving:false,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,editorLoadingDealId:null,components:[],detail:null,partial:null,importProgress:null,pages:{categories:{hasMore:false,cursor:null},products:{hasMore:false,cursor:null},collections:{hasMore:false,cursor:null},deals:{}}};
+    const s={loading:false,saving:false,mediaBusy:false,pendingMedia:null,dealRecord:null,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,editorLoadingDealId:null,components:[],detail:null,partial:null,importProgress:null,pages:{categories:{hasMore:false,cursor:null},products:{hasMore:false,cursor:null},collections:{hasMore:false,cursor:null},deals:{}}};
     async function read(action,args){const r=await request(action,args||{},false);if(!isObj(r)||r.ok===false)throw Error('Catalog read failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
     async function readPage(action,args){
       const r=await request(action,args||{},false);
@@ -492,7 +492,7 @@
         '<label>Sort order<input name="sort_order" type="number" min="0" step="1" value="'+esc(p?p.sort_order:0)+'"></label>'+
         '<label class="fcv3-wide">Description<textarea name="description_en" maxlength="2000" rows="2">'+esc(p&&p.description_en)+'</textarea></label>'+
         '<label class="fcv3-wide">Urdu description<textarea name="description_ur" maxlength="2000" rows="2">'+esc(p&&p.description_ur)+'</textarea></label></div>'+
-        '<div class="fcv3-checks">'+checkbox('featured','Featured',!!(p&&p.featured))+checkbox('is_active','Active',p?p.is_active!==false:true)+checkbox('is_available','Available',p?p.is_available!==false:true)+'</div>'+
+        '<div class="fcv3-checks">'+checkbox('featured','Featured',!!(p&&p.featured))+checkbox('is_active','Active',p?p.is_active!==false:true)+checkbox('is_available','Available',p?p.is_available!==false:true)+'</div>'+mediaEditor('products',p)+'+
         '<div class="fcv3-subhead"><div><h4>Variants</h4><p>Standalone prices are required; deal-only variant prices may be NULL.</p></div><button type="button" class="fcv3-button" data-action="variant-add">+ Add variant</button></div>'+
         '<div class="fcv3-variants">'+variantRows(p)+'</div><div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">Save product</button></div></form>';
     }
@@ -503,7 +503,7 @@
           '<label>Kind<select name="category_kind"><option value="menu">Menu</option><option value="deal">Deals</option></select></label>')+
         '<label>English name<input name="name_en" maxlength="120" required value="'+esc(category&&category.name_en)+'"></label><label>Urdu name<input name="name_ur" maxlength="120" value="'+esc(category&&category.name_ur)+'"></label>'+
         '<label>Sort order<input name="sort_order" type="number" min="0" step="1" value="'+esc(category?category.sort_order:0)+'"></label>'+
-        (editing?'<label class="fcv3-check"><input type="checkbox" name="is_active"'+(category.is_active?' checked':'')+'> Active</label>':'')+'</div>'+
+        (editing?'<label class="fcv3-check"><input type="checkbox" name="is_active"'+(category.is_active?' checked':'')+'> Active</label>':'')+'</div>'+(editing?mediaEditor('categories',category):'')+
         '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save category changes':'Save category')+'</button></div></form>';
     }
     function burgerCategoryAnchor(){
@@ -604,7 +604,7 @@
         '<label>Deal price (PKR)<input name="base_price" type="number" min="0" step="0.01" required value="'+esc(s.dealDraft&&s.dealDraft.base_price)+'"></label>'+
         '<label class="fcv3-wide">Description<textarea name="description_en" maxlength="3000" rows="2">'+esc(s.dealDraft&&s.dealDraft.description_en)+'</textarea></label>'+
         '<label class="fcv3-check"><input type="checkbox" name="flame_hour"'+(s.dealDraft&&s.dealDraft.flame_hour?' checked':'')+'> Flame Hour daily 3–5 PM (Asia/Karachi)</label>'+
-        (editing?'<label class="fcv3-check"><input type="checkbox" name="deal_available"'+(s.dealDraft.is_available?' checked':'')+'> Available to order</label><p class="fcv3-wide">Active status is preserved automatically. The deal is temporarily disabled while its contents are being verified.</p>':'')+'</div>'+
+        (editing?'<label class="fcv3-check"><input type="checkbox" name="deal_available"'+(s.dealDraft.is_available?' checked':'')+'> Available to order</label><p class="fcv3-wide">Active status is preserved automatically. The deal is temporarily disabled while its contents are being verified.</p>':'')+'</div>'+(editing?mediaEditor('deals',s.dealRecord):'')+
         '<div class="fcv3-subhead"><div><h4>Component groups</h4><p>Set each group quantity. Only Burger groups may contain multiple included choices.</p></div><button type="button" class="fcv3-button" data-action="component-add">+ Add component group</button></div>'+
         '<div class="fcv3-components">'+s.components.map(componentForm).join('')+'</div>'+
         '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save '+esc(s.dealDraft.title)+' changes':'Create fixed deal')+'</button></div></form>';
@@ -633,6 +633,7 @@
         (s.importProgress?'<div class="fcv3-notice" role="status"><strong>'+esc(s.importProgress.phase)+'</strong> · '+esc(s.importProgress.completed)+' / '+esc(s.importProgress.total)+' · '+esc(s.importProgress.message)+'</div>':'')+
         (s.editorLoadingDealId?'<div class="fcv3-notice" role="status">Loading the selected deal by its exact ID…</div>':'')+
         (s.error?'<div class="fcv3-error" role="alert">'+esc(s.error)+'</div>':'')+(s.notice?'<div class="fcv3-notice" role="status">'+esc(s.notice)+'</div>':'')+
+        (s.pendingMedia?'<div class="fcv3-warning" role="alert"><strong>Image operation needs reconciliation</strong><small>'+esc(s.pendingMedia.kind)+' · '+esc(s.pendingMedia.entity_id)+' · '+esc(s.pendingMedia.stage)+' · '+esc(s.pendingMedia.path)+'</small><button type="button" class="fcv3-button" data-action="media-recover"'+(s.mediaBusy?' disabled':'')+'>Check and resume image operation</button></div>':'')+
         (s.partial?'<div class="fcv3-warning">A deal operation stopped and the deal may remain inactive. ID: '+esc(s.partial.id)+'. Do not create a duplicate; inspect this draft before continuing.</div>':'')+
         '<div class="fcv3-summary-grid"><article><small>Menu categories</small><strong>'+s.categories.filter(c=>c.category_kind==='menu').length+'</strong></article><article><small>Products</small><strong>'+s.products.length+'</strong></article>'+
         '<article><small>Deal-only variants</small><strong>'+s.products.reduce((n,p)=>n+p.variants.filter(v=>v.is_standalone_sellable===false).length,0)+'</strong></article><article><small>Fixed deals</small><strong>'+s.deals.length+'</strong></article></div>'+
@@ -655,7 +656,7 @@
     function openProduct(p){s.editor={type:'product',product:p?JSON.parse(JSON.stringify(p)):null};s.notice=null;s.error=null;render();}
     function openDeal(){
       if(!s.products.some(p=>p.is_active!==false&&p.variants.some(v=>v.is_active!==false))){s.error='Add active products and variants before creating a deal.';render();return;}
-      s.editor={type:'deal'};s.editorRevision=s.revision;s.components=[{display_name:'Burger',quantity:1,allow_repeat_option:false,max_units_per_option:null,options:[{}]}];s.dealDraft={title:'',description_en:'',base_price:'',flame_hour:false,is_available:true};s.notice=null;s.error=null;s.partial=null;render();
+      s.editor={type:'deal'};s.dealRecord=null;s.editorRevision=s.revision;s.components=[{display_name:'Burger',quantity:1,allow_repeat_option:false,max_units_per_option:null,options:[{}]}];s.dealDraft={title:'',description_en:'',base_price:'',flame_hour:false,is_available:true};s.notice=null;s.error=null;s.partial=null;render();
     }
     async function openDealEdit(dealId,expectedTitle){
       if(s.editorLoadingDealId)return;
@@ -671,7 +672,7 @@
         const scheduleDetail=assignment?await read(READ.scheduleDetail,{schedule_set_id:assignment.schedule_set_id}):null;
         const draft=buildFixedDealEditDraft(detail,s.schedules,scheduleDetail,selectedId,title);
         if(s.editorLoadingDealId!==selectedId)return;
-        s.editor={type:'deal',deal:true};s.editorRevision=s.revision;s.components=draft.components;s.dealDraft=draft.dealDraft;
+        s.editor={type:'deal',deal:true};s.dealRecord=detail.deal;s.editorRevision=s.revision;s.components=draft.components;s.dealDraft=draft.dealDraft;
       }finally{
         if(s.editorLoadingDealId===selectedId)s.editorLoadingDealId=null;
         render();
@@ -748,6 +749,7 @@
         await write(WRITE.deal,{id:dealId,title,description_en:desc,is_active:true,is_available:true,
           variants:[{id:dealVariantId,variant_key:'BUNDLE',label_en:title,label_ur:null,pricing_mode:'FIXED_BUNDLE',base_price:base,sort_order:1,is_active:true}]});
         const afterActivation=await read(READ.dealDetail,{deal_id:dealId});
+        s.dealRecord=afterActivation.deal;
         verifyFixedDealDetail(afterActivation,{dealId,title,basePrice:base,components:s.components,flameHour:form.flame_hour===true,scheduleId,active:true});
         s.partial=null;s.editor=null;s.notice='Fixed deal saved and read-back verified. Components are locked and use INCLUDED pricing.';await refresh();
       }catch(error){if(dealId)s.partial={id:dealId,variantId:dealVariantId};throw error;}
@@ -909,10 +911,18 @@
 
     function bind(){
       el.onclick=async event=>{
-        const b=event.target.closest('[data-action]');if(!b||b.disabled||s.saving||s.editorLoadingDealId)return;const a=b.dataset.action;
+        const mediaButton=event.target.closest('[data-media-action]');
+        if(mediaButton){
+          if(mediaButton.disabled||s.saving||s.mediaBusy)return;
+          try{await changeMediaReference(mediaButton.dataset.kind,mediaButton.dataset.id,mediaButton.dataset.mediaAction);}
+          catch(error){s.error=error&&error.message||'Image change failed.';render();}
+          return;
+        }
+        const b=event.target.closest('[data-action]');if(!b||b.disabled||s.saving||s.mediaBusy||s.editorLoadingDealId)return;const a=b.dataset.action;
         try{
           if(s.error&&a!=='refresh')throw Error('Catalog data is not verified. Refresh successfully before making any changes.');
           if(a==='refresh')await refresh();
+          else if(a==='media-recover')await recoverPendingMedia();
           else if(a==='load-more')await loadMore(b.dataset.kind,b.dataset.collectionId||null);
           else if(a==='import-menu')await importPublishedMenuDraft();
           else if(a==='category-add'){s.editor={type:'category'};s.editorRevision=s.revision;render();}
@@ -951,6 +961,8 @@
         }catch(e){s.error=e.message||'Catalog action failed.';render();}
       };
       el.onchange=event=>{
+        const mediaInput=event.target.closest('[data-media-upload]');
+        if(mediaInput){const file=mediaInput.files&&mediaInput.files[0],kind=mediaInput.dataset.kind,id=mediaInput.dataset.id;mediaInput.value='';if(file)uploadMedia(kind,id,file).catch(()=>{});return;}
         if(event.target.matches('[data-choice-product]')){
           const row=event.target.closest('[data-choice-row]'),p=s.products.find(x=>x.id===event.target.value),select=row.querySelector('[data-choice-variant]');
           const variants=p?p.variants.filter(v=>v.is_active!==false):[];
@@ -977,7 +989,7 @@
         if(event.target.matches('[data-field="variant_kind"]')){const row=event.target.closest('[data-variant-row]'),pack=event.target.value==='pack';row.querySelector('[data-field="pack_quantity"]').disabled=!pack;row.querySelector('[data-field="pack_unit"]').disabled=!pack;}
       };
       el.onsubmit=async event=>{
-        const form=event.target.closest('form[data-form]');if(!form)return;event.preventDefault();if(s.saving)return;
+        const form=event.target.closest('form[data-form]');if(!form)return;event.preventDefault();if(s.saving||s.mediaBusy)return;
         if(s.error){s.notice='Catalog data is not verified. Refresh successfully before saving.';render();return;}
         s.saving=true;s.error=null;
         const formDataSnapshot=new FormData(form);
@@ -985,7 +997,7 @@
         finally{s.saving=false;render();}
       };
     }
-    return {mount:async(element,requestFn)=>{if(!element||typeof requestFn!=='function')throw Error('Catalog V3 workspace requires a root and authenticated request handler.');el=element;request=requestFn;bind();await refresh();},refresh,getState:()=>JSON.parse(JSON.stringify(s))};
+    return {mount:async(element,requestFn,mediaOptions={})=>{if(!element||typeof requestFn!=='function')throw Error('Catalog V3 workspace requires a root and authenticated request handler.');el=element;request=requestFn;mediaClient=mediaOptions&&mediaOptions.client||null;mediaRecoveryStore=mediaOptions&&mediaOptions.recoveryStore||null;mediaUserId=mediaOptions&&mediaOptions.userId||null;bind();await refresh();await inspectPendingMedia(mediaOptions&&mediaOptions.reconciliation||null);},refresh,getState:()=>JSON.parse(JSON.stringify(s))};
   }
   return {READ,WRITE,normalizeProductDraft,buildFixedComponentGroups,buildIncludedMappings,buildFixedDealEditDraft,isApprovedFlameHourSchedule,assertDealIdentity,eligibleChoiceProducts,verifyFixedDealDetail,createWorkspace};
 });
