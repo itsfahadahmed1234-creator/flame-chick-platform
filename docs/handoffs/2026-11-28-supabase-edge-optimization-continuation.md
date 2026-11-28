@@ -19,11 +19,8 @@
 - Existing explicit availability toggle still uses the authenticated presence action. The four-minute stale rule, 60-second offer expiry, private Realtime Broadcast, RLS, branch isolation, and `verify_jwt=false` internal Auth/CORS behavior are unchanged.
 - Regression coverage extended: Delivery API Deno mock test exercises authenticated sync and server-side presence; Node source-contract test checks combined sync, scoped task/offer reads, 120-second client cycle, and action snapshots. CI workflow now triggers when Rider app source changes.
 - Commits: Delivery API `30a50dd67148a45e48de072d693ba4ba919c5b47`; Rider client `d328ad93b243aad41c35a17c5e84e8c559fef0cb`; duplicate healthy-Realtime poll removal `2a8032816b1c6b42e41fe3b35345dac259320d4c`; Deno sync test `70694fda53e2a412b485c003cd958741a3528f6d`; Node source-contract test `5136e3564a1a79309a8b6d37043cffd466478b53`; offline sync safeguard `20657ac8ff84a05fca625b5b46fd930862be5f55`; CI trigger `2728792191a395c957d89af24d9eec65ef20e202`.
-- **Verification status:** source files and commits were written to the feature branch. The new GitHub Actions run has not yet been confirmed; do not report tests as passed until CI completes and its run is inspected. No local Deno runtime was available for executing the Deno test here.
+- **Verification status:** Initial Rider sync implementation CI run #5 passed. Runs #6–#8 failed in the Deno type-check step because the test asserted the mock `patchCount` was 1 and later compared it to 2; TypeScript narrowed it to literal type 1 (TS2367). The source-contract Node tests passed. Corrected the test assertion with `Number(patchCount) !== 2` in commit `bdfcb1e791b09e56f20bae3da2d33e27229d2f99`. Awaiting the new CI run triggered by this test-file change; do not mark the Rider phase passed until the run succeeds.
 - No database migration, Production Edge deployment, Production test traffic, shared Website/Admin API edit, secret/Auth change, or log query was performed. Continue only on this branch; do not deploy or merge without explicit user approval.
-
-# CURRENT CONTINUATION — SUPABASE EDGE FUNCTION OPTIMIZATION (2026-11-28)
-
 ## Latest Delivery Edge invocation investigation — 2026-11-28
 
 ### Usage evidence supplied by the user
