@@ -204,7 +204,7 @@ const DELIVERY_API=SUPABASE_URL+'/functions/v1/flame-chick-delivery-api';
 const ORDER_API=SUPABASE_URL+'/functions/v1/flame-chick-order-api';
 const AUTH_URL=SUPABASE_URL+'/auth/v1';
 const SESSION_KEY='flame_chick_rider_session_v1';
-let session=null,user=null,rider=null,jobs=[],offers=[],busy=false,pendingAuthSession=null,pendingAuthType='invite',riderPresenceTimer=null,riderPresenceSending=false,riderWantsOnline=true,offerExpiryTimer=null;
+let session=null,user=null,rider=null,jobs=[],offers=[],busy=false,pendingAuthSession=null,pendingAuthType='invite',riderPresenceTimer=null,riderPresenceSending=false,riderSyncTimer=null,riderSyncSending=false,riderWantsOnline=true,offerExpiryTimer=null;
 let deferredInstallPrompt=null;
 let riderRealtimeClient=null,riderRealtimeChannel=null,riderRealtimeConnected=false,riderRealtimeRefreshTimer=null,riderRealtimeRefreshDebounce=null,riderRealtimeFallbackTimer=null;
 const $=id=>document.getElementById(id);
@@ -302,22 +302,41 @@ async function updateRiderPresence(online=true,keepalive=false,updatePreference=
   renderRiderAvailability();
   return data;
 }
-function stopRiderPresence(){
-  if(riderPresenceTimer){clearInterval(riderPresenceTimer);riderPresenceTimer=null;}
-  riderPresenceSending=false;
+function applyRiderSnapshot(data){
+  if(!data||data.ok!==true||!Array.isArray(data.data)||!Array.isArray(data.offers))return false;
+  jobs=data.data;offers=data.offers;
+  if(data.profile&&data.profile.user_id===user?.id)rider={...rider,...data.profile};
+  if(typeof data.availability_status==='string')rider.availability_status=data.availability_status;
+  if(typeof data.accepting_jobs==='boolean')rider.accepting_jobs=data.accepting_jobs;
+  if(typeof data.last_seen_at==='string')rider.last_seen_at=data.last_seen_at;
+  renderJobs();renderOffers();renderRiderAvailability();
+  setConnection(true,riderRealtimeConnected?'Live updates':'Manual refresh available');
+  return true;
 }
-function startRiderPresence(){
-  stopRiderPresence();
-  if(!riderWantsOnline)return;
-  const beat=async()=>{
-    if(riderPresenceSending||!session?.access_token||!navigator.onLine||!riderWantsOnline)return;
-    riderPresenceSending=true;
-    try{await updateRiderPresence(true);}
-    catch(error){console.warn('Flame Chick rider presence heartbeat failed.',error.message);}
-    finally{riderPresenceSending=false;}
-  };
-  beat();
-  riderPresenceTimer=setInterval(beat,120000);
+async function syncRiderState(showLoading=false){
+  if(riderSyncSending||!session?.access_token||!user?.id||!rider?.branch_id||!navigator.onLine)return;
+  riderSyncSending=true;
+  if(showLoading)$('jobList').innerHTML='<div class="empty"><strong>Refreshing…</strong></div>';
+  try{
+    const data=await deliveryRequest('POST',null,{action:'sync',online:riderWantsOnline});
+    if(!applyRiderSnapshot(data))throw new Error('The rider sync response was incomplete.');
+  }catch(error){
+    console.warn('Flame Chick rider sync failed.',error.message);
+    setConnection(false,'Sync issue · retrying');
+    if(showLoading)$('jobList').innerHTML='<div class="empty"><strong>Could not sync deliveries</strong>'+esc(error.message)+'</div>';
+    else toast(error.message);
+  }finally{riderSyncSending=false;}
+}
+function stopRiderPresence(){stopRiderSync();}
+function startRiderPresence(){startRiderSync();}
+function stopRiderSync(){
+  if(riderSyncTimer){clearInterval(riderSyncTimer);riderSyncTimer=null;}
+  riderSyncSending=false;
+}
+function startRiderSync(){
+  stopRiderSync();
+  if(!session?.access_token)return;
+  riderSyncTimer=setInterval(()=>syncRiderState(false),120000);
 }
 function markRiderOfflineBestEffort(){
   if(!session?.access_token||!user?.id||!rider?.branch_id)return;
@@ -422,7 +441,6 @@ async function startRiderRealtime(){
         riderRealtimeFallbackTimer=setInterval(()=>{
           if(navigator.onLine&&session?.access_token)scheduleRiderJobsRefresh();
         },120000);
-        scheduleRiderJobsRefresh();
       }else if(["CHANNEL_ERROR","TIMED_OUT","CLOSED"].includes(status)){
         startRiderRealtimeFallback("Realtime reconnecting · automatic refresh fallback");
       }
@@ -540,8 +558,11 @@ async function performAction(taskId,action){
   if(action==='return_reported'&&!confirm('Confirm that you have physically returned the food to Flame Chick and handed it to the restaurant staff? The manager will still need to confirm the handover.'))return;
   const card=document.querySelector('[data-task-id="'+CSS.escape(taskId)+'"]');
   const buttons=card?[...card.querySelectorAll('button')]:[];buttons.forEach(b=>b.disabled=true);
-  try{await deliveryRequest('POST',null,{action,delivery_task_id:taskId,...(reason?{reason}:{})});toast(action==='picked_up'?'Pickup confirmed. The order is now out for delivery.':action==='delivered'?'Delivery marked delivered. The order remains awaiting cashier payment collection.':action==='failed'?'Delivery issue saved. Keep the order and return it to the restaurant.':action==='return_reported'?'Return reported. Wait for manager confirmation.':'Delivery updated.');await loadJobs(true);}
-  catch(e){toast(e.message);buttons.forEach(b=>b.disabled=false);}
+  try{
+    const result=await deliveryRequest('POST',null,{action,delivery_task_id:taskId,...(reason?{reason}:{})});
+    toast(action==='picked_up'?'Pickup confirmed. The order is now out for delivery.':action==='delivered'?'Delivery marked delivered. The order remains awaiting cashier payment collection.':action==='failed'?'Delivery issue saved. Keep the order and return it to the restaurant.':action==='return_reported'?'Return reported. Wait for manager confirmation.':'Delivery updated.');
+    if(!applyRiderSnapshot(result.rider_state||{}))await loadJobs(true);
+  }catch(e){toast(e.message);buttons.forEach(b=>b.disabled=false);}
 }
 
 function updateRiderExpiryTicker(){
@@ -580,14 +601,15 @@ async function respondToOffer(offerId,action,button){
   const card=document.querySelector('[data-offer-id="'+CSS.escape(offerId)+'"]');
   if(card)card.querySelectorAll('button').forEach(b=>b.disabled=true);
   try{
+    let result;
     if(action==='accept'){
-      const result=await deliveryRequest('POST',null,{action:'accept_offer',offer_id:offerId});
+      result=await deliveryRequest('POST',null,{action:'accept_offer',offer_id:offerId});
       toast('You got order '+(result.order_number||'delivery')+'. Please proceed to the restaurant.');
     }else{
-      await deliveryRequest('POST',null,{action:'decline_offer',offer_id:offerId,reason:'Rider declined'});
+      result=await deliveryRequest('POST',null,{action:'decline_offer',offer_id:offerId,reason:'Rider declined'});
       toast('Delivery offer declined.');
     }
-    await loadJobs(true);
+    if(!applyRiderSnapshot(result.rider_state||{}))await loadJobs(true);
   }catch(error){
     toast(error.message||'This offer is no longer available.');
     await loadJobs(false);
@@ -655,14 +677,13 @@ async function activateSession(next){
   $('riderName').textContent=rider.display_name||rider.rider_code||'Flame Chick Rider';
   renderRiderAvailability();
   showApp();
-  startRiderPresence();
-  // Realtime is an enhancement, never a sign-in dependency. A pending WebSocket
-  // auth handshake must not block the first rider jobs request or panel entry.
+  // Realtime is an enhancement; the authenticated sync supplies the initial snapshot.
   startRiderRealtime().catch(error=>{
     console.warn("Flame Chick rider Realtime could not start; manual refresh remains available.",error);
-    setConnection(true,"Realtime unavailable · use Refresh jobs");
+    setConnection(true,"Realtime unavailable · automatic sync active");
   });
-  await loadJobs(true);
+  startRiderSync();
+  await syncRiderState(true);
   ;
 }
 $('loginForm').addEventListener('submit',async e=>{
@@ -741,7 +762,7 @@ $('availabilityBtn').addEventListener('click',async()=>{
     await loadJobs(false);
   }finally{renderRiderAvailability();}
 });
-$('refreshBtn').addEventListener('click',()=>loadJobs(true));
+$('refreshBtn').addEventListener('click',()=>syncRiderState(true));
 $('offerList').addEventListener('click',e=>{
   const button=e.target.closest('[data-offer-action]');
   const card=button?.closest('[data-offer-id]');
