@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSingleFlight, isAmbiguousRequestFailure, sendWithOneRetry, CatalogMutationUncertainError, requestText } from '../apps/flame-chick-admin/connection-helpers.js';
+import connection from '../apps/flame-chick-admin/connection-helpers.js';
+const { createSingleFlight, isAmbiguousRequestFailure, sendWithOneRetry, CatalogMutationUncertainError, requestText, requestResponse } = connection;
 
 test('single-flight shares one refresh promise across concurrent callers', async () => {
   let calls=0,release; const gate=new Promise(resolve=>{release=resolve;});
@@ -38,4 +39,15 @@ test('request timeout remains active while response body is read',async()=>{
 test('requestText returns bounded response and body when completed in time',async()=>{
   const response={status:200,text:async()=>'ok'},result=await requestText('/test',{},100,async()=>response);
   assert.equal(result.response,response);assert.equal(result.text,'ok');
+});
+
+test('requestResponse preserves HTTP status and JSON interface after bounded body read',async()=>{
+  const response=await requestResponse('/test',{},100,async()=>new Response('{"ok":true}',{status:201,headers:{'content-type':'application/json'}}));
+  assert.equal(response.status,201);
+  assert.deepEqual(await response.json(),{ok:true});
+});
+test('requestResponse handles bodyless success responses',async()=>{
+  const response=await requestResponse('/test',{},100,async()=>new Response(null,{status:204}));
+  assert.equal(response.status,204);
+  assert.equal(await response.text(),'');
 });
