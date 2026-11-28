@@ -1,20 +1,15 @@
-# 🚫 MANDATORY NEW-CHAT SAFETY DIRECTIVE — DO NOT REPEAT THE 102 GB SUPABASE LOG QUERY
+# 🚫 ABSOLUTE FLAME CHICK RESTRICTION — ZERO SUPABASE LOG QUERIES / ZERO LOG INGESTION ACCESS
 
-**This is an explicit user instruction for every new ChatGPT conversation, assistant/agent, and Flame Chick task. Read it before carrying out Supabase diagnostics.**
+**This is an explicit user instruction for every branch, new chat, assistant/agent and Flame Chick task. It overrides any older or narrower logging instructions below.**
 
-The user clarified the measurements:
+- **ZERO Supabase log-query usage is permitted.** Do not run even a tiny query, sample, one-off check, test, partial scan, filtered query or minimal-volume request. Do not use a fraction of a query (including 0.00001), and do not try to make a query cheaper. There must be no use at all.
+- Do not open or use Supabase Logs Explorer, `query_logs`, log-query APIs, CLI commands, connectors, dashboards, SDKs, browser tools or any alternate/indirect interface to access or retrieve Supabase logs. Do not inspect, read, search, export, sample, filter, explain, troubleshoot or verify Supabase log data.
+- **Do not access or touch Supabase Log Ingestion either.** Do not inspect ingestion usage, create/change/disable log drains, alter retention/routing/telemetry, or otherwise read or modify Log Ingestion or logging configuration.
+- Historical clarification only: the **log query** exceeded **102 GB**; separately, **Log Ingestion usage was 0.10 GB out of a 1 GB allowance**. These are different measurements. Do not conflate them, and do not query either system to refresh the figures.
+- **No exceptions for debugging, optimization, verification, security or convenience.** Use source inspection, static analysis, local/disposable tests, narrowly scoped non-log metadata reads and browser-visible errors instead. Do not create Production traffic to produce logs.
+- Only the user can explicitly change this absolute prohibition. Until then, every new chat must obey it without asking to use even a small amount.
 
-- **The Supabase log query exceeded 102 GB.** This is the expensive query that must not be repeated.
-- **Log ingestion used 0.10 GB out of its 1 GB allowance.** Ingestion did **not** use 102 GB; these are separate measurements.
-
-**Do not rerun, edit, clone, recreate, broaden, optimize, or troubleshoot the specific 102 GB log query.** Do not use Supabase Logs Explorer, `query_logs`, a CLI/API/connector, or another interface to repeat or reproduce that expensive query. Do not run an equivalent broad log query as a workaround. If a future task appears to require new Supabase log-query activity, stop and obtain the user's explicit approval first.
-
-This restriction is specifically about the expensive log query. **Do not misstate it as a Log Ingestion overage or claim ingestion exceeded its 1 GB allowance.** The recorded ingestion usage was 0.10 GB / 1 GB. No log-ingestion configuration change is implied or authorized by these figures.
-
-For optimization and troubleshooting, prefer GitHub source inspection, static analysis, local tests, disposable test environments, and carefully scoped read-only database catalog inspection where appropriate. Avoid unnecessary Production test traffic and diagnostics that create avoidable logging volume. Never claim a check was performed if it was not. Any historical log-query observations are historical context only; do not refresh them by rerunning the expensive query.
-
-**Startup requirement:** Every new chat must read this directive in `PROJECT_HANDOFF.md` before Supabase diagnostics, and must read `docs/handoffs/2026-11-28-supabase-edge-optimization-continuation.md` when continuing Edge Function optimization.
-
+---
 ---
 ---
 
