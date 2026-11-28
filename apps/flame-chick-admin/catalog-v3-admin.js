@@ -325,7 +325,16 @@
         if(definiteMediaRejection(error)){
           pending.stage='cleanup_required';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
           try{await mediaClient.remove(pending.path);mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;}
-          catch(cleanupError){throw Error(er    async function uploadMedia(kind,id,file){
+          catch(cleanupError){throw Error(error.message+' The unreferenced new image could not be cleaned up; recovery path: '+pending.path+'. '+cleanupError.message);}
+        }
+        throw error;
+      }
+      await verifyMediaRecord(pending.kind,pending.entity_id,result,pending.path,pending.payload.image_previous_path||null);
+      mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
+      s.notice='Image uploaded, verified and linked to the catalog draft. The previous image remains as the restore point; older Storage objects are retained until publication-safe cleanup is implemented.';
+      return true;
+    }
+    async function uploadMedia(kind,id,file){
       if(!mediaClient||!mediaRecoveryStore)throw Error('Secure catalog image management is not configured.');
       if(s.error)throw Error('Catalog data is not verified. Refresh successfully before uploading an image.');
       if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
@@ -437,19 +446,6 @@
       if(pending.stage==='linking'&&mediaRecordMatchesPending(pending,currentMediaRecord(pending.kind,pending.entity_id))){
         mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
         s.notice='A previous image save was already committed and has been verified.';
-      }
-      render();
-    }
-Media=null;
-          s.notice='A previous image save was safely reconciled and verified.';
-          render();return;
-        }
-      }
-      if(pending.stage==='linking'){
-        const record=currentMediaRecord(pending.kind,pending.entity_id);
-        if(record&&record.image_current_path===pending.path&&record.image_previous_path===(pending.payload.image_previous_path||null)){
-          mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;s.notice='A previous image save was already committed and has been verified.';render();return;
-        }
       }
       render();
     }
