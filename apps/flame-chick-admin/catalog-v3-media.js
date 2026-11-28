@@ -61,12 +61,22 @@
     if(typeof key!=="string"||!key||!UUID_RE.test(String(userId||"")))
       throw new TypeError("Media recovery identity is invalid.");
     function validate(record){
+      const actionByKind={products:"catalog_product_upsert",categories:"catalog_category_upsert",deals:"catalog_deal_upsert"};
+      const previous=record&&record.payload&&record.payload.image_previous_path;
+      const previousValid=previous==null||
+        (isManagedPath(previous)&&previous.startsWith(record.kind+"/"+record.entity_id+"/"));
+      const productFieldsValid=record&&record.kind!=="products"||
+        (record&&record.payload&&record.payload.image_extension===record.extension&&
+         record.payload.image_published===true&&
+         record.payload.image_previous_extension===(previous?String(previous).split(".").pop().toLowerCase():null));
       if(!record||typeof record!=="object"||Array.isArray(record)||record.version!==1||
          record.user_id!==userId||!isTarget(record.kind,record.entity_id)||!isManagedPath(record.path)||
          !record.path.startsWith(record.kind+"/"+record.entity_id+"/")||
-         !["uploading","uploaded","linking","cleanup_required"].includes(record.stage)||
-         typeof record.action!=="string"||!/^catalog_(category|product|deal)_upsert$/.test(record.action)||
+         !["uploading","uploaded","linking","committed_unverified","cleanup_required"].includes(record.stage)||
+         record.action!==actionByKind[record.kind]||
          !record.payload||typeof record.payload!=="object"||Array.isArray(record.payload)||
+         record.payload.id!==record.entity_id||record.payload.image_current_path!==record.path||
+         !previousValid||!productFieldsValid||
          !Number.isSafeInteger(record.created_at)||record.created_at<0||
          !TYPES[record.mimeType]||TYPES[record.mimeType].extension!==record.extension||
          !Number.isSafeInteger(record.size)||record.size<1||record.size>MAX_BYTES)
