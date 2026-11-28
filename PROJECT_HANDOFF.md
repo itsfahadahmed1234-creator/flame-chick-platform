@@ -57,7 +57,7 @@ Treat these as review candidates, not approved changes. Inspect the current sour
 ## Safe working method
 
 - Read `PROJECT_HANDOFF.md`, this file, and the current source files/tests before edits.
-- Inspect the repository/branch state and deployed function source versions through GitHub/Supabase function metadata as needed, but **never use log-reading functions or logging interfaces**.
+- Inspect the repository/branch state and deployed function source versions through GitHub/Supabase function metadata as needed, but do not rerun or reproduce the specific 102 GB log query; obtain explicit approval before any new log-query activity.
 - Prefer static checks, unit/contract tests and controlled local tests using disposable fixtures. Keep test requests off Production.
 - Production SQL, if genuinely needed, must be read-only and narrowly scoped to schema/catalog/privilege/index inspection. Do not run migrations, writes, statistics resets, synthetic traffic, or heavy diagnostics as part of an optimization audit without explicit approval.
 - Keep secrets out of source, output and handoffs. Never read or print service-role credentials.
@@ -67,7 +67,7 @@ Treat these as review candidates, not approved changes. Inspect the current sour
 
 ## Next concrete step
 
-Re-open the current GitHub branch heads and inspect the optimization branch diff against `work/production-source-audit`. Confirm exactly which changes and tests exist, correct only evidenced issues, and run the relevant tests locally/disposably. **Do not query or otherwise touch Supabase Log Ingestion at any stage.** Report accurately what passed, what failed, and what remains before asking for deployment approval.
+Re-open the current GitHub branch heads and inspect the optimization branch diff against `work/production-source-audit`. Confirm exactly which changes and tests exist, correct only evidenced issues, and run the relevant tests locally/disposably. **Do not rerun or reproduce the specific 102 GB log query; obtain explicit approval before any new log-query activity.** Report accurately what passed, what failed, and what remains before asking for deployment approval.
 
 # CURRENT STATUS — POS MANUAL DELIVERY AND RECEIPT PRINT FIX DEPLOYED
 
