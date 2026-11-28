@@ -715,7 +715,7 @@ $('passwordForm').addEventListener('submit',async e=>{
     const r=await fetch(AUTH_URL+'/user',{method:'PUT',headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+pendingAuthSession.access_token,'Content-Type':'application/json'},body:JSON.stringify({password}),cache:'no-store'});
     await parseResponse(r);
     $('newPassword').value='';$('confirmPassword').value='';
-    const next=pendingAuthSession;pendingAuthSession=null;
+    const next=pendingAuthSession;
     const invitedUser=await getUser(next.access_token);
     if(pendingAuthType==='invite'){
       const acceptResponse=await fetch(STAFF_ADMIN_API,{
@@ -731,13 +731,17 @@ $('passwordForm').addEventListener('submit',async e=>{
     }
     const roleRows=await getActiveAccountRoles(invitedUser.id,next.access_token);
     const assigned=roleRows.find(x=>['owner','admin','manager','cashier','rider'].includes(x.role));
+    $('newPassword').value='';$('confirmPassword').value='';
     if(!assigned){
+      pendingAuthSession=null;
       saveSession(null);user=null;rider=null;jobs=[];
       showLogin('Your password is set, but an active Flame Chick role is not yet assigned. Please ask the owner or manager to finish your account setup.');
     }else if(assigned.role==='rider'){
       await activateSession(next);
+      pendingAuthSession=null;
       toast('Password saved. Your rider account is ready.');
     }else{
+      pendingAuthSession=null;
       saveSession(null);user=null;rider=null;jobs=[];
       showLogin('Your password is set. Your Flame Chick role is '+assigned.role+'. Contact your owner or manager for the current Flame Chick POS portal address, then sign in to use your staff access.');
     }
