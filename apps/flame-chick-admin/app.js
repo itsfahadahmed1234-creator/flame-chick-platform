@@ -157,7 +157,8 @@ async function staffApi(method,query,body){
  if(response.status===401){await refresh();response=await send();}
  const data=await response.json().catch(()=>({}));
  if(response.status===401){clearSession();showAuth(true);throw Error("Your session expired. Sign in again.");}
- if(!response.ok||data.ok===false)throw Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");
+ if(!response.ok){const failure=new Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");failure.name="HttpRequestError";failure.status=response.status;throw failure;}
+ if(data.ok===false)throw Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");
  return data;
 }
 async function catalogV3Request(action,payload,isMutation){
