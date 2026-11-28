@@ -36,7 +36,7 @@ test("Rider invite session is retained when activation or role verification fail
 });
 
 test("Rider page's inline browser scripts parse", () => {
-  const scripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)];
+  const scripts = [...html.matchAll(/<script[^>]*>([\\s\\S]*?)<\/script>/gi)];
   assert.ok(scripts.length > 0, "Rider page must contain its application script");
   for (const [index, match] of scripts.entries()) {
     const code = match[1].trim();
