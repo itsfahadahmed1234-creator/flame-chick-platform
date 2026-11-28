@@ -260,7 +260,11 @@ function catalogV3MediaOptions(){
   S.catalogV3MediaRecoveryUser=S.user.id;
  }
  return {client:S.catalogV3MediaClient,recoveryStore:S.catalogV3MediaRecoveryStore,
-  userId:S.user.id,reconciliation:S.catalogV3LastReconciliation};
+  userId:S.user.id,reconciliation:S.catalogV3LastReconciliation,
+  getPendingMutation:()=>{
+   const pending=pendingCatalogMutationForUser();
+   return pending?pending.body:null;
+  }};
 }
 async function openCatalogV3(){
  await reconcilePendingCatalogMutation();
