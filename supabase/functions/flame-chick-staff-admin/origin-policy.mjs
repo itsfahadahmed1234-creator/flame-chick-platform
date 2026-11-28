@@ -1,4 +1,5 @@
-const INVITATION_PATH = "/accept-invitation.html";
+const ADMIN_INVITATION_PATH = "/accept-invitation.html";
+const RIDER_INVITATION_PATH = "/";
 
 function isLoopbackHost(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
@@ -10,6 +11,9 @@ function isLoopbackHost(hostname) {
  * HTTP is accepted only for explicitly named loopback development origins.
  */
 export const CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN = "https://flamechickadmin.pages.dev";
+export const CLOUDFLARE_PRODUCTION_RIDER_ORIGIN = "https://flamechickrider.pages.dev";
+export const ADMIN_INVITATION_REDIRECT = CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN + ADMIN_INVITATION_PATH;
+export const RIDER_INVITATION_REDIRECT = CLOUDFLARE_PRODUCTION_RIDER_ORIGIN + RIDER_INVITATION_PATH;
 export const PRODUCTION_STAFF_ADMIN_ORIGIN = "https://flamechicadmin.vercel.app";
 
 /**
@@ -28,7 +32,7 @@ export const PREVIEW_STAFF_ADMIN_ORIGINS = Object.freeze([
 export function parseStaffAdminOrigins(raw) {
   const configured = typeof raw === "string" ? raw.trim() : "";
   return parseAllowedOrigins(
-    [configured, CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN, PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS].filter(Boolean).join(",")
+    [configured, CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN, CLOUDFLARE_PRODUCTION_RIDER_ORIGIN, PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS].filter(Boolean).join(",")
   );
 }
 
@@ -80,16 +84,27 @@ export function isAllowedRequestOrigin(origin, allowedOrigins) {
   return origin === null || (typeof origin === "string" && allowedOrigins.has(origin));
 }
 
-/** Only the Admin invitation-acceptance page may receive Auth invite redirects. */
+/** Route each invitation to the Cloudflare portal that owns that staff role. */
+export function getStaffInviteRedirect(role) {
+  const normalized = typeof role === "string" ? role.trim().toLowerCase() : "";
+  if (normalized === "rider") return RIDER_INVITATION_REDIRECT;
+  if (["admin", "owner", "manager", "cashier"].includes(normalized)) return ADMIN_INVITATION_REDIRECT;
+  throw new TypeError("Unsupported staff invitation role.");
+}
+
+/** Only the exact Cloudflare role-specific callback URLs may receive Auth tokens. */
 export function isSafeInviteRedirect(value, allowedOrigins) {
   if (typeof value !== "string" || value.trim() === "") return false;
   try {
     const url = new URL(value);
+    const roleRoute =
+      (url.origin === CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN && url.pathname === ADMIN_INVITATION_PATH) ||
+      (url.origin === CLOUDFLARE_PRODUCTION_RIDER_ORIGIN && url.pathname === RIDER_INVITATION_PATH);
     return url.protocol === "https:" &&
       url.username === "" &&
       url.password === "" &&
       allowedOrigins.has(url.origin) &&
-      url.pathname === INVITATION_PATH &&
+      roleRoute &&
       url.search === "" &&
       url.hash === "";
   } catch {
