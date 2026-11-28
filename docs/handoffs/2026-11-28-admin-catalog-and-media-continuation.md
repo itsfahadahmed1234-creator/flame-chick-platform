@@ -21,14 +21,16 @@ Supabase Production project: `adkrxfnawdiljhjaavnj` — Mumbai `ap-south-1`, Fre
 
 **Do not change `main` or another app's branch as a shortcut.** Work on the Admin release branch, inspect its current HEAD first, and keep all changes limited to Admin plus directly-required tests, Staff Admin API files, migrations (only if separately approved) and this handoff.
 
-## 2. Mandatory Supabase log-query restriction
+## 2. Absolute Supabase logging prohibition — ZERO usage
 
-The user clarified the two measurements:
+**There must be absolutely zero Supabase log-query usage and zero Log Ingestion access for this Admin work.** Not 0.00001, not a tiny sample, not one filtered record, not a one-off test. No usage at all.
 
-- The **Supabase log query exceeded 102 GB**. Do not rerun, edit, clone, recreate, broaden, optimize, or troubleshoot that specific expensive query. Do not reproduce its workload through Logs Explorer, `query_logs`, CLI, API, connector, or another interface.
-- **Log Ingestion used 0.10 GB out of its 1 GB allowance.** Ingestion did not exceed 102 GB. Query volume and ingestion usage are separate measurements; never conflate them.
-- Do not access Log Ingestion or logging configuration for this Admin work. Do not use log checks as acceptance tests. If any new Supabase log query seems necessary, stop and ask the user for explicit approval.
-- Use source inspection, narrow metadata/catalog reads, static analysis, local/disposable tests and user-visible browser errors instead. Avoid unnecessary Production test traffic.
+- Never run or access Supabase Logs Explorer, `query_logs`, log-query APIs, CLI log commands, connectors, dashboards, SDKs, browser tools or any alternate/indirect interface for Supabase logs.
+- Never inspect, read, retrieve, search, export, sample, filter, analyze, troubleshoot, or verify Supabase log data.
+- Never inspect or modify Log Ingestion usage, log drains, retention, routing, telemetry, analytics, or related settings. Do not use logs as an Admin QA or deployment verification method.
+- Historical figures only: the **log query exceeded 102 GB**; separately, **Log Ingestion was 0.10 GB out of 1 GB**. These are different measurements. Do not query either system to refresh them.
+- No exceptions for debugging, performance optimization, verification, security or convenience. Use GitHub/source inspection, static analysis, browser-visible errors, local/disposable integration tests and narrowly scoped non-log metadata reads.
+- This prohibition remains in force unless the user explicitly changes it. Do not propose or ask to use even a tiny amount.
 
 ## 3. Verified Admin source state
 
