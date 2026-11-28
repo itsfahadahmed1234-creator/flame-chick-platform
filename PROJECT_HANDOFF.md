@@ -1,3 +1,19 @@
+# CURRENT ADMIN RELEASE OVERRIDE — 2026-11-28
+
+The Flame Chick Admin Catalog V3/media UI has been merged and deployed. This supersedes the previous Admin review-only branch / no-deployment instruction below. The deployment is limited to the Admin Pages project.
+
+- Correct repository owner: `itsfahadahmed1234-creator`.
+- PR #3 merged; Production branch `cloudflare/admin-production` now contains merge commit `6950c9cd79d11d0e3db2efc0b1a06177c1b89528`.
+- Cloudflare Pages project `flamechickadmin` deployment `aacccbb0-89c5-4999-bdd4-3d6086a5f82b` succeeded; URL https://aacccbb0.flamechickadmin.pages.dev.
+- Full focused checkpoint: `docs/handoffs/2026-11-28-admin-catalog-and-media-continuation.md`.
+- CI run `46136611989` passed on the exact source head before merge.
+- Production Storage helper allows only active Admin/Owner; read-only checks passed for Admin allowed, Rider denied, no-user denied. Manager/Cashier/Owner full live matrix and browser upload compensation tests remain outstanding.
+- No real image uploads, catalog imports/publication, order/payment operations, or Storage object writes/deletes were performed.
+- No Supabase log-query or Log Ingestion access. Website, POS and Rider source/deployments untouched.
+- Next: user verifies Admin sign-in and Catalog V3 draft read/edit at the URL above. Keep real image upload and publication gated pending isolated Storage integration acceptance.
+
+---
+
 # 🚫 ABSOLUTE FLAME CHICK RESTRICTION — ZERO SUPABASE LOG QUERIES / ZERO LOG INGESTION ACCESS
 
 **This is an explicit user instruction for every branch, new chat, assistant/agent and Flame Chick task. It overrides any older or narrower logging instructions below.**
