@@ -14,6 +14,7 @@ const readSession=()=>{try{return JSON.parse(sessionStorage.getItem(C.sessionSto
 const saveSession=s=>{S.session=s;sessionStorage.setItem(C.sessionStorageKey,JSON.stringify(s));};
 const clearSession=()=>{S.session=null;sessionStorage.removeItem(C.sessionStorageKey);};
 const headers=()=>({apikey:C.publishableKey,...(S.session&&S.session.access_token?{Authorization:"Bearer "+S.session.access_token}:{}),"Content-Type":"application/json"});
+const pendingCatalogStore=(()=>{try{return window.FlameChickAdminConnection.createPendingMutationStore(sessionStorage,C.sessionStorageKey+":catalog-pending");}catch(error){return null;}})();
 const REQUEST_TIMEOUT_MS=12000;
 async function fetchBounded(url,options={},timeoutMs=REQUEST_TIMEOUT_MS){
  return window.FlameChickAdminConnection.requestResponse(url,options,timeoutMs,fetch);
@@ -158,14 +159,24 @@ async function staffApi(method,query,body){
  if(data.ok===false)throw Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");
  return data;
 }
+function pendingCatalogMutationForUser(){
+ if(!pendingCatalogStore)throw Error("Secure persistent storage is unavailable. Catalog saves are disabled to prevent losing an uncertain request.");
+ const record=pendingCatalogStore.read();
+ if(record&&record.user_id!==S.user.id)throw Error("A previous catalog save belongs to another signed-in account. Sign in with that account to reconcile it; no new save will be sent.");
+ return record;
+}
+function catalogMutationFingerprint(action,payload){return JSON.stringify({action,payload});}
 async function catalogV3Request(action,payload,isMutation){
- let body;
+ let body,record=null;
  if(isMutation){
-  const fingerprint=JSON.stringify({action,payload});
-  const pending=S.pendingCatalogMutation;
-  if(pending&&pending.fingerprint!==fingerprint)throw Error("A previous save has an uncertain result. Retry that exact save first; do not submit different edits until it is reconciled.");
-  body=pending?pending.body:{action,payload,expected_revision:S.catalogV3Revision,request_id:staffRequestId()};
-  if(!pending)S.pendingCatalogMutation={fingerprint,body};
+  const fingerprint=catalogMutationFingerprint(action,payload);
+  record=pendingCatalogMutationForUser();
+  if(record&&record.fingerprint!==fingerprint)throw Error("A previous save has an uncertain result. Retry that exact save first; do not submit different edits until it is reconciled.");
+  body=record?record.body:{action,payload,expected_revision:S.catalogV3Revision,request_id:window.FlameChickAdminConnection.createUuid()};
+  if(!record){
+   record={version:1,user_id:S.user.id,fingerprint,created_at:Date.now(),body};
+   pendingCatalogStore.write(record);
+  }
  }else body=Object.assign({action},payload||{});
  let response;
  try{
@@ -174,12 +185,14 @@ async function catalogV3Request(action,payload,isMutation){
    :await staffApi("POST",null,body);
  }catch(error){
   if(isMutation&&error.name==="CatalogMutationUncertainError")throw error;
-  if(isMutation)S.pendingCatalogMutation=null;
   throw error;
  }
  const result=response&&response.result;
- if(!result||result.ok===false){if(isMutation)S.pendingCatalogMutation=null;throw Error(result&&result.error&&result.error.message||"Catalog V3 request failed.");}
- if(isMutation)S.pendingCatalogMutation=null;
+ if(!result||result.ok===false){
+  if(isMutation)pendingCatalogStore.clear(body.request_id);
+  throw Error(result&&result.error&&result.error.message||"Catalog V3 request failed.");
+ }
+ if(isMutation)pendingCatalogStore.clear(body.request_id);
  if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=Math.max(S.catalogV3Revision||0,result.draft_revision);
  return result;
 }
@@ -196,7 +209,7 @@ async function openCatalogV3(){
  }
 }
 function staffRoleLabel(role){return ({owner:"Owner",admin:"Admin",manager:"Manager",cashier:"Cashier",rider:"Rider"})[role]||role;}
-function staffRequestId(){return crypto.randomUUID?crypto.randomUUID():"b4-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2);}
+function staffRequestId(){return window.FlameChickAdminConnection.createUuid();}
 function staffBranchIds(roleKey){
  if(["admin","owner"].includes(roleKey))return [];
  const main=S.staffBranches.filter(b=>b.is_active&&String(b.branch_code||"").toLowerCase()==="main");
