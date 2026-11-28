@@ -1591,14 +1591,30 @@ async function flameChickDeliveryRequest(method,query,body){
   if(!r.ok||data.ok===false)throw new Error(data?.error?.message||'Flame Chick delivery request failed.');
   return data;
 }
-function scheduleFlameChickRealtimeRefresh(){
+let flameChickRealtimePendingOrders=false,flameChickRealtimePendingDelivery=false;
+function scheduleFlameChickRealtimeRefresh(scope='all'){
+  if(scope==='all'||scope==='orders')flameChickRealtimePendingOrders=true;
+  if(scope==='all'||scope==='delivery')flameChickRealtimePendingDelivery=true;
   if(flameChickRealtimeRefreshDebounce)clearTimeout(flameChickRealtimeRefreshDebounce);
   flameChickRealtimeRefreshDebounce=setTimeout(async()=>{
     flameChickRealtimeRefreshDebounce=null;
-    if(!navigator.onLine||!flameChickStaffSession?.access_token||flameChickRealtimeRefreshRunning)return;
+    if(!navigator.onLine||!flameChickStaffSession?.access_token)return;
+    if(flameChickRealtimeRefreshRunning){
+      scheduleFlameChickRealtimeRefresh('all');
+      return;
+    }
+    const refreshOrders=flameChickRealtimePendingOrders;
+    const refreshDelivery=flameChickRealtimePendingDelivery;
+    flameChickRealtimePendingOrders=false;
+    flameChickRealtimePendingDelivery=false;
+    if(!refreshOrders&&!refreshDelivery)return;
     flameChickRealtimeRefreshRunning=true;
-    try{await loadInitialOnlineInbox();await loadDeliveryDispatch();}
-    catch(error){console.warn('POS live refresh failed; manual refresh remains available.',error);}
+    try{
+      // loadInitialOnlineInbox already refreshes dispatch once. A delivery-only
+      // event can skip the separate order-board request entirely.
+      if(refreshOrders)await loadInitialOnlineInbox();
+      else if(refreshDelivery)await loadDeliveryDispatch();
+    }catch(error){console.warn('POS live refresh failed; manual refresh remains available.',error);}
     finally{flameChickRealtimeRefreshRunning=false;}
   },350);
 }
@@ -1633,8 +1649,8 @@ async function startFlameChickRealtime(){
     flameChickRealtimeClient=client;
     await client.realtime.setAuth(flameChickStaffSession.access_token);
     const channel=client.channel('fc:branch:'+branch+':pos',{config:{private:true}});
-    channel.on('broadcast',{event:'orders_changed'},scheduleFlameChickRealtimeRefresh);
-    channel.on('broadcast',{event:'delivery_changed'},scheduleFlameChickRealtimeRefresh);
+    channel.on('broadcast',{event:'orders_changed'},()=>scheduleFlameChickRealtimeRefresh('orders'));
+    channel.on('broadcast',{event:'delivery_changed'},()=>scheduleFlameChickRealtimeRefresh('delivery'));
     flameChickRealtimeChannel=channel;
     channel.subscribe(status=>{
       if(status==='SUBSCRIBED'){
@@ -1781,7 +1797,7 @@ async function confirmDeliveryReturn(taskId,button){
   if(button)button.disabled=true;
   try{
     await flameChickDeliveryRequest('POST',null,{action:'confirm_return',delivery_task_id:taskId});
-    await loadInitialOnlineInbox();
+    scheduleFlameChickRealtimeRefresh('all');
     showToast('Physical return confirmed. Order moved to Cancelled Orders; payment status was not changed.');
   }catch(e){showToast(e?.message||'Could not confirm the returned delivery.');if(button)button.disabled=false;}
 }
@@ -1823,7 +1839,7 @@ async function assignRiderToOrder(orderId,riderUserId,button){
   try{
     await flameChickDeliveryRequest('POST',null,{action:'assign',delivery_task_id:task.id,rider_user_id:riderUserId});
     closeModal('assignRiderModal');
-    await loadInitialOnlineInbox();
+    scheduleFlameChickRealtimeRefresh('delivery');
     showToast('Offer sent. The selected rider has 60 seconds to accept. The order stays Ready until pickup.');
   }catch(e){
     showToast(e?.message||'Rider assignment failed.');

@@ -99,10 +99,14 @@ async function setRiderPresence(userId: string, branchId: string, online: boolea
   taskQuery.set("status", "in.(accepted,out_for_delivery,failed)");
   taskQuery.set("return_confirmed_at", "is.null");
   taskQuery.set("limit", "1");
-  const activeTasks = await readAsService("delivery_tasks?" + taskQuery.toString());
+  // These read-only inputs are independent; fetch them concurrently and keep
+  // the same fail-closed checks and existing update semantics.
+  const [activeTasks,profileBefore] = await Promise.all([
+    readAsService("delivery_tasks?" + taskQuery.toString()),
+    readAsService("rider_profiles?select=accepting_jobs&user_id=eq." + userId + "&branch_id=eq." + branchId + "&is_active=eq.true&limit=1"),
+  ]);
   if (!activeTasks.ok) return { ok:false as const, status:activeTasks.status, message:"Could not verify your active delivery." };
   const busy = Array.isArray(activeTasks.data) && activeTasks.data.length > 0;
-  const profileBefore = await readAsService("rider_profiles?select=accepting_jobs&user_id=eq." + userId + "&branch_id=eq." + branchId + "&is_active=eq.true&limit=1");
   if (!profileBefore.ok || !Array.isArray(profileBefore.data) || profileBefore.data.length !== 1) return { ok:false as const, status:409, message:"Your active rider profile was not found for this branch." };
   const acceptingJobs = updatePreference ? online : profileBefore.data[0].accepting_jobs !== false;
   const availability = busy ? "busy" : online && acceptingJobs ? "available" : "offline";
@@ -134,6 +138,66 @@ async function setRiderPresence(userId: string, branchId: string, online: boolea
     return { ok:false as const, status:409, message:"Your active rider profile was not found for this branch." };
   }
   return { ok:true as const, availability_status:availability, accepting_jobs:acceptingJobs, last_seen_at:now };
+}
+
+async function readRiderState(userId: string, branchId: string) {
+  const query = new URLSearchParams();
+  query.set("select",
+    "id,status,recipient_name_snapshot,recipient_phone_snapshot,address_snapshot,area_name_snapshot,delivery_fee_snapshot,delivery_instructions_snapshot,dispatch_started_at,assigned_at,picked_up_at,out_for_delivery_at,delivered_at,failed_at,failure_reason,return_reported_at,return_confirmed_at,orders!inner(id,order_number,status,fulfillment_type,total,payment_status,customer_name,customer_phone,delivery_address,delivery_instructions,order_items(id,line_number,quantity,product_name_snapshot,variant_label_snapshot,deal_title_snapshot,line_total,item_notes,order_item_modifiers(id,modifier_group_name_snapshot,modifier_name_snapshot,quantity,total_price_snapshot))),delivery_assignments!inner(id,rider_user_id,status,is_current,assigned_at,accepted_at,picked_up_at,delivered_at,created_at)");
+  query.set("branch_id", "eq." + branchId);
+  query.set("delivery_assignments.rider_user_id", "eq." + userId);
+  query.set("delivery_assignments.is_current", "eq.true");
+  query.set("delivery_assignments.status", "in.(accepted,out_for_delivery,failed)");
+  query.set("return_confirmed_at", "is.null");
+  query.set("status", "in.(accepted,out_for_delivery,failed)");
+  query.set("orders.fulfillment_type", "eq.delivery");
+  query.set("order", "created_at.asc");
+
+  const offersQuery = new URLSearchParams();
+  offersQuery.set("select", "id,delivery_task_id,offer_round,offered_at,expires_at,delivery_tasks!inner(id,status,branch_id,area_name_snapshot,delivery_fee_snapshot,orders!inner(order_number,status))");
+  offersQuery.set("rider_user_id", "eq." + userId);
+  offersQuery.set("status", "eq.offered");
+  offersQuery.set("expires_at", "gt." + new Date().toISOString());
+  offersQuery.set("delivery_tasks.status", "eq.offering");
+  offersQuery.set("delivery_tasks.branch_id", "eq." + branchId);
+  offersQuery.set("delivery_tasks.orders.status", "eq.ready");
+
+  const profileQuery = new URLSearchParams();
+  profileQuery.set("select", "user_id,branch_id,rider_code,display_name,phone,availability_status,accepting_jobs,last_seen_at,is_active");
+  profileQuery.set("user_id", "eq." + userId);
+  profileQuery.set("branch_id", "eq." + branchId);
+  profileQuery.set("is_active", "eq.true");
+  profileQuery.set("limit", "2");
+
+  const [tasksResult, offersResult, profileResult] = await Promise.all([
+    readAsService("delivery_tasks?" + query.toString()),
+    readAsService("delivery_task_offers?" + offersQuery.toString()),
+    readAsService("rider_profiles?" + profileQuery.toString()),
+  ]);
+  if (!tasksResult.ok) return tasksResult;
+  if (!offersResult.ok) return offersResult;
+  if (!profileResult.ok) return profileResult;
+  if (!Array.isArray(profileResult.data) || profileResult.data.length !== 1) {
+    return { ok:false as const, status:403, body:{ ok:false, error:{ code:"RIDER_PROFILE_REQUIRED", message:"Your active rider profile is missing for this branch." } } };
+  }
+  return {
+    ok:true as const,
+    data:Array.isArray(tasksResult.data) ? tasksResult.data : [],
+    offers:Array.isArray(offersResult.data) ? offersResult.data : [],
+    profile:profileResult.data[0],
+  };
+}
+
+function withRiderState(data: unknown, state: Awaited<ReturnType<typeof readRiderState>>) {
+  const payload:Record<string,unknown> = isObject(data) ? { ...data } : { result:data };
+  if (state.ok) {
+    payload.rider_state = { data:state.data, offers:state.offers, profile:state.profile };
+  } else {
+    // The state-changing operation already succeeded. Let the client fall back
+    // to the authenticated GET rather than presenting a successful mutation as failed.
+    payload.rider_refresh_required = true;
+  }
+  return payload;
 }
 
 async function callDeliveryRpc(payload: Record<string, unknown>) {
@@ -254,7 +318,7 @@ async function resolveDispatchContext(userId: string): Promise<{
 }
 
 
-async function isActiveRider(userId: string, token: string, apiKey: string) {
+async function isActiveRider(userId: string) {
   const projection=await readStaffContextProjection(userId);
   if(!projection)return { ok:false as const,status:503,body:{ok:false,error:{code:"RIDER_CONTEXT_UNAVAILABLE",message:"Flame Chick Rider context is unavailable."}}};
   const riderRoles=projection.roleRows.filter(row=>row.restaurant_id===projection.restaurantId&&row.role_key==="rider"&&row.is_active===true&&typeof row.branch_id==="string");
@@ -314,7 +378,7 @@ export async function handleDeliveryApiRequest(req: Request): Promise<Response> 
     const view = (url.searchParams.get("view") ?? "dispatch").toLowerCase();
 
     if (view === "profile") {
-      const riderScope = await isActiveRider(user.id, token, apiKey);
+      const riderScope = await isActiveRider(user.id);
       if (!riderScope.ok) return response(riderScope.body, riderScope.status);
       const profileQuery = new URLSearchParams();
       profileQuery.set("select", "user_id,branch_id,rider_code,display_name,phone,availability_status,accepting_jobs,last_seen_at,is_active");
@@ -331,34 +395,11 @@ export async function handleDeliveryApiRequest(req: Request): Promise<Response> 
     }
 
     if (view === "rider") {
-      const riderScope = await isActiveRider(user.id, token, apiKey);
+      const riderScope = await isActiveRider(user.id);
       if (!riderScope.ok) return response(riderScope.body, riderScope.status);
-
-      const query = new URLSearchParams();
-      query.set("select",
-        "id,status,recipient_name_snapshot,recipient_phone_snapshot,address_snapshot,area_name_snapshot,delivery_fee_snapshot,delivery_instructions_snapshot,dispatch_started_at,assigned_at,picked_up_at,out_for_delivery_at,delivered_at,failed_at,failure_reason,return_reported_at,return_confirmed_at,orders!inner(id,order_number,status,fulfillment_type,total,payment_status,customer_name,customer_phone,delivery_address,delivery_instructions,order_items(id,line_number,quantity,product_name_snapshot,variant_label_snapshot,deal_title_snapshot,line_total,item_notes,order_item_modifiers(id,modifier_group_name_snapshot,modifier_name_snapshot,quantity,total_price_snapshot))),delivery_assignments!inner(id,rider_user_id,status,is_current,assigned_at,accepted_at,picked_up_at,delivered_at,created_at)");
-      query.set("branch_id", "eq." + riderScope.branchId);
-      query.set("delivery_assignments.rider_user_id", "eq." + user.id);
-      query.set("delivery_assignments.is_current", "eq.true");
-      query.set("delivery_assignments.status", "in.(accepted,out_for_delivery,failed)");
-      query.set("return_confirmed_at", "is.null");
-      query.set("status", "in.(accepted,out_for_delivery,failed)");
-      query.set("orders.fulfillment_type", "eq.delivery");
-      query.set("order", "created_at.asc");
-      const offersQuery = new URLSearchParams();
-      offersQuery.set("select", "id,delivery_task_id,offer_round,offered_at,expires_at,delivery_tasks!inner(id,status,area_name_snapshot,delivery_fee_snapshot,orders!inner(order_number,status))");
-      offersQuery.set("rider_user_id", "eq." + user.id);
-      offersQuery.set("status", "eq.offered");
-      offersQuery.set("expires_at", "gt." + new Date().toISOString());
-      offersQuery.set("delivery_tasks.status", "eq.offering");
-      offersQuery.set("delivery_tasks.orders.status", "eq.ready");
-      const [tasksResult, offersResult] = await Promise.all([
-        readAsService("delivery_tasks?" + query.toString()),
-        readAsService("delivery_task_offers?" + offersQuery.toString()),
-      ]);
-      if (!tasksResult.ok) return response(tasksResult.body, tasksResult.status);
-      if (!offersResult.ok) return response(offersResult.body, offersResult.status);
-      return response({ ok:true, view:"rider", data:tasksResult.data, offers:offersResult.data });
+      const state = await readRiderState(user.id, riderScope.branchId);
+      if (!state.ok) return response(state.body, state.status);
+      return response({ ok:true, view:"rider", data:state.data, offers:state.offers, profile:state.profile });
     }
 
     if (view === "push-config") {
@@ -429,7 +470,7 @@ export async function handleDeliveryApiRequest(req: Request): Promise<Response> 
 
   const action = String(body.action ?? "").toLowerCase();
   if (action === "presence") {
-    const riderScope = await isActiveRider(user.id, token, apiKey);
+    const riderScope = await isActiveRider(user.id);
     if (!riderScope.ok) return response(riderScope.body, riderScope.status);
     const online = body.online !== false;
     const result = await setRiderPresence(user.id, riderScope.branchId, online, body.update_preference === true);
@@ -437,8 +478,25 @@ export async function handleDeliveryApiRequest(req: Request): Promise<Response> 
     return response({ ok:true, online, accepting_jobs:result.accepting_jobs, availability_status:result.availability_status, last_seen_at:result.last_seen_at });
   }
 
+  if (action === "sync") {
+    const riderScope = await isActiveRider(user.id);
+    if (!riderScope.ok) return response(riderScope.body, riderScope.status);
+    // Sync refreshes last_seen_at using server time but never changes the
+    // Rider's saved accepting_jobs preference.
+    const online = body.online !== false;
+    const presence = await setRiderPresence(user.id, riderScope.branchId, online, false);
+    if (!presence.ok) return response({ ok:false, error:{ code:"RIDER_SYNC_FAILED", message:presence.message } },presence.status);
+    const state = await readRiderState(user.id, riderScope.branchId);
+    if (!state.ok) return response(state.body, state.status);
+    return response({
+      ok:true, view:"rider", data:state.data, offers:state.offers, profile:state.profile,
+      online, accepting_jobs:presence.accepting_jobs,
+      availability_status:presence.availability_status, last_seen_at:presence.last_seen_at,
+    });
+  }
+
   if (action === "accept_offer" || action === "decline_offer") {
-    const riderScope = await isActiveRider(user.id, token, apiKey);
+    const riderScope = await isActiveRider(user.id);
     if (!riderScope.ok) return response(riderScope.body, riderScope.status);
     const offerId = String(body.offer_id ?? "");
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(offerId)) {
@@ -452,7 +510,8 @@ export async function handleDeliveryApiRequest(req: Request): Promise<Response> 
     args.p_request_id = requestId;
     const result = await callServiceRpc(rpcName,args);
     if(!result.ok) return response({ ok:false, error:{ code:"DELIVERY_OFFER_ACTION_FAILED", message:result.message.split(":").slice(1).join(":").trim() || "This delivery offer is no longer available." } },result.status);
-    return response(result.data,200);
+    const riderState = await readRiderState(user.id, riderScope.branchId);
+    return response(withRiderState(result.data, riderState),200);
   }
 
   if (action === "push_subscribe" || action === "push_unsubscribe") {
@@ -478,6 +537,26 @@ export async function handleDeliveryApiRequest(req: Request): Promise<Response> 
 
   const result = await callDeliveryRpc(payload);
   if (!result.ok) return response(result.body, result.status);
+  if (["picked_up", "delivered", "reject", "failed", "return_reported"].includes(action)) {
+    const riderScope = await isActiveRider(user.id);
+    if (riderScope.ok) {
+      let riderPresenceRefreshFailed = false;
+      // Completing or releasing a delivery must recalculate availability after
+      // the task leaves the Rider's active queue. Preserve the saved preference.
+      if (action === "delivered" || action === "reject") {
+        try {
+          const presence = await setRiderPresence(user.id, riderScope.branchId, true, false);
+          riderPresenceRefreshFailed = !presence.ok;
+        } catch {
+          riderPresenceRefreshFailed = true;
+        }
+      }
+      const riderState = await readRiderState(user.id, riderScope.branchId);
+      const payload = withRiderState(result.data, riderState);
+      if (riderPresenceRefreshFailed) payload.rider_presence_refresh_required = true;
+      return response(payload,200);
+    }
+  }
   return response(result.data, 200);
 }
 
