@@ -1,5 +1,9 @@
 # Flame Chick Website — Current Environment Index
 
+> 🚫 **ABSOLUTE USER RESTRICTION — ZERO Supabase log-query usage and ZERO Log Ingestion access.** No tiny query, sample, filtered request, partial scan, test or 0.00001 usage. Never use Logs Explorer, `query_logs`, log APIs/CLI/connectors, or any alternate route; never inspect or modify Log Ingestion, drains, retention or telemetry. No exceptions for debugging, optimization or verification. Historical figures only: log query exceeded **102 GB**; Log Ingestion was separately **0.10 GB / 1 GB**. Do not access either system to refresh those figures. Use source/static/local QA and browser-visible errors instead.
+
+
+
 > Entry point for continuing the customer Website. Read the linked handoffs and establish an overview before editing code.
 
 ## Latest status — 26 November 2026
