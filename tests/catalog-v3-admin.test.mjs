@@ -70,6 +70,27 @@ test('product variants are unique and standalone pricing is not confused with de
   }), /unique valid key/i);
 });
 
+test('subcategory drafts validate parent menu categories, status and ordering', () => {
+  const menu = { id:'10000000-0000-4000-8000-000000000001', category_kind:'menu', is_active:true };
+  const inactive = { id:'10000000-0000-4000-8000-000000000002', category_kind:'menu', is_active:false };
+  const deals = { id:'10000000-0000-4000-8000-000000000003', category_kind:'deal', is_active:true };
+  const categories = [menu,inactive,deals];
+  const payload = admin.normalizeSubcategoryDraft({
+    category_id:menu.id,name_en:'Chicken Burgers',name_ur:'چکن برگرز',sort_order:3,is_active:true
+  },categories);
+  assert.equal(payload.category_id,menu.id);
+  assert.equal(payload.name_en,'Chicken Burgers');
+  assert.equal(payload.is_active,true);
+  assert.throws(()=>admin.normalizeSubcategoryDraft({category_id:deals.id,name_en:'Invalid'},categories),/active menu category/i);
+  assert.throws(()=>admin.normalizeSubcategoryDraft({category_id:inactive.id,name_en:'Invalid'},categories),/active menu category/i);
+  assert.throws(()=>admin.normalizeSubcategoryDraft({category_id:menu.id,name_en:'Invalid',sort_order:-1},categories),/non-negative whole number/i);
+  const existing = admin.normalizeSubcategoryDraft({
+    id:'20000000-0000-4000-8000-000000000001',category_id:inactive.id,name_en:'Existing',sort_order:0,is_active:false
+  },categories);
+  assert.equal(existing.category_id,inactive.id);
+  assert.equal(existing.is_active,false);
+});
+
 test('fixed deal editor supports multiple INCLUDED burger choices while preserving fixed quantity and repeat policy', () => {
   const result = admin.buildFixedComponentGroups([
     { display_name: 'Burger', quantity: 2, allow_repeat_option: true, max_units_per_option: 2, options: [
@@ -125,10 +146,10 @@ test('mapping builder fails closed for missing component options or non-fixed de
 
 test('the Admin workspace exposes only finite catalog actions, with no publish or rollback action', () => {
   assert.deepEqual(Object.keys(admin.READ).sort(), [
-    'categories', 'collections', 'dealDetail', 'deals', 'products', 'scheduleDetail', 'schedules'
+    'categories', 'collections', 'dealDetail', 'deals', 'products', 'scheduleDetail', 'schedules', 'subcategories'
   ]);
   assert.deepEqual(Object.keys(admin.WRITE).sort(), [
-    'assignment', 'category', 'collection', 'components', 'deal', 'mappings', 'product', 'schedule'
+    'assignment', 'category', 'collection', 'components', 'deal', 'mappings', 'product', 'schedule', 'subcategory'
   ]);
   assert.equal(Object.values(admin.WRITE).includes('catalog_publish'), false);
   assert.equal(Object.values(admin.WRITE).includes('catalog_rollback'), false);
@@ -147,10 +168,15 @@ test('Admin read/write actions match the finite authenticated Staff Admin routes
   assert.doesNotMatch(source, /catalog_rollback\s*:/);
 });
 
-test('Dashboard, Catalog V3, Staff and Delivery navigation is available only inside verified Admin and Owner sessions', async () => {
+test('native Menu, Categories and Deals tabs are enabled only inside verified Admin and Owner sessions', async () => {
   const source = await readFile(new URL('../apps/flame-chick-admin/app.js', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../apps/flame-chick-admin/index.html', import.meta.url), 'utf8');
   assert.match(source, /\["admin","owner"\]\.includes\(context\.actor_role\)/);
-  assert.match(source, /\["dashboard","staff","catalog-v3","delivery"\]\.includes\(button\.dataset\.page\)/);
+  assert.match(source, /\["dashboard","staff","delivery","menu","categories","deals"\]\.includes\(button\.dataset\.page\)/);
+  assert.match(source, /openCatalogTab\(p\)/);
+  assert.doesNotMatch(source, /openCatalogV3/);
+  for (const root of ['catalogMenuRoot','catalogCategoriesRoot','catalogDealsRoot']) assert.ok(html.includes('id="'+root+'"'));
+  assert.doesNotMatch(html, /data-page="catalog-v3"|id="page-catalog-v3"|src="catalog-v3-importer\.js"/);
 });
 
 test('deal inspection renders the exact product-name field returned by the database detail DTO', async () => {
