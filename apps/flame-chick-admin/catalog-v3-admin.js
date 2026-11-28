@@ -222,20 +222,32 @@
     let el=null,request=null;
     const s={loading:false,saving:false,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,editorLoadingDealId:null,components:[],detail:null,partial:null,importProgress:null,pages:{categories:{hasMore:false,cursor:null},products:{hasMore:false,cursor:null},collections:{hasMore:false,cursor:null},deals:{}}};
     async function read(action,args){const r=await request(action,args||{},false);if(!isObj(r)||r.ok===false)throw Error('Catalog read failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
+    async function readPage(action,args){
+      const r=await request(action,args||{},false);
+      if(!isObj(r)||r.ok===false||!Array.isArray(r.items))throw Error('Catalog page response is invalid.');
+      if(!Number.isSafeInteger(r.draft_revision)||r.draft_revision<0)throw Error('Catalog page has no valid draft revision.');
+      if(r.has_more===true&&(!r.next_cursor||typeof r.next_cursor!=='string'))throw Error('Catalog page cursor is invalid.');
+      return r;
+    }
     async function write(action,payload){const r=await request(action,payload,true);if(!isObj(r)||r.ok===false)throw Error('Catalog save failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
     async function refresh(){
       if(!el)return;s.loading=true;s.error=null;render();
       try{
         const [cats,prods,cols,schedules]=await Promise.all([
-          read(READ.categories,{limit:100}),read(READ.products,{limit:50}),read(READ.collections,{limit:50}),read(READ.schedules,{limit:50})
+          readPage(READ.categories,{limit:100}),readPage(READ.products,{limit:50}),readPage(READ.collections,{limit:50}),readPage(READ.schedules,{limit:50})
         ]);
-        s.categories=cats.items||[];s.products=prods.items||[];s.collections=cols.items||[];s.schedules=schedules.items||[];
+        const baseRevision=cats.draft_revision;
+        if([prods,cols,schedules].some(x=>x.draft_revision!==baseRevision))throw Error('The draft changed while the catalog was loading. Refresh to load one consistent revision.');
+        const collections=cols.items;
+        const lists=await Promise.all(collections.map(c=>readPage(READ.deals,{collection_id:c.id,limit:50})));
+        if(lists.some(x=>x.draft_revision!==baseRevision))throw Error('The draft changed while deal lists were loading. Refresh to load one consistent revision.');
+        s.categories=cats.items;s.products=prods.items;s.collections=collections;s.schedules=schedules.items;
         s.pages={categories:{hasMore:cats.has_more===true,cursor:cats.next_cursor||null},
           products:{hasMore:prods.has_more===true,cursor:prods.next_cursor||null},
           collections:{hasMore:cols.has_more===true,cursor:cols.next_cursor||null},deals:{}};
-        const lists=await Promise.all(s.collections.map(c=>read(READ.deals,{collection_id:c.id,limit:50})));
-        s.deals=lists.flatMap(x=>x.items||[]);
-        lists.forEach((x,index)=>{s.pages.deals[s.collections[index].id]={hasMore:x.has_more===true,cursor:x.next_cursor||null};});
+        s.deals=lists.flatMap(x=>x.items);
+        lists.forEach((x,index)=>{s.pages.deals[collections[index].id]={hasMore:x.has_more===true,cursor:x.next_cursor||null};});
+        s.revision=baseRevision;
       }catch(e){s.error=e.message||'Unable to load catalog draft.';}
       finally{s.loading=false;render();}
     }
@@ -246,27 +258,31 @@
       const action=kind==='categories'?READ.categories:kind==='products'?READ.products:kind==='collections'?READ.collections:READ.deals;
       const args={after_id:page.cursor,limit:kind==='categories'?100:50};
       if(kind==='deals')args.collection_id=collectionId;
-      const result=await read(action,args);
-      if(Number.isSafeInteger(revision)&&Number.isSafeInteger(result.draft_revision)&&result.draft_revision!==revision){
+      const result=await readPage(action,args);
+      if(result.draft_revision!==revision){
         await refresh();
         throw Error('The draft changed while loading another page. Catalog lists were refreshed; review them before editing.');
       }
+      const added=kind==='collections'?result.items.filter(c=>c&&c.id):[];
+      const lists=kind==='collections'?await Promise.all(added.map(c=>readPage(READ.deals,{collection_id:c.id,limit:50}))):[];
+      if(lists.some(x=>x.draft_revision!==revision)){
+        await refresh();
+        throw Error('The draft changed while loading newly discovered deal collections. Catalog lists were refreshed.');
+      }
       const target=kind==='categories'?s.categories:kind==='products'?s.products:kind==='collections'?s.collections:s.deals;
       const seen=new Set(target.map(item=>item.id));
-      for(const item of result.items||[])if(item&&item.id&&!seen.has(item.id)){target.push(item);seen.add(item.id);}
+      for(const item of result.items)if(item&&item.id&&!seen.has(item.id)){target.push(item);seen.add(item.id);}
       page.hasMore=result.has_more===true;page.cursor=result.next_cursor||null;
       if(kind==='collections'){
-        const added=(result.items||[]).filter(c=>c&&c.id);
-        const lists=await Promise.all(added.map(c=>read(READ.deals,{collection_id:c.id,limit:50})));
+        const knownDeals=new Set(s.deals.map(d=>d.id));
         lists.forEach((list,index)=>{
-          const collection=added[index],known=new Set(s.deals.map(d=>d.id));
-          for(const deal of list.items||[])if(deal&&deal.id&&!known.has(deal.id)){s.deals.push(deal);known.add(deal.id);}
-          s.pages.deals[collection.id]={hasMore:list.has_more===true,cursor:list.next_cursor||null};
+          for(const deal of list.items)if(deal&&deal.id&&!knownDeals.has(deal.id)){s.deals.push(deal);knownDeals.add(deal.id);}
+          s.pages.deals[added[index].id]={hasMore:list.has_more===true,cursor:list.next_cursor||null};
         });
       }
       render();
     }
-    function categoryLabel(id){return s.categories.find(c=>c.id===id)?.name_en||'Unknown category';}
+        function categoryLabel(id){return s.categories.find(c=>c.id===id)?.name_en||'Unknown category';}
     function variantRows(product){
       const rows=product&&Array.isArray(product.variants)?product.variants:[{size_key:'REGULAR',size_label:'Regular',price:'',variant_kind:'standard',pack_quantity:null,pack_unit:null,is_standalone_sellable:true,is_active:true,is_available:true}];
       return rows.map(v=>'<article class="fcv3-variant-row" data-variant-row>'+
