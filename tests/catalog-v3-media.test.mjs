@@ -191,6 +191,10 @@ test('user-bound recovery records validate the entity path, stage and account',(
   assert.throws(()=>media.createRecoveryStore(storage,'pending-media',OTHER_USER_ID).read(),/invalid/);
   assert.throws(()=>store.write({...record,path:'products/'+ENTITY_ID+'/../bad.jpg'}),/invalid/);
   assert.throws(()=>store.write({...record,stage:'delete_everything'}),/invalid/);
+  assert.throws(()=>store.write({...record,action:'catalog_category_upsert'}),/invalid/);
+  assert.throws(()=>store.write({...record,payload:{...record.payload,id:OTHER_USER_ID}}),/invalid/);
+  assert.throws(()=>store.write({...record,payload:{...record.payload,image_published:false}}),/invalid/);
+  assert.doesNotThrow(()=>store.write({...record,stage:'committed_unverified'}));
   store.clear(record.path);
   assert.equal(store.read(),null);
 });
@@ -219,7 +223,11 @@ test('Catalog V3 wires media through secured catalog commands, not direct table 
   assert.match(source,/mediaEditor\('deals'/);
   assert.match(source,/write\(mediaAction\(kind\),payload\)/);
   assert.match(source,/Check and resume image operation/);
+  assert.match(source,/committed_unverified/);
+  assert.match(source,/getPendingMutation/);
   assert.match(source,/No Storage object was deleted/);
+  assert.match(source,/unpublished catalog draft only/);
+  assert.match(source,/does not yet display category artwork/);
   assert.doesNotMatch(source,/\/rest\/v1\/|\.from\(['"]storage['"]\)/);
   assert.match(app,/catalogV3MediaOptions/);
   assert.match(app,/catalog-media-pending/);
