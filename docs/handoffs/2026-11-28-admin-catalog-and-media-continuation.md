@@ -371,3 +371,47 @@ The Admin phase is ready for user review when:
 - Do not alter/deploy Staff Admin Edge Function or Pages.
 - Do not access Supabase Logs Explorer, the 102 GB log query or Log Ingestion.
 - Website promotional imagery remains a separate task.
+
+
+---
+
+## Senior-engineer review checkpoint — 2026-11-28 (response and authorization hardening)
+
+### New client defects found and fixed
+
+- A valid HTTP 200 with malformed/truncated JSON was previously converted to an empty object by `response.json().catch(()=>({}))`. The mutation wrapper could then treat it as a definite failure and clear the idempotency recovery record even if the database had committed. It now raises a typed ambiguous response error, retries the exact same request once, and retains the recovery record unless the server returns a verified success envelope or a typed/HTTP definitive rejection.
+- A mutation success envelope is now required to include `ok === true`, the exact original `request_id`, and a non-negative safe-integer `draft_revision` before the recovery record can be cleared.
+- Re-authentication reconciliation uses the same strict success-envelope checks. An unverified response retains the record.
+- A second HTTP 401 with an empty/non-JSON response was at risk of being parsed before the session-expiry path, which could prevent the explicit sign-out handling. The second 401 is now handled before parsing its body.
+- HTTP status classification distinguishes retryable/ambiguous 408, 425, 429 and 5xx outcomes from definitive 4xx validation/authorization/conflict outcomes. Business command errors returned in a valid error envelope are also classified as definite rejection.
+- Added regression tests for malformed-success retry, exact same request object reuse, definitive-vs-ambiguous status classification, and second-401 ordering.
+
+### Verified Production database contracts (read-only inspection only)
+
+- Category authoring is implemented in `app_private.flame_chick_catalog_command_internal(text,jsonb,bigint,uuid)`, reached through the public category wrapper. Its current allowlist does **not** accept image metadata. It uses actor-derived Admin/Owner authorization, a per-restaurant draft-state row lock, payload hashing, idempotency replay before revision conflict, audit log and response persistence.
+- Deal authoring is implemented in `app_private.flame_chick_catalog_deal_upsert_internal(jsonb,bigint,uuid)`. Its current allowlist does **not** accept image metadata. It uses `flame_chick_catalog_command_context` and `flame_chick_catalog_command_finish` for actor context, revision lock, idempotency and audit behavior.
+- Product authoring already accepts current/previous image paths and extensions and checks that each path is under the exact product UUID folder, uses an allowed extension, and exists in `storage.objects` in bucket `flame-chick-media`.
+- Production categories and deals have `image_current_path` and `image_previous_path`; products additionally have `image_extension`, `image_previous_extension`, `image_folder_key`, `image_group_id` and `image_published`.
+- Existing Storage object policies require authenticated Admin/Owner authorization and restrict paths to product/category/deal UUID folders (plus separate site/menu-slide folders). Read, insert, update and delete policies exist. No Storage object was read, created, updated or deleted in this audit.
+- The database helper functions inspected use `SECURITY DEFINER` with empty `search_path` and explicit schema qualification. The public wrappers inspected are invoker SQL wrappers with empty `search_path`. Existing function ACLs were inspected read-only; no grants were changed.
+
+### CI
+
+- `46123163193` on `27491b74631c735f5fe95ebacd01138340c6fd6c`: success.
+- `46123174032` on `5d4fe75f286648c205eaf3d9e931d449d9a300c6`: success.
+- `46123253337` on `8b77a13f506389a9d73a5b9a343b48945a8b8f2d`: success.
+- `46123260271` on `8a0b60c82a7f629b1f478746fa233b324b95fec7`: success; includes the new auth-ordering regression test and all static Admin checks.
+
+### Media implementation decision / remaining work
+
+- Do not add a broad generic media command or direct Storage metadata write shortcut. Extend the existing category and deal authoring contracts additively, preserving their established idempotency, revision and audit semantics.
+- Category and deal read paths must expose current/previous paths to the draft editor; verify the exact page/list response shape and publication compiler behavior before changing them.
+- Server validation must bind the path to the exact entity UUID and allowed entity folder, enforce the approved image suffix, and require an existing object in the exact `flame-chick-media` bucket. The client must not be trusted to assert ownership or Admin/Owner role.
+- Implement upload/replace/restore/remove as a compensating workflow: upload new immutable object first, commit metadata with revision/idempotency, reconcile ambiguous metadata results using the exact request ID, and only then attempt deletion of objects no longer referenced by current/previous metadata or published snapshots. Never delete an object while the metadata result is uncertain.
+- Keep the published image snapshot separate from draft image selection. Draft replacement/removal must not change the customer-visible published image until the existing publication process runs.
+- Before any media UI is exposed, add integration tests for category/deal metadata authoring, wrong-entity-folder paths, missing objects, cross-restaurant IDs, role denial, idempotency replay, revision conflict, interrupted upload, ambiguous metadata commit, restore, removal and orphan cleanup. A disposable Supabase test environment is required for the database/RPC/Storage failure cases.
+- No category/deal media migration has been authored or executed in this checkpoint. No media UI is ready. User image upload remains blocked until these contracts and tests are complete.
+
+### Boundary reaffirmation
+
+All Production database queries in this checkpoint were metadata/function-definition SELECTs only. No SQL writes, migration application, Storage object operations, Edge Function changes/deployments, Pages changes/deployments or production-branch edits occurred. Supabase Logs Explorer, the 102 GB query and Log Ingestion remain untouched.
