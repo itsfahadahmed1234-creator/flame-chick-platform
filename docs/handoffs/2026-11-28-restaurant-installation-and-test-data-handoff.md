@@ -13,7 +13,7 @@ Do not assume that restaurant installation or live operational readiness is comp
 ## Current production deployment state
 
 ### POS
-- URL: https://flamechickpos.itsfahadahmed1234.workers.dev
+- URL: https://flamechickpos.itsfahadah1234.workers.dev
 - Cloudflare Worker: `flamechickpos`
 - Active version: **9**
 - Version ID: `8b2f6ac4-0df4-4f74-84d2-c3f2b68c51d4`
@@ -63,7 +63,7 @@ The production apps and Supabase backend are hosted. The restaurant needs client
 Start with one cashier terminal. Add more terminals only after the first terminal and its printer are stable.
 
 ### POS installation at the restaurant
-1. Open https://flamechickpos.itsfahadahmed1234.workers.dev in Chrome/Edge on the actual cashier computer.
+1. Open https://flamechickpos.itsfahadah1234.workers.dev in Chrome/Edge on the actual cashier computer.
 2. Sign in using an individually assigned authorized staff account.
 3. Confirm the correct branch, menu, and Online Orders inbox load.
 4. Bookmark the URL or create a browser shortcut; it is a browser app, not a locally installed Windows POS executable.
