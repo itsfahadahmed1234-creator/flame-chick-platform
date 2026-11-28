@@ -522,17 +522,20 @@
     return rows.join('\n') + '\n' + cutterCommand;
   }
 
+  function rawCommand(data) {
+    return { type: 'raw', format: 'command', flavor: 'plain', data: [String(data == null ? '' : data)] };
+  }
+
   async function buildReceiptData(order, label) {
     const base64 = await loadReceiptLogoBase64();
     const logoEntry = buildReceiptImageEntry(base64);
-    if (!logoEntry) return [receiptCommands(order, label)];
-
-    // Set centered alignment before QZ inserts the ESC/POS raster logo.
+    const commands = receiptCommands(order, label);
+    if (!logoEntry) return [rawCommand(commands)];
     return [
-      '\x1B\x40' + '\x1B\x61\x01',
+      rawCommand('\x1B\x40' + '\x1B\x61\x01'),
       logoEntry,
-      '\n',
-      receiptCommands(order, label)
+      rawCommand('\n'),
+      rawCommand(commands)
     ];
   }
 
@@ -955,6 +958,7 @@
       buildTestPayload: testCommands,
       buildReceiptPayload: receiptCommands,
       buildReceiptImageEntry: buildReceiptImageEntry,
+      buildReceiptData: buildReceiptData,
       encodeCp437Ascii: encodeCp437Ascii,
       formatEscPosPayload: formatEscPosPayload
     }
