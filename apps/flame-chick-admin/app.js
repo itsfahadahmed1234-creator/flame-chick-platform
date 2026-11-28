@@ -141,9 +141,9 @@ async function staffApi(method,query,body){
  if(!response.ok||data.ok===false)throw Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");
  return data;
 }
-async function catalogV3Request(action,payload,isMutation){
+async function catalogV3Request(action,payload,isMutation,expectedRevision){
  const body=isMutation
-  ?{action,payload,expected_revision:S.catalogV3Revision,request_id:staffRequestId()}
+  ?{action,payload,expected_revision:Number.isSafeInteger(expectedRevision)?expectedRevision:S.catalogV3Revision,request_id:staffRequestId()}
   :Object.assign({action},payload||{});
  const response=await staffApi("POST",null,body);
  const result=response&&response.result;
@@ -160,7 +160,10 @@ async function openCatalogTab(view){
  if(!S.catalogWorkspaces[view]){
   S.catalogWorkspaces[view]=window.FlameChickAdminCatalogV3.createWorkspace();
   await S.catalogWorkspaces[view].mount(root,catalogV3Request,view);
+  return;
  }
+ const workspace=S.catalogWorkspaces[view],state=workspace.getState();
+ if(!state.editor&&!state.editorLoadingDealId&&!state.saving)await workspace.refresh();
 }
 function staffRoleLabel(role){return ({owner:"Owner",admin:"Admin",manager:"Manager",cashier:"Cashier",rider:"Rider"})[role]||role;}
 function staffRequestId(){return crypto.randomUUID?crypto.randomUUID():"b4-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2);}
