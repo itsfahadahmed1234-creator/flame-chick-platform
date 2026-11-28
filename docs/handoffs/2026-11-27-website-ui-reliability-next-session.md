@@ -1,3 +1,5 @@
+> **Shared Supabase safety clarification:** The specific Supabase log query exceeded **102 GB** and must not be rerun, edited, cloned, recreated, broadened, or troubleshot without the user's explicit approval. Separately, **Log Ingestion usage was 0.10 GB out of 1 GB**; ingestion did not exceed 102 GB. Do not conflate query volume with ingestion usage. For website work, avoid unrelated Supabase log-query access and keep the current scope focused.
+
 > **Supabase log-query safety:** The specific Supabase log query exceeded **102 GB** and must not be rerun, edited, cloned, recreated, broadened or troubleshot without the user's explicit approval. Separately, **Log Ingestion usage was 0.10 GB / 1 GB**; it did not exceed 102 GB. Do not confuse query volume with ingestion usage.
 
 # Flame Chick Website — 27 November 2026 UI Reliability Handoff
