@@ -81,5 +81,28 @@ Treat these as review candidates, not approved changes. Inspect the current sour
 
 ## Next concrete step
 
-Run the mocked Order API and Delivery API Deno handler tests on `supabase-edge-optimization-2026-11-28` and inspect their actual results. Deno was not installed in the local environment during the 2026-11-28 review, so those tests remain unverified; do not treat the added GitHub Actions workflow as passed without a confirmed run. Then review the Staff Admin RPC and other database call paths for safe, evidence-based improvements. Keep all tests off Production. **Do not rerun or reproduce the specific 102 GB log query; obtain explicit approval before any new log-query activity.** Report accurately what passed, what failed, and what remains before asking for deployment approval.
+**The Deno verification gate is now complete.** GitHub Actions workflow run [46108163974](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/46108163974), testing commit `eed5d102f00b5fb38d00f4c1646335fd6c48798a`, completed successfully on 2026-11-28:
 
+- Node.js source-contract and dashboard-validator tests: **6 passed, 0 failed**.
+- Deno mocked Order API and Delivery API regression tests: **5 passed, 0 failed** (Delivery: 1; Order: 4).
+- Total verified in the actual workflow logs: **11 passed, 0 failed**.
+- The current optimization branch head at this checkpoint is `03a52c499829d343c5fbf297e6889e826184b4b9`; the workflow-tested code is an ancestor of that head and subsequent commits only synchronized handoff documentation.
+
+## Staff Admin and database-path review — 2026-11-28
+
+- Reviewed the Staff Admin Edge Function, dashboard request allowlist, origin policy, staff command migrations, definer isolation, role projection RPC, rider provisioning migration, SQL security assertions, and existing staff indexes.
+- The dashboard public RPC is an invoker wrapper with an empty search path. Its private implementation is Postgres-owned, `SECURITY DEFINER`, uses an empty search path, and is executable by `authenticated` only (not `anon` or `service_role`).
+- The dashboard query runs several bounded date/status reads against `public.orders`. A narrow read-only production catalog inspection estimated `orders` at **33 rows / 3 heap pages**. Existing indexes cover branch/date, branch/status/date, and related operational keys. No dashboard rewrite or extra index is justified at this table size.
+- Staff roles, invitations, and audit paths already have targeted unique/partial indexes and supporting FK indexes. Do not add another index without evidence of table growth and a measured query bottleneck.
+- Order API and Delivery API source review confirms the independent HTTP reads identified in the plan already run concurrently: Website catalog/restaurant, per-branch delivery areas/settings, Rider active-task/profile reads, Rider tasks/offers, and Dispatch tasks/riders. Remaining sequences depend on prior authentication, authorization, state checks, transactional results, or fail-closed decisions.
+- The large order, payment, and delivery RPCs are single PostgREST calls executed as database transactions. Their internal SQL statements are not separate Edge-to-Postgres network round trips; avoid combining/reordering them without a concrete plan and regression coverage. The production RPCs inspected are Postgres-owned privileged functions with execution restricted to `service_role`.
+- **Decision:** no further Staff Admin, dashboard, index, or transactional RPC change is justified by current evidence. Keep the Catalog API checksum and immutable publication behavior unchanged.
+
+## Safety and release status
+
+- **Zero Supabase log-query use in this continuation.** No Logs Explorer, `query_logs`, log API/CLI, broad diagnostic query, log-drain setting, or log-ingestion setting was accessed or changed.
+- The only Supabase SQL used here was narrow, read-only catalog inspection (`pg_proc`, `pg_class`, `pg_indexes`) to inspect deployed function definitions, grants, and table/index metadata. No customer/order rows were selected or changed.
+- No Production test traffic, Edge Function deployment, migration, SQL write, secret/Auth change, or paid-plan change was made.
+- The 102 GB figure remains the expensive **log query** amount. Log ingestion remains **0.10 GB of 1 GB**. Do not conflate these measurements.
+
+Further optimization should be driven by source-level evidence, controlled local/disposable tests, or narrowly scoped read-only schema metadata—not by Supabase log queries. Do not merge, rebase, deploy, or apply migrations without a complete final review and the user's explicit approval.
