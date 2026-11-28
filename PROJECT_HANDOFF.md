@@ -18,6 +18,21 @@
 - The authenticated working GitHub account may be different; do not confuse the acting account with the repository owner. Always verify the canonical owner from the repository metadata and retain the exact spelling above.
 - This correction applies to every Flame Chick task, branch, handoff and new chat.
 
+
+## CURRENT POS RECEIPT REVISION — 2026-11-28
+
+- Canonical repository: `itsfahadahmed1234-creator/flame-chick-platform` (the owner handle MUST include `ahmed`).
+- Isolated work branch: `pos-qz-receipt-layout-revision-2026-11-28`.
+- Latest verified commit: `6496a5f79a4600d446c32bbef1ef0a12e92f0f2c`.
+- Receipt implementation is aligned to the November 25 physical sample: logo/header, large bold double-height (not double-width) headings, explicit printer centering, prominent table/grand total/payment status, and formatted payment labels.
+- Business email `hanzlaawanx@gmail.com` is included. P-NTN is deliberately excluded.
+- Delivery/customer fields, Delivery Charges, Discount, current totals/payment logic, paper feed and partial cut remain in place. No Surcharge line.
+- The existing logo is recolored to black on a transparent temporary print canvas; the source SVG asset is unchanged. QZ connection, printer configuration, certificate, private signing key and signing endpoint are unchanged.
+- GitHub Actions receipt/POS regression workflow **passed** on commit `6496a5f79a4600d446c32bbef1ef0a12e92f0f2c`: [run 46161109273](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/46161109273). This included QZ diagnostics, POS contract checks, full POS test suite, build and Wrangler dry-run.
+- Detailed addenda are in `docs/handoffs/2026-11-28-pos-rider-delivery-release-checkpoint.md` and `docs/handoffs/2026-11-28-restaurant-installation-and-test-data-handoff.md` on the work branch.
+- Production remains on Cloudflare POS Worker v9. No Cloudflare deployment or physical test print was performed for this revision. Do not deploy until the user reviews the branch and confirms an actual physical test receipt.
+- Vercel is not a deployment target. Preview deployments were disabled for legacy linked projects `flame-chick-pos-development` and `flame-chick-website-production`. The initial revision push had already generated a legacy POS Preview before this setting was applied; that POS deployment is canceled. An older Website Preview from a previous branch remains READY. No Vercel deployments were created for later receipt-revision commits. Do not trigger or use Vercel Preview or Production deployments.
+
 ---
 ---
 
