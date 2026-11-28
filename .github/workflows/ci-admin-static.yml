@@ -6,6 +6,7 @@ on:
       - work/production-source-audit
       - cloudflare/admin-production
       - work/admin-dashboard-release
+      - work/admin-catalog-media-review
     paths:
       - "apps/flame-chick-admin/**"
       - "apps/flame-chick-pos/**"
