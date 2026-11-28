@@ -84,8 +84,17 @@ Deno.test("Delivery API preserves Auth and Rider checks while overlapping presen
         }
       }
 
+      if (url.pathname.endsWith("/delivery_task_offers")) {
+        return new Response("[]", { status: 200 });
+      }
+
       if (url.pathname.endsWith("/rider_profiles")) {
-        return new Response(JSON.stringify([{ user_id: userId, branch_id: branchId, is_active: true }]), { status: 200 });
+        const detailed = url.searchParams.get("select")?.includes("display_name");
+        return new Response(JSON.stringify([detailed ? {
+          user_id:userId, branch_id:branchId, is_active:true, rider_code:"R-01",
+          display_name:"Test Rider", availability_status:"available",
+          accepting_jobs:true, last_seen_at:new Date().toISOString(),
+        } : { user_id: userId, branch_id: branchId, is_active: true }]), { status: 200 });
       }
 
       return new Response(JSON.stringify({ message: "Unexpected mocked request: " + method + " " + url.pathname }), { status: 500 });
@@ -114,6 +123,19 @@ Deno.test("Delivery API preserves Auth and Rider checks while overlapping presen
       throw new Error("Active-task and accepting-jobs reads did not overlap.");
     }
     if (patchCount !== 1) throw new Error("Rider presence should perform exactly one profile update.");
+
+    const sync = await handleDeliveryApiRequest(new Request(baseUrl + "/functions/v1/flame-chick-delivery-api", {
+      method:"POST",
+      headers:{ apikey:publishableKey, authorization:"Bearer "+validToken, "content-type":"application/json" },
+      body:JSON.stringify({ action:"sync", online:true }),
+    }));
+    const syncBody = await sync.json();
+    if (sync.status !== 200 || syncBody?.ok !== true || syncBody?.view !== "rider" ||
+        !Array.isArray(syncBody?.data) || !Array.isArray(syncBody?.offers) ||
+        syncBody?.profile?.user_id !== userId || syncBody?.availability_status !== "available") {
+      throw new Error("Authenticated Rider sync must return presence, profile, jobs and offers together: " + JSON.stringify(syncBody));
+    }
+    if (patchCount !== 2) throw new Error("Combined Rider sync must update server-timestamped presence exactly once.");
   } finally {
     globalThis.fetch = originalFetch;
     for (const name of envNames) {
