@@ -31,16 +31,28 @@ Continue the existing Flame Chick Production project. Do not restart, rebuild th
 - No Production Edge Function deployment, migration, secret/Auth modification, or order/customer data write was made during the prior optimization audit.
 - GST remains deferred.
 
-## Important branch and test status
+## Active optimization branch and test status
 
-A feature branch named `supabase-edge-optimization-2026-11-27` was created during the earlier attempt. Its exact current head and contents must be verified from GitHub before relying on it. Do not assume that its source, tests, CI or deployment state is valid.
+- Current feature branch: `supabase-edge-optimization-2026-11-28`. Do not continue the diverged `supabase-edge-optimization-2026-11-27` branch.
+- Current production-source branch at the last comparison: `work/production-source-audit`, commit `eee6d501703f3d5a71e11dadc3cfc63d7982b238`.
+- The optimization branch was ahead by 18 commits and behind by 9 at the comparison. The nine later commits on production-source were handoff/documentation commits; no later application-code changes were present in that compared range. Do not merge/rebase automatically.
+- The optimization regression workflow passed on commit `eed5d102f00b5fb38d00f4c1646335fd6c48798a`: Node tests **6/6**, mocked Deno Order API and Delivery API tests **5/5**, total **11/11**. Actual run: https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/46108163974
+- Subsequent commits through `c3cb427bf8f5f966077db6b0373ad360c3ada297` updated handoffs; no further application code was changed by those documentation commits.
+- Earlier CI failures are historical attempts and are not the result of the passing workflow above. A Vercel Free-plan deployment/build limit is unrelated to Supabase behavior.
+- Delivery API `verify_jwt=false` remains intentional because the handler performs internal Supabase Auth validation. Preserve unauthenticated browser OPTIONS preflight.
+- **Do not deploy, merge, rebase, or cherry-pick the optimization branch without a fresh source review and explicit user approval.**
 
-Earlier CI attempts were not fully green:
-- A source-contract assertion referenced a stale website quote error name.
-- A local order test failed because the disposable test DB did not have the required published catalog fixture.
-- A Vercel deployment/build status also failed because of an existing Vercel Free-plan build/deployment limit; that is not evidence of a Supabase defect.
-- A proposed Delivery API gateway JWT shortcut was reverted. Keep Delivery API `verify_jwt=false` unless a complete auth/CORS review proves a change safe; its handler performs internal Supabase Auth validation. In particular, do not break unauthenticated browser OPTIONS preflight.
-- Do not report the optimization branch or its tests as successful without checking the current commit, source and actual test results.
+## Parallel work boundary — Website and Admin ownership
+
+A separate ChatGPT conversation is actively working on the Flame Chick Website and Admin panel. Treat those workstreams as owned by that conversation.
+
+- Do not edit, refactor, reformat, replace, or deploy Website or Admin panel application files.
+- Do not change their UI, routes, API payloads/contracts, catalog/admin workflows, auth/session behavior, CORS allowlists, environment variables, secrets, Cloudflare Pages/Workers/Vercel projects, hostnames, DNS, aliases, or deployment configuration.
+- Do not change shared backend/API/database surfaces that can alter Website or Admin behavior while that work is in progress. This includes Order API, Catalog API, Staff Admin API/RPC, dashboard RPC, and shared Website/Admin contracts. Coordinate with the owner and obtain explicit approval before any such edit.
+- Do not merge, rebase, cherry-pick, force-push, or overwrite commits from the parallel workstream.
+- Existing unmerged optimization-branch changes remain isolated and must be reconciled against the parallel work before any rollout. Passing tests do not authorize merge or deployment.
+- Safe continuation is limited to read-only review or isolated backend areas that do not serve or modify the Website/Admin workstream.
+- The no-log-query restriction remains absolute unless the user explicitly approves new log-query activity.
 
 ## Optimization areas already identified
 
@@ -67,7 +79,15 @@ Treat these as review candidates, not approved changes. Inspect the current sour
 
 ## Next concrete step
 
-Run the mocked Order API and Delivery API Deno handler tests on `supabase-edge-optimization-2026-11-28` and inspect their actual results. Deno was not installed in the local environment during the 2026-11-28 review, so those tests remain unverified; do not treat the added GitHub Actions workflow as passed without a confirmed run. Then review the Staff Admin RPC and other database call paths for safe, evidence-based improvements. Keep all tests off Production. **Do not rerun or reproduce the specific 102 GB log query; obtain explicit approval before any new log-query activity.** Report accurately what passed, what failed, and what remains before asking for deployment approval.
+The original Deno verification gate is complete: workflow run [46108163974](https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/46108163974) passed all **11/11** Node and Deno tests. The Staff Admin and database-path source review is also complete for this checkpoint. It found no evidence supporting another Staff Admin/dashboard rewrite, extra index, or transactional RPC refactor.
+
+**Because a separate chat owns Website and Admin work, do not continue editing the shared Order API, Catalog API, Staff Admin API/RPC, dashboard RPC, Website/Admin contracts, or their deployment settings.** Before any merge or rollout, coordinate with that workstream's owner and review the resulting combined source.
+
+The only permitted continuation without that coordination is read-only analysis or an isolated backend optimization proven not to affect Website/Admin behavior, using static/source review and local/disposable tests. Keep tests off Production. Do not deploy Edge Functions, apply migrations, modify secrets/Auth, or upgrade the Free plan without explicit approval.
+
+**Never rerun, edit, recreate, broaden, optimize, troubleshoot, or reproduce the specific 102 GB Supabase log query.** Do not use Logs Explorer, `query_logs`, equivalent broad log APIs/CLI/diagnostics, or change log-drain/ingestion settings. The 102 GB figure is query usage; ingestion was only 0.10 GB of its 1 GB allowance. Ask for explicit approval before any new log-query activity.
+
+Read `docs/handoffs/2026-11-28-supabase-edge-optimization-continuation.md` for the full optimization and ownership checkpoint.
 
 ## Catalog API review — 2026-11-28
 
