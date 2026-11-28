@@ -587,3 +587,33 @@ test('Burger groups use a Chicken Burgers category source and Remove choice bypa
   assert.match(source, /choiceIndex<0\|\|!s\.components\[index\]/);
   assert.match(source, /if\(!group\|\|\/burger\/i\.test\(group\.display_name\)\)/);
 });
+
+
+test('Catalog V3 exposes cursor pagination for bounded product, category, collection and per-collection deal lists', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-admin/catalog-v3-admin.js', import.meta.url), 'utf8');
+  assert.match(source, /pages:\{categories:\{hasMore:false,cursor:null\},products:\{hasMore:false,cursor:null\},collections:\{hasMore:false,cursor:null\},deals:\{\}\}/);
+  assert.match(source, /hasMore:cats\.has_more===true/);
+  assert.match(source, /hasMore:prods\.has_more===true/);
+  assert.match(source, /hasMore:cols\.has_more===true/);
+  assert.match(source, /s\.pages\.deals\[collections\[index\]\.id\]/);
+  assert.match(source, /after_id:page\.cursor/);
+  assert.match(source, /page\.hasMore=result\.has_more===true;page\.cursor=result\.next_cursor\|\|null/);
+  assert.match(source, /data-action="load-more" data-kind="products"/);
+  assert.match(source, /data-action="load-more" data-kind="categories"/);
+  assert.match(source, /data-action="load-more" data-kind="collections"/);
+  assert.match(source, /data-action="load-more" data-kind="deals" data-collection-id=/);
+  assert.match(source, /The draft changed while loading another page/);
+});
+
+
+test('Catalog V3 commits pagination only after dependent deal reads share the same revision', async () => {
+  const source = await readFile(new URL('../apps/flame-chick-admin/catalog-v3-admin.js', import.meta.url), 'utf8');
+  assert.match(source, /async function readPage\(action,args\)/);
+  assert.match(source, /The draft changed while the catalog was loading/);
+  assert.match(source, /lists\.some\(x=>x\.draft_revision!==baseRevision\)/);
+  assert.match(source, /const lists=kind==='collections'\?await Promise\.all\(added\.map\(c=>readPage\(READ\.deals/);
+  assert.match(source, /lists\.some\(x=>x\.draft_revision!==revision\)/);
+  assert.match(source, /const target=kind==='categories'\?s\.categories/);
+  assert.match(source, /for\(const item of result\.items\)if\(item&&item\.id&&!seen\.has\(item\.id\)\)/);
+  assert.match(source, /page\.hasMore=result\.has_more===true;page\.cursor=result\.next_cursor\|\|null/);
+});

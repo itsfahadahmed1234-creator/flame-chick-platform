@@ -1,7 +1,7 @@
 (() => {
 "use strict";
 const C=window.FLAME_CHICK_CONFIG, $=id=>document.getElementById(id);
-const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],catalogV3Revision:0,catalogV3Workspace:null,catalogV3Mounted:false,range:"today",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
+const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],catalogV3Revision:0,catalogV3Workspace:null,catalogV3Mounted:false,catalogV3RecoveryUser:null,catalogV3MediaClient:null,catalogV3MediaRecoveryStore:null,catalogV3MediaRecoveryUser:null,catalogV3LastReconciliation:null,range:"today",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
 const roles=["owner","admin"], labels={new:"New",accepted:"Accepted",preparing:"Preparing",ready:"Ready",out_for_delivery:"On delivery",delivered:"Delivered",collected:"Collected",served:"Served",completed:"Completed",rejected:"Rejected",cancelled:"Cancelled"};
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const cash=n=>new Intl.NumberFormat("en-PK",{style:"currency",currency:"PKR",maximumFractionDigits:0}).format(Number(n)||0);
@@ -12,11 +12,32 @@ const ago=d=>{let m=Math.max(0,Math.floor((Date.now()-new Date(d).getTime())/600
 const toast=(msg,bad)=>{let e=document.createElement("div");e.className="toast"+(bad?" error":"");e.textContent=msg;$("toastRoot").appendChild(e);setTimeout(()=>e.remove(),3500);};
 const readSession=()=>{try{return JSON.parse(sessionStorage.getItem(C.sessionStorageKey)||"null");}catch{return null;}};
 const saveSession=s=>{S.session=s;sessionStorage.setItem(C.sessionStorageKey,JSON.stringify(s));};
-const clearSession=()=>{S.session=null;sessionStorage.removeItem(C.sessionStorageKey);};
+const clearSession=()=>{
+ S.session=null;sessionStorage.removeItem(C.sessionStorageKey);
+ S.catalogV3Workspace=null;S.catalogV3Mounted=false;S.catalogV3RecoveryUser=null;
+ S.catalogV3MediaClient=null;S.catalogV3MediaRecoveryStore=null;S.catalogV3MediaRecoveryUser=null;
+ S.catalogV3LastReconciliation=null;
+};
 const headers=()=>({apikey:C.publishableKey,...(S.session&&S.session.access_token?{Authorization:"Bearer "+S.session.access_token}:{}),"Content-Type":"application/json"});
-async function authPost(path,body){let r=await fetch(C.supabaseUrl+"/auth/v1/"+path,{method:"POST",headers:{apikey:C.publishableKey,"Content-Type":"application/json"},body:JSON.stringify(body)});let d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.msg||d.message||d.error_description||"Authentication failed.");return d;}
-async function refresh(){if(!S.session||!S.session.refresh_token)throw Error("Session expired. Please sign in again.");let x=await authPost("token?grant_type=refresh_token",{refresh_token:S.session.refresh_token});saveSession(Object.assign({},x,{expires_at:Date.now()+Number(x.expires_in||3600)*1000}));}
-async function getUser(){if(!S.session)S.session=readSession();if(!S.session||!S.session.access_token)throw Error("Please sign in.");if(S.session.expires_at&&Date.now()>Number(S.session.expires_at)-60000)await refresh();let r=await fetch(C.supabaseUrl+"/auth/v1/user",{headers:headers(),cache:"no-store"});if(r.status===401){await refresh();return getUser();}let u=await r.json().catch(()=>({}));if(!r.ok||!u.id)throw Error("Sign-in expired. Please sign in again.");S.user=u;return u;}
+const pendingCatalogStore=(()=>{try{return window.FlameChickAdminConnection.createPendingMutationStore(sessionStorage,C.sessionStorageKey+":catalog-pending");}catch(error){return null;}})();
+const REQUEST_TIMEOUT_MS=12000;
+async function fetchBounded(url,options={},timeoutMs=REQUEST_TIMEOUT_MS){
+ return window.FlameChickAdminConnection.requestResponse(url,options,timeoutMs,fetch);
+}
+async function authPost(path,body){let r=await fetchBounded(C.supabaseUrl+"/auth/v1/"+path,{method:"POST",headers:{apikey:C.publishableKey,"Content-Type":"application/json"},body:JSON.stringify(body)});let d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.msg||d.message||d.error_description||"Authentication failed.");return d;}
+const refresh=window.FlameChickAdminConnection.createSingleFlight(async()=>{
+ if(!S.session||!S.session.refresh_token)throw Error("Session expired. Please sign in again.");
+ const token=S.session.refresh_token;
+ const x=await authPost("token?grant_type=refresh_token",{refresh_token:token});
+ saveSession(Object.assign({},x,{expires_at:Date.now()+Number(x.expires_in||3600)*1000}));
+});
+async function getUser(){
+ if(!S.session)S.session=readSession();if(!S.session||!S.session.access_token)throw Error("Please sign in.");
+ if(S.session.expires_at&&Date.now()>Number(S.session.expires_at)-60000)await refresh();
+ let r=await fetchBounded(C.supabaseUrl+"/auth/v1/user",{headers:headers(),cache:"no-store"});
+ if(r.status===401){await refresh();r=await fetchBounded(C.supabaseUrl+"/auth/v1/user",{headers:headers(),cache:"no-store"});}
+ let u=await r.json().catch(()=>({}));if(!r.ok||!u.id)throw Error("Sign-in expired. Please sign in again.");S.user=u;return u;
+}
 async function db(path,opt){if(S.session&&S.session.expires_at&&Date.now()>Number(S.session.expires_at)-60000)await refresh();let h=headers();if(opt&&opt.prefer)h.Prefer=opt.prefer;let r=await fetch(C.supabaseUrl+"/rest/v1/"+path,{method:opt&&opt.method||"GET",headers:h,body:opt&&opt.body?JSON.stringify(opt.body):undefined,cache:"no-store"});let raw=await r.text(),d=null;try{d=raw?JSON.parse(raw):null;}catch{d=raw;}if(!r.ok){if(r.status===401){clearSession();throw Error("Session expired. Sign in again.");}throw Error(d&&d.message||"Database request failed ("+r.status+").");}return d;}
 
 function managedMediaPath(path){return /^(products|categories|deals)\/[0-9a-f-]{36}\/[^/]+\.(?:jpg|jpeg|png|webp)$/i.test(String(path||""));}
@@ -134,36 +155,133 @@ function renderAll(){renderOrders();renderProducts();renderCategories();renderDe
 async function staffApi(method,query,body){
  if(!S.session||!S.session.access_token)throw Error("Your session has expired. Sign in again.");
  if(S.session.expires_at&&Date.now()>Number(S.session.expires_at)-60000)await refresh();
- const response=await fetch(C.supabaseUrl+"/functions/v1/flame-chick-staff-admin",{method,headers:{apikey:C.publishableKey,Authorization:"Bearer "+S.session.access_token,"Content-Type":"application/json"},body:method==="GET"?undefined:JSON.stringify(body||{}),cache:"no-store"});
- const data=await response.json().catch(()=>({}));
+ const send=()=>fetchBounded(C.supabaseUrl+"/functions/v1/flame-chick-staff-admin",{method,headers:{apikey:C.publishableKey,Authorization:"Bearer "+S.session.access_token,"Content-Type":"application/json"},body:method==="GET"?undefined:JSON.stringify(body||{}),cache:"no-store"});
+ let response=await send();
+ if(response.status===401){await refresh();response=await send();}
  if(response.status===401){clearSession();showAuth(true);throw Error("Your session expired. Sign in again.");}
- if(!response.ok||data.ok===false)throw Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");
+ let data;
+ try{data=await response.json();}
+ catch(cause){const error=new Error("The Staff Admin response was not valid JSON.");error.name="HttpResponseParseError";error.cause=cause;throw error;}
+ if(!response.ok){const failure=new Error(data&&data.error&&data.error.message||"Staff request failed ("+response.status+").");failure.name="HttpRequestError";failure.status=response.status;throw failure;}
+ if(!data||typeof data!=="object"||Array.isArray(data)) {const error=new Error("The Staff Admin response has an invalid shape.");error.name="HttpResponseParseError";throw error;}
+ if(data.ok===false){const error=new Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");error.name="CatalogCommandRejectedError";error.code=data.error&&data.error.code;throw error;}
  return data;
 }
+function pendingCatalogMutationForUser(){
+ if(!pendingCatalogStore)throw Error("Secure persistent storage is unavailable. Catalog saves are disabled to prevent losing an uncertain request.");
+ const record=pendingCatalogStore.read();
+ if(record&&record.user_id!==S.user.id)throw Error("A previous catalog save belongs to another signed-in account. Sign in with that account to reconcile it; no new save will be sent.");
+ return record;
+}
+function catalogMutationFingerprint(action,payload){return JSON.stringify({action,payload});}
 async function catalogV3Request(action,payload,isMutation){
- const body=isMutation
-  ?{action,payload,expected_revision:S.catalogV3Revision,request_id:staffRequestId()}
-  :Object.assign({action},payload||{});
- const response=await staffApi("POST",null,body);
+ let body,record=null;
+ if(isMutation){
+  const fingerprint=catalogMutationFingerprint(action,payload);
+  record=pendingCatalogMutationForUser();
+  if(record&&record.fingerprint!==fingerprint)throw Error("A previous save has an uncertain result. Retry that exact save first; do not submit different edits until it is reconciled.");
+  body=record?record.body:{action,payload,expected_revision:S.catalogV3Revision,request_id:window.FlameChickAdminConnection.createUuid()};
+  if(!record){
+   record={version:1,user_id:S.user.id,fingerprint,created_at:Date.now(),body};
+   pendingCatalogStore.write(record);
+  }
+ }else body=Object.assign({action},payload||{});
+ let response;
+ try{
+  response=isMutation
+   ?await window.FlameChickAdminConnection.sendWithOneRetry((sameBody)=>staffApi("POST",null,sameBody),body)
+   :await staffApi("POST",null,body);
+ }catch(error){
+  if(isMutation&&window.FlameChickAdminConnection.isDefinitelyRejected(error)){
+   pendingCatalogStore.clear(body.request_id);
+  }
+  throw error;
+ }
  const result=response&&response.result;
- if(!result||result.ok===false)throw Error(result&&result.error&&result.error.message||"Catalog V3 request failed.");
+ if(isMutation){
+  if(!result||typeof result!=="object"||Array.isArray(result)||result.ok!==true||
+     result.request_id!==body.request_id||!Number.isSafeInteger(result.draft_revision)||result.draft_revision<0){
+   const error=new Error("The catalog save response could not be verified. Its recovery record has been retained; retry the exact save to reconcile it.");
+   error.name="CatalogResponseContractError";
+   throw error;
+  }
+  pendingCatalogStore.clear(body.request_id);
+ }else if(!result||typeof result!=="object"||Array.isArray(result)||result.ok===false){
+  throw Error(result&&result.error&&result.error.message||"Catalog V3 request failed.");
+ }
  if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=Math.max(S.catalogV3Revision||0,result.draft_revision);
  return result;
 }
+async function reconcilePendingCatalogMutation(){
+ const record=pendingCatalogMutationForUser();
+ if(!record&&S.catalogV3RecoveryUser===S.user.id)return;
+ if(record){
+  const response=await window.FlameChickAdminConnection.sendWithOneRetry(
+   sameBody=>staffApi("POST",null,sameBody),record.body);
+  const result=response&&response.result;
+  if(!result||typeof result!=="object"||Array.isArray(result)||result.ok!==true||
+     result.request_id!==record.body.request_id||!Number.isSafeInteger(result.draft_revision)||result.draft_revision<0){
+   const error=new Error("The previous catalog save response could not be verified. Its recovery record has been retained; reopen Catalog to retry reconciliation.");
+   error.name="CatalogResponseContractError";
+   throw error;
+  }
+  S.catalogV3LastReconciliation={action:record.body.action,payload:record.body.payload,result};
+  pendingCatalogStore.clear(record.body.request_id);
+  if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=Math.max(S.catalogV3Revision||0,result.draft_revision);
+  toast("A previous catalog save was safely reconciled.");
+ }
+ S.catalogV3RecoveryUser=S.user.id;
+}
+function catalogV3MediaOptions(){
+ const factory=window.FlameChickAdminCatalogMedia;
+ if(!factory||typeof factory.createClient!=="function"||typeof factory.createRecoveryStore!=="function")
+  throw Error("The authenticated catalog image service is unavailable. Catalog image changes are disabled.");
+ if(!S.catalogV3MediaClient){
+  S.catalogV3MediaClient=factory.createClient({
+   supabaseUrl:C.supabaseUrl,
+   bucket:C.mediaBucket,
+   apiKey:C.publishableKey,
+   getAccessToken:async()=>{
+    if(!S.session||!S.session.access_token)throw Error("Your signed-in session is unavailable. Sign in again.");
+    return S.session.access_token;
+   },
+   refreshSession:refresh,
+   requestResponse:window.FlameChickAdminConnection.requestResponse,
+   createUuid:window.FlameChickAdminConnection.createUuid,
+   fetchImpl:fetch,
+   timeoutMs:REQUEST_TIMEOUT_MS
+  });
+ }
+ if(!S.catalogV3MediaRecoveryStore||S.catalogV3MediaRecoveryUser!==S.user.id){
+  S.catalogV3MediaRecoveryStore=factory.createRecoveryStore(
+   sessionStorage,C.sessionStorageKey+":catalog-media-pending",S.user.id
+  );
+  S.catalogV3MediaRecoveryUser=S.user.id;
+ }
+ return {client:S.catalogV3MediaClient,recoveryStore:S.catalogV3MediaRecoveryStore,
+  userId:S.user.id,reconciliation:S.catalogV3LastReconciliation,
+  getPendingMutation:()=>{
+   const pending=pendingCatalogMutationForUser();
+   return pending?pending.body:null;
+  }};
+}
 async function openCatalogV3(){
+ await reconcilePendingCatalogMutation();
+ const mediaOptions=catalogV3MediaOptions();
  const root=$("catalogV3Root");
  if(!root)throw Error("Catalog V3 page root is missing.");
  if(!window.FlameChickAdminCatalogV3||typeof window.FlameChickAdminCatalogV3.createWorkspace!=="function")throw Error("Catalog V3 authoring module is unavailable.");
  if(!S.catalogV3Workspace)S.catalogV3Workspace=window.FlameChickAdminCatalogV3.createWorkspace();
  if(!S.catalogV3Mounted){
-  await S.catalogV3Workspace.mount(root,catalogV3Request);
+  await S.catalogV3Workspace.mount(root,catalogV3Request,mediaOptions);
   S.catalogV3Mounted=true;
+  S.catalogV3LastReconciliation=null;
  }else{
   await S.catalogV3Workspace.refresh();
  }
 }
 function staffRoleLabel(role){return ({owner:"Owner",admin:"Admin",manager:"Manager",cashier:"Cashier",rider:"Rider"})[role]||role;}
-function staffRequestId(){return crypto.randomUUID?crypto.randomUUID():"b4-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2);}
+function staffRequestId(){return window.FlameChickAdminConnection.createUuid();}
 function staffBranchIds(roleKey){
  if(["admin","owner"].includes(roleKey))return [];
  const main=S.staffBranches.filter(b=>b.is_active&&String(b.branch_code||"").toLowerCase()==="main");

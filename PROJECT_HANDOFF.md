@@ -10,6 +10,20 @@
 - Only the user can explicitly change this absolute prohibition. Until then, every new chat must obey it without asking to use even a small amount.
 
 ---
+
+## ACTIVE ADMIN REVIEW BRANCH OVERRIDE — 2026-11-28
+
+The focused continuation handoff `docs/handoffs/2026-11-28-admin-catalog-and-media-continuation.md` is the controlling instruction for the current Admin catalog/media review. Its explicit isolated-review boundary supersedes the older generic instruction below that says to work directly on `cloudflare/admin-production`.
+
+- Continue only on `work/admin-catalog-media-review` until the user explicitly approves a reviewed integration/deployment plan.
+- Production Pages branch `cloudflare/admin-production` is currently `5f17dcce76f90fab4e94ceb1830b76987f702bc9`; do not edit or deploy it.
+- Do not merge the review branch, create a replacement project/repository, deploy Pages or Edge Functions, or execute database migrations.
+- The isolated branch is currently a review branch, not a production branch. Passing CI does not authorize deployment.
+- Read the focused continuation handoff for the latest exact source head, tests, remaining blockers and image-upload readiness.
+
+---
+
+---
 ---
 
 # NEW-CHAT EXECUTION DIRECTIVE — ADMIN CATALOG & MEDIA WORK

@@ -220,22 +220,345 @@
   function checkbox(name,label,checked){return '<label class="fcv3-check"><input type="checkbox" name="'+name+'" data-field="'+name+'"'+(checked?' checked':'')+'> '+label+'</label>';}
   function createWorkspace(){
     let el=null,request=null;
-    const s={loading:false,saving:false,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,editorLoadingDealId:null,components:[],detail:null,partial:null,importProgress:null};
+    const s={loading:false,saving:false,mediaBusy:false,pendingMedia:null,dealRecord:null,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,editorLoadingDealId:null,components:[],detail:null,partial:null,importProgress:null,pages:{categories:{hasMore:false,cursor:null},products:{hasMore:false,cursor:null},collections:{hasMore:false,cursor:null},deals:{}}};
     async function read(action,args){const r=await request(action,args||{},false);if(!isObj(r)||r.ok===false)throw Error('Catalog read failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
+    async function readPage(action,args){
+      const r=await request(action,args||{},false);
+      if(!isObj(r)||r.ok===false||!Array.isArray(r.items))throw Error('Catalog page response is invalid.');
+      if(!Number.isSafeInteger(r.draft_revision)||r.draft_revision<0)throw Error('Catalog page has no valid draft revision.');
+      if(r.has_more===true&&(!r.next_cursor||typeof r.next_cursor!=='string'))throw Error('Catalog page cursor is invalid.');
+      return r;
+    }
     async function write(action,payload){const r=await request(action,payload,true);if(!isObj(r)||r.ok===false)throw Error('Catalog save failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
+    let mediaClient=null,mediaRecoveryStore=null,mediaUserId=null,getPendingMutation=null;
+    function mediaCurrent(kind,record){return record&&record.image_current_path||null;}
+    function mediaPrevious(kind,record){return record&&record.image_previous_path||null;}
+    function mediaExtension(path){const match=String(path||'').toLowerCase().match(/\.([a-z0-9]+)$/);return match?match[1]:null;}
+    function mediaAction(kind){return kind==='categories'?WRITE.category:kind==='products'?WRITE.product:WRITE.deal;}
+    function mediaPayload(kind,record,currentPath,previousPath){
+      if(!record||!record.id)throw Error('Save this catalog item before managing its image.');
+      if(kind==='categories')return {id:record.id,category_kind:record.category_kind,name_en:record.name_en,
+        image_current_path:currentPath,image_previous_path:previousPath};
+      if(kind==='deals')return {id:record.id,image_current_path:currentPath,image_previous_path:previousPath};
+      return {id:record.id,image_current_path:currentPath,image_previous_path:previousPath,
+        image_extension:mediaExtension(currentPath),image_previous_extension:mediaExtension(previousPath),
+        image_published:!!currentPath};
+    }
+    function definiteMediaRejection(error){
+      if(!error)return false;
+      if(error.code==='CATALOG_REVISION_CONFLICT'||error.code==='CATALOG_IDEMPOTENCY_KEY_REUSED')return false;
+      if(error.name==='CatalogCommandRejectedError'||error.name==='HttpApplicationError')return true;
+      return error.name==='HttpRequestError'&&[400,403,404,413,415,422].includes(Number(error.status));
+    }
+    function mediaEditor(kind,record){
+      if(!record||!record.id)return '<section class="fcv3-media-editor"><strong>Image management</strong><p>Save this item first. You can attach its image after it has a permanent catalog ID.</p></section>';
+      const current=mediaCurrent(kind,record),previous=mediaPrevious(kind,record);
+      const currentUrl=mediaClient&&current?mediaClient.publicUrl(current):null;
+      const previousUrl=mediaClient&&previous?mediaClient.publicUrl(previous):null;
+      const busy=s.mediaBusy||!!s.pendingMedia;
+      return '<section class="fcv3-media-editor" data-media-editor data-kind="'+kind+'" data-id="'+esc(record.id)+'">'+
+        '<div class="fcv3-media-heading"><div><strong>Image and one restore point</strong><small>JPG, PNG or WebP · maximum 5 MB</small></div>'+
+        '<span class="fcv3-media-state">'+(current?'Current image saved':'No current image')+'</span></div>'+
+        '<div class="fcv3-media-preview-grid">'+
+        '<div class="fcv3-media-preview"><span>Current</span>'+(currentUrl?'<img src="'+esc(currentUrl)+'" alt="Current '+kind+' image" loading="lazy">':'<div class="fcv3-media-empty">No current image</div>')+
+        '<small>'+esc(current?current.split('/').pop():'Not set')+'</small></div>'+
+        '<div class="fcv3-media-preview"><span>Backup</span>'+(previousUrl?'<img src="'+esc(previousUrl)+'" alt="Previous '+kind+' image" loading="lazy">':'<div class="fcv3-media-empty">No backup image</div>')+
+        '<small>'+esc(previous?previous.split('/').pop():'Not set')+'</small></div></div>'+
+        '<label class="fcv3-media-upload">Upload a new image<input type="file" accept="image/jpeg,image/png,image/webp" data-media-upload data-kind="'+kind+'" data-id="'+esc(record.id)+'" '+(busy?'disabled':'')+'></label>'+
+        '<div class="fcv3-media-actions">'+
+        (previous?'<button type="button" class="fcv3-button" data-media-action="restore" data-kind="'+kind+'" data-id="'+esc(record.id)+'" '+(busy?'disabled':'')+'>Restore backup</button>':'')+
+        (current?'<button type="button" class="fcv3-button fcv3-danger" data-media-action="remove" data-kind="'+kind+'" data-id="'+esc(record.id)+'" '+(busy?'disabled':'')+'>Remove current image</button>':'')+
+        '</div><small class="fcv3-media-footnote">These changes update the unpublished catalog draft only. Customers see image changes after a separate catalog publication. Replacing or removing a reference never deletes Storage objects automatically; older files may still be used by an immutable published snapshot.</small>'+
+        (kind==='categories'?'<small class="fcv3-media-footnote">The current customer Website template does not yet display category artwork.</small>':'')+'</section>';
+    }
+    function currentMediaRecord(kind,id){
+      if(kind==='products')return s.products.find(item=>item&&item.id===id)||null;
+      if(kind==='categories')return s.categories.find(item=>item&&item.id===id)||null;
+      if(kind==='deals')return (s.dealRecord&&s.dealRecord.id===id?s.dealRecord:s.deals.find(item=>item&&item.id===id))||null;
+      return null;
+    }
+    function syncMediaRecord(kind,id,record){
+      const target=kind==='products'?s.products:kind==='categories'?s.categories:s.deals;
+      const found=target.find(item=>item&&item.id===id);
+      if(found)Object.assign(found,{image_current_path:record.image_current_path||null,image_previous_path:record.image_previous_path||null,
+        ...(kind==='products'?{image_extension:record.image_extension||null,image_previous_extension:record.image_previous_extension||null,image_published:record.image_published===true}:{})});
+      if(kind==='products'&&s.editor&&s.editor.type==='product'&&s.editor.product&&s.editor.product.id===id)
+        Object.assign(s.editor.product,{image_current_path:record.image_current_path||null,image_previous_path:record.image_previous_path||null,
+          image_extension:record.image_extension||null,image_previous_extension:record.image_previous_extension||null,image_published:record.image_published===true});
+      if(kind==='categories'&&s.editor&&s.editor.type==='category'&&s.editor.category&&s.editor.category.id===id)
+        Object.assign(s.editor.category,{image_current_path:record.image_current_path||null,image_previous_path:record.image_previous_path||null});
+      if(kind==='deals')s.dealRecord=record;
+    }
+    function mediaRecordMatchesPending(pending,record){
+      if(!pending||!record||record.id!==pending.entity_id||
+         record.image_current_path!==(pending.payload.image_current_path||null)||
+         record.image_previous_path!==(pending.payload.image_previous_path||null))return false;
+      if(pending.kind==='products')return record.image_extension===(pending.payload.image_extension||null)&&
+        record.image_previous_extension===(pending.payload.image_previous_extension||null)&&
+        record.image_published===pending.payload.image_published;
+      return true;
+    }
+    async function verifyMediaRecord(kind,id,result,expectedCurrent,expectedPrevious){
+      let record=null;
+      if(kind==='deals'){
+        const detail=await read(READ.dealDetail,{deal_id:id});
+        record=detail&&detail.deal;
+      }else if(kind==='products')record=result&&result.record&&result.record.product;
+      else record=result&&result.record;
+      if(!record||record.id!==id||record.image_current_path!==(expectedCurrent||null)||record.image_previous_path!==(expectedPrevious||null))
+        throw Error('The image metadata save returned, but its exact current/backup paths could not be verified. Keep the uploaded image; do not upload another image or delete this object.');
+      if(kind==='products'&&(record.image_extension!==(mediaExtension(expectedCurrent)||null)||
+          record.image_previous_extension!==(mediaExtension(expectedPrevious)||null)||record.image_published!==!!expectedCurrent))
+        throw Error('The product image metadata did not pass its complete read-back verification. The uploaded object has been retained.');
+      syncMediaRecord(kind,id,record);
+      return record;
+    }
+    async function finishPendingMedia(pending){
+      if(!mediaClient||!mediaRecoveryStore)throw Error('The secure image service is unavailable. No catalog image reference was changed.');
+      const stored=await mediaClient.info(pending.path);
+      if(!stored)throw Error('The uploaded image is not yet visible in Storage. Its recovery record has been kept; try checking again later.');
+      if(stored.size!==pending.size||stored.mimeType!==pending.mimeType)
+        throw Error('The stored image does not match its recovery record. Its object has not been linked.');
+      pending.stage='linking';mediaRecoveryStore.write(pending);s.pendingMedia=pending;render();
+      let result;
+      try{result=await write(pending.action,pending.payload);}
+      catch(error){
+        if(definiteMediaRejection(error)){
+          pending.stage='cleanup_required';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
+          try{await mediaClient.remove(pending.path);mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;}
+          catch(cleanupError){throw Error(error.message+' The unreferenced new image could not be cleaned up; recovery path: '+pending.path+'. '+cleanupError.message);}
+        }
+        throw error;
+      }
+      pending.stage='committed_unverified';
+      try{mediaRecoveryStore.write(pending);}catch{ /* The existing linking marker remains fail-closed if storage is unavailable. */ }
+      s.pendingMedia=pending;render();
+      await verifyMediaRecord(pending.kind,pending.entity_id,result,pending.path,pending.payload.image_previous_path||null);
+      mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
+      s.notice='Image uploaded, verified and linked to the catalog draft. The previous image remains as the restore point; older Storage objects are retained until publication-safe cleanup is implemented.';
+      return true;
+    }
+    async function uploadMedia(kind,id,file){
+      if(!mediaClient||!mediaRecoveryStore)throw Error('Secure catalog image management is not configured.');
+      if(s.error)throw Error('Catalog data is not verified. Refresh successfully before uploading an image.');
+      if(getPendingMutation&&getPendingMutation())throw Error('A previous catalog save is awaiting reconciliation. Resolve that exact save before uploading an image.');
+      if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
+      const record=currentMediaRecord(kind,id);
+      if(!record)throw Error('Refresh and reopen this catalog item before changing its image.');
+      const existing=mediaRecoveryStore.read();
+      if(existing||s.pendingMedia){
+        s.pendingMedia=existing||s.pendingMedia;render();
+        throw Error('A previous image operation needs reconciliation first. Do not start another upload.');
+      }
+      s.mediaBusy=true;s.error=null;s.notice=null;render();
+      let pending=null;
+      try{
+        const plan=await mediaClient.prepareUpload(kind,id,file);
+        const current=mediaCurrent(kind,record),backup=current||mediaPrevious(kind,record);
+        const payload=mediaPayload(kind,record,plan.path,backup);
+        pending={version:1,user_id:mediaUserId,kind,entity_id:id,path:plan.path,extension:plan.extension,
+          mimeType:plan.mimeType,size:plan.size,action:mediaAction(kind),payload,stage:'uploading',created_at:Date.now()};
+        mediaRecoveryStore.write(pending);s.pendingMedia=pending;render();
+        await mediaClient.uploadPrepared(plan,file);
+        pending.stage='uploaded';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
+        await finishPendingMedia(pending);
+      }catch(error){
+        if(pending&&error&&error.name==='MediaStorageError'&&Number(error.status)>0&&Number(error.status)<500&&![408,425,429].includes(Number(error.status))){
+          try{
+            const stored=await mediaClient.info(pending.path);
+            if(!stored){mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;}
+            else s.pendingMedia=pending;
+          }catch{ s.pendingMedia=pending; }
+        }else if(pending&&error&&error.name==='MediaUploadValidationError'&&error.cleanupError){
+          pending.stage='cleanup_required';
+          try{mediaRecoveryStore.write(pending);}catch{}
+          s.pendingMedia=pending;
+        }else if(pending&&error&&error.name==='MediaUploadValidationError'){
+          try{
+            const stored=await mediaClient.info(pending.path);
+            if(!stored){mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;}
+            else s.pendingMedia=pending;
+          }catch{ s.pendingMedia=pending; }
+        }else if(pending){
+          s.pendingMedia=pending;
+        }
+        s.error=error&&error.message||'Image upload failed.';
+        throw error;
+      }finally{s.mediaBusy=false;render();}
+    }
+    async function resumePendingUpload(file){
+      if(!mediaClient||!mediaRecoveryStore)throw Error('Secure catalog image management is not configured.');
+      if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
+      const pending=mediaRecoveryStore.read();
+      if(!pending||pending.stage!=='uploading')throw Error('There is no interrupted image upload awaiting a file re-selection.');
+      if(pending.user_id!==mediaUserId)throw Error('This pending image belongs to another signed-in account.');
+      const plan={kind:pending.kind,id:pending.entity_id,path:pending.path,extension:pending.extension,
+        mimeType:pending.mimeType,size:pending.size,fingerprint:pending.fingerprint};
+      s.mediaBusy=true;s.error=null;render();
+      try{
+        let uploadError=null;
+        try{await mediaClient.uploadPrepared(plan,file);}
+        catch(error){
+          if(error&&error.name==='MediaFileValidationError')throw error;
+          uploadError=error;
+        }
+        const stored=await mediaClient.info(pending.path);
+        if(!stored){
+          s.pendingMedia=pending;
+          throw uploadError||Error('The image is still not visible in Storage. The recovery record remains; try again with the exact original file.');
+        }
+        if(stored.size!==pending.size||stored.mimeType!==pending.mimeType)
+          throw Error('The reserved Storage object does not match its saved MIME type and size. It was not linked or deleted.');
+        pending.stage='uploaded';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
+        await finishPendingMedia(pending);
+      }catch(error){s.error=error&&error.message||'Image upload recovery failed.';s.pendingMedia=pending;throw error;}
+      finally{s.mediaBusy=false;render();}
+    }
+    async function recoverPendingMedia(){
+      if(!mediaClient||!mediaRecoveryStore)throw Error('Secure catalog image management is not configured.');
+      if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
+      const pending=mediaRecoveryStore.read();
+      if(!pending){s.pendingMedia=null;render();return;}
+      if(pending.user_id!==mediaUserId)throw Error('This pending image belongs to another signed-in account.');
+      s.mediaBusy=true;s.error=null;render();
+      try{
+        s.pendingMedia=pending;
+        if(pending.stage==='cleanup_required'){
+          await mediaClient.remove(pending.path);mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
+          s.notice='The rejected upload was safely removed. No catalog image reference was changed.';
+          return;
+        }
+        await refresh();
+        if(s.error)throw Error('Catalog data could not be refreshed. The image was retained and no metadata retry or cleanup was attempted.');
+        const latest=currentMediaRecord(pending.kind,pending.entity_id);
+        if((pending.stage==='linking'||pending.stage==='committed_unverified')&&mediaRecordMatchesPending(pending,latest)){
+          mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
+          s.notice='The image was already committed and has now been verified. No duplicate catalog update was sent.';
+          return;
+        }
+        if(pending.stage==='committed_unverified'){
+          throw Error('The catalog command returned success, but the current draft does not match the confirmed image metadata. No retry or object deletion was attempted; inspect the item and reconcile this operation manually.');
+        }
+        if(pending.stage==='linking'){
+          const existing=getPendingMutation?getPendingMutation():null;
+          if(!existing){
+            pending.stage='committed_unverified';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
+            throw Error('No matching idempotency record remains for this uncertain metadata write. The image was retained; no new request ID, retry or deletion was attempted.');
+          }
+          if(existing.action!==pending.action||JSON.stringify(existing.payload)!==JSON.stringify(pending.payload)){
+            throw Error('A different catalog mutation is pending. The image was retained and no second mutation was sent.');
+          }
+        }
+        const stored=await mediaClient.info(pending.path);
+        if(!stored){s.pendingMedia=pending;throw Error('Storage has not confirmed this upload yet. The recovery record remains; no catalog write or deletion was attempted.');}
+        if(stored.size!==pending.size||stored.mimeType!==pending.mimeType)
+          throw Error('The pending object does not match its recorded size and MIME type. It was not linked or deleted.');
+        pending.stage='uploaded';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
+        await finishPendingMedia(pending);
+      }catch(error){s.error=error&&error.message||'Image recovery failed.';throw error;}
+      finally{s.mediaBusy=false;render();}
+    }
+    async function changeMediaReference(kind,id,mode){
+      if(s.error)throw Error('Catalog data is not verified. Refresh successfully before changing an image reference.');
+      if(s.pendingMedia||mediaRecoveryStore&&mediaRecoveryStore.read())throw Error('Reconcile the pending image operation before changing another image.');
+      if(getPendingMutation&&getPendingMutation())throw Error('A previous catalog save is awaiting reconciliation. Resolve that exact save before changing an image reference.');
+      if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
+      const record=currentMediaRecord(kind,id);
+      if(!record)throw Error('Refresh and reopen this catalog item before changing its image.');
+      const current=mediaCurrent(kind,record),previous=mediaPrevious(kind,record);
+      if(mode==='restore'&&!previous)throw Error('No backup image is available.');
+      if(mode==='remove'&&!current)throw Error('There is no current image to remove.');
+      const nextCurrent=mode==='restore'?previous:null;
+      const nextPrevious=mode==='restore'?current:previous;
+      s.mediaBusy=true;s.error=null;s.notice=null;render();
+      try{
+        const payload=mediaPayload(kind,record,nextCurrent,nextPrevious);
+        const result=await write(mediaAction(kind),payload);
+        await verifyMediaRecord(kind,id,result,nextCurrent,nextPrevious);
+        s.notice=mode==='restore'?'Backup restored. The former current image is now the backup. No Storage object was deleted.':'Current image reference removed. The previous image remains available as a backup. No Storage object was deleted.';
+      }finally{s.mediaBusy=false;render();}
+    }
+    async function inspectPendingMedia(reconciliation){
+      if(!mediaRecoveryStore)return;
+      const pending=mediaRecoveryStore.read();s.pendingMedia=pending;
+      if(!pending){render();return;}
+      if(pending.user_id!==mediaUserId)throw Error('A pending image operation belongs to another account.');
+      if(reconciliation&&reconciliation.action===pending.action&&
+         JSON.stringify(reconciliation.payload)===JSON.stringify(pending.payload)){
+        const record=pending.kind==='products'?reconciliation.result&&reconciliation.result.record&&reconciliation.result.record.product:
+          pending.kind==='categories'?reconciliation.result&&reconciliation.result.record:
+          reconciliation.result&&reconciliation.result.record&&reconciliation.result.record.deal;
+        if(mediaRecordMatchesPending(pending,record)){
+          mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
+          s.notice='A previous image save was safely reconciled and verified.';
+          render();return;
+        }
+      }
+      if((pending.stage==='linking'||pending.stage==='committed_unverified')&&mediaRecordMatchesPending(pending,currentMediaRecord(pending.kind,pending.entity_id))){
+        mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
+        s.notice='A previous image save was already committed and has been verified.';
+      }else if(pending.stage==='linking'){
+        const existing=getPendingMutation?getPendingMutation():null;
+        if(!existing||existing.action!==pending.action||JSON.stringify(existing.payload)!==JSON.stringify(pending.payload)){
+          pending.stage='committed_unverified';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
+          s.error='The image save may already have reached the database, but its matching idempotency record is unavailable. The image was preserved; no new request will be sent automatically.';
+        }
+      }
+      render();
+    }
     async function refresh(){
       if(!el)return;s.loading=true;s.error=null;render();
       try{
         const [cats,prods,cols,schedules]=await Promise.all([
-          read(READ.categories,{limit:100}),read(READ.products,{limit:50}),read(READ.collections,{limit:50}),read(READ.schedules,{limit:50})
+          readPage(READ.categories,{limit:100}),readPage(READ.products,{limit:50}),readPage(READ.collections,{limit:50}),readPage(READ.schedules,{limit:50})
         ]);
-        s.categories=cats.items||[];s.products=prods.items||[];s.collections=cols.items||[];s.schedules=schedules.items||[];
-        const lists=await Promise.all(s.collections.map(c=>read(READ.deals,{collection_id:c.id,limit:50})));
-        s.deals=lists.flatMap(x=>x.items||[]);
+        const baseRevision=cats.draft_revision;
+        if([prods,cols,schedules].some(x=>x.draft_revision!==baseRevision))throw Error('The draft changed while the catalog was loading. Refresh to load one consistent revision.');
+        const collections=cols.items;
+        const lists=await Promise.all(collections.map(c=>readPage(READ.deals,{collection_id:c.id,limit:50})));
+        if(lists.some(x=>x.draft_revision!==baseRevision))throw Error('The draft changed while deal lists were loading. Refresh to load one consistent revision.');
+        s.categories=cats.items;s.products=prods.items;s.collections=collections;s.schedules=schedules.items;
+        s.pages={categories:{hasMore:cats.has_more===true,cursor:cats.next_cursor||null},
+          products:{hasMore:prods.has_more===true,cursor:prods.next_cursor||null},
+          collections:{hasMore:cols.has_more===true,cursor:cols.next_cursor||null},deals:{}};
+        s.deals=lists.flatMap(x=>x.items);
+        lists.forEach((x,index)=>{s.pages.deals[collections[index].id]={hasMore:x.has_more===true,cursor:x.next_cursor||null};});
+        s.revision=baseRevision;
       }catch(e){s.error=e.message||'Unable to load catalog draft.';}
       finally{s.loading=false;render();}
     }
-    function categoryLabel(id){return s.categories.find(c=>c.id===id)?.name_en||'Unknown category';}
+    async function loadMore(kind,collectionId){
+      const page=kind==='deals'?s.pages.deals[collectionId]:s.pages[kind];
+      if(!page||page.hasMore!==true||!page.cursor)throw Error('No next page is available for this catalog list.');
+      const revision=s.revision;
+      const action=kind==='categories'?READ.categories:kind==='products'?READ.products:kind==='collections'?READ.collections:READ.deals;
+      const args={after_id:page.cursor,limit:kind==='categories'?100:50};
+      if(kind==='deals')args.collection_id=collectionId;
+      const result=await readPage(action,args);
+      if(result.draft_revision!==revision){
+        await refresh();
+        throw Error('The draft changed while loading another page. Catalog lists were refreshed; review them before editing.');
+      }
+      const added=kind==='collections'?result.items.filter(c=>c&&c.id):[];
+      const lists=kind==='collections'?await Promise.all(added.map(c=>readPage(READ.deals,{collection_id:c.id,limit:50}))):[];
+      if(lists.some(x=>x.draft_revision!==revision)){
+        await refresh();
+        throw Error('The draft changed while loading newly discovered deal collections. Catalog lists were refreshed.');
+      }
+      const target=kind==='categories'?s.categories:kind==='products'?s.products:kind==='collections'?s.collections:s.deals;
+      const seen=new Set(target.map(item=>item.id));
+      for(const item of result.items)if(item&&item.id&&!seen.has(item.id)){target.push(item);seen.add(item.id);}
+      page.hasMore=result.has_more===true;page.cursor=result.next_cursor||null;
+      if(kind==='collections'){
+        const knownDeals=new Set(s.deals.map(d=>d.id));
+        lists.forEach((list,index)=>{
+          for(const deal of list.items)if(deal&&deal.id&&!knownDeals.has(deal.id)){s.deals.push(deal);knownDeals.add(deal.id);}
+          s.pages.deals[added[index].id]={hasMore:list.has_more===true,cursor:list.next_cursor||null};
+        });
+      }
+      render();
+    }
+        function categoryLabel(id){return s.categories.find(c=>c.id===id)?.name_en||'Unknown category';}
     function variantRows(product){
       const rows=product&&Array.isArray(product.variants)?product.variants:[{size_key:'REGULAR',size_label:'Regular',price:'',variant_kind:'standard',pack_quantity:null,pack_unit:null,is_standalone_sellable:true,is_active:true,is_available:true}];
       return rows.map(v=>'<article class="fcv3-variant-row" data-variant-row>'+
@@ -260,7 +583,7 @@
         '<label>Sort order<input name="sort_order" type="number" min="0" step="1" value="'+esc(p?p.sort_order:0)+'"></label>'+
         '<label class="fcv3-wide">Description<textarea name="description_en" maxlength="2000" rows="2">'+esc(p&&p.description_en)+'</textarea></label>'+
         '<label class="fcv3-wide">Urdu description<textarea name="description_ur" maxlength="2000" rows="2">'+esc(p&&p.description_ur)+'</textarea></label></div>'+
-        '<div class="fcv3-checks">'+checkbox('featured','Featured',!!(p&&p.featured))+checkbox('is_active','Active',p?p.is_active!==false:true)+checkbox('is_available','Available',p?p.is_available!==false:true)+'</div>'+
+        '<div class="fcv3-checks">'+checkbox('featured','Featured',!!(p&&p.featured))+checkbox('is_active','Active',p?p.is_active!==false:true)+checkbox('is_available','Available',p?p.is_available!==false:true)+'</div>'+mediaEditor('products',p)+
         '<div class="fcv3-subhead"><div><h4>Variants</h4><p>Standalone prices are required; deal-only variant prices may be NULL.</p></div><button type="button" class="fcv3-button" data-action="variant-add">+ Add variant</button></div>'+
         '<div class="fcv3-variants">'+variantRows(p)+'</div><div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">Save product</button></div></form>';
     }
@@ -271,7 +594,7 @@
           '<label>Kind<select name="category_kind"><option value="menu">Menu</option><option value="deal">Deals</option></select></label>')+
         '<label>English name<input name="name_en" maxlength="120" required value="'+esc(category&&category.name_en)+'"></label><label>Urdu name<input name="name_ur" maxlength="120" value="'+esc(category&&category.name_ur)+'"></label>'+
         '<label>Sort order<input name="sort_order" type="number" min="0" step="1" value="'+esc(category?category.sort_order:0)+'"></label>'+
-        (editing?'<label class="fcv3-check"><input type="checkbox" name="is_active"'+(category.is_active?' checked':'')+'> Active</label>':'')+'</div>'+
+        (editing?'<label class="fcv3-check"><input type="checkbox" name="is_active"'+(category.is_active?' checked':'')+'> Active</label>':'')+'</div>'+(editing?mediaEditor('categories',category):'')+
         '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save category changes':'Save category')+'</button></div></form>';
     }
     function burgerCategoryAnchor(){
@@ -372,7 +695,7 @@
         '<label>Deal price (PKR)<input name="base_price" type="number" min="0" step="0.01" required value="'+esc(s.dealDraft&&s.dealDraft.base_price)+'"></label>'+
         '<label class="fcv3-wide">Description<textarea name="description_en" maxlength="3000" rows="2">'+esc(s.dealDraft&&s.dealDraft.description_en)+'</textarea></label>'+
         '<label class="fcv3-check"><input type="checkbox" name="flame_hour"'+(s.dealDraft&&s.dealDraft.flame_hour?' checked':'')+'> Flame Hour daily 3–5 PM (Asia/Karachi)</label>'+
-        (editing?'<label class="fcv3-check"><input type="checkbox" name="deal_available"'+(s.dealDraft.is_available?' checked':'')+'> Available to order</label><p class="fcv3-wide">Active status is preserved automatically. The deal is temporarily disabled while its contents are being verified.</p>':'')+'</div>'+
+        (editing?'<label class="fcv3-check"><input type="checkbox" name="deal_available"'+(s.dealDraft.is_available?' checked':'')+'> Available to order</label><p class="fcv3-wide">Active status is preserved automatically. The deal is temporarily disabled while its contents are being verified.</p>':'')+'</div>'+(editing?mediaEditor('deals',s.dealRecord):'')+
         '<div class="fcv3-subhead"><div><h4>Component groups</h4><p>Set each group quantity. Only Burger groups may contain multiple included choices.</p></div><button type="button" class="fcv3-button" data-action="component-add">+ Add component group</button></div>'+
         '<div class="fcv3-components">'+s.components.map(componentForm).join('')+'</div>'+
         '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save '+esc(s.dealDraft.title)+' changes':'Create fixed deal')+'</button></div></form>';
@@ -388,10 +711,11 @@
           '<td><button class="fcv3-button" data-action="product-edit" data-id="'+esc(p.id)+'">Edit</button></td></tr>';
       }).join('');
       const collectionHtml=s.collections.map(c=>{
-        const deals=s.deals.filter(d=>d.collection_id===c.id);
+        const deals=s.deals.filter(d=>d.collection_id===c.id),page=s.pages.deals[c.id];
         return '<section class="fcv3-collection"><h4>'+esc(c.name_en)+'</h4><div class="fcv3-deals">'+
           (deals.length?deals.map(d=>'<article class="fcv3-deal-card"><div><strong>'+esc(d.title)+'</strong><small>'+(d.active_variant_count||0)+' active variant(s) · '+(d.is_active?'Active':'Draft / hidden')+'</small></div>'+
-          '<div class="fcv3-card-actions"><button class="fcv3-button" data-action="deal-detail" data-id="'+esc(d.id)+'">Inspect</button><button class="fcv3-button" data-action="deal-edit" data-id="'+esc(d.id)+'" data-title="'+esc(d.title)+'" aria-label="Edit '+esc(d.title)+'"'+(s.editorLoadingDealId?' disabled':'')+'>Edit</button></div></article>').join(''):'<p class="fcv3-empty">No deals in this collection.</p>')+'</div></section>';
+          '<div class="fcv3-card-actions"><button class="fcv3-button" data-action="deal-detail" data-id="'+esc(d.id)+'">Inspect</button><button class="fcv3-button" data-action="deal-edit" data-id="'+esc(d.id)+'" data-title="'+esc(d.title)+'" aria-label="Edit '+esc(d.title)+'"'+(s.editorLoadingDealId?' disabled':'')+'>Edit</button></div></article>').join(''):'<p class="fcv3-empty">No deals in this collection.</p>')+
+          (page&&page.hasMore&&page.cursor?'<button class="fcv3-button" data-action="load-more" data-kind="deals" data-collection-id="'+esc(c.id)+'">Load 50 more deals</button>':'')+'</div></section>';
       }).join('');
       el.innerHTML='<div class="fcv3-head"><div><span class="fcv3-kicker">AUTHENTICATED COMMAND API</span><h2>Catalog V3 workspace</h2><p>Draft authoring through secured Admin/Owner commands; no direct PostgREST table writes.</p></div>'+
         '<div class="fcv3-head-actions"><span class="fcv3-revision">'+(s.revision==null?'Revision not loaded':'Draft revision '+s.revision)+'</span>'+
@@ -400,15 +724,21 @@
         (s.importProgress?'<div class="fcv3-notice" role="status"><strong>'+esc(s.importProgress.phase)+'</strong> · '+esc(s.importProgress.completed)+' / '+esc(s.importProgress.total)+' · '+esc(s.importProgress.message)+'</div>':'')+
         (s.editorLoadingDealId?'<div class="fcv3-notice" role="status">Loading the selected deal by its exact ID…</div>':'')+
         (s.error?'<div class="fcv3-error" role="alert">'+esc(s.error)+'</div>':'')+(s.notice?'<div class="fcv3-notice" role="status">'+esc(s.notice)+'</div>':'')+
+        (s.pendingMedia?'<div class="fcv3-warning" role="alert"><strong>Image operation needs reconciliation</strong><small>'+esc(s.pendingMedia.kind)+' · '+esc(s.pendingMedia.entity_id)+' · '+esc(s.pendingMedia.stage)+' · '+esc(s.pendingMedia.path)+'</small>'+
+          (s.pendingMedia.stage==='uploading'?'<label class="fcv3-media-upload">Re-select the exact same image file to resume<input type="file" accept="image/jpeg,image/png,image/webp" data-media-resume-upload '+(s.mediaBusy?'disabled':'')+'></label>':'')+
+          '<button type="button" class="fcv3-button" data-action="media-recover"'+(s.mediaBusy?' disabled':'')+'>Check and resume image operation</button></div>':'')+
         (s.partial?'<div class="fcv3-warning">A deal operation stopped and the deal may remain inactive. ID: '+esc(s.partial.id)+'. Do not create a duplicate; inspect this draft before continuing.</div>':'')+
         '<div class="fcv3-summary-grid"><article><small>Menu categories</small><strong>'+s.categories.filter(c=>c.category_kind==='menu').length+'</strong></article><article><small>Products</small><strong>'+s.products.length+'</strong></article>'+
         '<article><small>Deal-only variants</small><strong>'+s.products.reduce((n,p)=>n+p.variants.filter(v=>v.is_standalone_sellable===false).length,0)+'</strong></article><article><small>Fixed deals</small><strong>'+s.deals.length+'</strong></article></div>'+
         '<div class="fcv3-toolbar"><div><h3>Products and variants</h3><p>Standalone variants require prices. Deal-only variants may be unpriced and stay out of standalone menu cards.</p></div><button class="fcv3-button fcv3-primary" data-action="product-add">+ Add product</button></div>'+
         '<div class="fcv3-table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Standalone prices</th><th>Status</th><th></th></tr></thead><tbody>'+(productRows||'<tr><td colspan="5">No products in draft.</td></tr>')+'</tbody></table></div>'+
+        (s.pages.products.hasMore&&s.pages.products.cursor?'<button class="fcv3-button" data-action="load-more" data-kind="products">Load 50 more products</button>':'')+
         '<div class="fcv3-toolbar"><div><h3>Categories</h3><p>Menu and deal categories are distinct.</p></div><button class="fcv3-button" data-action="category-add">+ Add category</button></div>'+
         '<div class="fcv3-category-grid">'+s.categories.map(c=>'<article><strong>'+esc(c.name_en)+'</strong><small>'+esc(c.category_kind)+' · '+(c.is_active?'Active':'Inactive')+'</small><button class="fcv3-button" data-action="category-edit" data-id="'+esc(c.id)+'">Edit</button></article>').join('')+'</div>'+
+        (s.pages.categories.hasMore&&s.pages.categories.cursor?'<button class="fcv3-button" data-action="load-more" data-kind="categories">Load 100 more categories</button>':'')+
         '<div class="fcv3-toolbar"><div><h3>Deals and offers</h3><p>Fixed prices with INCLUDED component choices. Burger groups support per-burger dropdown selections.</p></div><button class="fcv3-button fcv3-primary" data-action="deal-add">+ Create fixed deal</button></div>'+
         (collectionHtml||'<p class="fcv3-empty">No deal collection yet. The first deal creates the Deals category and collection.</p>')+
+        (s.pages.collections.hasMore&&s.pages.collections.cursor?'<button class="fcv3-button" data-action="load-more" data-kind="collections">Load 50 more deal collections</button>':'')+
         (s.editor?'<div class="fcv3-editor-shell"><div class="fcv3-editor-head"><div><span class="fcv3-kicker">DRAFT EDITOR</span><h3>'+
           (s.editor.type==='product'?(s.editor.product?'Edit product':'Add product'):s.editor.type==='category'?(s.editor.category?'Edit category':'Add category'):(s.dealDraft&&s.dealDraft.id?'Edit fixed deal · '+esc(s.dealDraft.title):'Create fixed deal'))+'</h3></div><button class="fcv3-button fcv3-muted" data-action="editor-cancel">Close</button></div>'+
           (s.editor.type==='product'?productForm(s.editor.product):s.editor.type==='category'?categoryForm(s.editor.category):dealForm())+'</div>':'')+
@@ -419,7 +749,7 @@
     function openProduct(p){s.editor={type:'product',product:p?JSON.parse(JSON.stringify(p)):null};s.notice=null;s.error=null;render();}
     function openDeal(){
       if(!s.products.some(p=>p.is_active!==false&&p.variants.some(v=>v.is_active!==false))){s.error='Add active products and variants before creating a deal.';render();return;}
-      s.editor={type:'deal'};s.editorRevision=s.revision;s.components=[{display_name:'Burger',quantity:1,allow_repeat_option:false,max_units_per_option:null,options:[{}]}];s.dealDraft={title:'',description_en:'',base_price:'',flame_hour:false,is_available:true};s.notice=null;s.error=null;s.partial=null;render();
+      s.editor={type:'deal'};s.dealRecord=null;s.editorRevision=s.revision;s.components=[{display_name:'Burger',quantity:1,allow_repeat_option:false,max_units_per_option:null,options:[{}]}];s.dealDraft={title:'',description_en:'',base_price:'',flame_hour:false,is_available:true};s.notice=null;s.error=null;s.partial=null;render();
     }
     async function openDealEdit(dealId,expectedTitle){
       if(s.editorLoadingDealId)return;
@@ -435,7 +765,7 @@
         const scheduleDetail=assignment?await read(READ.scheduleDetail,{schedule_set_id:assignment.schedule_set_id}):null;
         const draft=buildFixedDealEditDraft(detail,s.schedules,scheduleDetail,selectedId,title);
         if(s.editorLoadingDealId!==selectedId)return;
-        s.editor={type:'deal',deal:true};s.editorRevision=s.revision;s.components=draft.components;s.dealDraft=draft.dealDraft;
+        s.editor={type:'deal',deal:true};s.dealRecord=detail.deal;s.editorRevision=s.revision;s.components=draft.components;s.dealDraft=draft.dealDraft;
       }finally{
         if(s.editorLoadingDealId===selectedId)s.editorLoadingDealId=null;
         render();
@@ -512,6 +842,7 @@
         await write(WRITE.deal,{id:dealId,title,description_en:desc,is_active:true,is_available:true,
           variants:[{id:dealVariantId,variant_key:'BUNDLE',label_en:title,label_ur:null,pricing_mode:'FIXED_BUNDLE',base_price:base,sort_order:1,is_active:true}]});
         const afterActivation=await read(READ.dealDetail,{deal_id:dealId});
+        s.dealRecord=afterActivation.deal;
         verifyFixedDealDetail(afterActivation,{dealId,title,basePrice:base,components:s.components,flameHour:form.flame_hour===true,scheduleId,active:true});
         s.partial=null;s.editor=null;s.notice='Fixed deal saved and read-back verified. Components are locked and use INCLUDED pricing.';await refresh();
       }catch(error){if(dealId)s.partial={id:dealId,variantId:dealVariantId};throw error;}
@@ -673,9 +1004,19 @@
 
     function bind(){
       el.onclick=async event=>{
-        const b=event.target.closest('[data-action]');if(!b||b.disabled||s.saving||s.editorLoadingDealId)return;const a=b.dataset.action;
+        const mediaButton=event.target.closest('[data-media-action]');
+        if(mediaButton){
+          if(mediaButton.disabled||s.saving||s.mediaBusy||s.error)return;
+          try{await changeMediaReference(mediaButton.dataset.kind,mediaButton.dataset.id,mediaButton.dataset.mediaAction);}
+          catch(error){s.error=error&&error.message||'Image change failed.';render();}
+          return;
+        }
+        const b=event.target.closest('[data-action]');if(!b||b.disabled||s.saving||s.mediaBusy||s.editorLoadingDealId)return;const a=b.dataset.action;
         try{
+          if(s.error&&a!=='refresh'&&a!=='media-recover')throw Error('Catalog data is not verified. Refresh successfully before making any changes.');
           if(a==='refresh')await refresh();
+          else if(a==='media-recover')await recoverPendingMedia();
+          else if(a==='load-more')await loadMore(b.dataset.kind,b.dataset.collectionId||null);
           else if(a==='import-menu')await importPublishedMenuDraft();
           else if(a==='category-add'){s.editor={type:'category'};s.editorRevision=s.revision;render();}
           else if(a==='category-edit'){const category=s.categories.find(c=>c.id===b.dataset.id);if(!category)throw Error('Category could not be found.');s.editor={type:'category',category};s.editorRevision=s.revision;render();}
@@ -713,6 +1054,10 @@
         }catch(e){s.error=e.message||'Catalog action failed.';render();}
       };
       el.onchange=event=>{
+        const resumeInput=event.target.closest('[data-media-resume-upload]');
+        if(resumeInput){const file=resumeInput.files&&resumeInput.files[0];resumeInput.value='';if(file)resumePendingUpload(file).catch(()=>{});return;}
+        const mediaInput=event.target.closest('[data-media-upload]');
+        if(mediaInput){const file=mediaInput.files&&mediaInput.files[0],kind=mediaInput.dataset.kind,id=mediaInput.dataset.id;mediaInput.value='';if(file)uploadMedia(kind,id,file).catch(()=>{});return;}
         if(event.target.matches('[data-choice-product]')){
           const row=event.target.closest('[data-choice-row]'),p=s.products.find(x=>x.id===event.target.value),select=row.querySelector('[data-choice-variant]');
           const variants=p?p.variants.filter(v=>v.is_active!==false):[];
@@ -739,14 +1084,15 @@
         if(event.target.matches('[data-field="variant_kind"]')){const row=event.target.closest('[data-variant-row]'),pack=event.target.value==='pack';row.querySelector('[data-field="pack_quantity"]').disabled=!pack;row.querySelector('[data-field="pack_unit"]').disabled=!pack;}
       };
       el.onsubmit=async event=>{
-        const form=event.target.closest('form[data-form]');if(!form)return;event.preventDefault();if(s.saving)return;
+        const form=event.target.closest('form[data-form]');if(!form)return;event.preventDefault();if(s.saving||s.mediaBusy)return;
+        if(s.error){s.notice='Catalog data is not verified. Refresh successfully before saving.';render();return;}
         s.saving=true;s.error=null;
         const formDataSnapshot=new FormData(form);
         try{await submit(form);}catch(e){s.error=e.message||'Catalog save failed.';}
         finally{s.saving=false;render();}
       };
     }
-    return {mount:async(element,requestFn)=>{if(!element||typeof requestFn!=='function')throw Error('Catalog V3 workspace requires a root and authenticated request handler.');el=element;request=requestFn;bind();await refresh();},refresh,getState:()=>JSON.parse(JSON.stringify(s))};
+    return {mount:async(element,requestFn,mediaOptions={})=>{if(!element||typeof requestFn!=='function')throw Error('Catalog V3 workspace requires a root and authenticated request handler.');el=element;request=requestFn;mediaClient=mediaOptions&&mediaOptions.client||null;mediaRecoveryStore=mediaOptions&&mediaOptions.recoveryStore||null;mediaUserId=mediaOptions&&mediaOptions.userId||null;getPendingMutation=mediaOptions&&mediaOptions.getPendingMutation||null;bind();await refresh();await inspectPendingMedia(mediaOptions&&mediaOptions.reconciliation||null);},refresh,getState:()=>JSON.parse(JSON.stringify(s))};
   }
   return {READ,WRITE,normalizeProductDraft,buildFixedComponentGroups,buildIncludedMappings,buildFixedDealEditDraft,isApprovedFlameHourSchedule,assertDealIdentity,eligibleChoiceProducts,verifyFixedDealDetail,createWorkspace};
 });
