@@ -12,6 +12,55 @@
 
 # CURRENT CONTINUATION — SUPABASE EDGE FUNCTION OPTIMIZATION (2026-11-28)
 
+## Latest Delivery Edge invocation investigation — 2026-11-28
+
+### Usage evidence supplied by the user
+
+- Supabase Usage displayed **5,915 Edge Function invocations** in the current billing cycle (19 Nov–19 Dec 2026), with 500,000 included on the Free plan and 0 overage.
+- User changed the project selector to Flame Chick Production and confirmed the same total. Treat 5,915 as this project's total, not as a Delivery API-only count.
+- The 28 Nov daily figure was **170 invocations**, and the user confirmed that **no orders had been placed that day**. This is direct evidence that a meaningful portion of invocation volume is background/app traffic, not order lifecycle activity.
+- Dashboard usage refreshes hourly. The 170 figure is the visible daily total at the time of the screenshot and may have been a partial day.
+- Do not use Logs/Logs Explorer to attribute traffic. Do not inspect or access log ingestion/drains either.
+
+### Source-based background traffic estimate
+
+On the existing production-source branch, when Realtime is healthy and one Rider session plus one POS session are left open:
+
+- Rider presence: immediate POST action=presence, then every 120 seconds — about **30 Delivery API invocations/hour**.
+- Rider jobs/offers safety refresh: immediate after Realtime subscription, then every 120 seconds — about **30 Delivery API invocations/hour**.
+- POS Realtime safety refresh: every 120 seconds. Its loadInitialOnlineInbox() already invokes loadDeliveryDispatch(), and the scheduler then calls loadDeliveryDispatch() again — about **60 Delivery API invocations/hour**, plus about 30 Order API requests/hour.
+- Thus a simple one-Rider + one-POS healthy-Realtime example can generate about **120 Delivery API invocations/hour with no orders**, before login/resume/event traffic. This is a source-based estimate, not a measured breakdown. Realtime fallback uses 30-second polling in both apps and can raise the rate.
+
+### Isolated POS duplicate-refresh fix committed on the feature branch
+
+- Branch: supabase-edge-optimization-2026-11-28
+- Current checkpoint before this handoff update: 393f6f8625a5b84c8a3d07f63d75298b3f7ffa49
+- POS Realtime events are now scoped: orders_changed requests the inbox refresh; delivery_changed requests dispatch refresh.
+- The scheduler no longer runs loadInitialOnlineInbox() and then redundantly calls loadDeliveryDispatch(). The inbox loader already refreshes dispatch once. A delivery-only event refreshes dispatch directly.
+- POS assignment and return-confirmation actions schedule their delivery refresh rather than immediately forcing a full inbox + dispatch reload.
+- Existing 120-second healthy safety refresh and 30-second Realtime fallback have been preserved. Authentication, authorization, branch scoping, offer expiry, delivery state rules and server RPCs are unchanged.
+- Added apps/flame-chick-pos/tests/delivery-refresh-optimization.test.cjs; included it in npm run test:cloudflare and in the POS regression workflow for this branch.
+- GitHub Actions run **46112617777** passed: existing mocked POS/receipt/QZ/business-contract checks and the new delivery refresh optimization regression all completed successfully. Run: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/46112617777
+- This fix is **not deployed**. Production Delivery API and POS remain unchanged. No Production requests, orders, writes, migrations, secrets/Auth changes or log queries were performed for this optimization.
+
+### Next optimization candidates — assess carefully
+
+1. Reduce Rider periodic request duplication by designing a single authenticated Rider sync operation that can reconcile presence and current jobs/offers in one Edge Function request. Preserve rider-only data isolation, active-task/busy calculation, the user's availability preference, last-seen freshness, offer visibility and the 60-second offer deadline. Prefer one request over simply lengthening heartbeat intervals.
+2. Remove immediate Rider post-action GETs only if the POST response can safely return refreshed jobs/offers or the UI can reconcile immediately without stale state. Do not rely on a broadcast alone when Realtime is disconnected.
+3. Keep the 30-second fallback needed to recover time-limited offers when Realtime is unavailable. Do not blindly lengthen or disable the heartbeat: POS rider availability currently treats last-seen older than 240 seconds as stale.
+4. Keep POS delivery refresh event-scoped and avoid refreshing delivery for unrelated non-delivery order updates when this can be proven safe.
+5. Build mocked request-count tests for an idle POS, an idle Rider, and one complete delivery lifecycle. Report background and per-order budgets separately. The target of 8 or fewer invocations is a goal for a normal completed delivery, not an assumption that every exceptional lifecycle (reassignment, expiry, failed/returned delivery) must fit the same count.
+
+### Ongoing safety boundaries
+
+- No Supabase log queries whatsoever. Do not access Log Ingestion, drains, or logging configuration.
+- A separate ChatGPT conversation owns Website and Admin work. Do not edit or deploy Website/Admin app files or shared APIs/RPCs/contracts that can affect them.
+- Continue isolated POS/Rider/Delivery work only on the existing feature branch. Do not merge, rebase, cherry-pick, or deploy without a complete review and explicit user approval.
+- Keep Production on the Free plan. No Production deployment, migration, secret/Auth change, test traffic or order/customer write is authorized.
+- Preserve Delivery API verify_jwt=false, internal Supabase Auth validation and unauthenticated OPTIONS preflight unless a separate full security review supports a change.
+
+---
+
 Continue the existing Flame Chick Production project. Do not restart, rebuild the project from assumptions, or deploy unreviewed changes.
 
 - Repository: `itsfahadahmed1234-creator/flame-chick-platform`
