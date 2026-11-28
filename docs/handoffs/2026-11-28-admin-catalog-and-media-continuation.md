@@ -75,6 +75,18 @@ The editor intentionally does **not** support arbitrary selectable flavours, pro
 - The current Catalog V3 editor does not yet integrate product/category/deal image upload into its secure command workflow. Website hero, fulfilment gate, About gallery and menu hero/slider settings also need a reviewed media workflow.
 - The detailed historic Catalog Admin API contract is `docs/handoffs/2026-11-22-catalog-admin-api-contract.md`; it explicitly records that media upload/delete and settings commands were outside that API slice. Treat it as historical scope documentation, not as the current deployment status.
 
+## Latest Admin dashboard checkpoint — 2026-11-27
+
+This work is already completed and is not the focus of the next phase:
+
+- Admin Pages UI was deployed to Cloudflare Pages at `https://flamechickadmin.pages.dev`; the recorded canonical deployment is `ee6b4f6f`, built from commit `acbb050413cc076c3cedc1715e7d1f467ab2f56e` on `cloudflare/admin-production`.
+- Supabase `flame-chick-staff-admin` Edge Function version **10** was reported ACTIVE with `verify_jwt=true`.
+- Dashboard startup is Today-first. The first summary request uses `p_include_period_history=false`; historical ranges are explicitly fetched only when selected. Recent orders are capped at eight. The operational unresolved-order watch remains separate (all-active count plus up to six oldest active order summaries) so older unresolved work is not hidden.
+- The dashboard migration is `20261127172402_flame_chick_admin_dashboard_on_demand_history_v1`. It adds an optional boolean while preserving the legacy payload shape; authorization remains Admin/Owner and no table grants/RLS policies were widened.
+- Historical SQL test numbers from 2026-11-27 are point-in-time only and must not be treated as today's figures. Do not query logs to re-confirm deployment or browser activity.
+
+The next chat should verify current branch/deployment metadata using read-only control-plane/source inspection as needed, but should not repeat the dashboard work unless a user-reported issue or new code evidence warrants it.
+
 ## 4. Target outcome for this Admin phase
 
 Make the Admin usable for day-to-day catalog maintenance without exposing privileged database access or causing unnecessary backend work.
