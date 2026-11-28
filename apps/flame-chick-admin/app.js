@@ -213,8 +213,8 @@ async function catalogV3Request(action,payload,isMutation){
  return result;
 }
 async function reconcilePendingCatalogMutation(){
- if(S.catalogV3RecoveryUser===S.user.id)return;
  const record=pendingCatalogMutationForUser();
+ if(!record&&S.catalogV3RecoveryUser===S.user.id)return;
  if(record){
   const response=await window.FlameChickAdminConnection.sendWithOneRetry(
    sameBody=>staffApi("POST",null,sameBody),record.body);
