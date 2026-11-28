@@ -317,7 +317,10 @@ function renderStaff(){
    const scope=["admin","owner"].includes(i.role_key)?"All branches":(i.branches||[]).map(b=>b.name).join(", ");
    const retry=i.status==="failed"&&i.auth_user_id?'<button class="action-link" data-invite-retry="'+esc(i.id)+'">Retry finalize</button>':"";
    const cancel=["pending","sent","failed"].includes(i.status)?'<button class="action-link danger-link" data-invite-cancel="'+esc(i.id)+'">Cancel</button>':"";
-   return '<tr><td><div class="order-code">'+esc(i.display_name||i.email)+'</div><div class="order-name">'+esc(i.email)+'</div></td><td>'+esc(staffRoleLabel(i.role_key))+'</td><td>'+esc(scope||"—")+'</td><td>'+esc(i.status)+'<small class="subtle-line">Expires '+esc(new Date(i.expires_at).toLocaleDateString("en-PK"))+'</small></td><td class="right staff-actions">'+retry+cancel+'</td></tr>';
+   const recoveryNote=i.status==="failed"?(i.auth_user_id
+    ?'<small class="subtle-line">Auth account exists. Retry finalize will not send another email.</small>'
+    :'<small class="subtle-line">No Auth account is linked. Finalize is unavailable; cancel this record before creating a replacement invitation.</small>'):"";
+   return '<tr><td><div class="order-code">'+esc(i.display_name||i.email)+'</div><div class="order-name">'+esc(i.email)+'</div></td><td>'+esc(staffRoleLabel(i.role_key))+'</td><td>'+esc(scope||"—")+'</td><td>'+esc(i.status)+recoveryNote+'<small class="subtle-line">Expires '+esc(new Date(i.expires_at).toLocaleDateString("en-PK"))+'</small></td><td class="right staff-actions">'+retry+cancel+'</td></tr>';
   }).join(""):'<tr><td colspan="5" class="empty-cell">No pending invitations.</td></tr>';
   inv.querySelectorAll("[data-invite-cancel]").forEach(button=>button.onclick=async()=>{if(!confirm("Cancel this invitation?"))return;button.disabled=true;try{await staffApi("POST",null,{action:"cancel_invitation",invitation_id:button.dataset.inviteCancel});toast("Invitation cancelled.");await loadStaff();}catch(e){toast(e.message,true);button.disabled=false;}});
   inv.querySelectorAll("[data-invite-retry]").forEach(button=>button.onclick=async()=>{button.disabled=true;try{await staffApi("POST",null,{action:"retry_finalize",invitation_id:button.dataset.inviteRetry});toast("Invitation finalization recovered.");await loadStaff();}catch(e){toast(e.message,true);button.disabled=false;}});

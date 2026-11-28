@@ -2,6 +2,7 @@
 import { getStaffInviteRedirect, isAllowedRequestOrigin, isSafeInviteRedirect, parseStaffAdminOrigins, staffCorsHeaders } from "./origin-policy.mjs";
 import { buildCatalogRpcCall } from "./catalog-actions.mjs";
 import { buildDashboardRpcCall } from "./dashboard-actions.mjs";
+import { staffRpcErrorMessage } from "./invitation-error-messages.mjs";
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").replace(/\/+$/,"");
 function readKey(jsonName:string,fallback:string[]):string{
  try{const x=JSON.parse(Deno.env.get(jsonName)??"{}");const v=x?.default;if(typeof v==="string"&&v)return Deno.env.get(v)??v;}catch{}
@@ -39,7 +40,7 @@ function token(req:Request):string{const h=req.headers.get("authorization")??"";
 function rpcErr(x:unknown):ApiError{
  const v=obj(x)?x:{};const raw=String(v.message??v.details??"");const code=raw.split(":")[0].trim().match(/^[A-Z0-9_]{3,80}$/)?.[0]??"STAFF_COMMAND_FAILED";
  const status=/FORBIDDEN|DENIED|AUTH_REQUIRED/.test(code)?403:/NOT_FOUND/.test(code)?404:/INVALID|REQUIRED|PROTECTED|CONFLICT|EXPIRED|UNAVAILABLE|ALREADY/.test(code)?400:500;
- return new ApiError(code,status,"Your staff action was not accepted.");
+ return new ApiError(code,status,staffRpcErrorMessage(code));
 }
 async function userRpc(t:string,action:string,payload:Obj={}):Promise<unknown>{
  const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/flame_chick_staff_admin_command",{method:"POST",headers:{apikey:PUBLIC_KEY,Authorization:"Bearer "+t,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({p_action:action,p_payload:payload}),cache:"no-store"});
