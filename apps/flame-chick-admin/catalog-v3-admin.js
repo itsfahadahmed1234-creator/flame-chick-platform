@@ -233,7 +233,7 @@
     let mediaClient=null,mediaRecoveryStore=null,mediaUserId=null;
     function mediaCurrent(kind,record){return record&&record.image_current_path||null;}
     function mediaPrevious(kind,record){return record&&record.image_previous_path||null;}
-    function mediaExtension(path){const match=String(path||'').toLowerCase().match(/\\.([a-z0-9]+)$/);return match?match[1]:null;}
+    function mediaExtension(path){const match=String(path||'').toLowerCase().match(/\.([a-z0-9]+)$/);return match?match[1]:null;}
     function mediaAction(kind){return kind==='categories'?WRITE.category:kind==='products'?WRITE.product:WRITE.deal;}
     function mediaPayload(kind,record,currentPath,previousPath){
       if(!record||!record.id)throw Error('Save this catalog item before managing its image.');
@@ -344,8 +344,21 @@
         pending.stage='uploaded';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
         await finishPendingMedia(pending);
       }catch(error){
-        if(pending&&error&&error.uncertain){s.pendingMedia=pending;}
-        if(pending&&error&&error.name==='MediaUploadUncertainError'){s.pendingMedia=pending;}
+        if(pending&&error&&error.name==='MediaStorageError'&&Number(error.status)>0&&Number(error.status)<500&&![408,425,429].includes(Number(error.status))){
+          try{
+            const stored=await mediaClient.info(pending.path);
+            if(!stored){mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;}
+            else s.pendingMedia=pending;
+          }catch{ s.pendingMedia=pending; }
+        }else if(pending&&error&&error.name==='MediaUploadValidationError'&&!error.cleanupError){
+          try{
+            const stored=await mediaClient.info(pending.path);
+            if(!stored){mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;}
+            else s.pendingMedia=pending;
+          }catch{ s.pendingMedia=pending; }
+        }else if(pending){
+          s.pendingMedia=pending;
+        }
         s.error=error&&error.message||'Image upload failed.';
         throw error;
       }finally{s.mediaBusy=false;render();}
