@@ -43,3 +43,18 @@ test("Staff Admin source includes deployed v10 dashboard handler and Cloudflare 
   assert.match(helper, /ISO_UTC = \/\^\\d\{4\}/);
   assert.match(origins, /https:\/\/flamechickadmin\.pages\.dev/);
 });
+
+test("Rider uses one authenticated presence-and-jobs sync cycle and action snapshots", () => {
+  const api = read("supabase/functions/flame-chick-delivery-api/index.ts");
+  const rider = read("apps/flame-chick-rider/index.html");
+  assert.match(api, /if \(action === "sync"\)/);
+  assert.match(api, /setRiderPresence\(user\.id, riderScope\.branchId, online, false\)/);
+  assert.match(api, /readRiderState\(user\.id, riderScope\.branchId\)/);
+  assert.match(api, /delivery_tasks\?" \+ query\.toString\(\)/);
+  assert.match(api, /delivery_task_offers\?" \+ offersQuery\.toString\(\)/);
+  assert.match(api, /payload\.rider_state = \{ data:state\.data, offers:state\.offers, profile:state\.profile \}/);
+  assert.match(rider, /action:'sync',online:riderWantsOnline/);
+  assert.match(rider, /riderSyncTimer=setInterval\(\(\)=>syncRiderState\(false\),120000\)/);
+  assert.match(rider, /applyRiderSnapshot\(result\.rider_state\|\|\{\}\)/);
+  assert.doesNotMatch(rider, /riderRealtimeFallbackTimer=setInterval\(\(\)=>\{[\s\S]{0,150}?\},120000\)/);
+});
