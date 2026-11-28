@@ -72,3 +72,24 @@ No real restaurant order/test order was created by this release deployment.
 - Remain on Supabase Free plan.
 - Do not deploy or edit the Website/Admin streams or shared Order API / Staff Admin components without explicit separate direction.
 - Do not start live restaurant operations until the user completes and accepts the manual end-to-end rehearsal.
+
+
+---
+
+## Addendum — 2026-11-28 manual test and restaurant-installation handoff
+
+The user has now reported the following manual checks after the Worker v8 deployment:
+1. Entered the POS and confirmed QZ Tray was working on the computer being used for that test.
+2. Placed a test order through the deployed customer website.
+3. Followed the order through POS, Rider delivery, and the payment-collection stage.
+4. Reported that the complete workflow ran smoothly.
+
+This is one successful end-to-end test reported by the user. Do not overstate it as a complete multi-scenario acceptance rehearsal. It does not prove QZ Tray, the physical receipt printer, or network recovery on the actual restaurant cashier computer. The physical restaurant hardware and staff setup remain unverified.
+
+See the new [Restaurant Installation & Test-Data Handoff](2026-11-28-restaurant-installation-and-test-data-handoff.md) for the next-chat plan. It covers the hardware/software installation sequence, separate kitchen-ticket printing limitation, staff roles, remaining restaurant rehearsals, test-order cleanup safeguards, and the Edge Function invocation baseline.
+
+No test orders have been deleted. No test-data cleanup, SQL write, migration, Auth change, secret change, or schema change has been performed.
+
+The next phase is supervised physical restaurant installation and completion of remaining rehearsals: dine-in, takeaway, concurrent orders, offer decline/expiry/reassignment, failed delivery and physical return confirmation, role isolation, printer restart, and network recovery. Do not start unrestricted restaurant operations until the user accepts the full rehearsal.
+
+The absolute Supabase Logs restriction remains unchanged: do not access, run, edit, investigate, or otherwise touch the log query that previously exceeded 102 GB and was later observed at 106 GB. Do not use Logs Explorer or any equivalent log-query route.
