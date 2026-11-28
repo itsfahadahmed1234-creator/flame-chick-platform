@@ -369,7 +369,11 @@
             if(!stored){mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;}
             else s.pendingMedia=pending;
           }catch{ s.pendingMedia=pending; }
-        }else if(pending&&error&&error.name==='MediaUploadValidationError'&&!error.cleanupError){
+        }else if(pending&&error&&error.name==='MediaUploadValidationError'&&error.cleanupError){
+          pending.stage='cleanup_required';
+          try{mediaRecoveryStore.write(pending);}catch{}
+          s.pendingMedia=pending;
+        }else if(pending&&error&&error.name==='MediaUploadValidationError'){
           try{
             const stored=await mediaClient.info(pending.path);
             if(!stored){mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;}
@@ -381,6 +385,34 @@
         s.error=error&&error.message||'Image upload failed.';
         throw error;
       }finally{s.mediaBusy=false;render();}
+    }
+    async function resumePendingUpload(file){
+      if(!mediaClient||!mediaRecoveryStore)throw Error('Secure catalog image management is not configured.');
+      if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
+      const pending=mediaRecoveryStore.read();
+      if(!pending||pending.stage!=='uploading')throw Error('There is no interrupted image upload awaiting a file re-selection.');
+      if(pending.user_id!==mediaUserId)throw Error('This pending image belongs to another signed-in account.');
+      const plan={kind:pending.kind,id:pending.entity_id,path:pending.path,extension:pending.extension,
+        mimeType:pending.mimeType,size:pending.size,fingerprint:pending.fingerprint};
+      s.mediaBusy=true;s.error=null;render();
+      try{
+        let uploadError=null;
+        try{await mediaClient.uploadPrepared(plan,file);}
+        catch(error){
+          if(error&&error.name==='MediaFileValidationError')throw error;
+          uploadError=error;
+        }
+        const stored=await mediaClient.info(pending.path);
+        if(!stored){
+          s.pendingMedia=pending;
+          throw uploadError||Error('The image is still not visible in Storage. The recovery record remains; try again with the exact original file.');
+        }
+        if(stored.size!==pending.size||stored.mimeType!==pending.mimeType)
+          throw Error('The reserved Storage object does not match its saved MIME type and size. It was not linked or deleted.');
+        pending.stage='uploaded';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
+        await finishPendingMedia(pending);
+      }catch(error){s.error=error&&error.message||'Image upload recovery failed.';s.pendingMedia=pending;throw error;}
+      finally{s.mediaBusy=false;render();}
     }
     async function recoverPendingMedia(){
       if(!mediaClient||!mediaRecoveryStore)throw Error('Secure catalog image management is not configured.');
@@ -692,7 +724,9 @@
         (s.importProgress?'<div class="fcv3-notice" role="status"><strong>'+esc(s.importProgress.phase)+'</strong> · '+esc(s.importProgress.completed)+' / '+esc(s.importProgress.total)+' · '+esc(s.importProgress.message)+'</div>':'')+
         (s.editorLoadingDealId?'<div class="fcv3-notice" role="status">Loading the selected deal by its exact ID…</div>':'')+
         (s.error?'<div class="fcv3-error" role="alert">'+esc(s.error)+'</div>':'')+(s.notice?'<div class="fcv3-notice" role="status">'+esc(s.notice)+'</div>':'')+
-        (s.pendingMedia?'<div class="fcv3-warning" role="alert"><strong>Image operation needs reconciliation</strong><small>'+esc(s.pendingMedia.kind)+' · '+esc(s.pendingMedia.entity_id)+' · '+esc(s.pendingMedia.stage)+' · '+esc(s.pendingMedia.path)+'</small><button type="button" class="fcv3-button" data-action="media-recover"'+(s.mediaBusy?' disabled':'')+'>Check and resume image operation</button></div>':'')+
+        (s.pendingMedia?'<div class="fcv3-warning" role="alert"><strong>Image operation needs reconciliation</strong><small>'+esc(s.pendingMedia.kind)+' · '+esc(s.pendingMedia.entity_id)+' · '+esc(s.pendingMedia.stage)+' · '+esc(s.pendingMedia.path)+'</small>'+
+          (s.pendingMedia.stage==='uploading'?'<label class="fcv3-media-upload">Re-select the exact same image file to resume<input type="file" accept="image/jpeg,image/png,image/webp" data-media-resume-upload '+(s.mediaBusy?'disabled':'')+'></label>':'')+
+          '<button type="button" class="fcv3-button" data-action="media-recover"'+(s.mediaBusy?' disabled':'')+'>Check and resume image operation</button></div>':'')+
         (s.partial?'<div class="fcv3-warning">A deal operation stopped and the deal may remain inactive. ID: '+esc(s.partial.id)+'. Do not create a duplicate; inspect this draft before continuing.</div>':'')+
         '<div class="fcv3-summary-grid"><article><small>Menu categories</small><strong>'+s.categories.filter(c=>c.category_kind==='menu').length+'</strong></article><article><small>Products</small><strong>'+s.products.length+'</strong></article>'+
         '<article><small>Deal-only variants</small><strong>'+s.products.reduce((n,p)=>n+p.variants.filter(v=>v.is_standalone_sellable===false).length,0)+'</strong></article><article><small>Fixed deals</small><strong>'+s.deals.length+'</strong></article></div>'+
@@ -1020,6 +1054,8 @@
         }catch(e){s.error=e.message||'Catalog action failed.';render();}
       };
       el.onchange=event=>{
+        const resumeInput=event.target.closest('[data-media-resume-upload]');
+        if(resumeInput){const file=resumeInput.files&&resumeInput.files[0];resumeInput.value='';if(file)resumePendingUpload(file).catch(()=>{});return;}
         const mediaInput=event.target.closest('[data-media-upload]');
         if(mediaInput){const file=mediaInput.files&&mediaInput.files[0],kind=mediaInput.dataset.kind,id=mediaInput.dataset.id;mediaInput.value='';if(file)uploadMedia(kind,id,file).catch(()=>{});return;}
         if(event.target.matches('[data-choice-product]')){
