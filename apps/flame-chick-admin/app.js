@@ -1,7 +1,7 @@
 (() => {
 "use strict";
 const C=window.FLAME_CHICK_CONFIG, $=id=>document.getElementById(id);
-const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],catalogV3Revision:0,catalogV3Workspace:null,catalogV3Mounted:false,range:"today",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
+const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],catalogV3Revision:0,catalogWorkspace:null,range:"today",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
 const roles=["owner","admin"], labels={new:"New",accepted:"Accepted",preparing:"Preparing",ready:"Ready",out_for_delivery:"On delivery",delivered:"Delivered",collected:"Collected",served:"Served",completed:"Completed",rejected:"Rejected",cancelled:"Cancelled"};
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const cash=n=>new Intl.NumberFormat("en-PK",{style:"currency",currency:"PKR",maximumFractionDigits:0}).format(Number(n)||0);
@@ -103,7 +103,7 @@ async function bootstrap(){
  $("profileBadge").textContent=(u.email||"FC").slice(0,2).toUpperCase();
  showAuth(false);
  document.querySelectorAll(".nav-item[data-page]").forEach(button=>{
-  const allowed=["dashboard","staff","catalog-v3","delivery"].includes(button.dataset.page);
+  const allowed=["dashboard","staff","delivery","menu","categories","deals"].includes(button.dataset.page);
   button.disabled=!allowed;
   if(!allowed){button.title="This module will be enabled after its secure production API is completed.";button.setAttribute("aria-disabled","true");}
  });
@@ -150,17 +150,14 @@ async function catalogV3Request(action,payload,isMutation){
  if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=Math.max(S.catalogV3Revision||0,result.draft_revision);
  return result;
 }
-async function openCatalogV3(){
- const root=$("catalogV3Root");
- if(!root)throw Error("Catalog V3 page root is missing.");
- if(!window.FlameChickAdminCatalogV3||typeof window.FlameChickAdminCatalogV3.createWorkspace!=="function")throw Error("Catalog V3 authoring module is unavailable.");
- if(!S.catalogV3Workspace)S.catalogV3Workspace=window.FlameChickAdminCatalogV3.createWorkspace();
- if(!S.catalogV3Mounted){
-  await S.catalogV3Workspace.mount(root,catalogV3Request);
-  S.catalogV3Mounted=true;
- }else{
-  await S.catalogV3Workspace.refresh();
- }
+async function openCatalogTab(view){
+ const roots={menu:"catalogMenuRoot",categories:"catalogCategoriesRoot",deals:"catalogDealsRoot"};
+ const root=$(roots[view]);
+ if(!root)throw Error("The selected catalog tab root is missing.");
+ if(!window.FlameChickAdminCatalogV3||typeof window.FlameChickAdminCatalogV3.createWorkspace!=="function")
+  throw Error("Secure catalog management is unavailable.");
+ if(!S.catalogWorkspace)S.catalogWorkspace=window.FlameChickAdminCatalogV3.createWorkspace();
+ await S.catalogWorkspace.mount(root,catalogV3Request,view);
 }
 function staffRoleLabel(role){return ({owner:"Owner",admin:"Admin",manager:"Manager",cashier:"Cashier",rider:"Rider"})[role]||role;}
 function staffRequestId(){return crypto.randomUUID?crypto.randomUUID():"b4-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2);}
@@ -260,7 +257,7 @@ async function saveStaffForm(e){
  finally{btn.disabled=false;btn.textContent="Send invitation";}
 }
 
-function nav(p){document.querySelectorAll(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===p));document.querySelectorAll(".page").forEach(x=>x.hidden=x.id!=="page-"+p);$("pageTitle").textContent=({dashboard:"Dashboard",orders:"Orders",menu:"Menu & products",categories:"Categories",deals:"Deals & offers",delivery:"Delivery areas",staff:"Staff & riders","catalog-v3":"Catalog V3 draft",media:"Website images",settings:"Website settings"})[p]||"Dashboard";$("crumb").textContent=p.toUpperCase();if(p==="staff")loadStaff().catch(e=>toast(e.message,true));if(p==="catalog-v3")openCatalogV3().catch(e=>toast(e.message,true));if(p==="media")renderSiteMedia();if(p==="delivery")loadDeliveryConfig().catch(e=>toast(e.message,true));if(p==="dashboard")loadDashboard().catch(()=>{});}
+function nav(p){document.querySelectorAll(".nav-item").forEach(x=>x.classList.toggle("active",x.dataset.page===p));document.querySelectorAll(".page").forEach(x=>x.hidden=x.id!=="page-"+p);$("pageTitle").textContent=({dashboard:"Dashboard",orders:"Orders",menu:"Menu & products",categories:"Categories",deals:"Deals & offers",delivery:"Delivery areas",staff:"Staff & riders",media:"Website images",settings:"Website settings"})[p]||"Dashboard";$("crumb").textContent=p.toUpperCase();if(p==="staff")loadStaff().catch(e=>toast(e.message,true));if(["menu","categories","deals"].includes(p))openCatalogTab(p).catch(e=>toast(e.message,true));if(p==="media")renderSiteMedia();if(p==="delivery")loadDeliveryConfig().catch(e=>toast(e.message,true));if(p==="dashboard")loadDashboard().catch(()=>{});}
 function renderDashboard(){
  let today=parts(new Date()),n=S.range==="today"?1:Number(S.range),start=parts(new Date(Date.now()-(n-1)*86400000));
  let os=S.orders.filter(o=>parts(new Date(o.created_at||o.placed_at))>=start),valid=os.filter(o=>!["cancelled","rejected"].includes(o.status));
@@ -793,8 +790,8 @@ function wire(){
   $("dashboardMonth").onchange=()=>{S.dashboardMonth=$("dashboardMonth").value||S.dashboardMonth;loadDashboard().catch(()=>{});};
   $("rushRangeSwitch").querySelectorAll("button").forEach(b=>b.onclick=()=>{S.rushRange=b.dataset.rush;$("rushRangeSwitch").querySelectorAll("button").forEach(x=>x.classList.toggle("selected",x===b));const m=$("rushMonth");m.hidden=S.rushRange!=="month";if(S.rushRange==="month")m.value=S.rushMonth;loadDashboard().catch(()=>{});});
   $("rushMonth").onchange=()=>{S.rushMonth=$("rushMonth").value||S.rushMonth;loadDashboard().catch(()=>{});};
- $("orderSearch").oninput=renderOrders;$("orderStatusFilter").onchange=renderOrders;$("productSearch").oninput=renderProducts;$("productCategoryFilter").onchange=renderProducts;$("productStateFilter").onchange=renderProducts;
- $("addProductButton").onclick=()=>editProduct(null);$("addCategoryButton").onclick=()=>editCategory(null);$("addSubcategoryButton").onclick=()=>editSubcategory(null);$("addDealButton").onclick=()=>editDeal(null);$("addAreaButton").onclick=()=>editArea(null);
+ $("orderSearch").oninput=renderOrders;$("orderStatusFilter").onchange=renderOrders;
+ $("addAreaButton").onclick=()=>editArea(null);
  $("saveDefaultDeliveryFeeButton").onclick=()=>saveDefaultDeliveryFee().catch(err=>toast(err.message,true));
  $("inviteStaffButton").onclick=()=>openStaffDialog();
  $("staffForm").onsubmit=e=>saveStaffForm(e);$("staffRoleSelect").onchange=syncStaffBranchControl;
