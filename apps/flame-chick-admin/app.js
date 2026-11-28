@@ -1,7 +1,7 @@
 (() => {
 "use strict";
 const C=window.FLAME_CHICK_CONFIG, $=id=>document.getElementById(id);
-const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],catalogV3Revision:0,catalogWorkspace:null,range:"today",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
+const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],catalogV3Revision:0,catalogWorkspaces:{},range:"today",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
 const roles=["owner","admin"], labels={new:"New",accepted:"Accepted",preparing:"Preparing",ready:"Ready",out_for_delivery:"On delivery",delivered:"Delivered",collected:"Collected",served:"Served",completed:"Completed",rejected:"Rejected",cancelled:"Cancelled"};
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const cash=n=>new Intl.NumberFormat("en-PK",{style:"currency",currency:"PKR",maximumFractionDigits:0}).format(Number(n)||0);
@@ -156,8 +156,10 @@ async function openCatalogTab(view){
  if(!root)throw Error("The selected catalog tab root is missing.");
  if(!window.FlameChickAdminCatalogV3||typeof window.FlameChickAdminCatalogV3.createWorkspace!=="function")
   throw Error("Secure catalog management is unavailable.");
- if(!S.catalogWorkspace)S.catalogWorkspace=window.FlameChickAdminCatalogV3.createWorkspace();
- await S.catalogWorkspace.mount(root,catalogV3Request,view);
+ if(!S.catalogWorkspaces[view])S.catalogWorkspaces[view]=window.FlameChickAdminCatalogV3.createWorkspace();
+ const workspace=S.catalogWorkspaces[view];
+ if(workspace.getState().view===view)await workspace.refresh();
+ else await workspace.mount(root,catalogV3Request,view);
 }
 function staffRoleLabel(role){return ({owner:"Owner",admin:"Admin",manager:"Manager",cashier:"Cashier",rider:"Rider"})[role]||role;}
 function staffRequestId(){return crypto.randomUUID?crypto.randomUUID():"b4-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2);}
