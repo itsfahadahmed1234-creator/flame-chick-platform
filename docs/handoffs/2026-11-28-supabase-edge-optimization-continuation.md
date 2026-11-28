@@ -189,3 +189,12 @@ Treat these as review candidates, not approved changes. Inspect the current sour
 - The 102 GB figure remains the expensive **log query** amount. Log ingestion remains **0.10 GB of 1 GB**. Do not conflate these measurements.
 
 Further optimization should be driven by source-level evidence, controlled local/disposable tests, or narrowly scoped read-only schema metadata—not by Supabase log queries. Do not merge, rebase, deploy, or apply migrations without a complete final review and the user's explicit approval.
+
+
+
+## Rider availability reconciliation follow-up — 2026-11-28
+
+- Review found that inline post-action snapshots could bypass the previous client reload that recalculated Rider availability after `delivered` or `reject` released the active task. This risked leaving the Rider UI in a stale `busy` state.
+- Delivery API now recalculates presence after those two actions using server time and `update_preference=false`, preserving the Rider's saved availability preference. The refreshed snapshot carries the resulting availability. If recalculation fails, the API returns `rider_presence_refresh_required`, and the client falls back to its authenticated GET reload path.
+- Source-contract assertions added. Commits: `2721e76`, `59b25f4`, `261be26`. CI is pending for this follow-up; verify the exact workflow run before considering it complete.
+- Production remains untouched. No migration, deployment, secret/Auth change, Production test traffic, or log query. The 102 GB log query remains absolutely prohibited; do not access Logs Explorer or equivalent query surfaces. Preserve the separate Website/Admin ownership boundary.
