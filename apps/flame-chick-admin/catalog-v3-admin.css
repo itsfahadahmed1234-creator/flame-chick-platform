@@ -23,7 +23,7 @@
 .fcv3-editor-head{margin-bottom:15px}.fcv3-editor-head h3{margin:4px 0;font-size:18px}
 .fcv3-editor{display:grid;gap:14px}.fcv3-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .fcv3-editor label{display:grid;gap:6px;font-size:11px;font-weight:700;color:var(--muted)}
-.fcv3-editor input:not([type=checkbox]),.fcv3-editor select,.fcv3-editor textarea{width:100%;min-width:0;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--text);padding:9px 10px;font:12px inherit}
+.fcv3-editor input:not([type=checkbox]),.fcv3-editor select,.fcv3-editor textarea{width:100%;min-width:0;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--text);padding:9px 10px;font:inherit;font-size:12px}
 .fcv3-editor input:focus,.fcv3-editor select:focus,.fcv3-editor textarea:focus{outline:2px solid color-mix(in srgb,var(--accent) 25%,transparent);border-color:var(--accent)}
 .fcv3-wide{grid-column:1/-1}.fcv3-checks{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .fcv3-editor .fcv3-check{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-weight:600}
