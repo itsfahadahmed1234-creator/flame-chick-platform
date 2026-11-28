@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import connection from '../apps/flame-chick-admin/connection-helpers.js';
-const { createSingleFlight, isAmbiguousRequestFailure, sendWithOneRetry, CatalogMutationUncertainError, requestText, requestResponse } = connection;
+const { createUuid, createPendingMutationStore, createSingleFlight, isAmbiguousRequestFailure, sendWithOneRetry, CatalogMutationUncertainError, requestText, requestResponse } = connection;
 
 test('single-flight shares one refresh promise across concurrent callers', async () => {
   let calls=0,release; const gate=new Promise(resolve=>{release=resolve;});
@@ -50,4 +50,44 @@ test('requestResponse handles bodyless success responses',async()=>{
   const response=await requestResponse('/test',{},100,async()=>new Response(null,{status:204}));
   assert.equal(response.status,204);
   assert.equal(await response.text(),'');
+});
+
+
+test('secure UUID generation uses randomUUID or RFC 4122 v4 getRandomValues and fails closed without crypto',()=>{
+  const known='123e4567-e89b-42d3-a456-426614174000';
+  assert.equal(createUuid({randomUUID:()=>known}),known);
+  const generated=createUuid({getRandomValues(bytes){bytes.fill(0);}});
+  assert.match(generated,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  assert.throws(()=>createUuid({}),/Secure random identifiers/);
+  assert.throws(()=>createUuid({randomUUID:()=>'not-a-uuid'}),/invalid identifier/);
+});
+
+test('pending mutation store persists, validates and clears only the exact request ID',()=>{
+  const values=new Map(),storage={getItem:k=>values.has(k)?values.get(k):null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+  const store=createPendingMutationStore(storage,'pending');
+  const body={action:'catalog_product_upsert',payload:{id:'p1',name_en:'Test'},expected_revision:4,request_id:'123e4567-e89b-42d3-a456-426614174000'};
+  const record={version:1,user_id:'123e4567-e89b-42d3-a456-426614174001',fingerprint:JSON.stringify({action:body.action,payload:body.payload}),created_at:123,body};
+  store.write(record);
+  assert.deepEqual(store.read(),record);
+  assert.throws(()=>store.clear('123e4567-e89b-42d3-a456-426614174002'),/different catalog recovery record/);
+  assert.deepEqual(store.read(),record);
+  store.clear(body.request_id);
+  assert.equal(store.read(),null);
+});
+
+test('pending mutation store fails closed on malformed or tampered recovery data',()=>{
+  const values=new Map([['pending','{bad json']]);
+  const storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+  const store=createPendingMutationStore(storage,'pending');
+  assert.throws(()=>store.read(),/cannot be read/);
+  values.set('pending',JSON.stringify({version:1,user_id:'123e4567-e89b-42d3-a456-426614174001',fingerprint:'tampered',created_at:123,body:{action:'catalog_product_upsert',payload:{},expected_revision:1,request_id:'123e4567-e89b-42d3-a456-426614174000'}}));
+  assert.throws(()=>store.read(),/integrity check/);
+});
+
+test('pending mutation store verifies durable write before allowing request',()=>{
+  const storage={getItem:()=>null,setItem:()=>{},removeItem:()=>{}};
+  const store=createPendingMutationStore(storage,'pending');
+  const body={action:'catalog_product_upsert',payload:{},expected_revision:0,request_id:'123e4567-e89b-42d3-a456-426614174000'};
+  const record={version:1,user_id:'123e4567-e89b-42d3-a456-426614174001',fingerprint:JSON.stringify({action:body.action,payload:body.payload}),created_at:123,body};
+  assert.throws(()=>store.write(record),/could not verify/);
 });
