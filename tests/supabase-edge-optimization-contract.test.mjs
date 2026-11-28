@@ -62,8 +62,10 @@ test("Rider uses one authenticated presence-and-jobs sync cycle and action snaps
 
 test("Rider snapshot helper accepts nested post-action snapshots without an API envelope", () => {
   const riderSource = read("apps/flame-chick-rider/index.html");
-  const helper = riderSource.match(/function applyRiderSnapshot\(data\)\{[^\n]*\}/)?.[0];
-  assert.ok(helper, "Rider snapshot helper should remain independently testable");
+  const helperStart = riderSource.indexOf("function applyRiderSnapshot(data){");
+  const helperEnd = riderSource.indexOf("\nasync function syncRiderState", helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart, "Rider snapshot helper should remain independently testable");
+  const helper = riderSource.slice(helperStart, helperEnd).trim();
 
   const calls = { jobs: 0, offers: 0, availability: 0, connection: 0 };
   const context = {
