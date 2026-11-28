@@ -340,6 +340,7 @@
     async function uploadMedia(kind,id,file){
       if(!mediaClient||!mediaRecoveryStore)throw Error('Secure catalog image management is not configured.');
       if(s.error)throw Error('Catalog data is not verified. Refresh successfully before uploading an image.');
+      if(getPendingMutation&&getPendingMutation())throw Error('A previous catalog save is awaiting reconciliation. Resolve that exact save before uploading an image.');
       if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
       const record=currentMediaRecord(kind,id);
       if(!record)throw Error('Refresh and reopen this catalog item before changing its image.');
@@ -427,6 +428,7 @@
     async function changeMediaReference(kind,id,mode){
       if(s.error)throw Error('Catalog data is not verified. Refresh successfully before changing an image reference.');
       if(s.pendingMedia||mediaRecoveryStore&&mediaRecoveryStore.read())throw Error('Reconcile the pending image operation before changing another image.');
+      if(getPendingMutation&&getPendingMutation())throw Error('A previous catalog save is awaiting reconciliation. Resolve that exact save before changing an image reference.');
       if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
       const record=currentMediaRecord(kind,id);
       if(!record)throw Error('Refresh and reopen this catalog item before changing its image.');
