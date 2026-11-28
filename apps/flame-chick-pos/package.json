@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "node scripts/build-cloudflare.mjs",
-    "test:cloudflare": "node --test tests/cloudflare-worker.test.cjs tests/delivery-refresh-optimization.test.cjs"
+    "test:cloudflare": "node --test tests/cloudflare-worker.test.cjs tests/delivery-refresh-optimization.test.cjs tests/qz-printing-diagnostics.test.js tests/pos-receipt-print-contract.test.mjs tests/pos-manual-delivery-receipt-ux.test.cjs"
   },
   "devDependencies": {
     "wrangler": "4.168.0"

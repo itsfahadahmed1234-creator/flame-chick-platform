@@ -8,6 +8,8 @@
   const CERTIFICATE_URL = '/qz/digital-certificate.txt';
   const SIGN_URL = '/api/qz/sign';
   const PRINTER_ENCODING = 'CP437';
+  const RECEIPT_LOGO_URL = '/assets/flame-chick-receipt-mark.svg';
+  let receiptLogoBase64Promise = null;
   const DIAGNOSTIC_ABORT_MESSAGE = 'Flame Chick diagnostic: intentionally rejected before printer submission.';
   let tokenProvider = function () { return ''; };
   let securityConfigured = false;
@@ -293,80 +295,249 @@
     return date.toLocaleDateString('en-US',{weekday:'short'})+', '+date.toLocaleDateString('en-US',{month:'long'})+' '+day+suffix+', '+
       date.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}).replace(/\s/g,'');
   }
-  function receiptCommands(order, label) {
-    const width=48, ESC='\x1B', GS='\x1D';
-    const fmt=v=>'Rs '+(Number(v)||0).toLocaleString('en-PK',{maximumFractionDigits:0});
-    const rows=[ESC+'\x40',ESC+'\x74'+'\x00',ESC+'\x61'+'\x01',ESC+'\x45'+'\x01',center('FLAME CHICK',width),ESC+'\x45'+'\x00'];
-    const itemPriceRows=function(label,amount){
-      const right=cleanText(amount);
-      const available=Math.max(1,width-right.length-1);
-      const leftRows=wrap(label,available);
-      const out=leftRows.slice(0,-1);
-      const last=leftRows[leftRows.length-1]||'';
-      out.push(last+' '.repeat(Math.max(1,width-last.length-right.length))+right);
-      return out;
-    };
-    ['Flame Chick, Main Kamra Road Opposite to Zellbury, Attock','Phone: +923358044164']
-      .forEach(v=>wrap(v,width).forEach(x=>rows.push(x)));
-    rows.push('',ESC+'\x45'+'\x01',center('*** ORIGINAL BILL ***',width),ESC+'\x45'+'\x00');
-    const id=order.serverOrderNumber||order.OrderNumber||order.invoiceNumber||order.InvoiceNumber||order.serverOrderId||order.OrderID||order.localOrderId||'POS Order';
-    rows.push(center('Invoice #'+id,width));
-    const ft=String(order.fulfillmentType||order.FulfillmentType||'Takeaway').toLowerCase();
-    rows.push(ESC+'\x45'+'\x01',center(ft.indexOf('dine')>=0?'DINE-IN':ft.indexOf('delivery')>=0?'DELIVERY':'TAKEAWAY',width),ESC+'\x45'+'\x00','',ESC+'\x61'+'\x00');
-    const meta=[['Placed',receiptDateText(order.createdAt||order.DateTime)],['Cashier',order.cashierName||order.CashierName||''],['Guests Served',order.guestsServed??order.GuestsServed??''],['Table',order.tableNumber||order.TableNumber||'']];
-    meta.forEach(p=>{if(p[1]!==''&&p[1]!==null&&p[1]!==undefined)wrap(rightPair(p[0],p[1],width),width).forEach(x=>rows.push(x));});
-    const customerName=order.customerName||order.CustomerName||'';
-    const phone=order.phone||order.Phone||'';
-    const address=order.address||order.Address||'';
-    const area=order.area||order.Area||'';
-    if(customerName)wrap('Customer: '+customerName,width).forEach(x=>rows.push(x));
-    if(phone)wrap('Phone: '+phone,width).forEach(x=>rows.push(x));
-    if(address)wrap('Address: '+address,width).forEach(x=>rows.push(x));
-    if(area)wrap('Area: '+area,width).forEach(x=>rows.push(x));
-    rows.push('-'.repeat(width),rightPair('Item','Price',width),'-'.repeat(width));
-    const items=Array.isArray(order.items)?order.items:[];
-    if(!items.length)rows.push('Item details unavailable');
-    items.forEach(item=>{
-      const name=item.itemName||item['Item Name']||item.ItemName||item.name||'Item';
-      const qty=Math.max(1,Number(item.quantity??item.Quantity)||1);
-      const price=Number(item.price??item.Price)||0;
-      const label=qty+'x '+name+(price>0?' @'+price.toLocaleString('en-PK',{maximumFractionDigits:0}):'');
-      itemPriceRows(label,fmt(lineTotal(item))).forEach(x=>rows.push(x));
-      const detail=Array.isArray(item.contents)?item.contents.join(', '):(item.description||item.Description||'');
-      if(detail)wrap('  '+detail,width).forEach(x=>rows.push(x));
+  function loadReceiptLogoBase64() {
+    if (receiptLogoBase64Promise) return receiptLogoBase64Promise;
+
+    receiptLogoBase64Promise = new Promise(function (resolve) {
+      try {
+        if (typeof window.Image !== 'function' || typeof document === 'undefined') {
+          resolve('');
+          return;
+        }
+        const image = new window.Image();
+        image.onload = function () {
+          try {
+            // Match the on-screen 19 mm square logo box while preserving the original mark ratio.
+            const canvas = document.createElement('canvas');
+            canvas.width = 132;
+            canvas.height = 152;
+            const context = canvas.getContext('2d');
+            if (!context) throw new Error('Canvas rendering is unavailable.');
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            const sourceWidth = Number(image.naturalWidth || image.width) || canvas.width;
+            const sourceHeight = Number(image.naturalHeight || image.height) || canvas.height;
+            const scale = Math.min(canvas.width / sourceWidth, canvas.height / sourceHeight);
+            const width = Math.max(1, Math.round(sourceWidth * scale));
+            const height = Math.max(1, Math.round(sourceHeight * scale));
+            const left = Math.floor((canvas.width - width) / 2);
+            const top = Math.floor((canvas.height - height) / 2);
+            context.drawImage(image, left, top, width, height);
+            const dataUrl = canvas.toDataURL('image/png');
+            const comma = dataUrl.indexOf(',');
+            const encoded = comma >= 0 ? dataUrl.slice(comma + 1) : '';
+            resolve(encoded || '');
+          } catch (_) {
+            resolve('');
+          }
+        };
+        image.onerror = function () { resolve(''); };
+        image.decoding = 'async';
+        image.src = RECEIPT_LOGO_URL;
+      } catch (_) {
+        resolve('');
+      }
     });
-    rows.push('-'.repeat(width));
-    const sub=Number(order.subtotal??order.Subtotal);
-    const subtotal=Number.isFinite(sub)&&sub>=0?sub:items.reduce((sum,item)=>sum+lineTotal(item),0);
-    const surcharge=Number(order.surcharge??order.Surcharge??order.serviceCharge??order.ServiceCharge)||0;
-    const delivery=Number(order.deliveryFee??order.DeliveryFee)||0;
-    const discount=Number(order.discount??order.Discount)||0;
-    const supplied=Number(order.total??order.Total);
-    const total=Number.isFinite(supplied)&&supplied>0?supplied:Math.max(0,subtotal+surcharge+delivery-discount);
-    rows.push(rightPair('Price',fmt(subtotal),width));
-    if(surcharge>0)rows.push(rightPair('Surcharge',fmt(surcharge),width));
-    if(delivery>0)rows.push(rightPair('Delivery',fmt(delivery),width));
-    if(discount>0)rows.push(rightPair('Discount',fmt(discount),width));
-    rows.push(ESC+'\x45'+'\x01',rightPair('Grand Total',fmt(total),width),ESC+'\x45'+'\x00');
-    const method=order.paymentMethod||order.PaymentMethod||'Cash';
-    const status=String(order.paymentStatus||order.PaymentStatus||'').toLowerCase();
-    const rawPaid=Number(order.paidAmount??order.PaidAmount);
-    const hasPaid=Number.isFinite(rawPaid)&&rawPaid>0;
-    const isPaid=status==='paid'||(hasPaid&&rawPaid>=total&&total>0);
-    const paid=hasPaid?rawPaid:(isPaid?total:0);
-    rows.push('');
-    if(isPaid||paid>0)rows.push(rightPair(method,fmt(paid),width));else rows.push(rightPair('Payment',method,width));
-    if(isPaid)rows.push(ESC+'\x61'+'\x01',ESC+'\x45'+'\x01',center('* PAID *',width),ESC+'\x45'+'\x00',ESC+'\x61'+'\x00');
-    else if(status==='unpaid'||status==='pending'||paid>0){
-      const bal=Number(order.balanceDue??order.BalanceDue);
-      rows.push(rightPair('Balance Due',fmt(Number.isFinite(bal)?bal:Math.max(0,total-paid)),width),center('* UNPAID *',width));
+    return receiptLogoBase64Promise;
+  }
+
+  function buildReceiptImageEntry(base64) {
+    const encoded = String(base64 || '').trim();
+    if (!encoded) return null;
+    return {
+      type: 'raw',
+      format: 'image',
+      flavor: 'base64',
+      data: encoded,
+      options: {
+        language: 'ESCPOS',
+        dotDensity: 'double'
+      }
+    };
+  }
+
+  function receiptCommands(order, label) {
+    const width = 48;
+    const ESC = '\x1B';
+    const GS = '\x1D';
+    const fmt = function (value) {
+      return 'Rs ' + (Number(value) || 0).toLocaleString('en-PK', { maximumFractionDigits: 0 });
+    };
+    const rows = [
+      ESC + '\x40',
+      ESC + '\x74' + '\x00',
+      ESC + '\x61' + '\x01',
+      ESC + '\x45' + '\x01',
+      center('FLAME CHICK', width),
+      ESC + '\x45' + '\x00'
+    ];
+
+    function addField(fieldLabel, value) {
+      if (value === undefined || value === null || String(value).trim() === '') return;
+      wrap(fieldLabel + ': ' + value, width).forEach(function (row) { rows.push(row); });
     }
-    const notes=order.notes||order.Notes;
-    if(notes){rows.push('-'.repeat(width));wrap('Note: '+notes,width).forEach(x=>rows.push(x));}
-    rows.push('','','','');
-    // Feed the paper before issuing the ESC/POS partial-cut command.
-    const cutterCommand=GS+'\x56\x42\x00';
-    return rows.join('\n')+'\n'+cutterCommand;
+
+    function itemPriceRows(itemLabel, amount) {
+      const right = cleanText(amount);
+      const available = Math.max(1, width - right.length - 1);
+      const leftRows = wrap(itemLabel, available);
+      const out = leftRows.slice(0, -1);
+      const last = leftRows[leftRows.length - 1] || '';
+      out.push(last + ' '.repeat(Math.max(1, width - last.length - right.length)) + right);
+      return out;
+    }
+
+    [
+      'Flame Chick, Main Kamra Road Opposite to Zellbury, Attock',
+      'Phone: +923358044164'
+    ].forEach(function (value) {
+      wrap(value, width).forEach(function (row) { rows.push(row); });
+    });
+
+    rows.push(
+      '',
+      ESC + '\x45' + '\x01',
+      center('*** ORIGINAL BILL ***', width),
+      ESC + '\x45' + '\x00'
+    );
+
+    const id = order.serverOrderNumber || order.OrderNumber || order.invoiceNumber ||
+      order.InvoiceNumber || order.serverOrderId || order.OrderID || order.localOrderId || 'POS Order';
+    rows.push(center('Invoice #' + id, width));
+
+    const fulfillment = String(order.fulfillmentType || order.FulfillmentType || 'Takeaway').toLowerCase();
+    const isDelivery = fulfillment.indexOf('delivery') >= 0;
+    const isDineIn = fulfillment.indexOf('dine') >= 0;
+    rows.push(
+      ESC + '\x45' + '\x01',
+      center(isDineIn ? 'DINE-IN' : (isDelivery ? 'DELIVERY' : 'TAKEAWAY'), width),
+      ESC + '\x45' + '\x00',
+      '',
+      ESC + '\x61' + '\x00'
+    );
+
+    const metadata = [
+      ['Placed', receiptDateText(order.createdAt || order.DateTime)],
+      ['Cashier', order.cashierName || order.CashierName || '']
+    ];
+    if (isDineIn) {
+      metadata.push(['Guests Served', order.guestsServed ?? order.GuestsServed ?? '']);
+      metadata.push(['Table', order.tableNumber || order.TableNumber || '']);
+    }
+    metadata.forEach(function (pair) {
+      if (pair[1] !== '' && pair[1] !== null && pair[1] !== undefined) {
+        wrap(rightPair(pair[0], pair[1], width), width).forEach(function (row) { rows.push(row); });
+      }
+    });
+
+    if (isDelivery) {
+      addField('Customer', order.customerName || order.CustomerName || '');
+      addField('Phone', order.phone || order.Phone || '');
+      addField('Address', order.address || order.Address || '');
+      addField('Area', order.area || order.Area || '');
+      addField('Locality', order.deliveryLocality || order.DeliveryLocality || order.locality || order.Locality || '');
+      addField('Delivery Instructions',
+        order.deliveryInstructions || order.DeliveryInstructions ||
+        order.customerInstructions || order.CustomerInstructions || '');
+    }
+
+    rows.push(
+      '-'.repeat(width),
+      rightPair('Item', 'Price', width),
+      '-'.repeat(width)
+    );
+
+    const items = Array.isArray(order.items) ? order.items : [];
+    if (!items.length) rows.push('Item details unavailable');
+    items.forEach(function (item) {
+      const name = item.itemName || item['Item Name'] || item.ItemName || item.name || 'Item';
+      const quantity = Math.max(1, Number(item.quantity ?? item.Quantity) || 1);
+      const price = Number(item.price ?? item.Price) || 0;
+      const labelText = quantity + 'x ' + name +
+        (price > 0 ? ' @' + price.toLocaleString('en-PK', { maximumFractionDigits: 0 }) : '');
+      itemPriceRows(labelText, fmt(lineTotal(item))).forEach(function (row) { rows.push(row); });
+      const detail = Array.isArray(item.contents)
+        ? item.contents.join(', ')
+        : (item.description || item.Description || '');
+      if (detail) wrap('  ' + detail, width).forEach(function (row) { rows.push(row); });
+    });
+
+    rows.push('-'.repeat(width));
+    const rawSubtotal = order.subtotal ?? order.Subtotal;
+    const suppliedSubtotal = Number(rawSubtotal);
+    const hasSuppliedSubtotal = rawSubtotal !== undefined && rawSubtotal !== null && rawSubtotal !== '';
+    const itemSubtotal = items.reduce(function (sum, item) { return sum + lineTotal(item); }, 0);
+    const subtotal = hasSuppliedSubtotal && Number.isFinite(suppliedSubtotal) && suppliedSubtotal >= 0
+      ? suppliedSubtotal
+      : itemSubtotal;
+    const deliveryFee = isDelivery ? Math.max(0, Number(order.deliveryFee ?? order.DeliveryFee) || 0) : 0;
+    const discount = Math.max(0, Number(order.discount ?? order.Discount) || 0);
+    const rawTotal = order.total ?? order.Total;
+    const suppliedTotal = Number(rawTotal);
+    const hasSuppliedTotal = rawTotal !== undefined && rawTotal !== null && rawTotal !== '';
+    const total = hasSuppliedTotal && Number.isFinite(suppliedTotal) && suppliedTotal >= 0
+      ? suppliedTotal
+      : Math.max(0, subtotal + deliveryFee - discount);
+
+    rows.push(rightPair('Price', fmt(subtotal), width));
+    if (isDelivery) rows.push(rightPair('Delivery Charges', fmt(deliveryFee), width));
+    if (discount > 0) rows.push(rightPair('Discount', fmt(discount), width));
+    rows.push(
+      ESC + '\x45' + '\x01',
+      rightPair('Grand Total', fmt(total), width),
+      ESC + '\x45' + '\x00'
+    );
+
+    const method = order.paymentMethod || order.PaymentMethod || 'Cash';
+    const status = String(order.paymentStatus || order.PaymentStatus || '').toLowerCase();
+    const rawPaid = Number(order.paidAmount ?? order.PaidAmount);
+    const hasPaid = Number.isFinite(rawPaid) && rawPaid > 0;
+    const isPaid = status === 'paid' || (hasPaid && rawPaid >= total && total > 0);
+    const paid = hasPaid ? rawPaid : (isPaid ? total : 0);
+    rows.push('');
+    if (isPaid || paid > 0) rows.push(rightPair(method, fmt(paid), width));
+    else rows.push(rightPair('Payment', method, width));
+
+    if (isPaid) {
+      rows.push(
+        ESC + '\x61' + '\x01',
+        ESC + '\x45' + '\x01',
+        center('* PAID *', width),
+        ESC + '\x45' + '\x00',
+        ESC + '\x61' + '\x00'
+      );
+    } else if (status === 'unpaid' || status === 'pending' || paid > 0) {
+      const balanceValue = Number(order.balanceDue ?? order.BalanceDue);
+      const balance = Number.isFinite(balanceValue) ? balanceValue : Math.max(0, total - paid);
+      rows.push(
+        rightPair('Balance Due', fmt(balance), width),
+        center('* UNPAID *', width)
+      );
+    }
+
+    const notes = order.notes || order.Notes;
+    if (notes) {
+      rows.push('-'.repeat(width));
+      addField('Note', notes);
+    }
+
+    rows.push('', '', '', '');
+    // Preserve the previously verified feed and partial-cut command for the iTech cutter.
+    const cutterCommand = GS + '\x56\x42\x00';
+    return rows.join('\n') + '\n' + cutterCommand;
+  }
+
+  async function buildReceiptData(order, label) {
+    const base64 = await loadReceiptLogoBase64();
+    const logoEntry = buildReceiptImageEntry(base64);
+    if (!logoEntry) return [receiptCommands(order, label)];
+
+    // Set centered alignment before QZ inserts the ESC/POS raster logo.
+    return [
+      '\x1B\x40' + '\x1B\x61\x01',
+      logoEntry,
+      '\n',
+      receiptCommands(order, label)
+    ];
   }
 
   function testCommands() {
@@ -757,12 +928,13 @@
     if (!name) throw new Error('Select the installed iTech printer first.');
     await connect();
     const config = qz.configs.create(name, { encoding: PRINTER_ENCODING });
-    await qz.print(config, [{
+    const printData = Array.isArray(data) ? data : [{
       type: 'raw',
       format: 'command',
       flavor: 'plain',
       data: [data]
-    }]);
+    }];
+    await qz.print(config, printData);
     return true;
   }
 
@@ -776,7 +948,8 @@
     connect: connect,
     scanPrinters: scanPrinters,
     printReceipt: function (order, label, printerName) {
-      return send(printerName, receiptCommands(order || {}, label || 'Counter Receipt'));
+      return buildReceiptData(order || {}, label || 'Counter Receipt')
+        .then(function (data) { return send(printerName, data); });
     },
     testPrint: function (printerName) {
       return send(printerName, testCommands());
@@ -785,6 +958,8 @@
     diagnostics: {
       buildTestPayload: testCommands,
       buildReceiptPayload: receiptCommands,
+      buildReceiptImageEntry: buildReceiptImageEntry,
+      buildReceiptData: buildReceiptData,
       encodeCp437Ascii: encodeCp437Ascii,
       formatEscPosPayload: formatEscPosPayload
     }

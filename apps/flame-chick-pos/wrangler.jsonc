@@ -8,12 +8,24 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/qz/sign"]
+    "run_worker_first": [
+      "/api/qz/sign"
+    ]
   },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,
-    "logs": { "enabled": true, "head_sampling_rate": 1, "persist": true, "invocation_logs": true },
-    "traces": { "enabled": false, "persist": false, "head_sampling_rate": 0.1 }
-  }
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": false,
+      "persist": false,
+      "head_sampling_rate": 0.1
+    }
+  },
+  "previews": {}
 }
