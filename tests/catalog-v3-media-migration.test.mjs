@@ -86,8 +86,8 @@ test('applied category/deal media migration is guarded and limited to four exist
   ]) assert.ok(sql.includes(token), 'Missing applied-migration safety condition: ' + token);
   assert.match(sql, /image_current_path = v_image_current_path/);
   assert.match(sql, /image_current_path=v_image_current_path/);
-  assert.match(sql, /ELSE\\s+v_image_current_path\\s*:=\\s*v_category\\.image_current_path;/);
-  assert.match(sql, /ELSIF v_id IS NOT NULL THEN\\s+v_image_current_path\\s*:=\\s*v_row\\.image_current_path;/);
+  assert.match(sql, /ELSE\s+v_image_current_path\s*:=\s*v_category\.image_current_path;/);
+  assert.match(sql, /ELSIF v_id IS NOT NULL THEN\s+v_image_current_path\s*:=\s*v_row\.image_current_path;/);
   assert.match(sql, /'image_current_path', s\.image_current_path/);
   assert.match(sql, /'image_current_path',d\.image_current_path/);
   assert.doesNotMatch(sql, /(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+storage\.objects/i);
