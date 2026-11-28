@@ -55,6 +55,54 @@
     return {raw,data};
   }
 
+  function createRecoveryStore(storage,key,userId){
+    if(!storage||typeof storage.getItem!=="function"||typeof storage.setItem!=="function"||typeof storage.removeItem!=="function")
+      throw new TypeError("A persistent media recovery store is required.");
+    if(typeof key!=="string"||!key||!UUID_RE.test(String(userId||"")))
+      throw new TypeError("Media recovery identity is invalid.");
+    function validate(record){
+      if(!record||typeof record!=="object"||Array.isArray(record)||record.version!==1||
+         record.user_id!==userId||!isTarget(record.kind,record.entity_id)||!isManagedPath(record.path)||
+         !record.path.startsWith(record.kind+"/"+record.entity_id+"/")||
+         !["uploading","uploaded","linking","cleanup_required"].includes(record.stage)||
+         typeof record.action!=="string"||!/^catalog_(category|product|deal)_upsert$/.test(record.action)||
+         !record.payload||typeof record.payload!=="object"||Array.isArray(record.payload)||
+         !Number.isSafeInteger(record.created_at)||record.created_at<0||
+         !TYPES[record.mimeType]||TYPES[record.mimeType].extension!==record.extension||
+         !Number.isSafeInteger(record.size)||record.size<1||record.size>MAX_BYTES)
+        throw fail("The saved image recovery record is invalid. Do not upload another image or remove this object until it is reconciled.","MediaRecoveryRecordError");
+      const encoded=JSON.stringify(record);
+      if(new TextEncoder().encode(encoded).byteLength>16384)
+        throw fail("The saved image recovery record exceeds its safe size limit.","MediaRecoveryRecordError");
+      return record;
+    }
+    function read(){
+      const raw=storage.getItem(key);
+      if(raw==null)return null;
+      let record;
+      try{record=JSON.parse(raw);}catch{
+        throw fail("The saved image recovery record cannot be read. No new catalog image change will be started.","MediaRecoveryRecordError");
+      }
+      return validate(record);
+    }
+    function write(record){
+      const valid=validate(record),encoded=JSON.stringify(valid);
+      storage.setItem(key,encoded);
+      if(storage.getItem(key)!==encoded)
+        throw fail("Could not verify the image recovery record was saved. The upload has not started.","MediaRecoveryRecordError");
+      return valid;
+    }
+    function clear(path){
+      const current=read();
+      if(current&&current.path!==path)
+        throw fail("A different image recovery record is stored; it was not removed.","MediaRecoveryRecordError");
+      if(current)storage.removeItem(key);
+      if(storage.getItem(key)!=null)
+        throw fail("Could not clear the reconciled image recovery record.","MediaRecoveryRecordError");
+    }
+    return Object.freeze({read,write,clear});
+  }
+
   function createClient(options={}){
     const baseUrl=String(options.supabaseUrl||"").replace(/\/$/,"");
     const bucket=String(options.bucket||"");
@@ -177,5 +225,5 @@
     return Object.freeze({upload,prepareUpload,uploadPrepared,remove,publicUrl,info});
   }
 
-  return Object.freeze({MAX_BYTES,TYPES,isManagedPath,isTarget,inspectImageFile,createClient});
+  return Object.freeze({MAX_BYTES,TYPES,isManagedPath,isTarget,inspectImageFile,createRecoveryStore,createClient});
 });
