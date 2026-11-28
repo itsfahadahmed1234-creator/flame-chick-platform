@@ -36,10 +36,13 @@ test("Rider invite session is retained when activation or role verification fail
 });
 
 test("Rider page's inline browser scripts parse", () => {
-  const scripts = [...html.matchAll(/<script[^>]*>([\\s\\S]*?)<\/script>/gi)];
+  const scripts = html.split("<script").slice(1);
   assert.ok(scripts.length > 0, "Rider page must contain its application script");
-  for (const [index, match] of scripts.entries()) {
-    const code = match[1].trim();
+  for (const [index, chunk] of scripts.entries()) {
+    const tagEnd = chunk.indexOf(">");
+    const close = chunk.indexOf("</script>", tagEnd + 1);
+    if (tagEnd < 0 || close < 0 || chunk.slice(0, tagEnd).toLowerCase().includes("src=")) continue;
+    const code = chunk.slice(tagEnd + 1, close).trim();
     if (code) new vm.Script(code, { filename: "rider-inline-" + index + ".js" });
   }
 });
