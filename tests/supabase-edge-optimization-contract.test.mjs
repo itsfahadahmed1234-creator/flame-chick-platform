@@ -57,6 +57,9 @@ test("Rider uses one authenticated presence-and-jobs sync cycle and action snaps
   assert.match(rider, /action:'sync',online:riderWantsOnline/);
   assert.match(rider, /riderSyncTimer=setInterval\(\(\)=>syncRiderState\(false\),120000\)/);
   assert.match(rider, /applyRiderSnapshot\(result\.rider_state\|\|\{\}\)/);
+  assert.match(api, /action === "delivered" \|\| action === "reject"/);
+  assert.match(api, /rider_presence_refresh_required/);
+  assert.match(rider, /result\.rider_presence_refresh_required\|\|!applyRiderSnapshot/);
   assert.doesNotMatch(rider, /riderRealtimeFallbackTimer=setInterval\(\(\)=>\{[\s\S]{0,150}?\},120000\)/);
 });
 
