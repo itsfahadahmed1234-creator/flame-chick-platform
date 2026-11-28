@@ -6,8 +6,8 @@
   if(root)root.FlameChickAdminCatalogV3=api;
 })(typeof window!=='undefined'?window:typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
-  const READ={categories:'catalog_categories_list',products:'catalog_products_list',collections:'catalog_deal_collections_list',schedules:'catalog_schedule_sets_list',deals:'catalog_deals_list',dealDetail:'catalog_deal_detail_read',scheduleDetail:'catalog_schedule_detail_read'};
-  const WRITE={category:'catalog_category_upsert',product:'catalog_product_upsert',collection:'catalog_deal_collection_upsert',deal:'catalog_deal_upsert',components:'catalog_deal_components_upsert',mappings:'catalog_deal_variant_options_upsert',schedule:'catalog_schedule_set_upsert',assignment:'catalog_deal_schedule_assignment_upsert'};
+  const READ={categories:'catalog_categories_list',subcategories:'catalog_subcategories_list',products:'catalog_products_list',collections:'catalog_deal_collections_list',schedules:'catalog_schedule_sets_list',deals:'catalog_deals_list',dealDetail:'catalog_deal_detail_read',scheduleDetail:'catalog_schedule_detail_read'};
+  const WRITE={category:'catalog_category_upsert',subcategory:'catalog_subcategory_upsert',product:'catalog_product_upsert',collection:'catalog_deal_collection_upsert',deal:'catalog_deal_upsert',components:'catalog_deal_components_upsert',mappings:'catalog_deal_variant_options_upsert',schedule:'catalog_schedule_set_upsert',assignment:'catalog_deal_schedule_assignment_upsert'};
   const isObj=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
   function text(v,max,label,required){const s=String(v==null?'':v).trim();if(required&&!s)throw Error(label+' is required.');if(s.length>max)throw Error(label+' is too long.');return s||null;}
   function amount(v,label,required){const s=String(v==null?'':v).trim();if(!s){if(required)throw Error(label+' is required for a standalone-sellable variant.');return null;}const n=Number(s);if(!Number.isFinite(n)||n<0||Math.round(n*100)!==n*100)throw Error(label+' must be a non-negative amount with up to two decimals.');return n;}
@@ -36,6 +36,17 @@
       description_en:text(form.description_en,2000,'Description',false),description_ur:text(form.description_ur,2000,'Urdu description',false),
       featured:form.featured===true,sort_order:Number.isSafeInteger(form.sort_order)&&form.sort_order>=0?form.sort_order:0,
       is_active:form.is_active!==false,is_available:form.is_available!==false,variants:rows};
+  }
+  function normalizeSubcategoryDraft(form,categories){
+    if(!isObj(form))throw Error('Subcategory form data is invalid.');
+    const categoryId=text(form.category_id,64,'Parent menu category',true);
+    if(!Array.isArray(categories)||!categories.some(category=>category&&category.id===categoryId&&category.category_kind==='menu'))
+      throw Error('Choose an existing menu category as the subcategory parent.');
+    const sortOrder=Number(form.sort_order??0);
+    if(!Number.isSafeInteger(sortOrder)||sortOrder<0)throw Error('Subcategory sort order must be a non-negative whole number.');
+    return {...(form.id?{id:text(form.id,64,'Subcategory ID',true)}:{}),category_id:categoryId,
+      name_en:text(form.name_en,120,'Subcategory name',true),name_ur:text(form.name_ur,120,'Urdu subcategory name',false),
+      sort_order:sortOrder,is_active:form.is_active!==false};
   }
   function buildFixedComponentGroups(components,existingGroups=[]){
     if(!Array.isArray(components)||components.length<1||components.length>40)throw Error('A fixed deal needs 1–40 component groups.');
@@ -220,20 +231,67 @@
   function checkbox(name,label,checked){return '<label class="fcv3-check"><input type="checkbox" name="'+name+'" data-field="'+name+'"'+(checked?' checked':'')+'> '+label+'</label>';}
   function createWorkspace(){
     let el=null,request=null;
-    const s={loading:false,saving:false,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,editorLoadingDealId:null,components:[],detail:null,partial:null,importProgress:null};
+    const s={view:null,loading:false,saving:false,error:null,notice:null,revision:null,categories:[],subcategories:[],products:[],collections:[],deals:[],schedules:[],editor:null,editorLoadingDealId:null,components:[],detail:null,partial:null,
+      pages:{categories:{limit:50,after:null,more:false},subcategories:{limit:50,after:null,more:false},products:{limit:25,after:null,more:false}},
+      dealPages:{}};
     async function read(action,args){const r=await request(action,args||{},false);if(!isObj(r)||r.ok===false)throw Error('Catalog read failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
     async function write(action,payload){const r=await request(action,payload,true);if(!isObj(r)||r.ok===false)throw Error('Catalog save failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
-    async function refresh(){
-      if(!el)return;s.loading=true;s.error=null;render();
+    async function refresh(view=s.view){
+      if(!el)return;
+      if(!['menu','categories','deals'].includes(view))throw Error('Choose a supported catalog tab.');
+      s.view=view;s.loading=true;s.error=null;
+      s.pages={categories:{limit:50,after:null,more:false},subcategories:{limit:50,after:null,more:false},products:{limit:25,after:null,more:false}};
+      s.dealPages={};
+      render();
+      const pageMeta=(items,limit)=>({limit,after:items.length?items[items.length-1].id:null,more:items.length===limit});
       try{
-        const [cats,prods,cols,schedules]=await Promise.all([
-          read(READ.categories,{limit:100}),read(READ.products,{limit:50}),read(READ.collections,{limit:50}),read(READ.schedules,{limit:50})
-        ]);
-        s.categories=cats.items||[];s.products=prods.items||[];s.collections=cols.items||[];s.schedules=schedules.items||[];
-        const lists=await Promise.all(s.collections.map(c=>read(READ.deals,{collection_id:c.id,limit:50})));
-        s.deals=lists.flatMap(x=>x.items||[]);
-      }catch(e){s.error=e.message||'Unable to load catalog draft.';}
+        if(view==='menu'){
+          const [cats,prods]=await Promise.all([
+            read(READ.categories,{limit:50}),read(READ.products,{limit:25})
+          ]);
+          s.categories=cats.items||[];s.products=prods.items||[];
+          s.pages.categories=pageMeta(s.categories,50);s.pages.products=pageMeta(s.products,25);
+        }else if(view==='categories'){
+          const [cats,subs]=await Promise.all([
+            read(READ.categories,{limit:50}),read(READ.subcategories,{limit:50})
+          ]);
+          s.categories=cats.items||[];s.subcategories=subs.items||[];
+          s.pages.categories=pageMeta(s.categories,50);s.pages.subcategories=pageMeta(s.subcategories,50);
+        }else{
+          const [cats,prods,cols,schedules]=await Promise.all([
+            read(READ.categories,{limit:50}),read(READ.products,{limit:25}),
+            read(READ.collections,{limit:25}),read(READ.schedules,{limit:25})
+          ]);
+          s.categories=cats.items||[];s.products=prods.items||[];
+          s.collections=cols.items||[];s.schedules=schedules.items||[];
+          s.pages.categories=pageMeta(s.categories,50);s.pages.products=pageMeta(s.products,25);
+          const lists=await Promise.all(s.collections.map(async collection=>{
+            const result=await read(READ.deals,{collection_id:collection.id,limit:25});
+            const items=result.items||[];s.dealPages[collection.id]=pageMeta(items,25);return items;
+          }));
+          s.deals=lists.flat();
+        }
+      }catch(e){s.error=e.message||'Unable to load catalog.';}
       finally{s.loading=false;render();}
+    }
+    async function loadMore(kind,collectionId){
+      const page=kind==='deals'?s.dealPages[collectionId]:s.pages[kind];
+      if(!page||!page.more||!page.after||s.loading||s.saving)return;
+      s.loading=true;s.error=null;render();
+      try{
+        const result=kind==='deals'
+          ?await read(READ.deals,{collection_id:collectionId,after_id:page.after,limit:page.limit})
+          :await read(READ[kind],{after_id:page.after,limit:page.limit});
+        const items=result.items||[];
+        if(kind==='deals')s.deals=s.deals.concat(items);else s[kind]=s[kind].concat(items);
+        page.after=items.length?items[items.length-1].id:page.after;
+        page.more=items.length===page.limit;
+      }catch(error){s.error=error.message||'Unable to load the next catalog page.';}
+      finally{s.loading=false;render();}
+    }
+    function moreButton(kind,label,collectionId){
+      const page=kind==='deals'?s.dealPages[collectionId]:s.pages[kind];
+      return page&&page.more?'<button class="fcv3-button" data-action="load-more" data-kind="'+kind+'"'+(collectionId?' data-collection-id="'+esc(collectionId)+'"':'')+(s.loading?' disabled':'')+'>Load more '+label+'</button>':'';
     }
     function categoryLabel(id){return s.categories.find(c=>c.id===id)?.name_en||'Unknown category';}
     function variantRows(product){
@@ -273,6 +331,19 @@
         '<label>Sort order<input name="sort_order" type="number" min="0" step="1" value="'+esc(category?category.sort_order:0)+'"></label>'+
         (editing?'<label class="fcv3-check"><input type="checkbox" name="is_active"'+(category.is_active?' checked':'')+'> Active</label>':'')+'</div>'+
         '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save category changes':'Save category')+'</button></div></form>';
+    }
+    function subcategoryForm(subcategory){
+      const editing=!!(subcategory&&subcategory.id);
+      const parents=s.categories.filter(category=>category&&category.category_kind==='menu'&&(category.is_active!==false||category.id===subcategory?.category_id));
+      return '<form class="fcv3-editor" data-form="subcategory">'+(editing?'<input type="hidden" name="id" value="'+esc(subcategory.id)+'">':'')+
+        '<div class="fcv3-form-grid"><label>Parent menu category<select name="category_id" required><option value="">Choose a menu category</option>'+
+        parents.map(category=>'<option value="'+esc(category.id)+'"'+(subcategory&&subcategory.category_id===category.id?' selected':'')+'>'+esc(category.name_en)+(category.is_active===false?' · Inactive':'')+'</option>').join('')+
+        '</select></label><label>English name<input name="name_en" maxlength="120" required value="'+esc(subcategory&&subcategory.name_en)+'"></label>'+
+        '<label>Urdu name<input name="name_ur" maxlength="120" value="'+esc(subcategory&&subcategory.name_ur)+'"></label>'+
+        '<label>Sort order<input name="sort_order" type="number" min="0" step="1" value="'+esc(subcategory?subcategory.sort_order:0)+'"></label>'+
+        (editing?'<label class="fcv3-check"><input type="checkbox" name="is_active"'+(subcategory.is_active?' checked':'')+'> Active</label>':'')+
+        '</div><p class="fcv3-empty">Subcategories remain attached to their parent menu category. Existing products and order history are not deleted by this editor.</p>'+
+        '<div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">'+(editing?'Save subcategory changes':'Save subcategory')+'</button></div></form>';
     }
     function burgerCategoryAnchor(){
       const matches=s.categories.filter(category=>category&&category.category_kind==='menu'&&category.is_active!==false&&category.name_en==='Chicken Burgers');
@@ -380,40 +451,56 @@
     function render(){
       if(!el)return;
       const productRows=s.products.map(p=>{
-        const standalone=p.variants.filter(v=>v.is_standalone_sellable!==false);
-        const dealOnly=p.variants.filter(v=>v.is_standalone_sellable===false);
+        const variants=Array.isArray(p.variants)?p.variants:[];
+        const standalone=variants.filter(v=>v.is_standalone_sellable!==false);
+        const dealOnly=variants.filter(v=>v.is_standalone_sellable===false);
         return '<tr><td><strong>'+esc(p.name_en)+'</strong><small>'+esc(p.description_en||'')+'</small></td><td>'+esc(categoryLabel(p.category_id))+'</td>'+
           '<td>'+(standalone.length?esc(standalone.map(v=>cash(v.price)+' ('+v.size_label+')').join(', ')):'—')+
           (dealOnly.length?'<small>'+dealOnly.length+' deal-only variant(s)</small>':'')+'</td><td>'+(p.is_active?(p.is_available?'Active':'Unavailable'):'Hidden')+'</td>'+
           '<td><button class="fcv3-button" data-action="product-edit" data-id="'+esc(p.id)+'">Edit</button></td></tr>';
       }).join('');
-      const collectionHtml=s.collections.map(c=>{
-        const deals=s.deals.filter(d=>d.collection_id===c.id);
-        return '<section class="fcv3-collection"><h4>'+esc(c.name_en)+'</h4><div class="fcv3-deals">'+
-          (deals.length?deals.map(d=>'<article class="fcv3-deal-card"><div><strong>'+esc(d.title)+'</strong><small>'+(d.active_variant_count||0)+' active variant(s) · '+(d.is_active?'Active':'Draft / hidden')+'</small></div>'+
-          '<div class="fcv3-card-actions"><button class="fcv3-button" data-action="deal-detail" data-id="'+esc(d.id)+'">Inspect</button><button class="fcv3-button" data-action="deal-edit" data-id="'+esc(d.id)+'" data-title="'+esc(d.title)+'" aria-label="Edit '+esc(d.title)+'"'+(s.editorLoadingDealId?' disabled':'')+'>Edit</button></div></article>').join(''):'<p class="fcv3-empty">No deals in this collection.</p>')+'</div></section>';
+      const categoryRows=s.categories.map(category=>'<article><strong>'+esc(category.name_en)+'</strong><small>'+(category.category_kind==='deal'?'Deals':'Menu')+' · '+(category.is_active?'Active':'Inactive')+' · Order '+esc(category.sort_order)+'</small>'+
+        '<button class="fcv3-button" data-action="category-edit" data-id="'+esc(category.id)+'">Edit</button></article>').join('');
+      const subcategoryRows=s.subcategories.map(subcategory=>'<article><strong>'+esc(subcategory.name_en)+'</strong><small>'+esc(categoryLabel(subcategory.category_id))+' · '+(subcategory.is_active?'Active':'Inactive')+' · Order '+esc(subcategory.sort_order)+'</small>'+
+        '<button class="fcv3-button" data-action="subcategory-edit" data-id="'+esc(subcategory.id)+'">Edit</button></article>').join('');
+      const collectionHtml=s.collections.map(collection=>{
+        const deals=s.deals.filter(deal=>deal.collection_id===collection.id);
+        return '<section class="fcv3-collection"><h4>'+esc(collection.name_en)+'</h4><div class="fcv3-deals">'+
+          (deals.length?deals.map(deal=>'<article class="fcv3-deal-card"><div><strong>'+esc(deal.title)+'</strong><small>'+(deal.active_variant_count||0)+' active variant(s) · '+(deal.is_active?'Active':'Hidden')+'</small></div>'+
+          '<div class="fcv3-card-actions"><button class="fcv3-button" data-action="deal-detail" data-id="'+esc(deal.id)+'">Inspect</button><button class="fcv3-button" data-action="deal-edit" data-id="'+esc(deal.id)+'" data-title="'+esc(deal.title)+'" aria-label="Edit '+esc(deal.title)+'"'+(s.editorLoadingDealId?' disabled':'')+'>Edit</button></div></article>').join(''):'<p class="fcv3-empty">No deals in this collection.</p>')+'</div>'+moreButton('deals','deals',collection.id)+'</section>';
       }).join('');
-      el.innerHTML='<div class="fcv3-head"><div><span class="fcv3-kicker">AUTHENTICATED COMMAND API</span><h2>Catalog V3 workspace</h2><p>Draft authoring through secured Admin/Owner commands; no direct PostgREST table writes.</p></div>'+
-        '<div class="fcv3-head-actions"><span class="fcv3-revision">'+(s.revision==null?'Revision not loaded':'Draft revision '+s.revision)+'</span>'+
-        '<button class="fcv3-button" data-action="refresh"'+(s.loading||s.saving?' disabled':'')+'>Refresh</button>'+
-        '<button class="fcv3-button fcv3-primary" data-action="import-menu"'+(s.loading||s.saving?' disabled':'')+'>Import published menu draft</button></div></div>'+
-        (s.importProgress?'<div class="fcv3-notice" role="status"><strong>'+esc(s.importProgress.phase)+'</strong> · '+esc(s.importProgress.completed)+' / '+esc(s.importProgress.total)+' · '+esc(s.importProgress.message)+'</div>':'')+
-        (s.editorLoadingDealId?'<div class="fcv3-notice" role="status">Loading the selected deal by its exact ID…</div>':'')+
+      const viewTitle=({menu:'Menu & products',categories:'Categories',deals:'Deals & offers'})[s.view]||'Catalog';
+      const editorMatches=s.editor&&((s.view==='menu'&&s.editor.type==='product')||(s.view==='categories'&&(s.editor.type==='category'||s.editor.type==='subcategory'))||(s.view==='deals'&&s.editor.type==='deal'));
+      let body='';
+      if(s.view==='menu'){
+        body='<div class="fcv3-summary-grid"><article><small>Menu categories loaded</small><strong>'+s.categories.filter(category=>category.category_kind==='menu').length+'</strong></article><article><small>Products loaded</small><strong>'+s.products.length+'</strong></article><article><small>Deal-only variants</small><strong>'+s.products.reduce((n,product)=>n+(product.variants||[]).filter(variant=>variant.is_standalone_sellable===false).length,0)+'</strong></article></div>'+
+          '<div class="fcv3-toolbar"><div><h3>Products and variants</h3><p>Standalone variants require a price. Deal-only variants may be unpriced and remain out of standalone menu cards.</p></div><button class="fcv3-button fcv3-primary" data-action="product-add">+ Add product</button></div>'+
+          '<div class="fcv3-table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Standalone prices</th><th>Status</th><th></th></tr></thead><tbody>'+(productRows||'<tr><td colspan="5" class="fcv3-empty">No products found on this page.</td></tr>')+'</tbody></table></div>'+
+          moreButton('products','products')+
+          '<p class="fcv3-empty">Product and variant edits save through the secured Admin/Owner catalog API. Images are not enabled until the secure media workflow is completed.</p>';
+      }else if(s.view==='categories'){
+        body='<div class="fcv3-toolbar"><div><h3>Parent categories</h3><p>Menu and deal categories are maintained separately. Use Active to hide a category without deleting it.</p></div><button class="fcv3-button fcv3-primary" data-action="category-add">+ Add category</button></div>'+
+          '<div class="fcv3-category-grid">'+(categoryRows||'<p class="fcv3-empty">No categories found on this page.</p>')+'</div>'+moreButton('categories','categories')+
+          '<div class="fcv3-toolbar"><div><h3>Subcategories</h3><p>Each subcategory belongs to one menu category. Existing products and deal references are preserved.</p></div><button class="fcv3-button" data-action="subcategory-add">+ Add subcategory</button></div>'+
+          '<div class="fcv3-category-grid">'+(subcategoryRows||'<p class="fcv3-empty">No subcategories found on this page.</p>')+'</div>'+moreButton('subcategories','subcategories');
+      }else{
+        body='<div class="fcv3-toolbar"><div><h3>Fixed-price deals</h3><p>Supported deals use fixed pricing and INCLUDED components. Unsupported variable pricing and surcharges remain unavailable.</p></div><button class="fcv3-button fcv3-primary" data-action="deal-add">+ Create fixed deal</button></div>'+
+          (collectionHtml||'<p class="fcv3-empty">No deal collection yet. A first deal creates the supported Deals category and collection.</p>')+
+          moreButton('products','product choices for deals');
+      }
+      const editorTypeLabel=s.editor?.type==='product'?'Product':s.editor?.type==='category'?'Category':s.editor?.type==='subcategory'?'Subcategory':'Fixed deal';
+      const editorHeading=s.editor?.type==='product'?(s.editor.product?'Edit product':'Add product'):s.editor?.type==='category'?(s.editor.category?'Edit category':'Add category'):s.editor?.type==='subcategory'?(s.editor.subcategory?'Edit subcategory':'Add subcategory'):(s.dealDraft&&s.dealDraft.id?'Edit fixed deal · '+esc(s.dealDraft.title):'Create fixed deal');
+      const editorForm=s.editor?.type==='product'?productForm(s.editor.product):s.editor?.type==='category'?categoryForm(s.editor.category):s.editor?.type==='subcategory'?subcategoryForm(s.editor.subcategory):dealForm();
+      el.innerHTML='<div class="fcv3-head"><div><span class="fcv3-kicker">SECURE CATALOG MANAGEMENT</span><h2>'+viewTitle+'</h2><p>Changes save through the authenticated Admin/Owner catalog commands. The customer website continues to use its current published catalog.</p></div>'+
+        '<div class="fcv3-head-actions"><span class="fcv3-revision">'+(s.revision==null?'Catalog revision not loaded':'Catalog revision '+s.revision)+'</span>'+
+        '<button class="fcv3-button" data-action="refresh"'+(s.loading||s.saving?' disabled':'')+'>Refresh</button></div></div>'+
+        (s.loading?'<div class="fcv3-notice" role="status">Loading '+viewTitle.toLowerCase()+'…</div>':'')+
         (s.error?'<div class="fcv3-error" role="alert">'+esc(s.error)+'</div>':'')+(s.notice?'<div class="fcv3-notice" role="status">'+esc(s.notice)+'</div>':'')+
-        (s.partial?'<div class="fcv3-warning">A deal operation stopped and the deal may remain inactive. ID: '+esc(s.partial.id)+'. Do not create a duplicate; inspect this draft before continuing.</div>':'')+
-        '<div class="fcv3-summary-grid"><article><small>Menu categories</small><strong>'+s.categories.filter(c=>c.category_kind==='menu').length+'</strong></article><article><small>Products</small><strong>'+s.products.length+'</strong></article>'+
-        '<article><small>Deal-only variants</small><strong>'+s.products.reduce((n,p)=>n+p.variants.filter(v=>v.is_standalone_sellable===false).length,0)+'</strong></article><article><small>Fixed deals</small><strong>'+s.deals.length+'</strong></article></div>'+
-        '<div class="fcv3-toolbar"><div><h3>Products and variants</h3><p>Standalone variants require prices. Deal-only variants may be unpriced and stay out of standalone menu cards.</p></div><button class="fcv3-button fcv3-primary" data-action="product-add">+ Add product</button></div>'+
-        '<div class="fcv3-table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Standalone prices</th><th>Status</th><th></th></tr></thead><tbody>'+(productRows||'<tr><td colspan="5">No products in draft.</td></tr>')+'</tbody></table></div>'+
-        '<div class="fcv3-toolbar"><div><h3>Categories</h3><p>Menu and deal categories are distinct.</p></div><button class="fcv3-button" data-action="category-add">+ Add category</button></div>'+
-        '<div class="fcv3-category-grid">'+s.categories.map(c=>'<article><strong>'+esc(c.name_en)+'</strong><small>'+esc(c.category_kind)+' · '+(c.is_active?'Active':'Inactive')+'</small><button class="fcv3-button" data-action="category-edit" data-id="'+esc(c.id)+'">Edit</button></article>').join('')+'</div>'+
-        '<div class="fcv3-toolbar"><div><h3>Deals and offers</h3><p>Fixed prices with INCLUDED component choices. Burger groups support per-burger dropdown selections.</p></div><button class="fcv3-button fcv3-primary" data-action="deal-add">+ Create fixed deal</button></div>'+
-        (collectionHtml||'<p class="fcv3-empty">No deal collection yet. The first deal creates the Deals category and collection.</p>')+
-        (s.editor?'<div class="fcv3-editor-shell"><div class="fcv3-editor-head"><div><span class="fcv3-kicker">DRAFT EDITOR</span><h3>'+
-          (s.editor.type==='product'?(s.editor.product?'Edit product':'Add product'):s.editor.type==='category'?(s.editor.category?'Edit category':'Add category'):(s.dealDraft&&s.dealDraft.id?'Edit fixed deal · '+esc(s.dealDraft.title):'Create fixed deal'))+'</h3></div><button class="fcv3-button fcv3-muted" data-action="editor-cancel">Close</button></div>'+
-          (s.editor.type==='product'?productForm(s.editor.product):s.editor.type==='category'?categoryForm(s.editor.category):dealForm())+'</div>':'')+
-        (s.detail?'<div class="fcv3-detail"><h3>Deal inspection</h3><strong>'+esc(s.detail.deal.title)+'</strong><small>'+esc(s.detail.deal.id)+'</small>'+
-          '<div>'+s.detail.component_groups.filter(g=>g.group&&g.group.is_active).map(g=>'<p>'+esc(g.group.name_en)+' × '+g.group.min_units+' — '+(g.options[0]?esc(g.options[0].product_name_en)+' / '+esc(g.options[0].variant_label):'No option')+'</p>').join('')+'</div>'+
+        (s.partial?'<div class="fcv3-warning">A deal operation stopped and the deal may remain inactive. ID: '+esc(s.partial.id)+'. Inspect this exact deal before continuing; do not create a duplicate.</div>':'')+
+        body+
+        (editorMatches?'<div class="fcv3-editor-shell"><div class="fcv3-editor-head"><div><span class="fcv3-kicker">'+editorTypeLabel.toUpperCase()+' EDITOR</span><h3>'+editorHeading+'</h3></div><button class="fcv3-button fcv3-muted" data-action="editor-cancel">Close</button></div>'+editorForm+'</div>':'')+
+        (s.detail&&s.view==='deals'?'<div class="fcv3-detail"><h3>Deal inspection</h3><strong>'+esc(s.detail.deal.title)+'</strong><small>'+esc(s.detail.deal.id)+'</small>'+
+          '<div>'+s.detail.component_groups.filter(group=>group.group&&group.group.is_active).map(group=>'<p>'+esc(group.group.name_en)+' × '+group.group.min_units+' — '+(group.options[0]?esc(group.options[0].product_name_en)+' / '+esc(group.options[0].variant_label):'No option')+'</p>').join('')+'</div>'+
           '<button class="fcv3-button" data-action="deal-edit" data-id="'+esc(s.detail.deal.id)+'">Edit fixed deal</button> <button class="fcv3-button" data-action="detail-close">Close inspection</button></div>':'');
     }
     function openProduct(p){s.editor={type:'product',product:p?JSON.parse(JSON.stringify(p)):null};s.notice=null;s.error=null;render();}
@@ -603,6 +690,13 @@
     }
     async function submit(form){
       const fd=new FormData(form),type=form.dataset.form;
+      if(type==='subcategory'){
+        const payload=normalizeSubcategoryDraft({
+          id:fd.get('id')||undefined,category_id:fd.get('category_id'),name_en:fd.get('name_en'),
+          name_ur:fd.get('name_ur'),sort_order:Number(fd.get('sort_order')||0),is_active:fd.get('id')?fd.has('is_active'):true
+        },s.categories);
+        await write(WRITE.subcategory,payload);s.editor=null;s.editorRevision=null;s.notice='Subcategory saved.';await refresh();return;
+      }
       if(type==='category'){
         await write(WRITE.category,{
           ...(fd.get('id')?{id:fd.get('id')}:{}),
@@ -612,11 +706,11 @@
           sort_order:Number(fd.get('sort_order')||0),
           is_active:fd.get('id')?fd.has('is_active'):true
         });
-        s.editor=null;s.editorRevision=null;s.notice='Category saved to catalog draft.';await refresh();return;
+        s.editor=null;s.editorRevision=null;s.notice='Category saved.';await refresh();return;
       }
       if(type==='product'){
         const payload=normalizeProductDraft({id:fd.get('id')||undefined,category_id:fd.get('category_id'),name_en:fd.get('name_en'),name_ur:fd.get('name_ur'),description_en:fd.get('description_en'),description_ur:fd.get('description_ur'),sort_order:Number(fd.get('sort_order')||0),featured:fd.has('featured'),is_active:fd.has('is_active'),is_available:fd.has('is_available'),variants:readVariantRows(form)});
-        await write(WRITE.product,payload);s.editor=null;s.notice='Product and variants saved to catalog draft.';await refresh();return;
+        await write(WRITE.product,payload);s.editor=null;s.notice='Product and variants saved.';await refresh();return;
       }
       if(type==='deal'){
         const existing=s.dealDraft&&s.dealDraft.id?s.dealDraft:null;
@@ -632,53 +726,16 @@
         else await createDeal(s.dealDraft);
       }
     }
-    async function importPublishedMenuDraft(){
-      const importer=window.FlameChickCatalogV3Importer;
-      if(!importer||typeof importer.runPublishedMenuImport!=='function')throw Error('The secured Catalog V3 importer module is unavailable.');
-      const response=await fetch('./flame-chick-published-menu-2026-11-23.v3-draft.json',{cache:'no-store',credentials:'same-origin'});
-      if(!response.ok)throw Error('The review-only published menu draft could not be loaded.');
-      const draft=await response.json();
-      const summary=importer.validatePublishedMenuDraft(draft);
-      const message=[
-        'Import this reviewed menu into the UNPUBLISHED Flame Chick catalog draft?',
-        '',
-        summary.products+' products ('+summary.standaloneVariants+' standalone variants; '+summary.dealOnlyVariants+' deal-only variants)',
-        summary.deals+' fixed deals / '+summary.offers+' fixed-price offers',
-        summary.components+' fixed INCLUDED components',
-        '',
-        'This writes catalog draft records only. Burger choices remain INCLUDED at zero surcharge. It will NOT publish the catalog, deploy an app, or enable checkout.',
-        '',
-        'If interrupted, the import can be resumed using stable identities. Conflicting or unexpected existing records will stop the process for inspection.',
-        '',
-        'Proceed with draft import?'
-      ].join('\n');
-      if(!window.confirm(message)){s.notice='Menu draft import was cancelled. No catalog writes were made.';render();return;}
-      s.saving=true;s.error=null;s.notice=null;s.importProgress={phase:'starting',completed:0,total:summary.categories+summary.products+summary.deals,message:'Starting review-only catalog draft import.'};render();
-      try{
-        const result=await importer.runPublishedMenuImport(draft,{
-          request,
-          onProgress:function(progress){s.importProgress=progress;render();}
-        });
-        s.notice='Published menu draft imported and read-back verified. It remains unpublished; no deployment or checkout change occurred.';
-        s.importProgress={phase:'complete',completed:summary.categories+summary.products+summary.deals,total:summary.categories+summary.products+summary.deals,message:'Unpublished catalog draft import finished. Publication was not performed.'};
-        s.lastImportResult=result;
-        await refresh();
-      }catch(error){
-        s.error=(error&&error.message||'Catalog draft import failed.')+' Any completed records remain in the unpublished draft. Refresh and retry only after reviewing the reported mismatch; stable import keys prevent blind duplicate creation.';
-      }finally{
-        s.saving=false;
-        render();
-      }
-    }
-
     function bind(){
       el.onclick=async event=>{
         const b=event.target.closest('[data-action]');if(!b||b.disabled||s.saving||s.editorLoadingDealId)return;const a=b.dataset.action;
         try{
           if(a==='refresh')await refresh();
-          else if(a==='import-menu')await importPublishedMenuDraft();
           else if(a==='category-add'){s.editor={type:'category'};s.editorRevision=s.revision;render();}
           else if(a==='category-edit'){const category=s.categories.find(c=>c.id===b.dataset.id);if(!category)throw Error('Category could not be found.');s.editor={type:'category',category};s.editorRevision=s.revision;render();}
+          else if(a==='subcategory-add'){s.editor={type:'subcategory'};s.editorRevision=s.revision;render();}
+          else if(a==='subcategory-edit'){const subcategory=s.subcategories.find(item=>item.id===b.dataset.id);if(!subcategory)throw Error('Subcategory could not be found.');s.editor={type:'subcategory',subcategory};s.editorRevision=s.revision;render();}
+          else if(a==='load-more')await loadMore(b.dataset.kind,b.dataset.collectionId||null);
           else if(a==='product-add')openProduct(null);
           else if(a==='product-edit')openProduct(s.products.find(p=>p.id===b.dataset.id));
           else if(a==='deal-add')openDeal();
@@ -746,7 +803,12 @@
         finally{s.saving=false;render();}
       };
     }
-    return {mount:async(element,requestFn)=>{if(!element||typeof requestFn!=='function')throw Error('Catalog V3 workspace requires a root and authenticated request handler.');el=element;request=requestFn;bind();await refresh();},refresh,getState:()=>JSON.parse(JSON.stringify(s))};
+    return {mount:async(element,requestFn,view)=>{
+      if(!element||typeof requestFn!=='function')throw Error('Catalog editor requires a root and authenticated request handler.');
+      if(!['menu','categories','deals'].includes(view))throw Error('Catalog editor tab is invalid.');
+      if(el&&el!==element){el.onclick=null;el.onchange=null;el.onsubmit=null;}
+      el=element;request=requestFn;s.view=view;bind();await refresh(view);
+    },refresh,getState:()=>JSON.parse(JSON.stringify(s))};
   }
-  return {READ,WRITE,normalizeProductDraft,buildFixedComponentGroups,buildIncludedMappings,buildFixedDealEditDraft,isApprovedFlameHourSchedule,assertDealIdentity,eligibleChoiceProducts,verifyFixedDealDetail,createWorkspace};
+  return {READ,WRITE,normalizeProductDraft,normalizeSubcategoryDraft,buildFixedComponentGroups,buildIncludedMappings,buildFixedDealEditDraft,isApprovedFlameHourSchedule,assertDealIdentity,eligibleChoiceProducts,verifyFixedDealDetail,createWorkspace};
 });
