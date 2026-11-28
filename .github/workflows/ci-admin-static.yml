@@ -5,6 +5,7 @@ on:
     branches:
       - work/production-source-audit
       - cloudflare/admin-production
+      - fix/staff-invitation-recovery-messages
       - work/admin-dashboard-release
       - work/admin-catalog-media-review
       - work/cloudflare-role-based-invitation-routing
