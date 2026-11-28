@@ -438,9 +438,7 @@ async function startRiderRealtime(){
         riderRealtimeConnected=true;
         setConnection(true,"Live updates");
         clearInterval(riderRealtimeFallbackTimer);
-        riderRealtimeFallbackTimer=setInterval(()=>{
-          if(navigator.onLine&&session?.access_token)scheduleRiderJobsRefresh();
-        },120000);
+        riderRealtimeFallbackTimer=null;
       }else if(["CHANNEL_ERROR","TIMED_OUT","CLOSED"].includes(status)){
         startRiderRealtimeFallback("Realtime reconnecting · automatic refresh fallback");
       }
