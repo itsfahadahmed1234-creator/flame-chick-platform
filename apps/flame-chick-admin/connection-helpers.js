@@ -48,22 +48,25 @@
   }
 
   async function requestText(url,options={},timeoutMs=12000,fetchImpl=fetch){
+    if(!Number.isFinite(timeoutMs)||timeoutMs<1)throw new RangeError("Request timeout must be a positive number of milliseconds.");
     const controller=new AbortController();
-    let timedOut=false;
+    let timedOut=false,abortListener=null;
+    const timeoutError=()=>{const error=new Error("The request timed out. Check your connection and retry safely.");error.name="TimeoutError";return error;};
     const timer=setTimeout(()=>{timedOut=true;controller.abort();},timeoutMs);
+    const aborted=new Promise((resolve,reject)=>{
+      abortListener=()=>reject(timeoutError());
+      controller.signal.addEventListener("abort",abortListener,{once:true});
+    });
     try{
-      const response=await fetchImpl(url,{...options,signal:controller.signal});
-      const text=await response.text();
+      const response=await Promise.race([fetchImpl(url,{...options,signal:controller.signal}),aborted]);
+      const text=await Promise.race([Promise.resolve().then(()=>response.text()),aborted]);
       return {response,text};
     }catch(error){
-      if(timedOut||controller.signal.aborted){
-        const timeout=new Error("The request timed out. Check your connection and retry safely.");
-        timeout.name="TimeoutError";
-        throw timeout;
-      }
+      if(timedOut||controller.signal.aborted)throw timeoutError();
       throw error;
     }finally{
       clearTimeout(timer);
+      if(abortListener)controller.signal.removeEventListener("abort",abortListener);
     }
   }
 
