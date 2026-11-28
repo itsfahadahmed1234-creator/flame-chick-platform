@@ -595,7 +595,7 @@ test('Catalog V3 exposes cursor pagination for bounded product, category, collec
   assert.match(source, /hasMore:cats\.has_more===true/);
   assert.match(source, /hasMore:prods\.has_more===true/);
   assert.match(source, /hasMore:cols\.has_more===true/);
-  assert.match(source, /s\.pages\.deals\[s\.collections\[index\]\.id\]/);
+  assert.match(source, /s\.pages\.deals\[collections\[index\]\.id\]/);
   assert.match(source, /after_id:page\.cursor/);
   assert.match(source, /page\.hasMore=result\.has_more===true;page\.cursor=result\.next_cursor\|\|null/);
   assert.match(source, /data-action="load-more" data-kind="products"/);
