@@ -238,25 +238,38 @@
 
   function wrap(value, width) {
     const text = cleanText(value);
+    const requestedWidth = Number(width);
+    const maxWidth = Number.isFinite(requestedWidth) ? Math.max(1, Math.floor(requestedWidth)) : 1;
     if (!text) return [''];
-    const words = text.split(' ');
+
     const rows = [];
     let row = '';
-    words.forEach(function (word) {
-      if (!row) {
-        row = word.slice(0, width);
-        if (word.length > width) {
-          const chunks = word.match(new RegExp('.{1,' + width + '}', 'g')) || [];
-          row = chunks.pop() || '';
-          rows.push.apply(rows, chunks);
+
+    text.split(' ').forEach(function (word) {
+      let remaining = word;
+
+      // Split long unbroken tokens before combining them with neighboring words.
+      // This keeps addresses, instructions and product names inside the printer width.
+      while (remaining.length > maxWidth) {
+        if (row) {
+          rows.push(row);
+          row = '';
         }
-      } else if ((row + ' ' + word).length <= width) {
-        row += ' ' + word;
+        rows.push(remaining.slice(0, maxWidth));
+        remaining = remaining.slice(maxWidth);
+      }
+
+      if (!remaining) return;
+      if (!row) {
+        row = remaining;
+      } else if ((row + ' ' + remaining).length <= maxWidth) {
+        row += ' ' + remaining;
       } else {
         rows.push(row);
-        row = word;
+        row = remaining;
       }
     });
+
     if (row) rows.push(row);
     return rows.length ? rows : [''];
   }
@@ -960,6 +973,7 @@
       buildReceiptPayload: receiptCommands,
       buildReceiptImageEntry: buildReceiptImageEntry,
       buildReceiptData: buildReceiptData,
+      wrap: wrap,
       encodeCp437Ascii: encodeCp437Ascii,
       formatEscPosPayload: formatEscPosPayload
     }
