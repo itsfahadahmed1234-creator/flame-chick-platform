@@ -1,0 +1,195 @@
+# Flame Chick Admin — Catalog Editing & Media Management Continuation
+
+**Updated:** 2026-11-28  
+**Purpose:** Continue the existing Flame Chick Admin application and make catalog authoring and image management genuinely usable. This is a focused implementation handoff, not permission to publish a menu, mutate Production data, deploy an Edge Function, or deploy the Admin site.
+
+## 1. Ownership and project boundaries — read first
+
+The user corrected the previous conversation summary:
+
+- The Website work was being done with the user in this conversation/thread. It is not owned by the POS/optimization chat.
+- A separate concurrent ChatGPT conversation is handling **POS work and Supabase Edge Function/backend optimization**.
+- This new continuation owns the **Admin application**: catalog editing, product/category/deal images, website media, and the reliability of those Admin workflows.
+- Preserve the existing Website deployment and behavior. The known Cloudflare Pages Website is `https://flamechick.pages.dev`; the user previously confirmed the Website was interacting with POS and submitted orders reached POS. Do not rebuild, redeploy, or change the Website while working on Admin.
+- Preserve the POS and Rider apps, their Cloudflare resources, and their production workflows. Do not overlap with the other chat's POS/optimization work.
+- Admin's known canonical Cloudflare Pages URL is `https://flamechickadmin.pages.dev`. Verify current deployment metadata before any release action; do not assume an old deployment record is current.
+
+Repository: `itsfahadahmed1234-creator/flame-chick-platform`  
+Admin release branch: `cloudflare/admin-production`  
+Admin app root: `apps/flame-chick-admin`  
+Supabase Production project: `adkrxfnawdiljhjaavnj` — Mumbai `ap-south-1`, Free plan.
+
+**Do not change `main` or another app's branch as a shortcut.** Work on the Admin release branch, inspect its current HEAD first, and keep all changes limited to Admin plus directly-required tests, Staff Admin API files, migrations (only if separately approved) and this handoff.
+
+## 2. Mandatory Supabase log-query restriction
+
+The user clarified the two measurements:
+
+- The **Supabase log query exceeded 102 GB**. Do not rerun, edit, clone, recreate, broaden, optimize, or troubleshoot that specific expensive query. Do not reproduce its workload through Logs Explorer, `query_logs`, CLI, API, connector, or another interface.
+- **Log Ingestion used 0.10 GB out of its 1 GB allowance.** Ingestion did not exceed 102 GB. Query volume and ingestion usage are separate measurements; never conflate them.
+- Do not access Log Ingestion or logging configuration for this Admin work. Do not use log checks as acceptance tests. If any new Supabase log query seems necessary, stop and ask the user for explicit approval.
+- Use source inspection, narrow metadata/catalog reads, static analysis, local/disposable tests and user-visible browser errors instead. Avoid unnecessary Production test traffic.
+
+## 3. Verified Admin source state
+
+The following was verified from `cloudflare/admin-production` on 2026-11-28. Recheck current branch HEAD and deployed versions before relying on it; later work may supersede these notes.
+
+### Existing Admin frontend modules
+
+- `index.html`, `app.js`, `config.js`, `styles.css`
+- `catalog-v3-admin.js` and `catalog-v3-admin.css`: existing authenticated Catalog V3 draft-authoring workspace.
+- `catalog-v3-importer.js` and `flame-chick-published-menu-2026-11-23.v3-draft.json`: review-only, resumable importer which targets the unpublished draft only.
+- Catalog authoring tests include `tests/catalog-v3-admin.test.mjs` and `tests/catalog-v3-importer.test.mjs`.
+
+The current Admin/Owner navigation bootstrap allows Dashboard, Staff & Riders, Catalog V3 Draft and Delivery Areas. The old Menu & Products, Categories, Deals & Offers, Website Images and Website Settings screens remain disabled; do not enable them by removing the navigation guard.
+
+### Existing Catalog V3 capability
+
+The existing Catalog V3 workspace already has meaningful source implementation. Build on it rather than starting over:
+
+- Category create/edit through the authenticated category upsert command.
+- Product create/edit with variants, standalone-sellable versus deal-only variants, nullable prices only for deal-only variants, and pack quantity/unit validation.
+- Fixed-price deal create/edit with exact product-variant references, fixed component quantities and INCLUDED/zero-surcharge mappings.
+- Schedule creation/assignment for the currently supported Flame Hour daily schedule.
+- Revision-aware mutations, UUID request IDs, read-back verification and safe inactive-first deal updates.
+- Review-only menu importer with identity preflight, sequential writes and retry/idempotency simulation. It has passed real local/disposable Supabase integration QA in earlier work; this is not proof of current Production state.
+
+The editor intentionally does **not** support arbitrary selectable flavours, product alternatives, optional paid upgrades, surcharge mappings, variable component groups, multiple/branch-specific schedules or general-purpose deal structures. Preserve these fail-closed limits unless the user approves a new catalog model and matching Website/POS pricing contracts.
+
+### Existing Staff Admin API boundary
+
+- The browser calls the single `flame-chick-staff-admin` Edge Function using the publishable key and the signed-in user's Bearer JWT.
+- The Edge Function has `verify_jwt=true`; the database derives `auth.uid()` and enforces active restaurant-wide Admin/Owner authority.
+- `supabase/functions/flame-chick-staff-admin/catalog-actions.mjs` contains a finite action-to-RPC allow-list. The client cannot choose arbitrary RPC names.
+- Catalog mutations carry `expected_revision` and a UUID `request_id`; payload limits and read IDs/cursors/limits are validated in the function.
+- The database command functions remain authoritative for role, tenant, relation, validation, revision, idempotency, transaction and audit behavior.
+- No direct table grants or broad RLS policies were added for catalog authoring.
+- The latest previously reported Production Staff Admin function version was **v10** with JWT verification enabled. Verify live version/source metadata read-only before proposing another deployment. The earlier Admin Pages rollout and dashboard changes have been reported complete; verify current canonical deployment and source alignment before any new build.
+
+### Image/media gap discovered in source
+
+- `index.html` already contains a Website Images screen and guidance for JPG/PNG/WebP images up to 5 MB, with a current image and one previous backup.
+- `config.js` names the intended Storage bucket `flame-chick-media`.
+- The older `app.js` helpers `storageUpload`, `storageRemove`, `replaceImage` and `rollbackImage` use direct browser Storage calls and direct PostgREST table PATCH operations. **Do not wire these legacy helpers back into active pages or loosen Storage/table policies to make them work.**
+- The previous security audit (2026-11-22) found no `flame-chick-media` bucket and no Storage policies. This is a historical observation; verify the current bucket/policy metadata with a narrow read-only check before deciding whether anything needs to be created.
+- The current Catalog V3 editor does not yet integrate product/category/deal image upload into its secure command workflow. Website hero, fulfilment gate, About gallery and menu hero/slider settings also need a reviewed media workflow.
+- The detailed historic Catalog Admin API contract is `docs/handoffs/2026-11-22-catalog-admin-api-contract.md`; it explicitly records that media upload/delete and settings commands were outside that API slice. Treat it as historical scope documentation, not as the current deployment status.
+
+## 4. Target outcome for this Admin phase
+
+Make the Admin usable for day-to-day catalog maintenance without exposing privileged database access or causing unnecessary backend work.
+
+### A. Catalog authoring
+
+Complete and verify the authenticated Catalog V3 Draft experience for:
+
+1. Categories and subcategories: create/edit, ordering, active/availability state where supported, clear validation and safe handling of categories that still contain products.
+2. Products: create/edit bilingual names/descriptions, category assignment, featured/order/availability controls and image references.
+3. Product variants: add/edit/reorder/deactivate variants, variant type, standalone-sellable flag, price, and pack metadata. Preserve the rule that each standalone-sellable variant requires its own price; deal-only variants may have a NULL price.
+4. Deals: safe editing of the currently approved fixed-bundle shape, with read-back of exact price, component quantities, product variant IDs, active state and supported schedule. Do not invent unsupported deal options or price surcharges.
+5. Schedule availability: expose only the schedule behaviors the current backend validates. Show understandable errors for unsupported or conflicting schedules.
+6. Draft preview/review: show what is saved in the unpublished draft, clearly label it as a draft, and distinguish draft edits from what customers currently see.
+
+Do not import the historic review-only JSON draft automatically. First establish whether that exact menu is still the user's intended catalog and whether Production already contains records; ask before any bulk import or seed.
+
+### B. Secure image/media management
+
+Implement a reviewed media workflow for:
+- Product images.
+- Category images.
+- Deal images.
+- Website landing hero, fulfilment gate, About/gallery images, menu hero fallback and promotional slider banners.
+
+Before implementation, inspect only the relevant schema, existing media references, Storage bucket metadata, current Website media-consumption contract and the Staff Admin API. Choose the smallest secure design that the current Website can consume.
+
+Requirements:
+- Admin/Owner authorization for upload, replace, restore and delete. Manager/Cashier/Rider and anonymous callers must be denied.
+- Never put a service-role/secret key in browser code, public assets, Git or client environment configuration.
+- Do not introduce generic RPC proxies, direct browser PostgREST table writes, or broad `storage.objects` policies.
+- Use fixed bucket/folder/object-key rules and allow only the intended image MIME types. Validate file size and type in both browser and server-side authorization/metadata path; current UI guidance is JPG/PNG/WebP up to 5 MB.
+- Preserve the current/previous image backup behavior. Upload first, verify object creation, commit the metadata/reference through a secure command, and only then clean up an older backup. A failed metadata write must not leave the record pointing to a missing image; a failed cleanup must be visible and recoverable.
+- Avoid destructive replacement: do not delete the currently referenced image until the replacement metadata is confirmed. Make restore/rollback swap the current and previous references safely.
+- Decide public-read versus signed delivery based on the public Website's needs. Public image delivery must not imply public write/delete access.
+- Use predictable cacheable object URLs/paths and avoid re-uploading unchanged images. Do not add a separate image-processing service or paid product without a clear need and approval.
+- Website media settings and catalog product images may have different lifecycle/publication behavior; don't couple them unless the current schema/Website contract proves they are one resource type.
+
+### C. Reliable connections and user workflow
+
+Audit and harden the existing browser-to-Staff-Admin connection:
+
+- Reuse the existing single Staff Admin Edge Function rather than adding multiple new functions by default.
+- Keep the existing session/JWT model. Use one in-flight token refresh at a time; avoid parallel refresh races.
+- Add bounded request timeouts/abort handling and clear user-visible errors. Do not leave save buttons spinning indefinitely.
+- Retry only safe reads, and only a small bounded number of times. Do not blindly retry mutations.
+- For mutations, keep the same `request_id` when reconciling an ambiguous timeout; re-read the affected entity/revision before deciding whether a new mutation is needed. Never create a new request ID and blindly resubmit a write after a timeout.
+- Respect `expected_revision`. On conflict, show a reload/reconcile path and preserve the user's form values where safe.
+- Serialize dependent multi-step mutations. Do not run writes concurrently with `Promise.all` when each write advances the shared draft revision.
+- Disable the submit control while a mutation is active, show progress, and give a confirmed saved/read-back result.
+- Handle offline/network loss gracefully. Do not create a background polling loop; refresh only on initial entry, explicit user action, successful mutation reconciliation and necessary focus/reconnect events.
+- Preserve unsaved form state on read failures; do not clear the user's edits because a list refresh failed.
+
+## 5. Lightweight query and low-resource rules — mandatory
+
+The user specifically wants lightweight database queries, low resource usage and reliable connections. Design for the Supabase Free plan and the shared production environment.
+
+- Do not use the legacy `loadAll()` as a catalog loading strategy. It contains a historical 1,000-order query plus broad table reads and direct REST behavior. Do not load all orders or all modules simply to open the Admin dashboard/catalog.
+- Use the finite Staff Admin/catalog commands, not direct table REST queries.
+- Use explicit field projections; never `select=*` for application reads.
+- Use bounded keyset pagination/cursors. Keep each page small (target 20–50 records; respect the existing action limits) and offer a user-controlled next page. Do not silently fetch every page in the background.
+- Fetch the minimum list summaries for the active screen only. Load detailed deal/product/schedule records only when the user opens the corresponding editor.
+- Audit the current Catalog V3 refresh path for N+1 reads: it currently loads bounded category/product/collection/schedule lists and then requests deal lists per collection. Replace with a bounded batch/list command or another compact query only if source/SQL review shows a real reduction without weakening authorization or consistency.
+- Avoid duplicate bootstrap, repeated reads on every render, per-row API requests, full-catalog reloads after each small edit and aggressive refresh timers.
+- Mutations should update the affected view from a verified command response where safe; otherwise re-read only that record/page and current revision.
+- Use database indexes only when an actual bounded query needs them and source/query-plan evidence supports the change. No speculative indexing, broad table scans, analytics scans or expensive diagnostics.
+- Prefer one small response containing the required view data over many chatty calls, but do not create giant denormalized payloads. Keep request/response payloads bounded.
+- Keep image upload separate from catalog JSON reads; do not base64-encode large image files into an Edge Function request body. Use a secure direct Storage/signed-upload pattern only after its authorization model is reviewed.
+- No continuous polling, no log-based diagnostics and no Production load tests. Use local/disposable integration tests for performance/call-count assertions.
+
+## 6. Draft, publication and live Website safety
+
+The catalog architecture intentionally separates mutable draft authoring from immutable customer publications.
+
+- Catalog draft mutations must never update the live customer menu by themselves.
+- Existing `catalog_publish` and `catalog_rollback` actions were deliberately excluded from the finite Staff Admin catalog route. Do not expose them as part of this task.
+- Do not change the current publication pointer, seed/import a menu, publish/rollback a catalog, or enable checkout without separate explicit user approval.
+- Before any future publish-related work, read the current Website handoff/source and verify the exact schema V3 DTO, pricing/deal compatibility, image path contract and browser behavior. A historical 2026-11-23 note recorded a V3-versus-V2 compatibility blocker; later Website work may have changed this. Verify the live/current Website source rather than assuming either state.
+- Website changes are outside this Admin task. Only implement the secure authoring/media API contract needed by Admin and keep public Website behavior unchanged.
+
+## 7. Suggested execution sequence for the new chat
+
+1. Read this file and the current `PROJECT_HANDOFF.md`; then inspect the current GitHub HEAD of `cloudflare/admin-production`. Treat older dated records below as history unless newer evidence confirms them.
+2. Read `apps/flame-chick-admin/README.md`, `index.html`, `app.js`, `catalog-v3-admin.js`, `catalog-v3-importer.js`, the Staff Admin `index.ts` and `catalog-actions.mjs`, the catalog API contract, and the matching Admin tests/workflows.
+3. Verify read-only: the current Pages canonical deployment/commit, Staff Admin Edge Function version and `verify_jwt`, current Admin API action map, relevant catalog schema/RPCs, bucket/policy metadata and current publication metadata. Do not query logs; use only small focused metadata reads.
+4. Produce a compact feature/gap matrix: already working, partially working, missing, unsafe legacy implementation, and blocked by backend/Website contract.
+5. Build and test in small batches. First make Catalog V3 editing predictable and bounded; then implement the secure media service/storage authorization; then integrate images into category/product/deal and Website media screens.
+6. Add static contract tests and a real local/disposable Supabase integration test for authorized/unauthorized roles, image upload/replace/restore/cleanup failure, revision conflict, duplicate/retry behavior, request counts and page-size limits. Do not test writes against Production.
+7. Run relevant Admin static CI and Edge Function static/type checks. Do not consider tests green unless the exact run/commit is verified.
+8. Present a concise review of code/schema changes and deployment plan. Obtain approval before any Production migration, Edge Function deployment, Storage bucket/policy change, menu import/publication, or Cloudflare Pages deployment. Preserve the current working Admin deployment until the replacement is approved and verified.
+
+## 8. Acceptance criteria
+
+The Admin phase is ready for user review when:
+
+- Admin and Owner can sign in and open Catalog V3 Draft; non-Admin/Owner roles and unauthenticated callers are denied.
+- Category, product, variant, price and supported fixed-deal changes can be added/edited with validation, revision protection and verified read-back.
+- Product/category/deal images and requested Website media can be added, replaced and restored without direct table writes or broad Storage access.
+- A partial failure never silently loses the current image or creates an ambiguous duplicate catalog mutation.
+- The UI uses bounded reads, lazy detail loads, no full-table/order-history load, no polling and no unnecessary background requests.
+- Network/session failures show clear recoverable states and do not lose unsaved edits.
+- Draft changes do not alter the current public menu or Website deployment.
+- Static and disposable integration QA pass; Production and Cloudflare deploy gates remain separately approved.
+- The 102 GB log query is never repeated or inspected, and no Log Ingestion access/configuration is used.
+
+## 9. Explicit exclusions
+
+- No POS or Rider changes.
+- No Supabase Edge Function optimization owned by the other conversation.
+- No Website redesign, deployment, DNS, hosting or checkout change.
+- No production menu seed/import/publication/rollback without approval.
+- No order, payment, staff-role, customer or delivery data changes unrelated to Admin authoring.
+- No GST/tax implementation; GST remains deferred.
+- No paid Supabase/Cloudflare upgrade or new paid infrastructure.
+- No service-role key in browser code.
+- No access to the expensive 102 GB log query or Log Ingestion.
+
+**The immediate next action is source/read-only audit of the current Admin release branch and a precise gap matrix—not a deployment and not a Production catalog write.**
