@@ -293,15 +293,18 @@ async function readBranchDeliveryConfiguration(
   query.set("is_active","eq.true");
   query.set("order","sort_order.asc,name.asc");
   query.set("limit","100");
-  const areas = await readAsService("delivery_areas?"+query.toString());
-  if (!areas.ok || !Array.isArray(areas.data)) return {ok:false};
   const settingsQuery = new URLSearchParams();
   settingsQuery.set("select","not_listed_delivery_fee");
   settingsQuery.set("restaurant_id","eq."+restaurantId);
   settingsQuery.set("branch_id","eq."+branchId);
   settingsQuery.set("limit","1");
-  const settings = await readAsService("branch_delivery_settings?"+settingsQuery.toString());
-  if (!settings.ok || !Array.isArray(settings.data)) return {ok:false};
+  // Both read-only configuration lookups are independent.
+  const [areas,settings] = await Promise.all([
+    readAsService("delivery_areas?"+query.toString()),
+    readAsService("branch_delivery_settings?"+settingsQuery.toString()),
+  ]);
+  if (!areas.ok || !Array.isArray(areas.data) ||
+      !settings.ok || !Array.isArray(settings.data)) return {ok:false};
   const rawFee = isObject(settings.data[0]) ? settings.data[0].not_listed_delivery_fee : null;
   const parsedFee = rawFee === null || rawFee === undefined ? null : Number(rawFee);
   if (parsedFee !== null && (!Number.isFinite(parsedFee) || parsedFee < 0)) return {ok:false};
@@ -545,20 +548,24 @@ async function lookupWebsiteOrderRetry(
 async function buildWebsiteContext(): Promise<
   {ok:true;data:Record<string,unknown>}|{ok:false;status:number;body:Record<string,unknown>}
 > {
-  const catalog = await readPublishedV3Catalog();
+  // Catalogue publication and restaurant metadata are independent reads.
+  const [catalog,restaurant] = await Promise.all([
+    readPublishedV3Catalog(),
+    readFlameChickRestaurant(),
+  ]);
   if(!catalog.ok)return catalog;
   const snapshot = catalog.snapshot;
-  const restaurant=await readFlameChickRestaurant();
   if(!restaurant)return websiteError("RESTAURANT_UNAVAILABLE","Flame Chick is not accepting online orders.",503);
   const branchRead=await readActiveWebsiteBranches(restaurant.id);
   if(!branchRead.ok)return websiteError("BRANCH_CONFIGURATION_UNAVAILABLE","Branch ordering options could not be loaded.",503);
-  const branches: Array<Record<string,unknown>> = [];
-  for(const branch of branchRead.branches){
+
+  // Preserve branch order while loading each branch's independent settings concurrently.
+  const branchResults = await Promise.all(branchRead.branches.map(async branch => {
     const branchId = typeof branch.id==="string"?branch.id:"";
-    if(!branchId)continue;
+    if(!branchId)return {ok:true as const,value:null};
     const config = await readBranchDeliveryConfiguration(restaurant.id,branchId);
-    if(!config.ok)return websiteError("DELIVERY_CONFIGURATION_UNAVAILABLE","Branch ordering options could not be loaded.",503);
-    branches.push({
+    if(!config.ok)return {ok:false as const,value:null};
+    return {ok:true as const,value:{
       id:branchId,
       name:typeof branch.name==="string"?branch.name:"",
       branchCode:typeof branch.branch_code==="string"?branch.branch_code:"",
@@ -568,8 +575,12 @@ async function buildWebsiteContext(): Promise<
         id:row.id,name:row.name,nameUr:row.name_ur??null,deliveryFee:Number(row.delivery_fee)
       })),
       notListedDeliveryFee:config.notListedFee
-    });
+    }};
+  }));
+  if(branchResults.some(result=>!result.ok)){
+    return websiteError("DELIVERY_CONFIGURATION_UNAVAILABLE","Branch ordering options could not be loaded.",503);
   }
+  const branches=branchResults.flatMap(result=>result.ok&&result.value?[result.value]:[]);
   const settings=isObject(snapshot.settings)?snapshot.settings:{};
   return {ok:true,data:{
     schemaVersion:3,
