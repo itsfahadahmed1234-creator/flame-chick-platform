@@ -1,3 +1,11 @@
+# 🚫 ABSOLUTE RESTRICTION — ZERO SUPABASE LOG QUERIES AND ZERO LOG INGESTION ACCESS
+
+**User instruction: there must be no use whatsoever.** Do not run even a tiny query, sample, partial scan, filtered request, one-off test or 0.00001 of a query. Do not try to reduce the query's cost. Do not access Supabase Logs Explorer, `query_logs`, log APIs, CLI, connectors, dashboards, SDKs, browser routes, or any alternative interface. Do not inspect/read/export/analyze/troubleshoot/verify Supabase logs. Do not inspect or change Log Ingestion, ingestion usage, drains, retention, routing or telemetry. No exceptions for optimization, debugging, performance checks, security reviews or deployment verification.
+
+Historical distinction only: the log query exceeded **102 GB**; Log Ingestion was separately **0.10 GB out of 1 GB**. Neither system may be accessed to refresh these figures. Use source inspection, static analysis, local/disposable testing, narrow non-log metadata checks and browser-visible errors. This restriction remains until the user explicitly changes it.
+
+---
+
 # 🚫 MANDATORY NEW-CHAT SAFETY DIRECTIVE — DO NOT REPEAT THE 102 GB SUPABASE LOG QUERY
 
 **This is an explicit user instruction. Read and obey it before carrying out Supabase diagnostics.**
