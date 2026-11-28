@@ -319,3 +319,55 @@ The Admin phase is ready for user review when:
 - No image UI has been added to Catalog V3 yet. Product backend capability exists but is not yet wired into the V3 form. Category/deal backend capability is incomplete. **Do not ask the user to upload images yet.**
 - The exact recovered migration is committed at `e5e679d323b774f20c3441883bddf6e85c72398e`; the file was verified byte-for-byte against the live migration ledger. The latest CI-covered commit is `0b087f64440f9c92dcca9eb7521a8156bcf0109d`; documentation-only follow-up commit `75bee04cdef2125f4eeb681debd6ff334461dbf7` does not change application source.
 - Next implementation must first create a tested, additive category/deal media command migration based on the live function definitions, then wire one unified Catalog V3 media workflow for products/categories/deals. The workflow must save metadata through existing revisioned/idempotent Catalog V3 commands, upload only under the existing authenticated Admin/Owner Storage policy, and reconcile/clean up safely after interrupted uploads or metadata failures. Add preview, one-backup restore, replacement, remove, authorization, revision-conflict, and orphan-cleanup tests before considering it ready.
+
+
+---
+
+## Verification-first hardening checkpoint — 2026-11-28
+
+### Branch and scope verification
+
+- Re-verified repository owner/name: `itsfahadahmed1234-creator/flame-chick-platform` (owner spelling includes **ahmed**).
+- Re-verified branch heads before editing:
+  - Production Pages branch `cloudflare/admin-production`: `5f17dcce76f90fab4e94ceb1830b76987f702bc9`.
+  - Isolated review branch `work/admin-catalog-media-review`: `6fef8a57f643dbd66239661ae260fb244d565204` before this hardening pass.
+- GitHub compare confirmed review branch was 24 commits ahead and 0 behind Production at the start of the audit. All changes in this task remain isolated on the review branch.
+- No PR merge, Pages deploy, Edge Function deploy, DB write, migration execution or Storage operation was performed.
+
+### Concrete defects found and fixed
+
+1. **Uncertain mutation lost on reload:** the previous implementation held the pending request only in JavaScript memory. A reload could lose the request ID after the server committed but before the browser received the response. Added a bounded, validated, sessionStorage-backed recovery record containing the exact action, payload, expected revision and request UUID, scoped to the authenticated user. Storage is read back after write before sending the mutation. Invalid/tampered records, unavailable storage, quota errors or account mismatch fail closed.
+2. **Automatic exact replay after re-authentication:** when Catalog V3 opens, it checks for a pending record for the same user and replays the exact original request body with the same UUID through the one-retry helper. A successful original mutation is returned by backend idempotency; an uncertain outcome retains the record. The user cannot submit different catalog edits while a pending record exists.
+3. **Non-UUID fallback:** replaced timestamp/random-string fallback with cryptographic RFC 4122 v4 generation using `crypto.randomUUID()` or `crypto.getRandomValues()`. If secure randomness is unavailable or malformed, the operation fails closed.
+4. **Pagination partial commit:** collection page state and collection records were previously appended before their associated first deal-page reads completed. Now the page, related deal pages and their revisions are staged first; only after every dependent read succeeds are arrays and cursors committed.
+5. **Mixed-revision refresh:** the initial four catalog lists and each collection's first deal page now must all report the same draft revision. Otherwise the refresh fails rather than showing a mixed snapshot.
+6. **Stale data editable after failed refresh:** click and form-submit handlers now block catalog actions/saves until a refresh succeeds after a load error.
+7. **Response reconstruction headers:** bounded response reconstruction removes transport/content-length headers whose values may no longer match the reconstructed body.
+
+### Added tests and CI observations
+
+- Added helper tests for secure UUID generation/fail-closed behavior; durable mutation persistence; request-ID-specific clearing; malformed/tampered recovery records; storage write verification; and atomic revision-consistent pagination source contract.
+- Historical red CI runs during this work were caused by test issues, not silently ignored:
+  - The first new store test used a case-sensitive assertion against an uppercase error string; corrected.
+  - The first pagination hardening test run retained an assertion for the old collection-index expression; updated to the new staged collection list.
+  - A prior CI run also exposed an old stale pagination source assertion; updated it.
+- Green CI:
+  - `46122189736` on `a9908e27f0bd44992504cbd6026d48a792ba29f0`: Admin Static Checks passed after durable-store tests and stale pagination assertion correction.
+  - `46122223726` on `cba8e9135315bb88da085caadf4741db9d3785f7`: Admin Static Checks passed with automatic pending-mutation reconciliation.
+  - Earlier baseline run `46121443832` on `0b087f64440f9c92dcca9eb7521a8156bcf0109d`: Admin Static Checks passed including recovered migration test.
+- The newest source change `7fc9bcdc370060ba05c2f2f8adc49c338872379b` adds the failed-refresh edit/save guard; its CI run must be checked before considering this checkpoint fully green.
+
+### Remaining verification limitations
+
+- These are source-level and CI checks. No browser acceptance test against a disposable Supabase stack has yet exercised a deliberately interrupted real RPC commit/replay across reload. Do not describe that end-to-end scenario as proven by static tests.
+- The product media migration was recovered byte-for-byte from the Production migration ledger and tested for expected structure, but it was not executed again (and must not be).
+- Category/deal image commands remain incomplete. No Catalog V3 image upload/preview/restore/remove workflow exists yet.
+- No customer image upload is ready. Do not invite the user to upload images until the complete product/category/deal workflow and failure-compensation tests are complete.
+
+### Non-negotiable boundary reaffirmed
+
+- Do not edit `cloudflare/admin-production`, merge, create a replacement project, or deploy.
+- Do not apply/reapply migrations or write to Production database/Storage.
+- Do not alter/deploy Staff Admin Edge Function or Pages.
+- Do not access Supabase Logs Explorer, the 102 GB log query or Log Ingestion.
+- Website promotional imagery remains a separate task.
