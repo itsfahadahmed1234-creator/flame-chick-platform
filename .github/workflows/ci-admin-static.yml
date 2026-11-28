@@ -16,6 +16,7 @@ on:
       - "supabase/migrations/*flame_chick_admin_dashboard_summary_v1.sql"
       - "supabase/migrations/*flame_chick_admin_dashboard_on_demand_history_v1.sql"
       - "tests/admin-dashboard-api.test.mjs"
+      - "tests/admin-connection-helpers.test.mjs"
       - "supabase/functions/flame-chick-order-api/**"
       - "supabase/functions/flame-chick-delivery-api/**"
       - "supabase/migrations/20261121053647_flame_chick_staff_admin_commands.sql"
