@@ -52,7 +52,6 @@
         <button class="nav-item" data-page="deals" disabled title="Awaiting its secure production API"><span class="nav-icon">✳</span>Deals & offers</button>
         <button class="nav-item" data-page="delivery"><span class="nav-icon">⌁</span>Delivery areas</button>
         <button class="nav-item active" data-page="staff"><span class="nav-icon">♙</span>Staff & riders</button>
-        <button class="nav-item" data-page="catalog-v3" disabled title="Available to verified Admin and Owner accounts"><span class="nav-icon">▦</span>Catalog V3 draft</button>
         <button class="nav-item" data-page="media" disabled title="Awaiting its secure production API"><span class="nav-icon">▧</span>Website images</button>
         <button class="nav-item" data-page="settings" disabled title="Awaiting its secure production API"><span class="nav-icon">⚙</span>Website settings</button>
       </nav>
@@ -123,23 +122,15 @@
       </section>
 
       <section class="page" id="page-menu" hidden>
-        <div class="page-intro"><div><h2>Menu & products</h2><p class="muted">Manage the products and variant prices customers see on the website.</p></div><button class="btn btn-primary" id="addProductButton">＋ Add product</button></div>
-        <div class="toolbar"><input id="productSearch" class="search-input" type="search" placeholder="Search products…"><select id="productCategoryFilter"><option value="">All categories</option></select><select id="productStateFilter"><option value="all">All products</option><option value="active">Active</option><option value="hidden">Hidden</option><option value="unavailable">Unavailable</option></select></div>
-        <div class="surface"><div class="table-wrap"><table><thead><tr><th>PRODUCT</th><th>CATEGORY</th><th>PRICE / OPTIONS</th><th>WEBSITE</th><th></th></tr></thead><tbody id="productsTable"><tr><td colspan="5" class="empty-cell">Loading menu…</td></tr></tbody></table></div></div>
-        <p class="data-note">Product and variant changes save directly to Supabase. Images upload to Supabase Storage. Each item retains only its current image and one previous backup.</p>
+        <div id="catalogMenuRoot"><div class="surface empty-state">Menu management loads after secure Admin verification.</div></div>
       </section>
 
       <section class="page" id="page-categories" hidden>
-        <div class="page-intro"><div><h2>Categories</h2><p class="muted">Manage parent menu categories and their child filters.</p></div><button class="btn btn-primary" id="addCategoryButton">＋ Add category</button></div>
-        <div id="categoryGrid" class="category-grid"><div class="surface empty-state">Loading categories…</div></div>
-        <div class="subcat-admin-head"><div><h3>Subcategories</h3><p class="muted">Each subcategory belongs to one parent category and appears as a clickable filter in the POS.</p></div><button class="btn btn-outline" id="addSubcategoryButton">＋ Add subcategory</button></div>
-        <div id="subcategoryGrid" class="category-grid"><div class="surface empty-state">Loading subcategories…</div></div>
+        <div id="catalogCategoriesRoot"><div class="surface empty-state">Category management loads after secure Admin verification.</div></div>
       </section>
 
       <section class="page" id="page-deals" hidden>
-        <div class="page-intro"><div><h2>Deals & offers</h2><p class="muted">Create Super Deals, Meal Deals and Normal Deals with configurable bundle components.</p></div><button class="btn btn-primary" id="addDealButton">＋ Create deal</button></div>
-        <div id="dealsList" class="deal-list"><div class="surface empty-state">Loading deals…</div></div>
-        <p class="data-note">New deals use the existing deal groups and component structure. A new deal remains hidden until all its components have been saved successfully.</p>
+        <div id="catalogDealsRoot"><div class="surface empty-state">Deals management loads after secure Admin verification.</div></div>
       </section>
 
       <section class="page" id="page-delivery" hidden>
@@ -156,10 +147,6 @@
           <small id="defaultDeliveryFeeStatus" class="muted" style="display:block;margin-top:9px">Not configured.</small>
         </div>
         <div id="areasList" class="area-list"><div class="surface empty-state">Loading delivery areas…</div></div>
-      </section>
-
-      <section class="page" id="page-catalog-v3" hidden>
-        <div id="catalogV3Root"><div class="surface empty-state">Catalog V3 workspace will load after secure Admin verification.</div></div>
       </section>
 
       <section class="page" id="page-staff" hidden>
@@ -227,7 +214,6 @@
   </dialog>
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
   <script src="config.js"></script>
-  <script src="catalog-v3-importer.js"></script>
   <script src="catalog-v3-admin.js"></script>
   <script src="app.js"></script>
 </body>
