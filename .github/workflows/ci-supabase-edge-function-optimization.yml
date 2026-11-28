@@ -1,0 +1,37 @@
+name: Supabase Edge Function Optimization Regression
+
+on:
+  push:
+    branches:
+      - supabase-edge-optimization-2026-11-28
+    paths:
+      - "supabase/config.toml"
+      - "supabase/functions/**"
+      - "tests/supabase-edge-optimization-contract.test.mjs"
+      - "tests/supabase-staff-dashboard-actions.test.mjs"
+      - ".github/workflows/ci-supabase-edge-function-optimization.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-edge-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+      - name: Set up Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: "2.x"
+      - name: Run source contracts and dashboard validator tests
+        run: node --test tests/supabase-edge-optimization-contract.test.mjs tests/supabase-staff-dashboard-actions.test.mjs
+      - name: Run mocked Order API and Delivery API regression tests
+        run: deno test --allow-env --allow-read supabase/functions/flame-chick-order-api/index_test.ts supabase/functions/flame-chick-delivery-api/index_test.ts
