@@ -458,3 +458,19 @@ All Production database queries in this checkpoint were metadata/function-defini
 - No Production database writes, migration applications, Storage object operations, Staff Admin Edge Function changes/deployments, Cloudflare Pages deployments, publication or menu imports occurred.
 - Website promotional media remains separate.
 - Supabase Logs Explorer, the 102 GB log query and Log Ingestion remain completely untouched.
+
+
+---
+
+## Latest review-draft verification — 2026-11-28
+
+- GitHub owner spelling is confirmed as `itsfahadahmed1234-creator`; all work is on the pre-existing `work/admin-catalog-media-review` branch. The earlier 404s were caused by the owner-name mismatch, not a missing repository or branch.
+- Latest application/test commit: `b39f9376da42cb82783be24b82a656556880d575`.
+- Admin Static Checks run `46129930224` on that exact commit completed successfully. The run passed JavaScript syntax, the full Node regression suite (including the review-draft contract tests), static Admin assets and POS/Rider inline-script parsing. It does **not** execute SQL.
+- A separate source-anchor replay used the current read-only Production `pg_get_functiondef` outputs and PostgreSQL-style literal string replacement semantics. All 14 of 14 guarded anchors matched exactly once across the four target functions. The resulting in-memory definitions retained `SECURITY DEFINER` and `search_path TO ''`. This is an anchor/source consistency check, not a PostgreSQL compile or execution test.
+- Category read patch was tightened to include the category-only `category_kind` JSON context so it cannot also modify the similarly-shaped subcategory JSON block.
+- No local Supabase CLI, PostgreSQL server/client, Docker runtime or disposable Supabase database is available in the current execution environment. The SQL draft has therefore **not** been compiled or executed, and must remain a review-only draft.
+- No Catalog V3 media UI has been added. Product media remains unwired to the editor; category/deal metadata draft is not yet PostgreSQL-validated. The full upload/replace/restore/remove experience is **not ready**, and the user must not be asked to upload images yet.
+- Next gate: obtain/use an isolated disposable Supabase/Postgres environment with the complete production-aligned migration chain, execute the draft only there inside a rollback-safe transaction, and cover wrong-folder, missing-object, null/omitted metadata, cross-restaurant, Admin/Owner vs other-role, idempotency, revision-conflict and interrupted/ambiguous mutation cases. Proceed to UI only after that integration suite passes.
+
+No Production database write, migration execution, Storage object operation, policy/grant change, publication, Edge Function or Pages deployment, Website/POS/Rider modification, or log/Log Ingestion access occurred during this verification.
