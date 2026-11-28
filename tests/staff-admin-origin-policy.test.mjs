@@ -45,16 +45,26 @@ test("checks Origin values with exact matching", () => {
   assert.equal(isAllowedRequestOrigin(null, allowed), true);
 });
 
-test("accepts only the exact HTTPS invitation callback on an allowed origin", () => {
-  assert.equal(isSafeInviteRedirect(adminOrigin + "/accept-invitation.html", allowed), true);
+test("accepts only the exact HTTPS Cloudflare invitation callbacks", () => {
+  const productionOrigins = parseStaffAdminOrigins("");
+  assert.equal(isSafeInviteRedirect(ADMIN_INVITATION_REDIRECT, productionOrigins), true);
+  assert.equal(isSafeInviteRedirect(RIDER_INVITATION_REDIRECT, productionOrigins), true);
+
   for (const value of [
-    "http://admin.example.test/accept-invitation.html", adminOrigin + "/",
-    adminOrigin + "/admin.html", adminOrigin + "/accept-invitation.html/",
-    adminOrigin + "/accept-invitation.html?next=/", adminOrigin + "/accept-invitation.html#token",
+    "http://flamechickadmin.pages.dev/accept-invitation.html",
+    "https://flamechickadmin.pages.dev/",
+    "https://flamechickadmin.pages.dev/admin.html",
+    "https://flamechickadmin.pages.dev/accept-invitation.html/",
+    "https://flamechickadmin.pages.dev/accept-invitation.html?next=/",
+    "https://flamechickadmin.pages.dev/accept-invitation.html#token",
+    "https://flamechickrider.pages.dev/accept-invitation.html",
+    "https://flamechickrider.pages.dev/?next=/",
     "https://evil.example.test/accept-invitation.html",
-    "https://admin.example.test.evil.test/accept-invitation.html",
-    "https://user:secret@admin.example.test/accept-invitation.html", "not a url"
-  ]) assert.equal(isSafeInviteRedirect(value, allowed), false, value);
+    "https://flamechickadmin.pages.dev.evil.test/accept-invitation.html",
+    "https://user:secret@flamechickadmin.pages.dev/accept-invitation.html",
+    "not a url",
+    adminOrigin + "/accept-invitation.html"
+  ]) assert.equal(isSafeInviteRedirect(value, productionOrigins), false, value);
 });
 
 test("CORS reflects only explicitly allowed origins without wildcard or credentials", () => {
