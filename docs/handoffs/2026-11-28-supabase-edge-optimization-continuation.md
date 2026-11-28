@@ -98,6 +98,17 @@ Treat these as review candidates, not approved changes. Inspect the current sour
 - The large order, payment, and delivery RPCs are single PostgREST calls executed as database transactions. Their internal SQL statements are not separate Edge-to-Postgres network round trips; avoid combining/reordering them without a concrete plan and regression coverage. The production RPCs inspected are Postgres-owned privileged functions with execution restricted to `service_role`.
 - **Decision:** no further Staff Admin, dashboard, index, or transactional RPC change is justified by current evidence. Keep the Catalog API checksum and immutable publication behavior unchanged.
 
+## Parallel work boundary — Website and Admin ownership
+
+**A separate ChatGPT conversation is actively working on the Flame Chick Website and Admin panel. Treat those workstreams as owned by that conversation.**
+
+- Do not edit, replace, refactor, reformat, or deploy any Website or Admin panel application files.
+- Do not change their UI, routes, API payloads/contracts, catalog/admin workflows, auth/session behavior, CORS allowlists, environment variables, secrets, Cloudflare Pages/Workers/Vercel projects, hostnames, DNS, aliases, or deployment configuration.
+- Do not make backend/API/database changes that could alter Website or Admin panel behavior while that work is in progress. In particular, defer Order API, Catalog API, Staff Admin API/RPC, dashboard RPC, and shared Website/Admin contract changes unless the owner of that parallel work explicitly coordinates and approves the exact change.
+- Do not cherry-pick, merge, rebase, force-push, or overwrite commits from the parallel workstream. Keep optimization work isolated on `supabase-edge-optimization-2026-11-28`.
+- Safe continuation is limited to read-only review and isolated backend areas that do not serve or change the Website/Admin workstream. Before any shared-surface edit, stop and coordinate rather than guessing.
+- This boundary does not authorize deployment or Production traffic. The no-log-query restriction remains absolute unless the user explicitly approves a new log-query activity.
+
 ## Safety and release status
 
 - **Zero Supabase log-query use in this continuation.** No Logs Explorer, `query_logs`, log API/CLI, broad diagnostic query, log-drain setting, or log-ingestion setting was accessed or changed.
