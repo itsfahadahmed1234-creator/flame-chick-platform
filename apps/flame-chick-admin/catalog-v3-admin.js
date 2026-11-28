@@ -40,8 +40,8 @@
   function normalizeSubcategoryDraft(form,categories){
     if(!isObj(form))throw Error('Subcategory form data is invalid.');
     const categoryId=text(form.category_id,64,'Parent menu category',true);
-    if(!Array.isArray(categories)||!categories.some(category=>category&&category.id===categoryId&&category.category_kind==='menu'))
-      throw Error('Choose an existing menu category as the subcategory parent.');
+    if(!Array.isArray(categories)||!categories.some(category=>category&&category.id===categoryId&&category.category_kind==='menu'&&(category.is_active!==false||(form.id&&form.category_id===categoryId))))
+      throw Error('Choose an active menu category as the subcategory parent.');
     const sortOrder=Number(form.sort_order??0);
     if(!Number.isSafeInteger(sortOrder)||sortOrder<0)throw Error('Subcategory sort order must be a non-negative whole number.');
     return {...(form.id?{id:text(form.id,64,'Subcategory ID',true)}:{}),category_id:categoryId,
@@ -312,7 +312,7 @@
     function productForm(p){
       return '<form class="fcv3-editor" data-form="product">'+(p&&p.id?'<input type="hidden" name="id" value="'+esc(p.id)+'">':'')+
         '<div class="fcv3-form-grid"><label>Menu category<select name="category_id" required><option value="">Select category</option>'+
-        s.categories.filter(c=>c.category_kind==='menu').map(c=>'<option value="'+esc(c.id)+'"'+(p&&p.category_id===c.id?' selected':'')+'>'+esc(c.name_en)+'</option>').join('')+
+        s.categories.filter(c=>c.category_kind==='menu'&&(c.is_active!==false||(p&&p.category_id===c.id))).map(c=>'<option value="'+esc(c.id)+'"'+(p&&p.category_id===c.id?' selected':'')+'>'+esc(c.name_en)+(c.is_active===false?' · Inactive':'')+'</option>').join('')+
         '</select></label><label>Product name<input name="name_en" maxlength="120" required value="'+esc(p&&p.name_en)+'"></label>'+
         '<label>Urdu name<input name="name_ur" maxlength="120" value="'+esc(p&&p.name_ur)+'"></label>'+
         '<label>Sort order<input name="sort_order" type="number" min="0" step="1" value="'+esc(p?p.sort_order:0)+'"></label>'+
