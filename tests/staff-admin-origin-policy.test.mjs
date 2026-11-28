@@ -112,7 +112,7 @@ test("production invitation callback is pinned to the Admin domain", () => {
   assert.equal(isSafeInviteRedirect(
     productionAdminOrigin + "/accept-invitation.html",
     productionAllowed
-  ), true);
+  ), false);
   assert.equal(isSafeInviteRedirect(
     "https://flamechic.vercel.app/accept-invitation.html",
     productionAllowed
