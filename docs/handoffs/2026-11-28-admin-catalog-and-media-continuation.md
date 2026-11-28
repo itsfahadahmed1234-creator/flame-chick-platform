@@ -228,3 +228,21 @@ The Admin phase is ready for user review when:
 - The migration provenance discrepancy remains unresolved. The repository tree on the source branch does not contain `20261127090849_flame_chick_catalog_product_media_v1.sql`. Do not recreate or reapply it blindly.
 - Supabase logging restrictions remain absolute: no log-query use and no Log Ingestion access, including settings/metadata.
 - Next: verify the CI rerun for `f1f489b6fb4702d802c61b87850f6faaa38db811`; add focused tests for timeout retry/request-ID reuse and single-flight refresh; then implement explicit bounded pagination. Continue migration provenance from repository and authorized non-log source material only. Keep media backend/UI work blocked until the applied migration is recovered and the secure command contract is reviewed.
+
+
+---
+
+## Follow-on connection regression work — 2026-11-28
+
+- Verified Admin Static Checks run `46115559510` for commit `f1f489b6fb4702d802c61b87850f6faaa38db811`: completed successfully. All workflow steps passed.
+- Added `apps/flame-chick-admin/connection-helpers.js` with isolated helpers for single-flight refresh, ambiguous-failure classification, one same-request retry, explicit uncertain mutation result and a bounded response-body reader.
+- Loaded the helper before `app.js` in the Admin page.
+- Updated `app.js` to use the tested single-flight helper and same-body mutation retry helper. The pending mutation retains its original action, payload, expected revision and request ID while the result remains ambiguous.
+- Staff Admin non-2xx responses now carry their HTTP status as `HttpRequestError`, allowing only selected ambiguous statuses (408, 425, 429, 500, 502, 503, 504) to qualify for one same-request retry. Definite conflicts/validation failures are not retried.
+- Added `tests/admin-connection-helpers.test.mjs` covering concurrent refresh coalescing, refresh recovery after rejection, ambiguous versus definite errors, exact same-object retry, uncertain result after two ambiguous attempts, and timeout while reading the response body.
+- **Important validation gap:** the new Node tests have not yet been executed by CI. The last verified green run predates these follow-on commits. Do not call the current branch green until the tests are wired into the static workflow and the exact new HEAD run passes.
+- The bounded fetch wrapper in `app.js` still clears its timer after receiving the Response rather than after consuming its body. The new helper test covers body-read timeout, but the app wrapper has not yet been switched to that body-aware helper. Address this before marking request timeout handling complete.
+- No Catalog V3 pagination changes were committed. No legacy importer change, DB/Storage/API/Edge Function changes, migration execution, publication, menu import or deployment occurred.
+- GitHub connector reads intermittently returned 404/unknown repository errors after the latest commits. Reconfirm branch HEAD and workflow file before the next write; do not infer current state from a failed lookup.
+- Continue respecting the absolute Supabase restriction: no Supabase Logs Explorer, no expensive 102 GB query, and no Log Ingestion access or configuration.
+- Next: restore reliable source reads, wire and run `node --test tests/admin-connection-helpers.test.mjs` in the Admin static workflow, update the app request wrapper so the timeout covers response-body consumption, verify exact HEAD CI, then continue with pagination. Keep the migration/media workflow blocked pending provenance and backend command review.
