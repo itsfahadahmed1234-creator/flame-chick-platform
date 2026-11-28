@@ -220,7 +220,7 @@
   function checkbox(name,label,checked){return '<label class="fcv3-check"><input type="checkbox" name="'+name+'" data-field="'+name+'"'+(checked?' checked':'')+'> '+label+'</label>';}
   function createWorkspace(){
     let el=null,request=null;
-    const s={loading:false,saving:false,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,editorLoadingDealId:null,components:[],detail:null,partial:null,importProgress:null};
+    const s={loading:false,saving:false,error:null,notice:null,revision:null,categories:[],products:[],collections:[],deals:[],schedules:[],editor:null,editorLoadingDealId:null,components:[],detail:null,partial:null,importProgress:null,pages:{categories:{hasMore:false,cursor:null},products:{hasMore:false,cursor:null},collections:{hasMore:false,cursor:null},deals:{}}};
     async function read(action,args){const r=await request(action,args||{},false);if(!isObj(r)||r.ok===false)throw Error('Catalog read failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
     async function write(action,payload){const r=await request(action,payload,true);if(!isObj(r)||r.ok===false)throw Error('Catalog save failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
     async function refresh(){
@@ -230,10 +230,41 @@
           read(READ.categories,{limit:100}),read(READ.products,{limit:50}),read(READ.collections,{limit:50}),read(READ.schedules,{limit:50})
         ]);
         s.categories=cats.items||[];s.products=prods.items||[];s.collections=cols.items||[];s.schedules=schedules.items||[];
+        s.pages={categories:{hasMore:cats.has_more===true,cursor:cats.next_cursor||null},
+          products:{hasMore:prods.has_more===true,cursor:prods.next_cursor||null},
+          collections:{hasMore:cols.has_more===true,cursor:cols.next_cursor||null},deals:{}};
         const lists=await Promise.all(s.collections.map(c=>read(READ.deals,{collection_id:c.id,limit:50})));
         s.deals=lists.flatMap(x=>x.items||[]);
+        lists.forEach((x,index)=>{s.pages.deals[s.collections[index].id]={hasMore:x.has_more===true,cursor:x.next_cursor||null};});
       }catch(e){s.error=e.message||'Unable to load catalog draft.';}
       finally{s.loading=false;render();}
+    }
+    async function loadMore(kind,collectionId){
+      const page=kind==='deals'?s.pages.deals[collectionId]:s.pages[kind];
+      if(!page||page.hasMore!==true||!page.cursor)throw Error('No next page is available for this catalog list.');
+      const revision=s.revision;
+      const action=kind==='categories'?READ.categories:kind==='products'?READ.products:kind==='collections'?READ.collections:READ.deals;
+      const args={after_id:page.cursor,limit:kind==='categories'?100:50};
+      if(kind==='deals')args.collection_id=collectionId;
+      const result=await read(action,args);
+      if(Number.isSafeInteger(revision)&&Number.isSafeInteger(result.draft_revision)&&result.draft_revision!==revision){
+        await refresh();
+        throw Error('The draft changed while loading another page. Catalog lists were refreshed; review them before editing.');
+      }
+      const target=kind==='categories'?s.categories:kind==='products'?s.products:kind==='collections'?s.collections:s.deals;
+      const seen=new Set(target.map(item=>item.id));
+      for(const item of result.items||[])if(item&&item.id&&!seen.has(item.id)){target.push(item);seen.add(item.id);}
+      page.hasMore=result.has_more===true;page.cursor=result.next_cursor||null;
+      if(kind==='collections'){
+        const added=(result.items||[]).filter(c=>c&&c.id);
+        const lists=await Promise.all(added.map(c=>read(READ.deals,{collection_id:c.id,limit:50})));
+        lists.forEach((list,index)=>{
+          const collection=added[index],known=new Set(s.deals.map(d=>d.id));
+          for(const deal of list.items||[])if(deal&&deal.id&&!known.has(deal.id)){s.deals.push(deal);known.add(deal.id);}
+          s.pages.deals[collection.id]={hasMore:list.has_more===true,cursor:list.next_cursor||null};
+        });
+      }
+      render();
     }
     function categoryLabel(id){return s.categories.find(c=>c.id===id)?.name_en||'Unknown category';}
     function variantRows(product){
@@ -388,10 +419,11 @@
           '<td><button class="fcv3-button" data-action="product-edit" data-id="'+esc(p.id)+'">Edit</button></td></tr>';
       }).join('');
       const collectionHtml=s.collections.map(c=>{
-        const deals=s.deals.filter(d=>d.collection_id===c.id);
+        const deals=s.deals.filter(d=>d.collection_id===c.id),page=s.pages.deals[c.id];
         return '<section class="fcv3-collection"><h4>'+esc(c.name_en)+'</h4><div class="fcv3-deals">'+
           (deals.length?deals.map(d=>'<article class="fcv3-deal-card"><div><strong>'+esc(d.title)+'</strong><small>'+(d.active_variant_count||0)+' active variant(s) · '+(d.is_active?'Active':'Draft / hidden')+'</small></div>'+
-          '<div class="fcv3-card-actions"><button class="fcv3-button" data-action="deal-detail" data-id="'+esc(d.id)+'">Inspect</button><button class="fcv3-button" data-action="deal-edit" data-id="'+esc(d.id)+'" data-title="'+esc(d.title)+'" aria-label="Edit '+esc(d.title)+'"'+(s.editorLoadingDealId?' disabled':'')+'>Edit</button></div></article>').join(''):'<p class="fcv3-empty">No deals in this collection.</p>')+'</div></section>';
+          '<div class="fcv3-card-actions"><button class="fcv3-button" data-action="deal-detail" data-id="'+esc(d.id)+'">Inspect</button><button class="fcv3-button" data-action="deal-edit" data-id="'+esc(d.id)+'" data-title="'+esc(d.title)+'" aria-label="Edit '+esc(d.title)+'"'+(s.editorLoadingDealId?' disabled':'')+'>Edit</button></div></article>').join(''):'<p class="fcv3-empty">No deals in this collection.</p>')+
+          (page&&page.hasMore&&page.cursor?'<button class="fcv3-button" data-action="load-more" data-kind="deals" data-collection-id="'+esc(c.id)+'">Load 50 more deals</button>':'')+'</div></section>';
       }).join('');
       el.innerHTML='<div class="fcv3-head"><div><span class="fcv3-kicker">AUTHENTICATED COMMAND API</span><h2>Catalog V3 workspace</h2><p>Draft authoring through secured Admin/Owner commands; no direct PostgREST table writes.</p></div>'+
         '<div class="fcv3-head-actions"><span class="fcv3-revision">'+(s.revision==null?'Revision not loaded':'Draft revision '+s.revision)+'</span>'+
@@ -405,10 +437,13 @@
         '<article><small>Deal-only variants</small><strong>'+s.products.reduce((n,p)=>n+p.variants.filter(v=>v.is_standalone_sellable===false).length,0)+'</strong></article><article><small>Fixed deals</small><strong>'+s.deals.length+'</strong></article></div>'+
         '<div class="fcv3-toolbar"><div><h3>Products and variants</h3><p>Standalone variants require prices. Deal-only variants may be unpriced and stay out of standalone menu cards.</p></div><button class="fcv3-button fcv3-primary" data-action="product-add">+ Add product</button></div>'+
         '<div class="fcv3-table-wrap"><table><thead><tr><th>Product</th><th>Category</th><th>Standalone prices</th><th>Status</th><th></th></tr></thead><tbody>'+(productRows||'<tr><td colspan="5">No products in draft.</td></tr>')+'</tbody></table></div>'+
+        (s.pages.products.hasMore&&s.pages.products.cursor?'<button class="fcv3-button" data-action="load-more" data-kind="products">Load 50 more products</button>':'')+
         '<div class="fcv3-toolbar"><div><h3>Categories</h3><p>Menu and deal categories are distinct.</p></div><button class="fcv3-button" data-action="category-add">+ Add category</button></div>'+
         '<div class="fcv3-category-grid">'+s.categories.map(c=>'<article><strong>'+esc(c.name_en)+'</strong><small>'+esc(c.category_kind)+' · '+(c.is_active?'Active':'Inactive')+'</small><button class="fcv3-button" data-action="category-edit" data-id="'+esc(c.id)+'">Edit</button></article>').join('')+'</div>'+
+        (s.pages.categories.hasMore&&s.pages.categories.cursor?'<button class="fcv3-button" data-action="load-more" data-kind="categories">Load 100 more categories</button>':'')+
         '<div class="fcv3-toolbar"><div><h3>Deals and offers</h3><p>Fixed prices with INCLUDED component choices. Burger groups support per-burger dropdown selections.</p></div><button class="fcv3-button fcv3-primary" data-action="deal-add">+ Create fixed deal</button></div>'+
         (collectionHtml||'<p class="fcv3-empty">No deal collection yet. The first deal creates the Deals category and collection.</p>')+
+        (s.pages.collections.hasMore&&s.pages.collections.cursor?'<button class="fcv3-button" data-action="load-more" data-kind="collections">Load 50 more deal collections</button>':'')+
         (s.editor?'<div class="fcv3-editor-shell"><div class="fcv3-editor-head"><div><span class="fcv3-kicker">DRAFT EDITOR</span><h3>'+
           (s.editor.type==='product'?(s.editor.product?'Edit product':'Add product'):s.editor.type==='category'?(s.editor.category?'Edit category':'Add category'):(s.dealDraft&&s.dealDraft.id?'Edit fixed deal · '+esc(s.dealDraft.title):'Create fixed deal'))+'</h3></div><button class="fcv3-button fcv3-muted" data-action="editor-cancel">Close</button></div>'+
           (s.editor.type==='product'?productForm(s.editor.product):s.editor.type==='category'?categoryForm(s.editor.category):dealForm())+'</div>':'')+
@@ -676,6 +711,7 @@
         const b=event.target.closest('[data-action]');if(!b||b.disabled||s.saving||s.editorLoadingDealId)return;const a=b.dataset.action;
         try{
           if(a==='refresh')await refresh();
+          else if(a==='load-more')await loadMore(b.dataset.kind,b.dataset.collectionId||null);
           else if(a==='import-menu')await importPublishedMenuDraft();
           else if(a==='category-add'){s.editor={type:'category'};s.editorRevision=s.revision;render();}
           else if(a==='category-edit'){const category=s.categories.find(c=>c.id===b.dataset.id);if(!category)throw Error('Category could not be found.');s.editor={type:'category',category};s.editorRevision=s.revision;render();}
