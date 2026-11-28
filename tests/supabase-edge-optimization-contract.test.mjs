@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
+import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -57,4 +58,65 @@ test("Rider uses one authenticated presence-and-jobs sync cycle and action snaps
   assert.match(rider, /riderSyncTimer=setInterval\(\(\)=>syncRiderState\(false\),120000\)/);
   assert.match(rider, /applyRiderSnapshot\(result\.rider_state\|\|\{\}\)/);
   assert.doesNotMatch(rider, /riderRealtimeFallbackTimer=setInterval\(\(\)=>\{[\s\S]{0,150}?\},120000\)/);
+});
+
+test("Rider snapshot helper accepts nested post-action snapshots without an API envelope", () => {
+  const riderSource = read("apps/flame-chick-rider/index.html");
+  const helper = riderSource.match(/function applyRiderSnapshot\(data\)\{[^\n]*\}/)?.[0];
+  assert.ok(helper, "Rider snapshot helper should remain independently testable");
+
+  const calls = { jobs: 0, offers: 0, availability: 0, connection: 0 };
+  const context = {
+    user: { id: "rider-user-1" },
+    rider: { user_id: "rider-user-1", branch_id: "branch-1", availability_status: "offline" },
+    jobs: [],
+    offers: [],
+    riderRealtimeConnected: true,
+    renderJobs: () => { calls.jobs += 1; },
+    renderOffers: () => { calls.offers += 1; },
+    renderRiderAvailability: () => { calls.availability += 1; },
+    setConnection: () => { calls.connection += 1; },
+  };
+  vm.runInNewContext(helper + "\nglobalThis.applyRiderSnapshot = applyRiderSnapshot;", context);
+
+  const actionSnapshot = {
+    data: [{ id: "task-1" }],
+    offers: [{ id: "offer-1" }],
+    profile: {
+      user_id: "rider-user-1",
+      branch_id: "branch-1",
+      display_name: "Updated Rider",
+      availability_status: "available",
+      accepting_jobs: true,
+      last_seen_at: "2026-11-28T07:00:00.000Z",
+    },
+  };
+  assert.equal(context.applyRiderSnapshot(actionSnapshot), true);
+  assert.equal(context.jobs.length, 1);
+  assert.equal(context.jobs[0].id, "task-1");
+  assert.equal(context.offers.length, 1);
+  assert.equal(context.offers[0].id, "offer-1");
+  assert.equal(context.rider.display_name, "Updated Rider");
+  assert.equal(context.rider.availability_status, "available");
+  assert.equal(calls.jobs, 1);
+  assert.equal(calls.offers, 1);
+  assert.equal(calls.availability, 1);
+  assert.equal(calls.connection, 1);
+
+  // The same helper also accepts the full sync API response envelope.
+  const syncEnvelope = {
+    ok: true,
+    data: [],
+    offers: [],
+    profile: { user_id: "rider-user-1", branch_id: "branch-1" },
+    availability_status: "busy",
+    accepting_jobs: false,
+    last_seen_at: "2026-11-28T07:02:00.000Z",
+  };
+  assert.equal(context.applyRiderSnapshot(syncEnvelope), true);
+  assert.equal(context.jobs.length, 0);
+  assert.equal(context.rider.availability_status, "busy");
+  assert.equal(context.rider.accepting_jobs, false);
+  assert.equal(context.rider.last_seen_at, "2026-11-28T07:02:00.000Z");
+  assert.equal(context.applyRiderSnapshot({ data: [], offers: null }), false);
 });
