@@ -156,10 +156,10 @@ async function openCatalogTab(view){
  if(!root)throw Error("The selected catalog tab root is missing.");
  if(!window.FlameChickAdminCatalogV3||typeof window.FlameChickAdminCatalogV3.createWorkspace!=="function")
   throw Error("Secure catalog management is unavailable.");
- if(!S.catalogWorkspaces[view])S.catalogWorkspaces[view]=window.FlameChickAdminCatalogV3.createWorkspace();
- const workspace=S.catalogWorkspaces[view];
- if(workspace.getState().view===view)await workspace.refresh();
- else await workspace.mount(root,catalogV3Request,view);
+ if(!S.catalogWorkspaces[view]){
+  S.catalogWorkspaces[view]=window.FlameChickAdminCatalogV3.createWorkspace();
+  await S.catalogWorkspaces[view].mount(root,catalogV3Request,view);
+ }
 }
 function staffRoleLabel(role){return ({owner:"Owner",admin:"Admin",manager:"Manager",cashier:"Cashier",rider:"Rider"})[role]||role;}
 function staffRequestId(){return crypto.randomUUID?crypto.randomUUID():"b4-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2);}
