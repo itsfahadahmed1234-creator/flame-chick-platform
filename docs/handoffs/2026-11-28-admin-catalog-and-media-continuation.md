@@ -1,3 +1,40 @@
+# ACTIVE PRODUCTION MIGRATION CHECKPOINT — 2026-11-28
+
+**This checkpoint supersedes older instructions in this file that prohibit the already-approved category/deal media migration.** The user explicitly approved applying the pending category/deal media database patch because the restaurant is not yet running real production orders.
+
+## What is now applied
+
+- Supabase project: `adkrxfnawdiljhjaavnj` — Flame Chick Production, Mumbai `ap-south-1`, Free plan, PostgreSQL 17.
+- Applied migration: `20261128092721_flame_chick_category_deal_media_v1`.
+- The exact applied SQL is preserved at `supabase/migrations/20261128092721_flame_chick_category_deal_media_v1.sql` in this review branch.
+- Only these four existing `app_private` functions were replaced:
+  - `flame_chick_catalog_command_internal(text,jsonb,bigint,uuid)`
+  - `flame_chick_catalog_draft_read_internal(text,uuid,integer)`
+  - `flame_chick_catalog_deal_upsert_internal(jsonb,bigint,uuid)`
+  - `flame_chick_catalog_deal_list_read_internal(uuid,uuid,integer)`
+- Category/deal current/previous image paths now participate in their existing authenticated write/read command flow. Supplied paths must use the matching entity UUID folder, an allowed JPG/JPEG/PNG/WebP suffix, and an existing object in `flame-chick-media`. New entities must be created before media metadata can be attached. Omitted path fields preserve their current values; null/empty clears the respective value.
+- Verification after apply: migration appears in the production migration ledger; all four function definitions contain both image-path fields; owner remains `postgres`; `SECURITY DEFINER` and empty `search_path` remain; ACLs are unchanged (`authenticated` can execute, `anon` cannot).
+- Regex smoke checks accepted JPG/WebP/PNG examples and did not match a traversal-style path or GIF suffix.
+- Security advisor returned 51 existing RLS-enabled/no-policy informational findings and the existing leaked-password-protection warning. This migration changed no RLS policy, grant, bucket, Storage object, publication pointer, catalog row, or Auth setting.
+
+## What is not complete
+
+- This is a database metadata-command capability only. No Admin UI upload controls, preview, replace, restore, delete, orphan cleanup or failure compensation have been implemented.
+- No Storage object upload or real image upload has been tested. Do not invite the user to upload menu images yet.
+- No Admin Pages or Staff Admin Edge Function deployment was performed. The application branch remains isolated.
+- No menu import, seed, draft publish/rollback, publication-pointer change, order creation or payment was performed.
+- No POS, Rider, Website or other app branch was changed.
+- Supabase Logs Explorer, the 102 GB log query and Log Ingestion remain untouched.
+
+## Repository state
+
+- Continue only on `work/admin-catalog-media-review`.
+- Do not merge it into `cloudflare/admin-production`, deploy Pages or Edge Functions, or change any other app.
+- The review-only draft `docs/drafts/2026-11-28-flame-chick-category-deal-media-v1.sql` is now historical source-review material and still contains a prominent DO NOT APPLY warning. The numbered migration above is the applied, tracked migration.
+- Next: finish the Admin-side media workflow, using secure upload-first / metadata-commit / delayed-cleanup semantics, add failure-compensation coverage, run relevant tests, and seek separate approval before application deployment. User may perform their own Admin dashboard verification, but the UI does not yet expose this new capability.
+
+---
+
 # Flame Chick Admin — Catalog Editing & Media Management Continuation
 
 **Updated:** 2026-11-28  
