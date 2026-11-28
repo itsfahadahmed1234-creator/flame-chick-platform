@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fix/pos-manual-delivery-receipt-print-ux-2026-11-27
+      - supabase-edge-optimization-2026-11-28
     paths:
       - "apps/flame-chick-pos/**"
       - ".github/workflows/ci-pos-manual-delivery-receipt-print-ux.yml"
@@ -30,6 +31,9 @@ jobs:
           node --test apps/flame-chick-pos/tests/pos-receipt-print-contract.test.mjs
       - name: Run existing QZ adapter diagnostics (no printer dispatch)
         run: node --test apps/flame-chick-pos/tests/qz-printing-diagnostics.test.js
+
+      - name: Run delivery invocation optimization regression
+        run: node --test apps/flame-chick-pos/tests/delivery-refresh-optimization.test.cjs
 
       - name: Run existing POS business-contract regression checks
         run: |
