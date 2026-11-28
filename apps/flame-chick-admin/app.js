@@ -1,7 +1,7 @@
 (() => {
 "use strict";
 const C=window.FLAME_CHICK_CONFIG, $=id=>document.getElementById(id);
-const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],catalogV3Revision:0,catalogV3Workspace:null,catalogV3Mounted:false,catalogV3RecoveryUser:null,range:"today",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
+const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],catalogV3Revision:0,catalogV3Workspace:null,catalogV3Mounted:false,catalogV3RecoveryUser:null,catalogV3MediaClient:null,catalogV3MediaRecoveryStore:null,catalogV3LastReconciliation:null,range:"today",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
 const roles=["owner","admin"], labels={new:"New",accepted:"Accepted",preparing:"Preparing",ready:"Ready",out_for_delivery:"On delivery",delivered:"Delivered",collected:"Collected",served:"Served",completed:"Completed",rejected:"Rejected",cancelled:"Cancelled"};
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const cash=n=>new Intl.NumberFormat("en-PK",{style:"currency",currency:"PKR",maximumFractionDigits:0}).format(Number(n)||0);
@@ -220,21 +220,53 @@ async function reconcilePendingCatalogMutation(){
    error.name="CatalogResponseContractError";
    throw error;
   }
+  S.catalogV3LastReconciliation={action:record.body.action,payload:record.body.payload,result};
   pendingCatalogStore.clear(record.body.request_id);
   if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=Math.max(S.catalogV3Revision||0,result.draft_revision);
   toast("A previous catalog save was safely reconciled.");
  }
  S.catalogV3RecoveryUser=S.user.id;
 }
+function catalogV3MediaOptions(){
+ const factory=window.FlameChickAdminCatalogMedia;
+ if(!factory||typeof factory.createClient!=="function"||typeof factory.createRecoveryStore!=="function")
+  throw Error("The authenticated catalog image service is unavailable. Catalog image changes are disabled.");
+ if(!S.catalogV3MediaClient){
+  S.catalogV3MediaClient=factory.createClient({
+   supabaseUrl:C.supabaseUrl,
+   bucket:C.mediaBucket,
+   apiKey:C.publishableKey,
+   getAccessToken:async()=>{
+    if(!S.session||!S.session.access_token)throw Error("Your signed-in session is unavailable. Sign in again.");
+    if(S.session.expires_at&&Date.now()>Number(S.session.expires_at)-60000)await refresh();
+    return S.session.access_token;
+   },
+   refreshSession:refresh,
+   requestResponse:window.FlameChickAdminConnection.requestResponse,
+   createUuid:window.FlameChickAdminConnection.createUuid,
+   fetchImpl:fetch,
+   timeoutMs:REQUEST_TIMEOUT_MS
+  });
+ }
+ if(!S.catalogV3MediaRecoveryStore){
+  S.catalogV3MediaRecoveryStore=factory.createRecoveryStore(
+   sessionStorage,C.sessionStorageKey+":catalog-media-pending",S.user.id
+  );
+ }
+ return {client:S.catalogV3MediaClient,recoveryStore:S.catalogV3MediaRecoveryStore,
+  userId:S.user.id,reconciliation:S.catalogV3LastReconciliation};
+}
 async function openCatalogV3(){
  await reconcilePendingCatalogMutation();
+ const mediaOptions=catalogV3MediaOptions();
  const root=$("catalogV3Root");
  if(!root)throw Error("Catalog V3 page root is missing.");
  if(!window.FlameChickAdminCatalogV3||typeof window.FlameChickAdminCatalogV3.createWorkspace!=="function")throw Error("Catalog V3 authoring module is unavailable.");
  if(!S.catalogV3Workspace)S.catalogV3Workspace=window.FlameChickAdminCatalogV3.createWorkspace();
  if(!S.catalogV3Mounted){
-  await S.catalogV3Workspace.mount(root,catalogV3Request);
+  await S.catalogV3Workspace.mount(root,catalogV3Request,mediaOptions);
   S.catalogV3Mounted=true;
+  S.catalogV3LastReconciliation=null;
  }else{
   await S.catalogV3Workspace.refresh();
  }
