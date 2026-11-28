@@ -91,3 +91,25 @@ test('pending mutation store verifies durable write before allowing request',()=
   const record={version:1,user_id:'123e4567-e89b-42d3-a456-426614174001',fingerprint:JSON.stringify({action:body.action,payload:body.payload}),created_at:123,body};
   assert.throws(()=>store.write(record),/could not verify/i);
 });
+
+
+test('malformed or contract-invalid success responses are classified as ambiguous',()=>{
+  for(const name of ['HttpResponseParseError','CatalogResponseContractError']){
+    assert.equal(isAmbiguousRequestFailure(Object.assign(Error(name),{name})),true);
+  }
+  assert.equal(connection.isDefinitelyRejected(Object.assign(Error('invalid payload'),{name:'CatalogCommandRejectedError'})),true);
+  assert.equal(connection.isDefinitelyRejected(Object.assign(Error('conflict'),{name:'HttpRequestError',status:409})),true);
+  assert.equal(connection.isDefinitelyRejected(Object.assign(Error('gateway'),{name:'HttpRequestError',status:503})),false);
+});
+
+test('malformed successful response is retried with the same idempotency request',async()=>{
+  const body={action:'catalog_product_upsert',request_id:'same-request'};
+  const seen=[];let count=0;
+  const result=await sendWithOneRetry(async request=>{
+    seen.push(request);count++;
+    if(count===1)throw Object.assign(Error('invalid JSON'),{name:'HttpResponseParseError'});
+    return {ok:true,request_id:body.request_id};
+  },body);
+  assert.equal(result.request_id,body.request_id);
+  assert.equal(seen.length,2);assert.equal(seen[0],body);assert.equal(seen[1],body);
+});
