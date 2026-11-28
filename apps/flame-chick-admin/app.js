@@ -1,7 +1,7 @@
 (() => {
 "use strict";
 const C=window.FLAME_CHICK_CONFIG, $=id=>document.getElementById(id);
-const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],catalogV3Revision:0,catalogV3Workspace:null,catalogV3Mounted:false,range:"today",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
+const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],catalogV3Revision:0,catalogV3Workspace:null,catalogV3Mounted:false,catalogV3RecoveryUser:null,range:"today",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
 const roles=["owner","admin"], labels={new:"New",accepted:"Accepted",preparing:"Preparing",ready:"Ready",out_for_delivery:"On delivery",delivered:"Delivered",collected:"Collected",served:"Served",completed:"Completed",rejected:"Rejected",cancelled:"Cancelled"};
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const cash=n=>new Intl.NumberFormat("en-PK",{style:"currency",currency:"PKR",maximumFractionDigits:0}).format(Number(n)||0);
@@ -196,7 +196,25 @@ async function catalogV3Request(action,payload,isMutation){
  if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=Math.max(S.catalogV3Revision||0,result.draft_revision);
  return result;
 }
+async function reconcilePendingCatalogMutation(){
+ if(S.catalogV3RecoveryUser===S.user.id)return;
+ const record=pendingCatalogMutationForUser();
+ if(record){
+  const response=await window.FlameChickAdminConnection.sendWithOneRetry(
+   sameBody=>staffApi("POST",null,sameBody),record.body);
+  const result=response&&response.result;
+  if(!result||result.ok===false){
+   pendingCatalogStore.clear(record.body.request_id);
+   throw Error(result&&result.error&&result.error.message||"The previous catalog save was rejected and has been safely reconciled. Review the draft before continuing.");
+  }
+  pendingCatalogStore.clear(record.body.request_id);
+  if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=Math.max(S.catalogV3Revision||0,result.draft_revision);
+  toast("A previous catalog save was safely reconciled.");
+ }
+ S.catalogV3RecoveryUser=S.user.id;
+}
 async function openCatalogV3(){
+ await reconcilePendingCatalogMutation();
  const root=$("catalogV3Root");
  if(!root)throw Error("Catalog V3 page root is missing.");
  if(!window.FlameChickAdminCatalogV3||typeof window.FlameChickAdminCatalogV3.createWorkspace!=="function")throw Error("Catalog V3 authoring module is unavailable.");
