@@ -84,7 +84,7 @@ The user has now reported the following manual checks after the Worker v8 deploy
 3. Followed the order through POS, Rider delivery, and the payment-collection stage.
 4. Reported that the complete workflow ran smoothly.
 
-This is one successful end-to-end test reported by the user. Do not overstate it as a complete multi-scenario acceptance rehearsal. It does not prove QZ Tray, the physical receipt printer, or network recovery on the actual restaurant cashier computer. The user has now confirmed that the restaurant printer has been tested and is working. Remaining hardware-specific receipt appearance refinements and broader staff/restaurant rehearsals are still pending.
+This is one successful end-to-end test reported by the user, not a complete multi-scenario acceptance rehearsal. In a separate later confirmation, the user has physically tested the restaurant printer with the current QZ setup and reports that it is working. Basic physical printing is therefore confirmed; receipt appearance refinements and broader staff/restaurant rehearsals remain pending.
 
 See the new [Restaurant Installation & Test-Data Handoff](2026-11-28-restaurant-installation-and-test-data-handoff.md) for the next-chat plan. It covers the hardware/software installation sequence, separate kitchen-ticket printing limitation, staff roles, remaining restaurant rehearsals, test-order cleanup safeguards, and the Edge Function invocation baseline.
 
