@@ -65,3 +65,14 @@ test("Admin dashboard is enabled and loaded through Staff Admin", () => {
   assert.match(app, /p_include_period_history:S\.range!=="today"/);
   assert.match(app, /const att=d\.attention_orders\|\|\[\],activeCount=num\(d,"attention_count"\)/);
 });
+
+
+test("Staff Admin handles a second 401 before parsing its response body",()=>{
+  const start=app.indexOf("async function staffApi");
+  const end=app.indexOf("function pendingCatalogMutationForUser",start);
+  const source=app.slice(start,end);
+  const second401=source.indexOf('if(response.status===401){clearSession();showAuth(true);');
+  const parse=source.indexOf('try{data=await response.json();}');
+  assert.ok(second401>=0&&parse>second401,"401 must clear the expired session before JSON parsing");
+  assert.match(source,/if\(response\.status===401\)\{await refresh\(\);response=await send\(\);\}/);
+});
