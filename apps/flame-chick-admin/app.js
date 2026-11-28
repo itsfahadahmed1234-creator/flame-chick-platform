@@ -1,7 +1,7 @@
 (() => {
 "use strict";
 const C=window.FLAME_CHICK_CONFIG, $=id=>document.getElementById(id);
-const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],catalogV3Revision:0,catalogV3Workspace:null,catalogV3Mounted:false,catalogV3RecoveryUser:null,catalogV3MediaClient:null,catalogV3MediaRecoveryStore:null,catalogV3LastReconciliation:null,range:"today",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
+const S={session:null,user:null,role:null,restaurant:null,branch:null,orders:[],products:[],variants:[],categories:[],subcategories:[],deals:[],dealComponents:[],drinkOptions:[],areas:[],settings:[],staffMembers:[],staffAudit:[],staffBranches:[],catalogV3Revision:0,catalogV3Workspace:null,catalogV3Mounted:false,catalogV3RecoveryUser:null,catalogV3MediaClient:null,catalogV3MediaRecoveryStore:null,catalogV3MediaRecoveryUser:null,catalogV3LastReconciliation:null,range:"today",dashboardData:null,dashboardBusy:false,dashboardMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date()),rushRange:"today",rushMonth:new Intl.DateTimeFormat("en-CA",{timeZone:C.timezone,year:"numeric",month:"2-digit"}).format(new Date())};
 const roles=["owner","admin"], labels={new:"New",accepted:"Accepted",preparing:"Preparing",ready:"Ready",out_for_delivery:"On delivery",delivered:"Delivered",collected:"Collected",served:"Served",completed:"Completed",rejected:"Rejected",cancelled:"Cancelled"};
 const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const cash=n=>new Intl.NumberFormat("en-PK",{style:"currency",currency:"PKR",maximumFractionDigits:0}).format(Number(n)||0);
@@ -12,7 +12,12 @@ const ago=d=>{let m=Math.max(0,Math.floor((Date.now()-new Date(d).getTime())/600
 const toast=(msg,bad)=>{let e=document.createElement("div");e.className="toast"+(bad?" error":"");e.textContent=msg;$("toastRoot").appendChild(e);setTimeout(()=>e.remove(),3500);};
 const readSession=()=>{try{return JSON.parse(sessionStorage.getItem(C.sessionStorageKey)||"null");}catch{return null;}};
 const saveSession=s=>{S.session=s;sessionStorage.setItem(C.sessionStorageKey,JSON.stringify(s));};
-const clearSession=()=>{S.session=null;sessionStorage.removeItem(C.sessionStorageKey);};
+const clearSession=()=>{
+ S.session=null;sessionStorage.removeItem(C.sessionStorageKey);
+ S.catalogV3Workspace=null;S.catalogV3Mounted=false;S.catalogV3RecoveryUser=null;
+ S.catalogV3MediaClient=null;S.catalogV3MediaRecoveryStore=null;S.catalogV3MediaRecoveryUser=null;
+ S.catalogV3LastReconciliation=null;
+};
 const headers=()=>({apikey:C.publishableKey,...(S.session&&S.session.access_token?{Authorization:"Bearer "+S.session.access_token}:{}),"Content-Type":"application/json"});
 const pendingCatalogStore=(()=>{try{return window.FlameChickAdminConnection.createPendingMutationStore(sessionStorage,C.sessionStorageKey+":catalog-pending");}catch(error){return null;}})();
 const REQUEST_TIMEOUT_MS=12000;
@@ -248,10 +253,11 @@ function catalogV3MediaOptions(){
    timeoutMs:REQUEST_TIMEOUT_MS
   });
  }
- if(!S.catalogV3MediaRecoveryStore){
+ if(!S.catalogV3MediaRecoveryStore||S.catalogV3MediaRecoveryUser!==S.user.id){
   S.catalogV3MediaRecoveryStore=factory.createRecoveryStore(
    sessionStorage,C.sessionStorageKey+":catalog-media-pending",S.user.id
   );
+  S.catalogV3MediaRecoveryUser=S.user.id;
  }
  return {client:S.catalogV3MediaClient,recoveryStore:S.catalogV3MediaRecoveryStore,
   userId:S.user.id,reconciliation:S.catalogV3LastReconciliation};
