@@ -14,9 +14,29 @@ const readSession=()=>{try{return JSON.parse(sessionStorage.getItem(C.sessionSto
 const saveSession=s=>{S.session=s;sessionStorage.setItem(C.sessionStorageKey,JSON.stringify(s));};
 const clearSession=()=>{S.session=null;sessionStorage.removeItem(C.sessionStorageKey);};
 const headers=()=>({apikey:C.publishableKey,...(S.session&&S.session.access_token?{Authorization:"Bearer "+S.session.access_token}:{}),"Content-Type":"application/json"});
-async function authPost(path,body){let r=await fetch(C.supabaseUrl+"/auth/v1/"+path,{method:"POST",headers:{apikey:C.publishableKey,"Content-Type":"application/json"},body:JSON.stringify(body)});let d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.msg||d.message||d.error_description||"Authentication failed.");return d;}
-async function refresh(){if(!S.session||!S.session.refresh_token)throw Error("Session expired. Please sign in again.");let x=await authPost("token?grant_type=refresh_token",{refresh_token:S.session.refresh_token});saveSession(Object.assign({},x,{expires_at:Date.now()+Number(x.expires_in||3600)*1000}));}
-async function getUser(){if(!S.session)S.session=readSession();if(!S.session||!S.session.access_token)throw Error("Please sign in.");if(S.session.expires_at&&Date.now()>Number(S.session.expires_at)-60000)await refresh();let r=await fetch(C.supabaseUrl+"/auth/v1/user",{headers:headers(),cache:"no-store"});if(r.status===401){await refresh();return getUser();}let u=await r.json().catch(()=>({}));if(!r.ok||!u.id)throw Error("Sign-in expired. Please sign in again.");S.user=u;return u;}
+const REQUEST_TIMEOUT_MS=12000;
+async function fetchBounded(url,options={},timeoutMs=REQUEST_TIMEOUT_MS){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
+ try{return await fetch(url,{...options,signal:controller.signal});}
+ catch(error){if(controller.signal.aborted){const timeout=new Error("The request timed out. Check your connection and retry safely.");timeout.name="TimeoutError";throw timeout;}throw error;}
+ finally{clearTimeout(timer);}
+}
+async function authPost(path,body){let r=await fetchBounded(C.supabaseUrl+"/auth/v1/"+path,{method:"POST",headers:{apikey:C.publishableKey,"Content-Type":"application/json"},body:JSON.stringify(body)});let d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.msg||d.message||d.error_description||"Authentication failed.");return d;}
+let refreshInFlight=null;
+async function refresh(){
+ if(refreshInFlight)return refreshInFlight;
+ if(!S.session||!S.session.refresh_token)throw Error("Session expired. Please sign in again.");
+ const token=S.session.refresh_token;
+ refreshInFlight=(async()=>{const x=await authPost("token?grant_type=refresh_token",{refresh_token:token});saveSession(Object.assign({},x,{expires_at:Date.now()+Number(x.expires_in||3600)*1000}));})();
+ try{await refreshInFlight;}finally{refreshInFlight=null;}
+}
+async function getUser(){
+ if(!S.session)S.session=readSession();if(!S.session||!S.session.access_token)throw Error("Please sign in.");
+ if(S.session.expires_at&&Date.now()>Number(S.session.expires_at)-60000)await refresh();
+ let r=await fetchBounded(C.supabaseUrl+"/auth/v1/user",{headers:headers(),cache:"no-store"});
+ if(r.status===401){await refresh();r=await fetchBounded(C.supabaseUrl+"/auth/v1/user",{headers:headers(),cache:"no-store"});}
+ let u=await r.json().catch(()=>({}));if(!r.ok||!u.id)throw Error("Sign-in expired. Please sign in again.");S.user=u;return u;
+}
 async function db(path,opt){if(S.session&&S.session.expires_at&&Date.now()>Number(S.session.expires_at)-60000)await refresh();let h=headers();if(opt&&opt.prefer)h.Prefer=opt.prefer;let r=await fetch(C.supabaseUrl+"/rest/v1/"+path,{method:opt&&opt.method||"GET",headers:h,body:opt&&opt.body?JSON.stringify(opt.body):undefined,cache:"no-store"});let raw=await r.text(),d=null;try{d=raw?JSON.parse(raw):null;}catch{d=raw;}if(!r.ok){if(r.status===401){clearSession();throw Error("Session expired. Sign in again.");}throw Error(d&&d.message||"Database request failed ("+r.status+").");}return d;}
 
 function managedMediaPath(path){return /^(products|categories|deals)\/[0-9a-f-]{36}\/[^/]+\.(?:jpg|jpeg|png|webp)$/i.test(String(path||""));}
@@ -134,19 +154,37 @@ function renderAll(){renderOrders();renderProducts();renderCategories();renderDe
 async function staffApi(method,query,body){
  if(!S.session||!S.session.access_token)throw Error("Your session has expired. Sign in again.");
  if(S.session.expires_at&&Date.now()>Number(S.session.expires_at)-60000)await refresh();
- const response=await fetch(C.supabaseUrl+"/functions/v1/flame-chick-staff-admin",{method,headers:{apikey:C.publishableKey,Authorization:"Bearer "+S.session.access_token,"Content-Type":"application/json"},body:method==="GET"?undefined:JSON.stringify(body||{}),cache:"no-store"});
+ const send=()=>fetchBounded(C.supabaseUrl+"/functions/v1/flame-chick-staff-admin",{method,headers:{apikey:C.publishableKey,Authorization:"Bearer "+S.session.access_token,"Content-Type":"application/json"},body:method==="GET"?undefined:JSON.stringify(body||{}),cache:"no-store"});
+ let response=await send();
+ if(response.status===401){await refresh();response=await send();}
  const data=await response.json().catch(()=>({}));
  if(response.status===401){clearSession();showAuth(true);throw Error("Your session expired. Sign in again.");}
  if(!response.ok||data.ok===false)throw Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");
  return data;
 }
+function isAmbiguousRequestFailure(error){return !!error&&(error.name==="TimeoutError"||error.name==="TypeError");}
 async function catalogV3Request(action,payload,isMutation){
- const body=isMutation
-  ?{action,payload,expected_revision:S.catalogV3Revision,request_id:staffRequestId()}
-  :Object.assign({action},payload||{});
- const response=await staffApi("POST",null,body);
+ let body;
+ if(isMutation){
+  const fingerprint=JSON.stringify({action,payload});
+  const pending=S.pendingCatalogMutation;
+  if(pending&&pending.fingerprint!==fingerprint)throw Error("A previous save has an uncertain result. Retry that exact save first; do not submit different edits until it is reconciled.");
+  body=pending?pending.body:{action,payload,expected_revision:S.catalogV3Revision,request_id:staffRequestId()};
+  if(!pending)S.pendingCatalogMutation={fingerprint,body};
+ }else body=Object.assign({action},payload||{});
+ let response;
+ try{response=await staffApi("POST",null,body);}
+ catch(error){
+  if(!isMutation||!isAmbiguousRequestFailure(error))throw error;
+  try{response=await staffApi("POST",null,body);}
+  catch(retryError){
+   if(isAmbiguousRequestFailure(retryError))throw Error("Save result is still uncertain. Retry the same unchanged save to reconcile it; a new request ID will not be generated.");
+   throw retryError;
+  }
+ }
  const result=response&&response.result;
  if(!result||result.ok===false)throw Error(result&&result.error&&result.error.message||"Catalog V3 request failed.");
+ if(isMutation)S.pendingCatalogMutation=null;
  if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=Math.max(S.catalogV3Revision||0,result.draft_revision);
  return result;
 }
