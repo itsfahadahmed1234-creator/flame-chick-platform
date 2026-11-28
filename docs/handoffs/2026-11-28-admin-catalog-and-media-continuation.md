@@ -304,3 +304,18 @@ The Admin phase is ready for user review when:
 4. Implement Catalog V3 product/category/deal upload, preview, replace, restore and remove using authenticated Storage and the secure command API; use compensation/reconciliation for interrupted uploads and metadata failures.
 5. Add object-path validation, orphan cleanup review and complete authorization/role/revision/publication tests.
 6. Keep Website promotional images separate. Do not deploy until the review branch is fully tested and explicitly approved.
+
+
+### Latest validation and media backend clarification
+
+- Verified latest CI run `46121443832` for commit `0b087f64440f9c92dcca9eb7521a8156bcf0109d`: all Admin Static Checks stages passed, including the recovered-migration test.
+- The migration recovery test checks that the exact restored SQL contains the audited product image path/object validation and does not contain destructive table/schema/function drops.
+- Read-only Production metadata confirms:
+  - `public.products` has current/previous image paths, current/previous extensions and the compatibility `image_published` field.
+  - `public.categories` and `public.deals` have current/previous image path columns.
+  - The live product draft-read internal function returns image metadata; the live product upsert internal function accepts it and verifies object existence in `storage.objects`.
+  - The live category/deal draft read and upsert functions do not currently expose or manage their image path columns. Their secure command functions need an additive patch before the same workflow can be offered for those entities.
+- The legacy `app.js` image helpers are still present, but their old Menu, Categories, Deals and Website Images navigation controls remain disabled. They are not part of the Catalog V3 workspace. They must remain disabled and must not be reused.
+- No image UI has been added to Catalog V3 yet. Product backend capability exists but is not yet wired into the V3 form. Category/deal backend capability is incomplete. **Do not ask the user to upload images yet.**
+- The exact recovered migration is committed at `e5e679d323b774f20c3441883bddf6e85c72398e`; the file was verified byte-for-byte against the live migration ledger. The latest CI-covered commit is `0b087f64440f9c92dcca9eb7521a8156bcf0109d`; documentation-only follow-up commit `75bee04cdef2125f4eeb681debd6ff334461dbf7` does not change application source.
+- Next implementation must first create a tested, additive category/deal media command migration based on the live function definitions, then wire one unified Catalog V3 media workflow for products/categories/deals. The workflow must save metadata through existing revisioned/idempotent Catalog V3 commands, upload only under the existing authenticated Admin/Owner Storage policy, and reconcile/clean up safely after interrupted uploads or metadata failures. Add preview, one-backup restore, replacement, remove, authorization, revision-conflict, and orphan-cleanup tests before considering it ready.
