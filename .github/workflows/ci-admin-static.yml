@@ -6,6 +6,7 @@ on:
       - work/production-source-audit
       - cloudflare/admin-production
       - work/admin-dashboard-release
+      - work/admin-native-catalog-2026-11-28
     paths:
       - "apps/flame-chick-admin/**"
       - "apps/flame-chick-pos/**"
@@ -65,17 +66,19 @@ jobs:
           const admin = readFileSync(root + "index.html", "utf8");
           const invite = readFileSync(root + "accept-invitation.html", "utf8");
           const inviteJs = readFileSync(root + "accept-invitation.js", "utf8");
-          const adminDraft = readFileSync(root + "flame-chick-published-menu-2026-11-23.v3-draft.json", "utf8");
-          const sourceDraft = readFileSync("ops/catalog-drafts/flame-chick-published-menu-2026-11-23.v3-draft.json", "utf8");
-          if (adminDraft !== sourceDraft) throw new Error("Admin menu draft asset differs from the authoritative review draft.");
-          for (const file of ["config.js", "app.js", "catalog-v3-admin.js", "catalog-v3-importer.js", "flame-chick-published-menu-2026-11-23.v3-draft.json", "catalog-v3-admin.css", "styles.css", "assets/flame-chick-mark.svg", "accept-invitation.html", "accept-invitation.js"]) {
+          for (const file of ["config.js", "app.js", "catalog-v3-admin.js", "catalog-v3-admin.css", "styles.css", "assets/flame-chick-mark.svg", "accept-invitation.html", "accept-invitation.js"]) {
             if (!existsSync(root + file)) throw new Error("Missing Admin asset: " + file);
           }
           if (!admin.includes('href="accept-invitation.html"')) throw new Error("Admin sign-in does not link to invitation acceptance.");
-          if (!admin.includes('data-page="catalog-v3"')) throw new Error("Catalog V3 navigation entry is missing.");
-          if (!admin.includes('id="page-catalog-v3"')) throw new Error("Catalog V3 page root is missing.");
-          if (!admin.includes('src="catalog-v3-admin.js"')) throw new Error("Catalog V3 authoring module is not linked.");
-          if (!admin.includes('src="catalog-v3-importer.js"')) throw new Error("Catalog V3 importer module is not linked.");
+          for (const page of ["menu", "categories", "deals"]) {
+            if (!admin.includes('data-page="' + page + '"')) throw new Error("Native catalog navigation entry is missing: " + page);
+          }
+          for (const rootId of ["catalogMenuRoot", "catalogCategoriesRoot", "catalogDealsRoot"]) {
+            if (!admin.includes('id="' + rootId + '"')) throw new Error("Native catalog root is missing: " + rootId);
+          }
+          if (admin.includes('data-page="catalog-v3"') || admin.includes('id="page-catalog-v3"')) throw new Error("The separate Catalog V3 Draft page must remain disabled.");
+          if (admin.includes('src="catalog-v3-importer.js"')) throw new Error("The catalog importer must not be loaded by Admin.");
+          if (!admin.includes('src="catalog-v3-admin.js"')) throw new Error("Secure native catalog editor module is not linked.");
           if (!admin.includes('href="catalog-v3-admin.css"')) throw new Error("Catalog V3 workspace stylesheet is not linked.");
           if (!invite.includes('src="accept-invitation.js"')) throw new Error("Invitation page script is not linked.");
           if (!inviteJs.includes('action: "accept_invitation"')) throw new Error("Invitation page does not invoke the acceptance action.");
