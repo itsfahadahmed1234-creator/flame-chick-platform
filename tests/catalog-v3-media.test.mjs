@@ -17,7 +17,8 @@ function imageFile(bytes,type='image/jpeg'){
     slice(start,end){
       const part=data.slice(start,end);
       return {arrayBuffer:async()=>part.buffer.slice(part.byteOffset,part.byteOffset+part.byteLength)};
-    }
+    },
+    arrayBuffer:async()=>data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength)
   };
 }
 function memoryStorage(){
@@ -100,9 +101,11 @@ test('managed paths are restricted to supported media folders and filenames',()=
 });
 
 test('file validation checks MIME, signature, empty data and the 5 MiB cap',async()=>{
-  assert.deepEqual(await media.inspectImageFile(imageFile([0xff,0xd8,0xff,0x00])),{
-    extension:'jpg',mimeType:'image/jpeg',size:4
-  });
+  const inspected=await media.inspectImageFile(imageFile([0xff,0xd8,0xff,0x00]));
+  assert.equal(inspected.extension,'jpg');
+  assert.equal(inspected.mimeType,'image/jpeg');
+  assert.equal(inspected.size,4);
+  assert.match(inspected.fingerprint,/^[0-9a-f]{64}$/);
   await assert.rejects(()=>media.inspectImageFile(imageFile([0x00,0x00,0x00],'image/jpeg')),/contents do not match/);
   await assert.rejects(()=>media.inspectImageFile(imageFile([0xff,0xd8,0xff],'image/gif')),/JPG, PNG or WebP/);
   const tooLarge={size:5*1024*1024+1,type:'image/jpeg',slice(){throw new Error('must not inspect large file');}};
@@ -117,6 +120,7 @@ test('upload uses a fresh UUID path and verifies exact Storage size and MIME',as
   assert.equal(result.path,'products/'+ENTITY_ID+'/'+UUID+'.jpg');
   assert.equal(result.size,file.size);
   assert.equal(result.mimeType,'image/jpeg');
+  assert.match(result.fingerprint,/^[0-9a-f]{64}$/);
   assert.equal(mock.objects.size,1);
   assert.equal(mock.calls.some(call=>call.method==='POST'&&call.headers['x-upsert']==='false'),true);
   assert.equal(mock.calls.some(call=>call.method==='GET'&&call.url.includes('/object/info/')),true);
@@ -180,7 +184,7 @@ test('user-bound recovery records validate the entity path, stage and account',(
   const record={
     version:1,user_id:USER_ID,kind:'products',entity_id:ENTITY_ID,
     path:'products/'+ENTITY_ID+'/'+UUID+'.jpg',
-    extension:'jpg',mimeType:'image/jpeg',size:4,
+    extension:'jpg',mimeType:'image/jpeg',size:4,fingerprint:'a'.repeat(64),
     action:'catalog_product_upsert',
     payload:{id:ENTITY_ID,image_current_path:'products/'+ENTITY_ID+'/'+UUID+'.jpg',image_previous_path:null,
       image_extension:'jpg',image_previous_extension:null,image_published:true},
@@ -205,7 +209,7 @@ test('media recovery store refuses to clear a different operation',()=>{
   const record={
     version:1,user_id:USER_ID,kind:'deals',entity_id:ENTITY_ID,
     path:'deals/'+ENTITY_ID+'/'+UUID+'.png',
-    extension:'png',mimeType:'image/png',size:4,
+    extension:'png',mimeType:'image/png',size:4,fingerprint:'b'.repeat(64),
     action:'catalog_deal_upsert',payload:{id:ENTITY_ID,image_current_path:'deals/'+ENTITY_ID+'/'+UUID+'.png',image_previous_path:null},
     stage:'linking',created_at:Date.now()
   };
