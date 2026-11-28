@@ -102,12 +102,12 @@ The absolute Supabase Logs restriction remains unchanged: do not access, run, ed
 The QZ receipt-layout release has now been merged and deployed to the existing production POS Cloudflare Worker.
 
 - Repository: `itsfahadahmed1234-creator/flame-chick-platform`
-- PR: [#2 — POS branded QZ delivery receipt](https://github.com/itsfahadah1234-creator/flame-chick-platform/pull/2)
+- PR: [#2 — POS branded QZ delivery receipt](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/pull/2)
 - Merge commit: `50eb6e40143dd8f2bf7a824001a1de50a9de7d21`
 - Isolated release branch: `release/pos-rider-delivery-optimization-2026-11-28`
 - Feature branch merged: `feature/pos-qz-receipt-layout-2026-11-28`
 - Cloudflare Worker: `flamechickpos`
-- Production URL: https://flamechickpos.itsfahadah1234-creator.workers.dev
+- Production URL: https://flamechickpos.itsfahadahmed1234-creator.workers.dev
 - Active Worker version: **9**
 - Version ID: `8b2f6ac4-0df4-4f74-84d2-c3f2b68c51d4`
 - Deployment ID: `ca57b6b0-bcdb-4ade-9c92-657fa613dafe`
