@@ -243,7 +243,6 @@ function catalogV3MediaOptions(){
    apiKey:C.publishableKey,
    getAccessToken:async()=>{
     if(!S.session||!S.session.access_token)throw Error("Your signed-in session is unavailable. Sign in again.");
-    if(S.session.expires_at&&Date.now()>Number(S.session.expires_at)-60000)await refresh();
     return S.session.access_token;
    },
    refreshSession:refresh,
