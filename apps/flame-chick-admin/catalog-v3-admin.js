@@ -246,15 +246,16 @@
     }
     function definiteMediaRejection(error){
       if(!error)return false;
+      if(error.code==='CATALOG_REVISION_CONFLICT'||error.code==='CATALOG_IDEMPOTENCY_KEY_REUSED')return false;
       if(error.name==='CatalogCommandRejectedError'||error.name==='HttpApplicationError')return true;
-      return error.name==='HttpRequestError'&&[400,403,404,409,413,415,422].includes(Number(error.status));
+      return error.name==='HttpRequestError'&&[400,403,404,413,415,422].includes(Number(error.status));
     }
     function mediaEditor(kind,record){
       if(!record||!record.id)return '<section class="fcv3-media-editor"><strong>Image management</strong><p>Save this item first. You can attach its image after it has a permanent catalog ID.</p></section>';
       const current=mediaCurrent(kind,record),previous=mediaPrevious(kind,record);
       const currentUrl=mediaClient&&current?mediaClient.publicUrl(current):null;
       const previousUrl=mediaClient&&previous?mediaClient.publicUrl(previous):null;
-      const busy=s.mediaBusy||s.pendingMedia&&s.pendingMedia.kind===kind&&s.pendingMedia.entity_id===record.id;
+      const busy=s.mediaBusy||!!s.pendingMedia;
       return '<section class="fcv3-media-editor" data-media-editor data-kind="'+kind+'" data-id="'+esc(record.id)+'">'+
         '<div class="fcv3-media-heading"><div><strong>Image and one restore point</strong><small>JPG, PNG or WebP · maximum 5 MB</small></div>'+
         '<span class="fcv3-media-state">'+(current?'Current image saved':'No current image')+'</span></div>'+
@@ -326,6 +327,9 @@
     }
     async function uploadMedia(kind,id,file){
       if(!mediaClient||!mediaRecoveryStore)throw Error('Secure catalog image management is not configured.');
+      if(s.error)throw Error('Catalog data is not verified. Refresh successfully before uploading an image.');
+      if(s.error)throw Error('Catalog data is not verified. Refresh successfully before changing an image reference.');
+      if(s.pendingMedia||mediaRecoveryStore&&mediaRecoveryStore.read())throw Error('Reconcile the pending image operation before changing another image.');
       if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
       const record=currentMediaRecord(kind,id);
       if(!record)throw Error('Refresh and reopen this catalog item before changing its image.');
@@ -927,7 +931,7 @@
       el.onclick=async event=>{
         const mediaButton=event.target.closest('[data-media-action]');
         if(mediaButton){
-          if(mediaButton.disabled||s.saving||s.mediaBusy)return;
+          if(mediaButton.disabled||s.saving||s.mediaBusy||s.error)return;
           try{await changeMediaReference(mediaButton.dataset.kind,mediaButton.dataset.id,mediaButton.dataset.mediaAction);}
           catch(error){s.error=error&&error.message||'Image change failed.';render();}
           return;
