@@ -540,8 +540,21 @@ export async function handleDeliveryApiRequest(req: Request): Promise<Response> 
   if (["picked_up", "delivered", "reject", "failed", "return_reported"].includes(action)) {
     const riderScope = await isActiveRider(user.id);
     if (riderScope.ok) {
+      let riderPresenceRefreshFailed = false;
+      // Completing or releasing a delivery must recalculate availability after
+      // the task leaves the Rider's active queue. Preserve the saved preference.
+      if (action === "delivered" || action === "reject") {
+        try {
+          const presence = await setRiderPresence(user.id, riderScope.branchId, true, false);
+          riderPresenceRefreshFailed = !presence.ok;
+        } catch {
+          riderPresenceRefreshFailed = true;
+        }
+      }
       const riderState = await readRiderState(user.id, riderScope.branchId);
-      return response(withRiderState(result.data, riderState),200);
+      const payload = withRiderState(result.data, riderState);
+      if (riderPresenceRefreshFailed) payload.rider_presence_refresh_required = true;
+      return response(payload,200);
     }
   }
   return response(result.data, 200);
