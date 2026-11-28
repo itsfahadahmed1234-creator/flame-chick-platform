@@ -175,15 +175,16 @@ async function catalogV3Request(action,payload,isMutation){
  let response;
  try{response=await staffApi("POST",null,body);}
  catch(error){
-  if(!isMutation||!isAmbiguousRequestFailure(error))throw error;
+  if(!isMutation||!isAmbiguousRequestFailure(error)){if(isMutation)S.pendingCatalogMutation=null;throw error;}
   try{response=await staffApi("POST",null,body);}
   catch(retryError){
    if(isAmbiguousRequestFailure(retryError))throw Error("Save result is still uncertain. Retry the same unchanged save to reconcile it; a new request ID will not be generated.");
+   S.pendingCatalogMutation=null;
    throw retryError;
   }
  }
  const result=response&&response.result;
- if(!result||result.ok===false)throw Error(result&&result.error&&result.error.message||"Catalog V3 request failed.");
+ if(!result||result.ok===false){if(isMutation)S.pendingCatalogMutation=null;throw Error(result&&result.error&&result.error.message||"Catalog V3 request failed.");}
  if(isMutation)S.pendingCatalogMutation=null;
  if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=Math.max(S.catalogV3Revision||0,result.draft_revision);
  return result;
