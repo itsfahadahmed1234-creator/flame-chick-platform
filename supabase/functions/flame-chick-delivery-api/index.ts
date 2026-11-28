@@ -99,10 +99,14 @@ async function setRiderPresence(userId: string, branchId: string, online: boolea
   taskQuery.set("status", "in.(accepted,out_for_delivery,failed)");
   taskQuery.set("return_confirmed_at", "is.null");
   taskQuery.set("limit", "1");
-  const activeTasks = await readAsService("delivery_tasks?" + taskQuery.toString());
+  // These read-only inputs are independent; fetch them concurrently and keep
+  // the same fail-closed checks and existing update semantics.
+  const [activeTasks,profileBefore] = await Promise.all([
+    readAsService("delivery_tasks?" + taskQuery.toString()),
+    readAsService("rider_profiles?select=accepting_jobs&user_id=eq." + userId + "&branch_id=eq." + branchId + "&is_active=eq.true&limit=1"),
+  ]);
   if (!activeTasks.ok) return { ok:false as const, status:activeTasks.status, message:"Could not verify your active delivery." };
   const busy = Array.isArray(activeTasks.data) && activeTasks.data.length > 0;
-  const profileBefore = await readAsService("rider_profiles?select=accepting_jobs&user_id=eq." + userId + "&branch_id=eq." + branchId + "&is_active=eq.true&limit=1");
   if (!profileBefore.ok || !Array.isArray(profileBefore.data) || profileBefore.data.length !== 1) return { ok:false as const, status:409, message:"Your active rider profile was not found for this branch." };
   const acceptingJobs = updatePreference ? online : profileBefore.data[0].accepting_jobs !== false;
   const availability = busy ? "busy" : online && acceptingJobs ? "available" : "offline";
@@ -254,7 +258,7 @@ async function resolveDispatchContext(userId: string): Promise<{
 }
 
 
-async function isActiveRider(userId: string, token: string, apiKey: string) {
+async function isActiveRider(userId: string) {
   const projection=await readStaffContextProjection(userId);
   if(!projection)return { ok:false as const,status:503,body:{ok:false,error:{code:"RIDER_CONTEXT_UNAVAILABLE",message:"Flame Chick Rider context is unavailable."}}};
   const riderRoles=projection.roleRows.filter(row=>row.restaurant_id===projection.restaurantId&&row.role_key==="rider"&&row.is_active===true&&typeof row.branch_id==="string");
@@ -314,7 +318,7 @@ export async function handleDeliveryApiRequest(req: Request): Promise<Response> 
     const view = (url.searchParams.get("view") ?? "dispatch").toLowerCase();
 
     if (view === "profile") {
-      const riderScope = await isActiveRider(user.id, token, apiKey);
+      const riderScope = await isActiveRider(user.id);
       if (!riderScope.ok) return response(riderScope.body, riderScope.status);
       const profileQuery = new URLSearchParams();
       profileQuery.set("select", "user_id,branch_id,rider_code,display_name,phone,availability_status,accepting_jobs,last_seen_at,is_active");
@@ -331,7 +335,7 @@ export async function handleDeliveryApiRequest(req: Request): Promise<Response> 
     }
 
     if (view === "rider") {
-      const riderScope = await isActiveRider(user.id, token, apiKey);
+      const riderScope = await isActiveRider(user.id);
       if (!riderScope.ok) return response(riderScope.body, riderScope.status);
 
       const query = new URLSearchParams();
@@ -429,7 +433,7 @@ export async function handleDeliveryApiRequest(req: Request): Promise<Response> 
 
   const action = String(body.action ?? "").toLowerCase();
   if (action === "presence") {
-    const riderScope = await isActiveRider(user.id, token, apiKey);
+    const riderScope = await isActiveRider(user.id);
     if (!riderScope.ok) return response(riderScope.body, riderScope.status);
     const online = body.online !== false;
     const result = await setRiderPresence(user.id, riderScope.branchId, online, body.update_preference === true);
@@ -438,7 +442,7 @@ export async function handleDeliveryApiRequest(req: Request): Promise<Response> 
   }
 
   if (action === "accept_offer" || action === "decline_offer") {
-    const riderScope = await isActiveRider(user.id, token, apiKey);
+    const riderScope = await isActiveRider(user.id);
     if (!riderScope.ok) return response(riderScope.body, riderScope.status);
     const offerId = String(body.offer_id ?? "");
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(offerId)) {
