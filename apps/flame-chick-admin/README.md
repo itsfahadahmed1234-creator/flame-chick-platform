@@ -2,6 +2,14 @@
 
 Static administration app.
 
+## Current continuation — 2026-11-28
+
+The next Admin work is Catalog V3 authoring and secure image/media management. Read `docs/handoffs/2026-11-28-admin-catalog-and-media-continuation.md` from the repository root before editing or enabling Admin modules.
+
+Ownership clarification: the Website work was being handled with the user in the prior conversation; the separate concurrent chat owns POS and Supabase Edge Function/backend optimization. This Admin task must not interfere with Website, POS or Rider deployments.
+
+Mandatory resource boundary: the specific Supabase log query exceeded 102 GB and must not be repeated; Log Ingestion usage was separately 0.10 GB out of 1 GB. Do not access Logs Explorer or Log Ingestion for this Admin work.
+
 - Entrypoint: `index.html`
 - Client modules: `app.js`, `config.js`, `styles.css`
 - Browser code uses only the Production Project URL and publishable key. Never add a service-role or secret key here.
