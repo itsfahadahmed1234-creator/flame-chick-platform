@@ -11,6 +11,17 @@
 
 ---
 
+## Latest Rider request-reduction checkpoint — 2026-11-28
+
+- Implemented on the isolated feature branch: authenticated `action:"sync"` in Delivery API. It validates the Rider through the existing Auth + active Rider role/branch checks, updates `last_seen_at` using server time while preserving the saved `accepting_jobs` preference, and returns only that Rider's active assigned jobs, unexpired offers, and active profile in one response.
+- Rider app now uses one combined sync at startup and every 120 seconds. Healthy Realtime remains event-driven without a second 120-second polling loop. The 30-second fallback remains for Realtime failures. Offline preference does not stop sync, so already-assigned delivery changes remain visible.
+- Successful Rider state actions and offer accept/decline now include a refreshed `rider_state` snapshot where available; the client applies it without an extra GET. If the snapshot cannot be read after the mutation, the response marks `rider_refresh_required` and the client falls back to the existing GET rather than falsely failing the successful action.
+- Existing explicit availability toggle still uses the authenticated presence action. The four-minute stale rule, 60-second offer expiry, private Realtime Broadcast, RLS, branch isolation, and `verify_jwt=false` internal Auth/CORS behavior are unchanged.
+- Regression coverage extended: Delivery API Deno mock test exercises authenticated sync and server-side presence; Node source-contract test checks combined sync, scoped task/offer reads, 120-second client cycle, and action snapshots. CI workflow now triggers when Rider app source changes.
+- Commits: Delivery API `30a50dd67148a45e48de072d693ba4ba919c5b47`; Rider client `d328ad93b243aad41c35a17c5e84e8c559fef0cb`; duplicate healthy-Realtime poll removal `2a8032816b1c6b42e41fe3b35345dac259320d4c`; Deno sync test `70694fda53e2a412b485c003cd958741a3528f6d`; Node source-contract test `5136e3564a1a79309a8b6d37043cffd466478b53`; offline sync safeguard `20657ac8ff84a05fca625b5b46fd930862be5f55`; CI trigger `2728792191a395c957d89af24d9eec65ef20e202`.
+- **Verification status:** source files and commits were written to the feature branch. The new GitHub Actions run has not yet been confirmed; do not report tests as passed until CI completes and its run is inspected. No local Deno runtime was available for executing the Deno test here.
+- No database migration, Production Edge deployment, Production test traffic, shared Website/Admin API edit, secret/Auth change, or log query was performed. Continue only on this branch; do not deploy or merge without explicit user approval.
+
 # CURRENT CONTINUATION — SUPABASE EDGE FUNCTION OPTIMIZATION (2026-11-28)
 
 ## Latest Delivery Edge invocation investigation — 2026-11-28
