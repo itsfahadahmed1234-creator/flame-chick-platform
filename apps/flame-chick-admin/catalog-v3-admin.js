@@ -230,7 +230,7 @@
       return r;
     }
     async function write(action,payload){const r=await request(action,payload,true);if(!isObj(r)||r.ok===false)throw Error('Catalog save failed.');if(Number.isSafeInteger(r.draft_revision))s.revision=r.draft_revision;return r;}
-    let mediaClient=null,mediaRecoveryStore=null,mediaUserId=null;
+    let mediaClient=null,mediaRecoveryStore=null,mediaUserId=null,getPendingMutation=null;
     function mediaCurrent(kind,record){return record&&record.image_current_path||null;}
     function mediaPrevious(kind,record){return record&&record.image_previous_path||null;}
     function mediaExtension(path){const match=String(path||'').toLowerCase().match(/\.([a-z0-9]+)$/);return match?match[1]:null;}
@@ -329,6 +329,9 @@
         }
         throw error;
       }
+      pending.stage='committed_unverified';
+      try{mediaRecoveryStore.write(pending);}catch{ /* The existing linking marker remains fail-closed if storage is unavailable. */ }
+      s.pendingMedia=pending;render();
       await verifyMediaRecord(pending.kind,pending.entity_id,result,pending.path,pending.payload.image_previous_path||null);
       mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
       s.notice='Image uploaded, verified and linked to the catalog draft. The previous image remains as the restore point; older Storage objects are retained until publication-safe cleanup is implemented.';
@@ -394,10 +397,23 @@
         await refresh();
         if(s.error)throw Error('Catalog data could not be refreshed. The image was retained and no metadata retry or cleanup was attempted.');
         const latest=currentMediaRecord(pending.kind,pending.entity_id);
-        if(pending.stage==='linking'&&mediaRecordMatchesPending(pending,latest)){
+        if((pending.stage==='linking'||pending.stage==='committed_unverified')&&mediaRecordMatchesPending(pending,latest)){
           mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
           s.notice='The image was already committed and has now been verified. No duplicate catalog update was sent.';
           return;
+        }
+        if(pending.stage==='committed_unverified'){
+          throw Error('The catalog command returned success, but the current draft does not match the confirmed image metadata. No retry or object deletion was attempted; inspect the item and reconcile this operation manually.');
+        }
+        if(pending.stage==='linking'){
+          const existing=getPendingMutation?getPendingMutation():null;
+          if(!existing){
+            pending.stage='committed_unverified';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
+            throw Error('No matching idempotency record remains for this uncertain metadata write. The image was retained; no new request ID, retry or deletion was attempted.');
+          }
+          if(existing.action!==pending.action||JSON.stringify(existing.payload)!==JSON.stringify(pending.payload)){
+            throw Error('A different catalog mutation is pending. The image was retained and no second mutation was sent.');
+          }
         }
         const stored=await mediaClient.info(pending.path);
         if(!stored){s.pendingMedia=pending;throw Error('Storage has not confirmed this upload yet. The recovery record remains; no catalog write or deletion was attempted.');}
@@ -443,9 +459,15 @@
           render();return;
         }
       }
-      if(pending.stage==='linking'&&mediaRecordMatchesPending(pending,currentMediaRecord(pending.kind,pending.entity_id))){
+      if((pending.stage==='linking'||pending.stage==='committed_unverified')&&mediaRecordMatchesPending(pending,currentMediaRecord(pending.kind,pending.entity_id))){
         mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
         s.notice='A previous image save was already committed and has been verified.';
+      }else if(pending.stage==='linking'){
+        const existing=getPendingMutation?getPendingMutation():null;
+        if(!existing||existing.action!==pending.action||JSON.stringify(existing.payload)!==JSON.stringify(pending.payload)){
+          pending.stage='committed_unverified';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
+          s.error='The image save may already have reached the database, but its matching idempotency record is unavailable. The image was preserved; no new request will be sent automatically.';
+        }
       }
       render();
     }
@@ -1031,7 +1053,7 @@
         finally{s.saving=false;render();}
       };
     }
-    return {mount:async(element,requestFn,mediaOptions={})=>{if(!element||typeof requestFn!=='function')throw Error('Catalog V3 workspace requires a root and authenticated request handler.');el=element;request=requestFn;mediaClient=mediaOptions&&mediaOptions.client||null;mediaRecoveryStore=mediaOptions&&mediaOptions.recoveryStore||null;mediaUserId=mediaOptions&&mediaOptions.userId||null;bind();await refresh();await inspectPendingMedia(mediaOptions&&mediaOptions.reconciliation||null);},refresh,getState:()=>JSON.parse(JSON.stringify(s))};
+    return {mount:async(element,requestFn,mediaOptions={})=>{if(!element||typeof requestFn!=='function')throw Error('Catalog V3 workspace requires a root and authenticated request handler.');el=element;request=requestFn;mediaClient=mediaOptions&&mediaOptions.client||null;mediaRecoveryStore=mediaOptions&&mediaOptions.recoveryStore||null;mediaUserId=mediaOptions&&mediaOptions.userId||null;getPendingMutation=mediaOptions&&mediaOptions.getPendingMutation||null;bind();await refresh();await inspectPendingMedia(mediaOptions&&mediaOptions.reconciliation||null);},refresh,getState:()=>JSON.parse(JSON.stringify(s))};
   }
   return {READ,WRITE,normalizeProductDraft,buildFixedComponentGroups,buildIncludedMappings,buildFixedDealEditDraft,isApprovedFlameHourSchedule,assertDealIdentity,eligibleChoiceProducts,verifyFixedDealDetail,createWorkspace};
 });
