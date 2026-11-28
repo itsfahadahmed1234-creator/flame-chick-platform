@@ -303,7 +303,7 @@ async function updateRiderPresence(online=true,keepalive=false,updatePreference=
   return data;
 }
 function applyRiderSnapshot(data){
-  if(!data||data.ok!==true||!Array.isArray(data.data)||!Array.isArray(data.offers))return false;
+  if(!data||!Array.isArray(data.data)||!Array.isArray(data.offers))return false;
   jobs=data.data;offers=data.offers;
   if(data.profile&&data.profile.user_id===user?.id)rider={...rider,...data.profile};
   if(typeof data.availability_status==='string')rider.availability_status=data.availability_status;
