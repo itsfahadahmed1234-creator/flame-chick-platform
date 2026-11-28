@@ -73,9 +73,11 @@ async function systemRpc(action:string,payload:Obj):Promise<unknown>{
  const x=await body(r);if(!r.ok)throw rpcErr(x);return x;
 }
 function duplicate(status:number,x:unknown):boolean{if(![400,409,422].includes(status))return false;const v=obj(x)?x:{};const s=[v.code,v.error,v.msg,v.message,v.error_description].filter(y=>typeof y==="string").join(" ").toLowerCase();return /already.?registered|already.?exists|user.?exists|email.?exists/.test(s);}
-async function sendInvite(email:string,name:string,phone:string|null):Promise<{kind:"sent";id:string}|{kind:"existing"}>{
- if(!SECRET_KEY||!redirectOk())throw new ApiError("STAFF_INVITE_NOT_CONFIGURED",503,"The secure invitation destination is not configured.");
- const r=await fetch(SUPABASE_URL+"/auth/v1/invite?redirect_to="+encodeURIComponent(REDIRECT),{method:"POST",headers:{apikey:SECRET_KEY,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({email,data:{display_name:name,...(phone?{phone}:{})}}),cache:"no-store"});
+async function sendInvite(email:string,name:string,phone:string|null,role:string):Promise<{kind:"sent";id:string}|{kind:"existing"}>{
+ let redirect:string;
+ try{redirect=getStaffInviteRedirect(role);}catch{throw new ApiError("STAFF_ROLE_INVALID",400,"Choose a supported staff invitation role.");}
+ if(!SECRET_KEY||!isSafeInviteRedirect(redirect,ORIGINS))throw new ApiError("STAFF_INVITE_NOT_CONFIGURED",503,"The secure invitation destination is not configured.");
+ const r=await fetch(SUPABASE_URL+"/auth/v1/invite?redirect_to="+encodeURIComponent(redirect),{method:"POST",headers:{apikey:SECRET_KEY,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({email,data:{display_name:name,...(phone?{phone}:{})}}),cache:"no-store"});
  const x=await body(r);if(!r.ok){if(duplicate(r.status,x))return{kind:"existing"};throw new ApiError("AUTH_INVITATION_FAILED",502,"Supabase Auth could not send the invitation. Retry from Staff Admin.");}
  const u=obj(x)&&obj(x.user)?x.user:x;if(!obj(u)||typeof u.id!=="string")throw new ApiError("AUTH_INVITATION_RESPONSE_INVALID",502,"The invitation response was incomplete. Check its status before retrying.");
  return{kind:"sent",id:u.id};
