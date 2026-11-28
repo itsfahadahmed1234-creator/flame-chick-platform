@@ -16,7 +16,7 @@ Date: 2026-11-28 (Asia/Karachi)
 ### POS Cloudflare Worker
 
 - Worker: `flamechickpos`
-- Production URL: https://flamechickpos.itsfahadahmed1234.workers.dev
+- Production URL: https://flamechickpos.itsfahadah1234.workers.dev
 - Active Worker version: **9**
 - Version ID: `8b2f6ac4-0df4-4f74-84d2-c3f2b68c51d4`
 - Deployment ID: `ca57b6b0-bcdb-4ade-9c92-657fa613dafe`
