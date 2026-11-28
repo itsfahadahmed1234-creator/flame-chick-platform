@@ -9,6 +9,15 @@
 - **No exceptions for debugging, optimization, verification, security or convenience.** Use source inspection, static analysis, local/disposable tests, narrowly scoped non-log metadata reads and browser-visible errors instead. Do not create Production traffic to produce logs.
 - Only the user can explicitly change this absolute prohibition. Until then, every new chat must obey it without asking to use even a small amount.
 
+
+## CANONICAL GITHUB OWNER — DO NOT TYPO (USER-CONFIRMED)
+
+- The exact GitHub repository owner for the Flame Chick production repository is **`itsfahadahmed1234-creator`**.
+- Correct repository: `https://github.com/itsfahadahmed1234-creator/flame-chick-platform`.
+- Never omit **`ahmed`** from this owner handle. The commonly mistyped form `itsfahadah1234-creator` is incorrect and must not be used in repository paths, URLs, clone commands, Git remotes, handoffs, workflow links, branch references or tool arguments.
+- The authenticated working GitHub account may be different; do not confuse the acting account with the repository owner. Always verify the canonical owner from the repository metadata and retain the exact spelling above.
+- This correction applies to every Flame Chick task, branch, handoff and new chat.
+
 ---
 ---
 
@@ -263,8 +272,8 @@ The editable catalog and the customer-visible catalog are separate data paths:
 
 ### Applied publication-read migration
 - `20261121155900_flame_chick_catalog_public_snapshot_read_v1`
-- Guarded workflow: https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44922905879
-- Edge Function static checks: https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44922820111
+- Guarded workflow: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44922905879
+- Edge Function static checks: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44922820111
 
 ### Publish and website-switch rules — mandatory next stage
 1. Build a full catalog compiler/validator. It must validate products, variants, modifiers, deals, price completeness, component selection ranges, variant-option maps, schedule windows, timezones and branch availability before publication.
@@ -535,7 +544,7 @@ The first migration's SQL had already been applied before its ledger record was 
 
 The FK-index migration was then applied through the official Supabase CLI v3 `db push` workflow after a dry-run confirmed that `20261121062000_flame_chick_catalog_fk_indexes.sql` was the only pending migration. The workflow uses explicit `--remote=<project-ref>`, pinned CLI v3.2.0, the repository Actions secrets, and a non-interactive `--yes` confirmation after the dry-run gate.
 
-GitHub Actions run [44892500555](https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44892500555) completed successfully. Independent Supabase verification confirms migration versions `20261121061000` and `20261121062000` are recorded, all 15 expected indexes exist in `public`, and all 15 are owned by `postgres`. No catalog business rows were inserted. The index migration did not alter RLS, policies, grants or Realtime publication.
+GitHub Actions run [44892500555](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44892500555) completed successfully. Independent Supabase verification confirms migration versions `20261121061000` and `20261121062000` are recorded, all 15 expected indexes exist in `public`, and all 15 are owned by `postgres`. No catalog business rows were inserted. The index migration did not alter RLS, policies, grants or Realtime publication.
 
 Next: build secure Admin/Owner catalog command APIs, immutable published catalog snapshots, audit/revision controls, and migrate Admin UI away from direct table writes. Keep public catalog reads separate from authenticated writes. Do not seed live menu data until the catalog UI and command validation are ready.
 
@@ -633,9 +642,9 @@ Completed source hygiene:
 - Verified the active Admin, Website, POS and Rider runtime files contain no Pizza Bite branding or HFP identifiers (base64 image data is excluded from semantic checks).
 
 Static CI results:
-- [Admin static checks passed](https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44881645889).
-- [Website static checks passed](https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44881563119).
-- [POS and Rider static checks passed](https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44881805138).
+- [Admin static checks passed](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44881645889).
+- [Website static checks passed](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44881563119).
+- [POS and Rider static checks passed](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44881805138).
 
 Important compatibility note: the source rename of `flame_chick_admin_dashboard` and `flame_chick_admin_reassign_delivery` does not create those database RPCs. The related Admin dashboard and POS delivery-reassignment server contracts still need implementation and QA before those operations can be enabled.
 
@@ -2261,7 +2270,7 @@ Implementation already made:
 - Removed redundant \`/auth/v1/user\` round-trip from Staff Admin function; it remains \`verify_jwt=true\`, and database command independently derives \`auth.uid()\` and enforces Admin/Owner.
 - Commit: \`6e21262ce052189e196332db464014b02435b3fc\`.
 - Added CI assertion for this contract: \`95f56d26f2124b42992c7c49107d6ed828082d8a\`.
-- Static CI run: https://github.com/itsfahadah1234-creator/flame-chick-platform/actions/runs/44907048541 (check final status before claiming green).
+- Static CI run: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/44907048541 (check final status before claiming green).
 
 Architecture decisions:
 - Keep four domain functions (catalog, order, delivery, staff-admin), not per-action functions.
