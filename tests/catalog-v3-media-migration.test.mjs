@@ -40,3 +40,9 @@ test('category/deal media review draft patches only the four existing audited fu
   assert.doesNotMatch(sql, /CREATE\s+POLICY|ALTER\s+POLICY|\bGRANT\b|\bREVOKE\b/i);
   assert.match(sql, /DO NOT APPLY TO PRODUCTION/);
 });
+
+test('category image read patch is scoped only to category_kind rows, not subcategories', async () => {
+  const sql = await readFile(new URL('../docs/drafts/2026-11-28-flame-chick-category-deal-media-v1.sql', import.meta.url), 'utf8');
+  assert.match(sql, /v_original := \$old\$\s*'category_kind', s\.category_kind,[\s\S]*?'is_active', s\.is_active,[\s\S]*?'created_at', s\.created_at,\$old\$;\s*v_replacement := \$new\$\s*'category_kind', s\.category_kind,[\s\S]*?'image_current_path', s\.image_current_path,[\s\S]*?'image_previous_path', s\.image_previous_path,[\s\S]*?'created_at', s\.created_at,\$new\$;/);
+  assert.match(sql, /CATEGORY_MEDIA_READ_JSON_ANCHOR_MISMATCH/);
+});
