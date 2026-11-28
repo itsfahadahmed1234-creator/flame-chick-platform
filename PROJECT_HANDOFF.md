@@ -1,24 +1,21 @@
-# 🚫 MANDATORY NEW-CHAT SAFETY DIRECTIVE — DO NOT TOUCH SUPABASE LOG INGESTION
+# 🚫 MANDATORY NEW-CHAT SAFETY DIRECTIVE — DO NOT REPEAT THE 102 GB SUPABASE LOG QUERY
 
-**This is an explicit user instruction and a hard, project-wide restriction. It applies to every new ChatGPT conversation, every assistant/agent, and every Flame Chick task unless the user explicitly changes it. Read and obey it before using any Supabase tool.**
+**This is an explicit user instruction for every new ChatGPT conversation, assistant/agent, and Flame Chick task. Read it before carrying out Supabase diagnostics.**
 
-The user has expressly prohibited all further interaction with **Supabase Log Ingestion**. **Important clarification of the figures (confirmed by the user): it was the log query that exceeded 102 GB; separately, Log Ingestion usage was 0.10 GB out of a 1 GB allowance. These are different measurements and must never be conflated.** Do not investigate, inspect, query, read, retrieve, export, sample, filter, analyze, configure, enable, disable, or otherwise touch Supabase Log Ingestion again.
+The user clarified the measurements:
 
-This prohibition includes, but is not limited to:
+- **The Supabase log query exceeded 102 GB.** This is the expensive query that must not be repeated.
+- **Log ingestion used 0.10 GB out of its 1 GB allowance.** Ingestion did **not** use 102 GB; these are separate measurements.
 
-- **Never call** Supabase `query_logs`, Logs Explorer, project log-query endpoints, log search/export APIs, or equivalent functionality through a connector, dashboard, CLI, SDK, direct API, browser, or another tool.
-- Do not read or query existing Supabase Edge Function, Postgres, Auth, API gateway, Realtime, or other project logs through the Log Ingestion system.
-- Do not create, edit, enable, disable, test, or reconfigure log drains, log ingestion, log routing, telemetry, analytics, retention, or related integrations/settings.
-- Do not generate synthetic requests, test traffic, retries, health checks, or diagnostic events against Production for the purpose of producing or examining logs.
-- Do not run monitoring or diagnostics that are likely to create substantial log-ingestion volume. Do not try another interface or indirect route to obtain the same logs.
-- Do not reset log/statistics data or make logging-related configuration changes.
+**Do not rerun, edit, clone, recreate, broaden, optimize, or troubleshoot the specific 102 GB log query.** Do not use Supabase Logs Explorer, `query_logs`, a CLI/API/connector, or another interface to repeat or reproduce that expensive query. Do not run an equivalent broad log query as a workaround. If a future task appears to require new Supabase log-query activity, stop and obtain the user's explicit approval first.
 
-**No exceptions based on convenience or diagnostic value.** Do not touch Log Ingestion even if it appears useful for debugging, performance analysis, security review, or verification. Do not ask the user to repeat this instruction. Only the user can explicitly lift or narrow this restriction.
+This restriction is specifically about the expensive log query. **Do not misstate it as a Log Ingestion overage or claim ingestion exceeded its 1 GB allowance.** The recorded ingestion usage was 0.10 GB / 1 GB. No log-ingestion configuration change is implied or authorized by these figures.
 
-For future optimization and troubleshooting, prefer GitHub source inspection, static analysis, local tests, disposable test environments, and carefully scoped read-only database catalog inspection where appropriate. Do not send test traffic to the Production project. Never claim that a check was performed if it was not. Historical observations gathered before this restriction may be treated only as historical context; do not refresh them by querying logs.
+For optimization and troubleshooting, prefer GitHub source inspection, static analysis, local tests, disposable test environments, and carefully scoped read-only database catalog inspection where appropriate. Avoid unnecessary Production test traffic and diagnostics that create avoidable logging volume. Never claim a check was performed if it was not. Any historical log-query observations are historical context only; do not refresh them by rerunning the expensive query.
 
-**Startup requirement:** Every new chat must read this directive in `PROJECT_HANDOFF.md` before using Supabase tools, and must read `docs/handoffs/2026-11-28-supabase-edge-optimization-continuation.md` when continuing the Edge Function optimization. If a proposed task appears to require Log Ingestion, stop and explain the limitation rather than accessing it.
+**Startup requirement:** Every new chat must read this directive in `PROJECT_HANDOFF.md` before Supabase diagnostics, and must read `docs/handoffs/2026-11-28-supabase-edge-optimization-continuation.md` when continuing Edge Function optimization.
 
+---
 ---
 
 # CURRENT CONTINUATION — SUPABASE EDGE FUNCTION OPTIMIZATION (2026-11-28)
