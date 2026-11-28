@@ -1,15 +1,17 @@
-# 🚫 ABSOLUTE FLAME CHICK RESTRICTION — ZERO SUPABASE LOG QUERIES / ZERO LOG INGESTION ACCESS
+# 🚫 ABSOLUTE FLAME CHICK RESTRICTION — PROHIBITED SUPABASE LOG QUERY
 
-**This is an explicit user instruction for every branch, new chat, assistant/agent and Flame Chick task. It overrides any older or narrower logging instructions below. Read this before carrying out any Supabase diagnostics.**
+**This is an explicit user instruction for every branch, new chat, assistant/agent and Flame Chick task. Read it before carrying out Supabase diagnostics. It supersedes older logging wording in historical notes below.**
 
-- **ZERO Supabase log-query usage is permitted.** Do not run even a tiny query, sample, one-off check, test, partial scan, filtered query or minimal-volume request. Do not use a fraction of a query or try to make one cheaper.
-- Do not open or use Supabase Logs Explorer, query_logs, log-query APIs, CLI commands, connectors, dashboards, SDKs, browser tools or any alternate/indirect interface to access or retrieve Supabase logs. Do not inspect, read, search, export, sample, filter, explain, troubleshoot or verify Supabase log data.
-- **Do not access or touch Supabase Log Ingestion either.** Do not inspect ingestion usage, create/change/disable log drains, alter retention/routing/telemetry, or otherwise read or modify Log Ingestion or logging configuration.
-- Historical clarification only: the **log query** exceeded **102 GB**; separately, **Log Ingestion usage was 0.10 GB out of a 1 GB allowance**. These are different measurements. Do not conflate them or query either system to refresh the figures.
-- **No exceptions for debugging, optimization, verification, security or convenience.** Use GitHub source inspection, static analysis, local/disposable tests, narrowly scoped non-log metadata reads and browser-visible errors instead. Do not create Production traffic to produce logs.
-- Only the user can explicitly change this absolute prohibition. Until then, every new chat must obey it without asking to use even a small amount.
+- **The Supabase log query that exceeded 102 GB must not be touched.** Do not rerun, open, edit, recreate, broaden, sample, filter, optimize, troubleshoot, or reproduce it or its workload.
+- Do not use Supabase Logs Explorer, `query_logs`, log-query APIs, CLI commands, connectors, SDKs, dashboards, browser interfaces, or alternate/indirect tools to run or retrieve Supabase log queries. Do not try a tiny, filtered, sampled, or supposedly cheaper version.
+- **Log Ingestion is separate and is not categorically prohibited.** The user explicitly permits accessing Log Ingestion data/usage when relevant. This read access is distinct from the prohibited log query; it does not authorize opening or running the prohibited query.
+- Historical usage clarification: **Log Ingestion was 0.10 GB out of a 1 GB allowance**; the **102 GB** figure belongs to the log query. Never conflate the two.
+- Read/access Log Ingestion information only when it is relevant. Do not create, change, disable, or reconfigure log drains, retention, routing, telemetry, or ingestion settings without separate explicit authorization.
+- Do not create Production traffic to generate telemetry. Prefer GitHub source inspection, static analysis, local/disposable tests, scoped non-log metadata reads, and browser-visible errors.
+- The query prohibition remains in force unless the user explicitly changes it. The Log Ingestion read allowance does not weaken that prohibition.
 
-**Startup requirement:** Every new chat must read this directive in PROJECT_HANDOFF.md before Supabase diagnostics and read docs/handoffs/2026-11-28-supabase-edge-optimization-continuation.md when continuing Edge Function optimization.
+**Startup requirement:** Every new chat must read this directive in `PROJECT_HANDOFF.md` before Supabase diagnostics and read `docs/handoffs/2026-11-28-supabase-edge-optimization-continuation.md` when continuing Edge Function optimization.
+
 ---
 ---
 
@@ -17,16 +19,20 @@
 
 ## Latest Delivery Edge invocation investigation — 2026-11-28
 
-- Supabase Usage screenshot: 5,915 Edge Function invocations for the current billing cycle (19 Nov–19 Dec 2026), 500,000 Free allowance, 0 overage. User changed selector to Flame Chick Production and confirmed the same total. This is project-wide Edge Function usage, not Delivery API-only.
-- The 28 Nov daily figure was 170; user explicitly confirmed no orders were placed that day. Attribute the issue first to background/app traffic, not orders. Usage refreshes hourly, so this was the displayed partial-day figure.
-- Source estimate on production branch with one Rider and one POS session, healthy Realtime: Rider presence about 30 Delivery requests/hour; Rider jobs/offers refresh about 30/hour; POS refresh about 60/hour because inbox refresh already loads dispatch and current scheduler then loads dispatch again. Total about 120 Delivery API invocations/hour, before app events/login/resume. This is an estimate, not an observed per-function breakdown. 30-second fallback polling can increase it.
-- Isolated fix on feature branch: POS event-specific refreshes (orders_changed vs delivery_changed), removal of duplicate dispatch fetch, and assignment/return UI refresh coalescing. Preserves 120s healthy safety refresh and 30s Realtime fallback.
-- Regression workflow 46112617777 succeeded on commit 393f6f8625a5b84c8a3d07f63d75298b3f7ffa49, including new request-count/scheduler tests and existing POS regression checks. https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/46112617777
-- This fix is not deployed. No Production code, database, secrets/Auth, orders or customer data changed. Continue on supabase-edge-optimization-2026-11-28 only.
-- Next: design a single authenticated Rider sync request that safely reconciles presence + jobs/offers, then remove immediate post-action GETs only if the response can return a safe refreshed state. Preserve Rider-only offer isolation, 60-second offer expiry, online presence freshness and 30-second Realtime fallback. Do not simply lengthen heartbeat intervals: POS treats Rider last_seen older than 240 seconds as stale.
-- Parallel ownership remains: another ChatGPT chat owns Website/Admin. Do not edit/deploy those apps or shared Order/Catalog/Staff Admin APIs, RPCs, contracts or settings. No merge/rebase/cherry-pick/deploy without explicit approval.
-- No log queries and no Log Ingestion access under any circumstances. Free plan only; no migrations or Production traffic for this optimization.
-
+- Supabase Usage displayed **5,915 Edge Function invocations** for the 19 Nov–19 Dec 2026 billing cycle, with 500,000 included on the Free plan and 0 overage. The user selected Flame Chick Production and confirmed the same total. This is project-wide usage, not a Delivery API-only count.
+- The 28 Nov daily figure displayed **170 invocations**; the user confirmed that no orders were placed that day. This points to background/app traffic as a material contributor. Usage refreshes hourly, so the screenshot figure may have been a partial-day total.
+- Source-based estimate before the POS fix, with one Rider and one POS session and healthy Realtime: Rider presence about 30 Delivery requests/hour; Rider jobs/offers refresh about 30/hour; POS duplicate dispatch scheduling about 60/hour — approximately **120 Delivery API invocations/hour**, plus about 30 Order API requests/hour. This was an estimate, not a measured per-function breakdown.
+- The isolated POS fix removes the duplicate dispatch request: on the same healthy-Realtime example, POS now contributes about 30 Delivery requests/hour, while Rider presence and jobs/offers remain about 30/hour each. Updated estimate: approximately **90 Delivery API invocations/hour plus about 30 Order API requests/hour**. Event-driven activity, logins/resumes, more sessions and Realtime fallback polling can change the total; this is not an observed production rate.
+- POS optimization regression workflow **46112617777** passed on code commit `393f6f8625a5b84c8a3d07f63d75298b3f7ffa49`. The workflow covered existing mocked POS/receipt/QZ/business contracts and the new delivery-refresh request-count/scheduler regression.
+- The POS change is **not deployed**. No Production code, database, secrets/Auth, orders, customer data, or Production test traffic was changed for this optimization. Continue only on `supabase-edge-optimization-2026-11-28`.
+- Rider periodic traffic remains the next candidate: presence POST immediately and every 120 seconds; a healthy-Realtime jobs/offers safety refresh also runs immediately after subscription and every 120 seconds. If Realtime is unavailable, the Rider and POS recovery refresh falls back to 30-second polling.
+- The current availability contract treats `rider_profiles.last_seen_at` older than **240 seconds (4 minutes)** as stale; a future timestamp more than 15 seconds ahead is also rejected. Do not simply increase the heartbeat interval or adopt a 5-minute online threshold without redesigning and testing the existing availability contract.
+- A possible next design is one authenticated Rider sync request/RPC that reconciles server-timestamped presence with that rider's own jobs/offers. This is only a design candidate, not implemented or approved. Do not allow direct browser table updates or weaken RLS/role/branch isolation. Preserve the rider's online preference, busy/active-task calculation, offer isolation, 60-second offer expiry, and updates for already-assigned work even when the rider's online preference is off.
+- Rider state-changing actions currently issue a follow-up jobs refresh. Remove those requests only if a safe refreshed state can be returned/reconciled; a broadcast alone is not sufficient when Realtime is disconnected.
+- Keep the existing private Supabase Realtime Broadcast model. Do not replace it with broad `postgres_changes` subscriptions without a separate security/performance review.
+- The 60-second offer expiry behavior and server-side expiry sweep are separate safeguards; preserve both while optimizing. The server sweep is currently reached through POS Dispatch view activity.
+- Another ChatGPT conversation owns Website and Admin. Do not edit/deploy those apps or shared Order/Catalog/Staff Admin APIs, RPCs, contracts, or settings. No merge/rebase/cherry-pick/deploy without explicit approval.
+- Supabase remains on the Free plan. No migration, Production traffic, shared API change, or rollout is authorized by this optimization task.
 
 Continue the existing Flame Chick Production project. Do not restart, rebuild the project from assumptions, or deploy unreviewed changes.
 
