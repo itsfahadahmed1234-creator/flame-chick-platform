@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - work/production-source-audit
+      - work/rider-invitation-callback-only
     paths:
       - "apps/flame-chick-admin/**"
       - "apps/flame-chick-pos/**"
@@ -17,6 +18,7 @@ on:
       - "supabase/migrations/20261125083051_flame_chick_staff_main_branch_rider_provisioning.sql"
       - "tests/staff-main-branch-rider-provisioning.test.mjs"
       - "tests/admin-invitation-acceptance.test.mjs"
+      - "tests/rider-invitation-acceptance.test.mjs"
       - "tests/admin-navigation-access.test.mjs"
       - "tests/catalog-v3-admin.test.mjs"
       - "tests/catalog-v3-importer.test.mjs"
@@ -49,7 +51,7 @@ jobs:
           node --check apps/flame-chick-admin/catalog-v3-admin.js
           node --check apps/flame-chick-admin/catalog-v3-importer.js
           node --check apps/flame-chick-admin/accept-invitation.js
-          node --test tests/admin-invitation-acceptance.test.mjs tests/admin-navigation-access.test.mjs tests/catalog-v3-admin.test.mjs tests/catalog-v3-importer.test.mjs tests/edge-function-contract-hygiene.test.mjs tests/staff-admin-origin-policy.test.mjs tests/staff-admin-role-boundary.test.mjs tests/staff-main-branch-rider-provisioning.test.mjs
+          node --test tests/admin-invitation-acceptance.test.mjs tests/rider-invitation-acceptance.test.mjs tests/admin-navigation-access.test.mjs tests/catalog-v3-admin.test.mjs tests/catalog-v3-importer.test.mjs tests/edge-function-contract-hygiene.test.mjs tests/staff-admin-origin-policy.test.mjs tests/staff-admin-role-boundary.test.mjs tests/staff-main-branch-rider-provisioning.test.mjs
 
       - name: Verify static page assets and invitation wiring
         run: |

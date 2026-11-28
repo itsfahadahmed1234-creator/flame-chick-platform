@@ -27,13 +27,13 @@ test("Rider availability renderer does not reference a removed pending variable"
   assert.match(riderHtml, /btn\.textContent=effectiveStatus===/);
 });
 
-test("Rider job loading does not wait for Realtime to initialize", () => {
+test("Rider initial delivery sync does not wait for Realtime to initialize", () => {
   assert.match(
     riderHtml,
-    /startRiderRealtime\(\)\.catch\([\s\S]*?await loadJobs\(true\)/
+    /startRiderRealtime\(\)\.catch\([\s\S]*?startRiderSync\(\);\s*await syncRiderState\(true\)/
   );
-  assert.doesNotMatch(riderHtml, /await startRiderRealtime\(\);\s*await loadJobs\(true\)/);
-});
+  assert.doesNotMatch(riderHtml, /await startRiderRealtime\(\);\s*await syncRiderState\(true\)/);
+});;
 
 test("database enforces Main and rejects multi-branch staff assignments", () => {
   assert.match(migration, /lower\(pg_catalog\.btrim\(b\.branch_code\)\)='main'/);
