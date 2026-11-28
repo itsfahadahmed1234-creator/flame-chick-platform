@@ -275,9 +275,29 @@
   }
 
   function center(value, width) {
-    const text = cleanText(value).slice(0, width);
-    const left = Math.max(0, Math.floor((width - text.length) / 2));
-    return ' '.repeat(left) + text;
+    // Alignment is controlled by ESC a; never add manual padding on top of it.
+    const requestedWidth = Number(width);
+    const maxWidth = Number.isFinite(requestedWidth) ? Math.max(1, Math.floor(requestedWidth)) : 48;
+    return cleanText(value).slice(0, maxWidth);
+  }
+
+  function paymentMethodText(value) {
+    const raw = cleanText(value).replace(/[_-]+/g, ' ').toLowerCase();
+    if (!raw) return '';
+    const known = {
+      'cash on delivery': 'Cash on Delivery',
+      'cod': 'Cash on Delivery',
+      'cash': 'Cash',
+      'easypaisa': 'Easypaisa',
+      'jazzcash': 'JazzCash',
+      'bank transfer': 'Bank Transfer',
+      'card': 'Card'
+    };
+    if (known[raw]) return known[raw];
+    return raw.split(' ').map(function (word, index) {
+      if (index > 0 && (word === 'on' || word === 'of' || word === 'and' || word === 'to')) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    }).join(' ');
   }
 
   function rightPair(label, value, width) {
@@ -335,6 +355,12 @@
             const left = Math.floor((canvas.width - width) / 2);
             const top = Math.floor((canvas.height - height) / 2);
             context.drawImage(image, left, top, width, height);
+            // The existing mark is white artwork for dark UI backgrounds. Thermal paper is white.
+            // Recolor only visible pixels to black and retain the transparent background.
+            context.globalCompositeOperation = 'source-in';
+            context.fillStyle = '#000000';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.globalCompositeOperation = 'source-over';
             const dataUrl = canvas.toDataURL('image/png');
             const comma = dataUrl.indexOf(',');
             const encoded = comma >= 0 ? dataUrl.slice(comma + 1) : '';
@@ -372,21 +398,61 @@
     const width = 48;
     const ESC = '\x1B';
     const GS = '\x1D';
-    const fmt = function (value) {
-      return 'Rs ' + (Number(value) || 0).toLocaleString('en-PK', { maximumFractionDigits: 0 });
-    };
     const rows = [
       ESC + '\x40',
-      ESC + '\x74' + '\x00',
-      ESC + '\x61' + '\x01',
-      ESC + '\x45' + '\x01',
-      center('FLAME CHICK', width),
-      ESC + '\x45' + '\x00'
+      ESC + '\x74' + '\x00'
     ];
+
+    function bold(enabled) {
+      return ESC + '\x45' + (enabled ? '\x01' : '\x00');
+    }
+
+    function size(value) {
+      return GS + '\x21' + String.fromCharCode(value || 0);
+    }
+
+    function addCentered(value, options) {
+      const settings = options || {};
+      const textSize = Number(settings.size) || 0;
+      const columns = (textSize & 0x10) ? 24 : width;
+      rows.push(
+        ESC + '\x61' + '\x01',
+        size(textSize),
+        bold(Boolean(settings.bold)),
+        center(value, columns),
+        bold(false),
+        size(0),
+        ESC + '\x61' + '\x00'
+      );
+    }
+
+    function addCenteredBlock(value, options) {
+      wrap(value, width).forEach(function (line) { addCentered(line, options); });
+    }
+
+    function addPair(fieldLabel, value, options) {
+      const settings = options || {};
+      const textSize = Number(settings.size) || 0;
+      const columns = (textSize & 0x10) ? 24 : width;
+      rows.push(
+        size(textSize),
+        bold(Boolean(settings.bold)),
+        rightPair(fieldLabel, value, columns),
+        bold(false),
+        size(0)
+      );
+    }
 
     function addField(fieldLabel, value) {
       if (value === undefined || value === null || String(value).trim() === '') return;
-      wrap(fieldLabel + ': ' + value, width).forEach(function (row) { rows.push(row); });
+      wrap(fieldLabel + ': ' + value, width).forEach(function (line) { rows.push(line); });
+    }
+
+    function addIndentedBlock(value, indent) {
+      const spaces = Math.max(1, Math.min(6, Number(indent) || 2));
+      wrap(value, width - spaces).forEach(function (line) {
+        rows.push(' '.repeat(spaces) + line);
+      });
     }
 
     function itemPriceRows(itemLabel, amount) {
@@ -399,48 +465,39 @@
       return out;
     }
 
-    [
-      'Flame Chick, Main Kamra Road Opposite to Zellbury, Attock',
-      'Phone: +923358044164'
-    ].forEach(function (value) {
-      wrap(value, width).forEach(function (row) { rows.push(row); });
-    });
+    // The existing white brand mark is recolored to black on a transparent canvas
+    // before QZ emits the ESC/POS raster image.
+    addCentered('FLAME CHICK', { size: 0x11, bold: true });
+    addCenteredBlock('Address: Flame Chick, Main Kamra Road Opposite to Zellbury, Attock');
+    addCentered('Email: hanzlaawanx@gmail.com');
+    addCentered('Phone: +923358044164');
 
-    rows.push(
-      '',
-      ESC + '\x45' + '\x01',
-      center('*** ORIGINAL BILL ***', width),
-      ESC + '\x45' + '\x00'
-    );
+    rows.push('');
+    addCentered('*** ORIGINAL BILL ***', { size: 0x01, bold: true });
 
     const id = order.serverOrderNumber || order.OrderNumber || order.invoiceNumber ||
       order.InvoiceNumber || order.serverOrderId || order.OrderID || order.localOrderId || 'POS Order';
-    rows.push(center('Invoice #' + id, width));
+    addCentered('Invoice #' + id);
 
     const fulfillment = String(order.fulfillmentType || order.FulfillmentType || 'Takeaway').toLowerCase();
     const isDelivery = fulfillment.indexOf('delivery') >= 0;
     const isDineIn = fulfillment.indexOf('dine') >= 0;
-    rows.push(
-      ESC + '\x45' + '\x01',
-      center(isDineIn ? 'DINE-IN' : (isDelivery ? 'DELIVERY' : 'TAKEAWAY'), width),
-      ESC + '\x45' + '\x00',
-      '',
-      ESC + '\x61' + '\x00'
-    );
-
-    const metadata = [
-      ['Placed', receiptDateText(order.createdAt || order.DateTime)],
-      ['Cashier', order.cashierName || order.CashierName || '']
-    ];
-    if (isDineIn) {
-      metadata.push(['Guests Served', order.guestsServed ?? order.GuestsServed ?? '']);
-      metadata.push(['Table', order.tableNumber || order.TableNumber || '']);
-    }
-    metadata.forEach(function (pair) {
-      if (pair[1] !== '' && pair[1] !== null && pair[1] !== undefined) {
-        wrap(rightPair(pair[0], pair[1], width), width).forEach(function (row) { rows.push(row); });
-      }
+    addCentered(isDineIn ? 'DINE-IN' : (isDelivery ? 'DELIVERY' : 'TAKEAWAY'), {
+      size: 0x11,
+      bold: true
     });
+    rows.push('');
+
+    const placed = receiptDateText(order.createdAt || order.DateTime);
+    const cashier = order.cashierName || order.CashierName || '';
+    if (placed) addPair('Placed', placed);
+    if (cashier) addPair('Cashier', cashier);
+    if (isDineIn) {
+      const guests = order.guestsServed ?? order.GuestsServed ?? '';
+      if (guests !== '' && guests !== null && guests !== undefined) addPair('Guests Served', guests);
+      const table = order.tableNumber || order.TableNumber || '';
+      if (table) addPair('Table', table, { size: 0x11, bold: true });
+    }
 
     if (isDelivery) {
       addField('Customer', order.customerName || order.CustomerName || '');
@@ -455,7 +512,9 @@
 
     rows.push(
       '-'.repeat(width),
+      bold(true),
       rightPair('Item', 'Price', width),
+      bold(false),
       '-'.repeat(width)
     );
 
@@ -467,11 +526,13 @@
       const price = Number(item.price ?? item.Price) || 0;
       const labelText = quantity + 'x ' + name +
         (price > 0 ? ' @' + price.toLocaleString('en-PK', { maximumFractionDigits: 0 }) : '');
-      itemPriceRows(labelText, fmt(lineTotal(item))).forEach(function (row) { rows.push(row); });
-      const detail = Array.isArray(item.contents)
-        ? item.contents.join(', ')
+      itemPriceRows(labelText, 'Rs ' + (Number(lineTotal(item)) || 0).toLocaleString('en-PK', { maximumFractionDigits: 0 }))
+        .forEach(function (line) { rows.push(line); });
+
+      const details = Array.isArray(item.contents)
+        ? item.contents.filter(Boolean).join(', ')
         : (item.description || item.Description || '');
-      if (detail) wrap('  ' + detail, width).forEach(function (row) { rows.push(row); });
+      if (details) addIndentedBlock(details, 2);
     });
 
     rows.push('-'.repeat(width));
@@ -490,41 +551,34 @@
     const total = hasSuppliedTotal && Number.isFinite(suppliedTotal) && suppliedTotal >= 0
       ? suppliedTotal
       : Math.max(0, subtotal + deliveryFee - discount);
+    const fmt = function (value) {
+      return 'Rs ' + (Number(value) || 0).toLocaleString('en-PK', { maximumFractionDigits: 0 });
+    };
 
-    rows.push(rightPair('Price', fmt(subtotal), width));
-    if (isDelivery) rows.push(rightPair('Delivery Charges', fmt(deliveryFee), width));
-    if (discount > 0) rows.push(rightPair('Discount', fmt(discount), width));
-    rows.push(
-      ESC + '\x45' + '\x01',
-      rightPair('Grand Total', fmt(total), width),
-      ESC + '\x45' + '\x00'
-    );
+    addPair('Price', fmt(subtotal));
+    if (isDelivery) addPair('Delivery Charges', fmt(deliveryFee));
+    if (discount > 0) addPair('Discount', fmt(discount));
+    addPair('Grand Total', fmt(total), { size: 0x01, bold: true });
 
-    const method = order.paymentMethod || order.PaymentMethod || 'Cash';
+    const rawMethod = order.paymentMethod || order.PaymentMethod ||
+      order.proposedPaymentMethod || order.ProposedPaymentMethod || 'Cash';
+    const method = paymentMethodText(rawMethod);
     const status = String(order.paymentStatus || order.PaymentStatus || '').toLowerCase();
     const rawPaid = Number(order.paidAmount ?? order.PaidAmount);
     const hasPaid = Number.isFinite(rawPaid) && rawPaid > 0;
     const isPaid = status === 'paid' || (hasPaid && rawPaid >= total && total > 0);
     const paid = hasPaid ? rawPaid : (isPaid ? total : 0);
     rows.push('');
-    if (isPaid || paid > 0) rows.push(rightPair(method, fmt(paid), width));
-    else rows.push(rightPair('Payment', method, width));
+    if (isPaid || paid > 0) addPair(method || 'Payment collected', fmt(paid), { size: 0x01, bold: true });
+    else addPair('Payment', method || 'Not collected', { bold: true });
 
     if (isPaid) {
-      rows.push(
-        ESC + '\x61' + '\x01',
-        ESC + '\x45' + '\x01',
-        center('* PAID *', width),
-        ESC + '\x45' + '\x00',
-        ESC + '\x61' + '\x00'
-      );
+      addCentered('* PAID *', { size: 0x11, bold: true });
     } else if (status === 'unpaid' || status === 'pending' || paid > 0) {
       const balanceValue = Number(order.balanceDue ?? order.BalanceDue);
       const balance = Number.isFinite(balanceValue) ? balanceValue : Math.max(0, total - paid);
-      rows.push(
-        rightPair('Balance Due', fmt(balance), width),
-        center('* UNPAID *', width)
-      );
+      addPair('Balance Due', fmt(balance), { bold: true });
+      addCentered('* UNPAID *', { size: 0x11, bold: true });
     }
 
     const notes = order.notes || order.Notes;
@@ -533,10 +587,11 @@
       addField('Note', notes);
     }
 
-    rows.push('', '', '', '');
+    rows.push('');
+    addCentered('Thank you for ordering from Flame Chick!');
     // Preserve the previously verified feed and partial-cut command for the iTech cutter.
-    const cutterCommand = GS + '\x56\x42\x00';
-    return rows.join('\n') + '\n' + cutterCommand;
+    rows.push('', '', '', '');
+    return rows.join('\n') + '\n' + GS + '\x56\x42\x00';
   }
 
   async function buildReceiptData(order, label) {
@@ -974,6 +1029,8 @@
       buildReceiptImageEntry: buildReceiptImageEntry,
       buildReceiptData: buildReceiptData,
       wrap: wrap,
+      center: center,
+      paymentMethodText: paymentMethodText,
       encodeCp437Ascii: encodeCp437Ascii,
       formatEscPosPayload: formatEscPosPayload
     }
