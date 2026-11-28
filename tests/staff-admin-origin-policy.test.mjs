@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { staffRpcErrorMessage } from "../supabase/functions/flame-chick-staff-admin/invitation-error-messages.mjs";
 import {
   isAllowedRequestOrigin,
   isSafeInviteRedirect,
@@ -206,4 +207,17 @@ test("Rider Cloudflare origin is included in exact CORS allowlist", () => {
   assert.equal(configured.has(CLOUDFLARE_PRODUCTION_RIDER_ORIGIN), true);
   assert.equal(isAllowedRequestOrigin(CLOUDFLARE_PRODUCTION_RIDER_ORIGIN, configured), true);
   assert.equal(staffCorsHeaders(CLOUDFLARE_PRODUCTION_RIDER_ORIGIN, configured)["Access-Control-Allow-Origin"], CLOUDFLARE_PRODUCTION_RIDER_ORIGIN);
+});
+
+
+test("invitation RPC failures explain whether to cancel or finalize without sending duplicate email", () => {
+  assert.equal(
+    staffRpcErrorMessage("STAFF_INVITATION_ALREADY_OPEN"),
+    "An invitation for this email is already open. Refresh the staff list and use or cancel the existing invitation before creating another."
+  );
+  assert.equal(
+    staffRpcErrorMessage("STAFF_INVITATION_FINALIZE_NOT_AVAILABLE"),
+    "This invitation has no linked Auth account, so it cannot be finalized. Cancel the failed record and create a new invitation only after verifying the email address."
+  );
+  assert.match(staffRpcErrorMessage("STAFF_ADMIN_FORBIDDEN"), /STAFF_ADMIN_FORBIDDEN/);
 });
