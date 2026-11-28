@@ -144,6 +144,43 @@ test('mapping builder fails closed for missing component options or non-fixed de
   }), /one fixed-price variant/i);
 });
 
+test('native catalog tabs issue only bounded reads for the selected view', async () => {
+  const makeRoot = () => ({innerHTML:'',onclick:null,onchange:null,onsubmit:null});
+  const calls = [];
+  const request = async (action,args,isMutation) => {
+    calls.push({action,args,isMutation});
+    const items = action === 'catalog_deal_collections_list'
+      ? [{id:'50000000-0000-4000-8000-000000000001',name_en:'Deals'}]
+      : [];
+    return {ok:true,items,draft_revision:4};
+  };
+  const menu = admin.createWorkspace();
+  await menu.mount(makeRoot(),request,'menu');
+  assert.deepEqual(calls.map(call=>call.action).sort(),['catalog_categories_list','catalog_products_list']);
+  assert.ok(calls.every(call=>call.isMutation===false));
+  assert.deepEqual(calls.find(call=>call.action==='catalog_categories_list').args,{limit:50});
+  assert.deepEqual(calls.find(call=>call.action==='catalog_products_list').args,{limit:25});
+
+  calls.length=0;
+  const categories = admin.createWorkspace();
+  await categories.mount(makeRoot(),request,'categories');
+  assert.deepEqual(calls.map(call=>call.action).sort(),['catalog_categories_list','catalog_subcategories_list']);
+  assert.ok(calls.every(call=>call.isMutation===false));
+  assert.deepEqual(calls.find(call=>call.action==='catalog_subcategories_list').args,{limit:50});
+
+  calls.length=0;
+  const deals = admin.createWorkspace();
+  await deals.mount(makeRoot(),request,'deals');
+  assert.deepEqual(calls.map(call=>call.action).sort(),[
+    'catalog_categories_list','catalog_deal_collections_list','catalog_deals_list',
+    'catalog_products_list','catalog_schedule_sets_list'
+  ]);
+  assert.deepEqual(calls.find(call=>call.action==='catalog_products_list').args,{limit:25});
+  assert.deepEqual(calls.find(call=>call.action==='catalog_deals_list').args,{
+    collection_id:'50000000-0000-4000-8000-000000000001',limit:25
+  });
+});
+
 test('the Admin workspace exposes only finite catalog actions, with no publish or rollback action', () => {
   assert.deepEqual(Object.keys(admin.READ).sort(), [
     'categories', 'collections', 'dealDetail', 'deals', 'products', 'scheduleDetail', 'schedules', 'subcategories'
