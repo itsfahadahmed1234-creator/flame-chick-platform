@@ -8,7 +8,7 @@ The next Admin work is Catalog V3 authoring and secure image/media management. R
 
 Ownership clarification: the Website work was being handled with the user in the prior conversation; the separate concurrent chat owns POS and Supabase Edge Function/backend optimization. This Admin task must not interfere with Website, POS or Rider deployments.
 
-Mandatory resource boundary: the specific Supabase log query exceeded 102 GB and must not be repeated; Log Ingestion usage was separately 0.10 GB out of 1 GB. Do not access Logs Explorer or Log Ingestion for this Admin work.
+**ABSOLUTE logging boundary: ZERO Supabase log-query usage and ZERO Log Ingestion access.** No query, sample, partial scan, tiny test, filtered query, Logs Explorer, `query_logs`, API/CLI/connector, ingestion inspection or logging configuration access. The historical query exceeded 102 GB; separately, Log Ingestion was 0.10 GB out of 1 GB. Neither system may be accessed at all for this work.
 
 - Entrypoint: `index.html`
 - Client modules: `app.js`, `config.js`, `styles.css`
