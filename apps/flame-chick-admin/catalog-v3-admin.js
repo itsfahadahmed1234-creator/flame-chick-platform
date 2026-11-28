@@ -335,8 +335,8 @@
       let pending=null;
       try{
         const plan=await mediaClient.prepareUpload(kind,id,file);
-        const current=mediaCurrent(kind,record);
-        const payload=mediaPayload(kind,record,plan.path,current);
+        const current=mediaCurrent(kind,record),backup=current||mediaPrevious(kind,record);
+        const payload=mediaPayload(kind,record,plan.path,backup);
         pending={version:1,user_id:mediaUserId,kind,entity_id:id,path:plan.path,extension:plan.extension,
           mimeType:plan.mimeType,size:plan.size,action:mediaAction(kind),payload,stage:'uploading',created_at:Date.now()};
         mediaRecoveryStore.write(pending);s.pendingMedia=pending;render();
@@ -411,7 +411,8 @@
       if(reconciliation&&reconciliation.action===pending.action&&
          JSON.stringify(reconciliation.payload)===JSON.stringify(pending.payload)){
         const record=pending.kind==='products'?reconciliation.result&&reconciliation.result.record&&reconciliation.result.record.product:
-          pending.kind==='categories'?reconciliation.result&&reconciliation.result.record:null;
+          pending.kind==='categories'?reconciliation.result&&reconciliation.result.record:
+          reconciliation.result&&reconciliation.result.record&&reconciliation.result.record.deal;
         if(record&&record.id===pending.entity_id&&record.image_current_path===pending.path&&
            record.image_previous_path===(pending.payload.image_previous_path||null)&&
            (pending.kind!=='products'||(record.image_extension===pending.extension&&record.image_previous_extension===(mediaExtension(pending.payload.image_previous_path)||null)&&record.image_published===true))){
