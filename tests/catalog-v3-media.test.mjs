@@ -129,6 +129,19 @@ test('upload uses a fresh UUID path and verifies exact Storage size and MIME',as
   assert.equal(mock.calls.some(call=>String(call.headers.Authorization).includes('service_role')),false);
 });
 
+test('a resumed upload rejects a different file even when MIME type and size match',async()=>{
+  const mock=mockClient();
+  const original=imageFile([0xff,0xd8,0xff,0x01]);
+  const plan=await mock.client.prepareUpload('products',ENTITY_ID,original);
+  const different=imageFile([0xff,0xd8,0xff,0x02]);
+  await assert.rejects(()=>mock.client.uploadPrepared(plan,different),error=>{
+    assert.equal(error.name,'MediaFileValidationError');
+    return true;
+  });
+  assert.equal(mock.getPostCount(),0);
+  assert.equal(mock.objects.size,0);
+});
+
 test('ambiguous upload response reconciles by checking the exact object before failing',async()=>{
   const mock=mockClient({ambiguousUpload:true});
   const result=await mock.client.upload('categories',ENTITY_ID,imageFile([0xff,0xd8,0xff,0x04]));
@@ -227,6 +240,8 @@ test('Catalog V3 wires media through secured catalog commands, not direct table 
   assert.match(source,/mediaEditor\('deals'/);
   assert.match(source,/write\(mediaAction\(kind\),payload\)/);
   assert.match(source,/Check and resume image operation/);
+  assert.match(source,/data-media-resume-upload/);
+  assert.match(source,/resumePendingUpload/);
   assert.match(source,/committed_unverified/);
   assert.match(source,/getPendingMutation/);
   assert.match(source,/No Storage object was deleted/);
