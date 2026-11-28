@@ -153,10 +153,10 @@ async function staffApi(method,query,body){
  const send=()=>fetchBounded(C.supabaseUrl+"/functions/v1/flame-chick-staff-admin",{method,headers:{apikey:C.publishableKey,Authorization:"Bearer "+S.session.access_token,"Content-Type":"application/json"},body:method==="GET"?undefined:JSON.stringify(body||{}),cache:"no-store"});
  let response=await send();
  if(response.status===401){await refresh();response=await send();}
+ if(response.status===401){clearSession();showAuth(true);throw Error("Your session expired. Sign in again.");}
  let data;
  try{data=await response.json();}
  catch(cause){const error=new Error("The Staff Admin response was not valid JSON.");error.name="HttpResponseParseError";error.cause=cause;throw error;}
- if(response.status===401){clearSession();showAuth(true);throw Error("Your session expired. Sign in again.");}
  if(!response.ok){const failure=new Error(data&&data.error&&data.error.message||"Staff request failed ("+response.status+").");failure.name="HttpRequestError";failure.status=response.status;throw failure;}
  if(!data||typeof data!=="object"||Array.isArray(data)) {const error=new Error("The Staff Admin response has an invalid shape.");error.name="HttpResponseParseError";throw error;}
  if(data.ok===false){const error=new Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");error.name="CatalogCommandRejectedError";error.code=data.error&&data.error.code;throw error;}
