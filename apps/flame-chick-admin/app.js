@@ -16,10 +16,7 @@ const clearSession=()=>{S.session=null;sessionStorage.removeItem(C.sessionStorag
 const headers=()=>({apikey:C.publishableKey,...(S.session&&S.session.access_token?{Authorization:"Bearer "+S.session.access_token}:{}),"Content-Type":"application/json"});
 const REQUEST_TIMEOUT_MS=12000;
 async function fetchBounded(url,options={},timeoutMs=REQUEST_TIMEOUT_MS){
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
- try{return await fetch(url,{...options,signal:controller.signal});}
- catch(error){if(controller.signal.aborted){const timeout=new Error("The request timed out. Check your connection and retry safely.");timeout.name="TimeoutError";throw timeout;}throw error;}
- finally{clearTimeout(timer);}
+ return window.FlameChickAdminConnection.requestResponse(url,options,timeoutMs,fetch);
 }
 async function authPost(path,body){let r=await fetchBounded(C.supabaseUrl+"/auth/v1/"+path,{method:"POST",headers:{apikey:C.publishableKey,"Content-Type":"application/json"},body:JSON.stringify(body)});let d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.msg||d.message||d.error_description||"Authentication failed.");return d;}
 const refresh=window.FlameChickAdminConnection.createSingleFlight(async()=>{
