@@ -15,11 +15,12 @@ Do not assume that restaurant installation or live operational readiness is comp
 ### POS
 - URL: https://flamechickpos.itsfahadahmed1234.workers.dev
 - Cloudflare Worker: `flamechickpos`
-- Active version: **8**
-- Version ID: `a6145175-caa0-4138-ba53-f5c7782d147d`
-- Deployment ID: `79e98bf7-6bbb-480d-bcd0-6fb357c7a52f`
-- Production deployment workflow run [46128209921](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/46128209921) succeeded.
-- POS Worker/refresh regression: **13 passed, 0 failed**.
+- Active version: **9**
+- Version ID: `8b2f6ac4-0df4-4f74-84d2-c3f2b68c51d4`
+- Deployment ID: `ca57b6b0-bcdb-4ade-9c92-657fa613dafe`
+- Previous version 8 rollback point: `a6145175-caa0-4138-ba53-f5c7782d147d`
+- Production deployment workflow run [46140147550](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/46140147550) succeeded; Cloudflare reports 100% traffic on version 9.
+- Receipt release regression workflow [46140147656](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/46140147656) succeeded, including POS tests, build and Wrangler dry-run.
 
 ### Rider
 - URL: https://flamechickrider.pages.dev
@@ -46,7 +47,7 @@ The user confirmed that they:
 5. Completed the end-to-end workflow including the payment-collection stage.
 6. Reported that the whole workflow ran smoothly.
 
-Treat this as a **successful single end-to-end test reported by the user**, not proof that every operational scenario or the actual restaurant hardware has passed. QZ Tray has not yet been confirmed on the physical restaurant cashier computer/printer.
+Treat this as a **successful single end-to-end test reported by the user**, not proof that every operational scenario has passed. The user has now separately reported that the actual restaurant printer was tested and is working with the current QZ setup. Basic physical printing is therefore confirmed by the user; receipt appearance/layout optimization remains the next task.
 
 ## Restaurant installation plan — no on-premises server required
 
@@ -70,9 +71,9 @@ Start with one cashier terminal. Add more terminals only after the first termina
 6. Install QZ Tray from its official source: https://qz.io/download?os=windows and keep it running.
 7. In POS, open **System & Data → Printing**.
 8. Choose **Find Windows Printers**, select the receipt-printer queue, enable the QZ Tray direct-print preference, save, and send a clearly identified test receipt.
-9. Verify printing after a POS refresh and after a QZ Tray/computer restart.
+9. The user has completed a physical printer test and reports that it is working. The next chat should optimize receipt layout rather than repeat basic printer installation. Still verify persistence after a later POS refresh/QZ restart if that behavior has not already been exercised.
 
-QZ Tray on the user's current computer does not mean it is installed on the restaurant's computer. Repeat local setup at the restaurant.
+QZ Tray setup is now confirmed working with the restaurant printer by the user's physical test. Any additional cashier computer still needs its own local QZ Tray and printer setup.
 
 ### Important current kitchen-printing limitation
 - The current POS defaults to Counter Receipt enabled and Kitchen KOT disabled.
@@ -164,9 +165,67 @@ ORDER BY o.created_at;
 ## Suggested next-chat sequence
 
 1. Read this document and the linked release checkpoint before taking action.
-2. Ask whether the restaurant has the Windows cashier PC and receipt printer ready; hardware availability has not been confirmed yet.
-3. Plan on-site setup for the cashier PC, Windows printer driver, QZ Tray, and one genuine test receipt.
-4. Decide how kitchen KOT will be handled, since separate direct kitchen printing is not yet verified.
-5. Complete remaining operational rehearsals: dine-in, takeaway, simultaneous orders, rider decline/reassignment, 60-second offer expiry, failed delivery/physical return confirmation, role isolation, and disconnect/reconnect recovery.
-6. Separately inspect and prepare the safe test-order cleanup; first settle whether any real money was involved. Do not execute the delete script until approved.
-7. Later obtain the refreshed Edge Function invocation number from usage counters only; keep Supabase Logs untouched.
+2. Begin the new chat with the specific task: **optimize the QZ thermal receipt layout** on the deployed v9 POS. Read both handoffs and inspect current source before editing.
+3. Preserve the currently working restaurant printer/QZ setup. Use the user's actual printed receipt and observations to refine the 80mm layout, logo, header, delivery details/charges, item wrapping, totals, payment block, footer, paper feed and cut behavior.
+4. Keep changes isolated to POS receipt printing and regression tests. Run POS test suite, build and Wrangler dry-run before deployment. Version 9 remains the known rollback point until a subsequent verified deploy.
+5. Decide how kitchen KOT will be handled, since separate direct kitchen printing is not yet verified.
+6. Complete remaining operational rehearsals: dine-in, takeaway, simultaneous orders, rider decline/reassignment, 60-second offer expiry, failed delivery/physical return confirmation, role isolation, and disconnect/reconnect recovery.
+7. Separately inspect and prepare the safe test-order cleanup; first settle whether any real money was involved. Do not execute the delete script until approved.
+8. Later obtain the refreshed Edge Function invocation number from usage counters only; keep Supabase Logs untouched.
+
+
+---
+
+## Addendum — 2026-11-28 POS v9 receipt release and physical printer test
+
+The QZ receipt changes have been merged and deployed to the existing Cloudflare POS Worker.
+
+- GitHub repository: `itsfahadahmed1234-creator/flame-chick-platform`
+- PR #2: https://github.com/itsfahadahmed1234-creator/flame-chick-platform/pull/2 — merged.
+- Merge commit: `50eb6e40143dd8f2bf7a824001a1de50a9de7d21`.
+- Release branch: `release/pos-rider-delivery-optimization-2026-11-28`.
+- Feature branch merged: `feature/pos-qz-receipt-layout-2026-11-28`.
+- Production POS URL: https://flamechickpos.itsfahadah1234-creator.workers.dev
+- Active Worker version: **9** (`8b2f6ac4-0df4-4f74-84d2-c3f2b68c51d4`).
+- Deployment ID: `ca57b6b0-bcdb-4ade-9c92-657fa613dafe`.
+- Cloudflare confirms 100% traffic on version 9.
+- Previous version 8 remains the rollback point: `a6145175-caa0-4138-ba53-f5c7782d147d`.
+- Production deploy workflow [46140147550](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/46140147550) — success.
+- POS/Rider release checks [46140147656](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/46140147656) — success.
+- The receipt-specific workflow passed regressions, POS build and Wrangler dry-run before deployment.
+
+### What v9 changes in QZ receipt printing
+
+- Existing Flame Chick receipt logo is included through printer-compatible ESC/POS image output.
+- Receipt structure follows the POS receipt renderer more closely.
+- Delivery orders show available customer delivery information and a **Delivery Charges** row.
+- Dine-in and takeaway omit delivery-only details/charges.
+- Legacy surcharge presentation is removed.
+- Existing payment details, totals, feed and cut logic are retained.
+
+### Physical printer status
+
+The user has tested the printer at the restaurant and confirms that it is working with the current setup. Record the physical printer/basic QZ printing path as working. Do not confuse that with final receipt-layout acceptance: the user wants the next task to optimize the visual/print output further.
+
+### Next new-chat task: optimize thermal receipt output
+
+This is the immediate next task. Do not restart system installation, redesign POS, or move to order cleanup first.
+
+1. Read this handoff and the linked POS/Rider/Delivery Release Checkpoint.
+2. Inspect the existing v9 receipt implementation on the release branch before making changes.
+3. Keep the current working printer, Generic / Text Only Windows queue, QZ Tray connection and existing certificate arrangement intact unless a specific fault is demonstrated.
+4. Compare the printed output against the user's reference and optimize:
+   - proper 80mm print width, margins, line spacing and alignment;
+   - logo dimensions, clarity and centered header;
+   - restaurant contact and invoice metadata;
+   - delivery customer name, phone, address, area and instructions;
+   - Delivery Charges and grand total, never a Surcharge row;
+   - item names, modifiers, quantities, price columns and long-text wrapping;
+   - payment method/status and footer;
+   - feed length and automatic cutter command.
+5. Ask the user to share a clear photo of the latest printed receipt or describe the specific layout defects. Do not guess at visual changes that cannot be seen.
+6. Make receipt-only changes within POS source/tests. Do not modify Website, Admin, Rider, Supabase, order APIs, database schema, Auth, secrets, or shared contracts.
+7. Run the full POS regression suite, build and Wrangler dry-run. Deploy only after successful verification and preserve Worker v9 as the rollback point.
+8. Obtain user's confirmation from the actual physical print before marking receipt layout accepted.
+
+The separate kitchen KOT limitation, remaining operational rehearsals, safe test-order cleanup process, Edge Function usage baseline and all hard prohibitions below remain in force.
