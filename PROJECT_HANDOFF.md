@@ -5734,3 +5734,11 @@ See `docs/handoffs/2026-11-27-cloudflare-pos-hosting-continuation.md` for the de
 - The user also requests a Cloudflare-side archive. At the start of the next task, inspect whether an appropriate **private** Cloudflare storage resource already exists. If none exists, evaluate a private R2 bucket for the minutes archive and confirm its current free allowance/cost implications before provisioning. Do not incur charges or enable a paid plan/add-on without the user's explicit approval.
 - Never put internal project minutes, credentials, personal/customer data, or private operational notes in `apps/flame-chick-pos/dist`, Workers Static Assets, a public URL, or the POS Worker's public response. Do not bind the minutes archive to the live POS Worker or alter its runtime for note storage.
 - Keep backups synchronized: add/update the Markdown minutes in GitHub and, once a private Cloudflare destination is safely available, copy the same version there. Record the Cloudflare bucket/object path and last-sync timestamp in the handoff. Do not claim the Cloudflare copy exists until it has been verified by reading it back.
+
+## Rider availability reconciliation follow-up — 2026-11-28
+
+- Careful review found a regression introduced by returning Rider action snapshots inline: successful `delivered` and `reject` actions could bypass the prior client `loadJobs()` path that recalculated availability after an active task left the Rider queue. This could leave the Rider UI marked busy.
+- Delivery API now recalculates presence after `delivered` and `reject` using server time and `update_preference=false`, preserving the Rider's saved `accepting_jobs` preference. The refreshed action snapshot therefore carries the recalculated availability when successful.
+- If the presence recalculation fails, the API sets `rider_presence_refresh_required`; the Rider client then uses its existing authenticated GET reload/reconciliation path.
+- Added source-contract assertions for the API and client fallback. Commits: `2721e76`, `59b25f4`, `261be26`. CI for these commits is pending; do not call this verified until the actual Actions run passes.
+- No schema/migration, Production deploy, Production request, Auth/secret change, or log query. Continue to honor the Website/Admin workstream boundary and the absolute 102 GB log-query restriction.
