@@ -649,7 +649,7 @@ async function getActiveAccountRoles(userId,token){
 async function signOut(message=''){
   const token=session?.access_token;
   markRiderOfflineBestEffort();
-  stopRiderPresence();
+  stopRiderSync();
   stopRiderRealtime();
   if(token){
     try{
@@ -741,7 +741,7 @@ $('availabilityBtn').addEventListener('click',async()=>{
     if(!nextOnline){
       await updateRiderPresence(false,false,true);
       riderWantsOnline=false;
-      stopRiderPresence();
+      // Keep periodic sync active while offline so assigned work remains visible.
       // Keep the rider's own private channel alive for already-assigned work.
       // Availability preference only prevents new offers; it must not suppress
       // changes to a current delivery while the rider is offline.
@@ -772,10 +772,10 @@ $('connection').addEventListener('click',()=>{});
   initRiderPwa();
   $('installAppBtn').addEventListener('click',promptRiderAppInstall);
   setConnection(navigator.onLine,'Connecting');
-  window.addEventListener('online',()=>{setConnection(true,riderRealtimeConnected?'Live updates':'Reconnecting live updates');if(session){if(riderWantsOnline)startRiderPresence();startRiderRealtime();loadJobs(true);}});
+  window.addEventListener('online',()=>{setConnection(true,riderRealtimeConnected?'Live updates':'Reconnecting live updates');if(session){startRiderSync();startRiderRealtime();syncRiderState(true);}});
   window.addEventListener('offline',()=>setConnection(false,'Offline'));
   window.addEventListener('pagehide',()=>markRiderOfflineBestEffort());
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&session&&riderWantsOnline){updateRiderPresence(true).catch(e=>console.warn('Rider presence resume failed.',e.message));}});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&session){syncRiderState(false);}});
   const authCallback=readAuthCallback();
   if(authCallback?.error){showLogin('The email link could not be completed. '+authCallback.error+' Use Set / reset password to request a fresh link.');return;}
   if(authCallback?.session){
