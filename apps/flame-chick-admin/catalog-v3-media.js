@@ -31,6 +31,13 @@
   function isTarget(kind,id){
     return CATALOG_KIND_RE.test(String(kind||""))&&UUID_RE.test(String(id||""));
   }
+  async function fileFingerprint(file){
+    const cryptoApi=typeof globalThis!=="undefined"?globalThis.crypto:null;
+    if(!cryptoApi||!cryptoApi.subtle||typeof cryptoApi.subtle.digest!=="function"||typeof file.arrayBuffer!=="function")
+      throw fail("Secure file fingerprinting is unavailable in this browser. Image upload is disabled.","MediaFileValidationError");
+    const digest=await cryptoApi.subtle.digest("SHA-256",await file.arrayBuffer());
+    return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,"0")).join("");
+  }
   async function inspectImageFile(file){
     if(!file||typeof file!=="object"||!Number.isSafeInteger(file.size)||file.size<1)
       throw fail("Choose a non-empty image file.","MediaFileValidationError");
@@ -46,7 +53,7 @@
       bytes[8]===0x57&&bytes[9]===0x45&&bytes[10]===0x42&&bytes[11]===0x50;
     if((type.signature==="jpeg"&&!jpeg)||(type.signature==="png"&&!png)||(type.signature==="webp"&&!webp))
       throw fail("The file contents do not match the selected image type.","MediaFileValidationError");
-    return {extension:type.extension,mimeType:file.type,size:file.size};
+    return {extension:type.extension,mimeType:file.type,size:file.size,fingerprint:await fileFingerprint(file)};
   }
   async function readJson(response){
     const raw=await response.text();
@@ -79,6 +86,7 @@
          !previousValid||!productFieldsValid||
          !Number.isSafeInteger(record.created_at)||record.created_at<0||
          !TYPES[record.mimeType]||TYPES[record.mimeType].extension!==record.extension||
+         typeof record.fingerprint!=="string"||!/^[0-9a-f]{64}$/.test(record.fingerprint)||
          !Number.isSafeInteger(record.size)||record.size<1||record.size>MAX_BYTES)
         throw fail("The saved image recovery record is invalid. Do not upload another image or remove this object until it is reconciled.","MediaRecoveryRecordError");
       const encoded=JSON.stringify(record);
@@ -175,14 +183,14 @@
       const fileId=createUuid();
       if(!UUID_RE.test(String(fileId||"")))throw fail("Secure image identifiers are unavailable.","MediaPathValidationError");
       const path=kind+"/"+id+"/"+fileId+"."+inspected.extension;
-      return Object.freeze({kind,id,path,extension:inspected.extension,mimeType:inspected.mimeType,size:inspected.size});
+      return Object.freeze({kind,id,path,extension:inspected.extension,mimeType:inspected.mimeType,size:inspected.size,fingerprint:inspected.fingerprint});
     }
     async function uploadPrepared(plan,file){
       if(!plan||!isTarget(plan.kind,plan.id)||!isManagedPath(plan.path)||
          !plan.path.startsWith(plan.kind+"/"+plan.id+"/"))
         throw fail("The pending image path is invalid.","MediaPathValidationError");
       const inspected=await inspectImageFile(file);
-      if(inspected.extension!==plan.extension||inspected.mimeType!==plan.mimeType||inspected.size!==plan.size)
+      if(inspected.extension!==plan.extension||inspected.mimeType!==plan.mimeType||inspected.size!==plan.size||inspected.fingerprint!==plan.fingerprint)
         throw fail("The selected image no longer matches the reserved upload.","MediaFileValidationError");
       const responseUrl=baseUrl+"/storage/v1/object/"+encodeURIComponent(bucket)+"/"+encodePath(plan.path);
       let response=null,uploadFailure=null;
@@ -222,7 +230,7 @@
           (cleanupError?" Cleanup failed; retain this orphan path: "+plan.path:""),
           "MediaUploadValidationError",{path:plan.path,cleanupError});
       }
-      return {path:plan.path,extension:plan.extension,mimeType:plan.mimeType,size:plan.size};
+      return {path:plan.path,extension:plan.extension,mimeType:plan.mimeType,size:plan.size,fingerprint:plan.fingerprint};
     }
     async function upload(kind,id,file){
       const plan=await prepareUpload(kind,id,file);
