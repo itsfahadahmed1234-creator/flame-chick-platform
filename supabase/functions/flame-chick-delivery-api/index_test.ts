@@ -135,7 +135,7 @@ Deno.test("Delivery API preserves Auth and Rider checks while overlapping presen
         syncBody?.profile?.user_id !== userId || syncBody?.availability_status !== "available") {
       throw new Error("Authenticated Rider sync must return presence, profile, jobs and offers together: " + JSON.stringify(syncBody));
     }
-    if (patchCount !== 2) throw new Error("Combined Rider sync must update server-timestamped presence exactly once.");
+    if (Number(patchCount) !== 2) throw new Error("Combined Rider sync must update server-timestamped presence exactly once.");
   } finally {
     globalThis.fetch = originalFetch;
     for (const name of envNames) {
