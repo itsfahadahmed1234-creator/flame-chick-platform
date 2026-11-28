@@ -106,6 +106,7 @@ async function bootstrap(){
   const allowed=["dashboard","staff","delivery","menu","categories","deals"].includes(button.dataset.page);
   button.disabled=!allowed;
   if(!allowed){button.title="This module will be enabled after its secure production API is completed.";button.setAttribute("aria-disabled","true");}
+  else{button.removeAttribute("title");button.removeAttribute("aria-disabled");}
  });
  const old=$("tenantGate");if(old)old.remove();
  nav("dashboard");
