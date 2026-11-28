@@ -89,5 +89,5 @@ test('pending mutation store verifies durable write before allowing request',()=
   const store=createPendingMutationStore(storage,'pending');
   const body={action:'catalog_product_upsert',payload:{},expected_revision:0,request_id:'123e4567-e89b-42d3-a456-426614174000'};
   const record={version:1,user_id:'123e4567-e89b-42d3-a456-426614174001',fingerprint:JSON.stringify({action:body.action,payload:body.payload}),created_at:123,body};
-  assert.throws(()=>store.write(record),/could not verify/);
+  assert.throws(()=>store.write(record),/could not verify/i);
 });
