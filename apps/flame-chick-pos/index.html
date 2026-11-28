@@ -4748,13 +4748,17 @@ function normalizeReceiptOrder(order){
     return {...it,quantity,price,lineTotal:Number(it.lineTotal??it.LineTotal??it['Line Total'])||price*quantity};
   });
   const subtotal=items.reduce((sum,it)=>sum+(Number(it.lineTotal)||0),0);
-  const storedSubtotal=Number(order?.subtotal??order?.Subtotal);
-  const receiptSubtotal=Number.isFinite(storedSubtotal)&&storedSubtotal>=0&&storedSubtotal===subtotal?storedSubtotal:subtotal;
+  const rawStoredSubtotal=order?.subtotal??order?.Subtotal;
+  const storedSubtotal=Number(rawStoredSubtotal);
+  const hasStoredSubtotal=rawStoredSubtotal!==undefined&&rawStoredSubtotal!==null&&rawStoredSubtotal!=='';
+  const receiptSubtotal=hasStoredSubtotal&&Number.isFinite(storedSubtotal)&&storedSubtotal>=0&&storedSubtotal===subtotal?storedSubtotal:subtotal;
   const fulfillment=String(order?.fulfillmentType??order?.FulfillmentType??'').toLowerCase();
   const deliveryFee=fulfillment.includes('delivery')?Math.max(0,Number(order?.deliveryFee??order?.DeliveryFee)||0):0;
   const discount=Math.max(0,Number(order?.discount??order?.Discount)||0);
-  const storedTotal=Number(order?.total??order?.Total);
-  const total=Number.isFinite(storedTotal)&&storedTotal>=0?storedTotal:Math.max(0,receiptSubtotal+deliveryFee-discount);
+  const rawStoredTotal=order?.total??order?.Total;
+  const storedTotal=Number(rawStoredTotal);
+  const hasStoredTotal=rawStoredTotal!==undefined&&rawStoredTotal!==null&&rawStoredTotal!=='';
+  const total=hasStoredTotal&&Number.isFinite(storedTotal)&&storedTotal>=0?storedTotal:Math.max(0,receiptSubtotal+deliveryFee-discount);
   return {...order,items,subtotal:receiptSubtotal,total};
 }
 
@@ -4809,13 +4813,17 @@ function buildReceiptHtml(order){
     const price=Number(it.price??it.Price)||0;
     return sum+(Number(it.lineTotal??it.LineTotal??it['Line Total'])||(price*q));
   },0);
-  const suppliedSubtotal=Number(order.subtotal??order.Subtotal);
-  const priceTotal=Number.isFinite(suppliedSubtotal)&&suppliedSubtotal>=0?suppliedSubtotal:itemSubtotal;
+  const rawSubtotal=order.subtotal??order.Subtotal;
+  const suppliedSubtotal=Number(rawSubtotal);
+  const hasSuppliedSubtotal=rawSubtotal!==undefined&&rawSubtotal!==null&&rawSubtotal!=='';
+  const priceTotal=hasSuppliedSubtotal&&Number.isFinite(suppliedSubtotal)&&suppliedSubtotal>=0?suppliedSubtotal:itemSubtotal;
   const isDeliveryOrder=type.indexOf('delivery')>=0;
   const deliveryFee=isDeliveryOrder?Math.max(0,Number(order.deliveryFee??order.DeliveryFee)||0):0;
   const discount=Math.max(0,Number(order.discount??order.Discount)||0);
-  const suppliedTotal=Number(order.total??order.Total);
-  const total=Number.isFinite(suppliedTotal)&&suppliedTotal>=0?suppliedTotal:Math.max(0,priceTotal+deliveryFee-discount);
+  const rawTotal=order.total??order.Total;
+  const suppliedTotal=Number(rawTotal);
+  const hasSuppliedTotal=rawTotal!==undefined&&rawTotal!==null&&rawTotal!=='';
+  const total=hasSuppliedTotal&&Number.isFinite(suppliedTotal)&&suppliedTotal>=0?suppliedTotal:Math.max(0,priceTotal+deliveryFee-discount);
   const summary=[['Price',priceTotal]];
   if(isDeliveryOrder)summary.push(['Delivery Charges',deliveryFee]);
   if(discount>0)summary.push(['Discount',discount]);

@@ -462,15 +462,19 @@
     });
 
     rows.push('-'.repeat(width));
-    const suppliedSubtotal = Number(order.subtotal ?? order.Subtotal);
+    const rawSubtotal = order.subtotal ?? order.Subtotal;
+    const suppliedSubtotal = Number(rawSubtotal);
+    const hasSuppliedSubtotal = rawSubtotal !== undefined && rawSubtotal !== null && rawSubtotal !== '';
     const itemSubtotal = items.reduce(function (sum, item) { return sum + lineTotal(item); }, 0);
-    const subtotal = Number.isFinite(suppliedSubtotal) && suppliedSubtotal >= 0
+    const subtotal = hasSuppliedSubtotal && Number.isFinite(suppliedSubtotal) && suppliedSubtotal >= 0
       ? suppliedSubtotal
       : itemSubtotal;
     const deliveryFee = isDelivery ? Math.max(0, Number(order.deliveryFee ?? order.DeliveryFee) || 0) : 0;
     const discount = Math.max(0, Number(order.discount ?? order.Discount) || 0);
-    const suppliedTotal = Number(order.total ?? order.Total);
-    const total = Number.isFinite(suppliedTotal) && suppliedTotal >= 0
+    const rawTotal = order.total ?? order.Total;
+    const suppliedTotal = Number(rawTotal);
+    const hasSuppliedTotal = rawTotal !== undefined && rawTotal !== null && rawTotal !== '';
+    const total = hasSuppliedTotal && Number.isFinite(suppliedTotal) && suppliedTotal >= 0
       ? suppliedTotal
       : Math.max(0, subtotal + deliveryFee - discount);
 
@@ -955,6 +959,7 @@
       buildTestPayload: testCommands,
       buildReceiptPayload: receiptCommands,
       buildReceiptImageEntry: buildReceiptImageEntry,
+      buildReceiptData: buildReceiptData,
       encodeCp437Ascii: encodeCp437Ascii,
       formatEscPosPayload: formatEscPosPayload
     }

@@ -130,7 +130,7 @@ test('restaurant receipt payload preserves dine-in layout and does not print ser
     ]
   });
   const readable = helpers.formatEscPosPayload(payload);
-  assert.equal(payload.slice(-4), '\\x1D\\x56\\x42\\x00');
+  assert.equal(payload.slice(-4), '\x1D\x56\x42\x00');
   [
     'FLAME CHICK', 'ORIGINAL BILL', 'Invoice #FC-TEST-001', 'DINE-IN',
     'Cashier', 'Hanzala', 'Guests Served', 'Table', 'G3', 'Half Broast', 'Full Broast',
@@ -138,8 +138,8 @@ test('restaurant receipt payload preserves dine-in layout and does not print ser
   ].forEach(function (value) {
     assert.ok(readable.includes(value), 'receipt should contain ' + value);
   });
-  assert.match(readable, /Half Broast @1,599\\s+Rs 1,599/);
-  assert.match(readable, /Full Broast @2,399\\s+Rs 2,399/);
+  assert.match(readable, /Half Broast @1,599\s+Rs 1,599/);
+  assert.match(readable, /Full Broast @2,399\s+Rs 2,399/);
   assert.equal(readable.includes('Surcharge'), false);
 });
 
@@ -222,4 +222,49 @@ test('receipt payload omits cashier, guest and surcharge details when not suppli
   ['Cashier', 'Guests Served', 'Surcharge'].forEach(function (value) {
     assert.equal(readable.includes(value), false, 'receipt should omit unavailable ' + value);
   });
+});
+
+
+test('QZ receipt data places the existing logo image between ESC/POS commands', async function () {
+  function FakeImage() { this.naturalWidth = 33; this.naturalHeight = 38; }
+  Object.defineProperty(FakeImage.prototype, 'src', { set() { this.onload(); } });
+  const context = { clearRect() {}, drawImage() {} };
+  const sandbox = {
+    window: { Image: FakeImage },
+    document: { createElement(name) {
+      assert.equal(name, 'canvas');
+      return { width: 0, height: 0, getContext() { return context; },
+        toDataURL() { return 'data:image/png;base64,UE5HREFUQQ=='; } };
+    } }
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(source, sandbox, { filename: 'qz-printing.js' });
+  const data = await sandbox.window.FlameChickQZ.diagnostics.buildReceiptData({
+    serverOrderNumber: 'FC-QZ-LOGO-001', fulfillmentType: 'Delivery',
+    customerName: 'Restaurant Test', phone: '03001234567',
+    address: 'Main Kamra Road', area: 'Kamra', subtotal: 500,
+    deliveryFee: 100, total: 600, paymentStatus: 'Unpaid',
+    items: [{ itemName: 'Broast', quantity: 1, price: 500, lineTotal: 500 }]
+  }, 'Counter Receipt');
+  assert.equal(data.length, 4);
+  assert.equal(data[0], '\x1B\x40\x1B\x61\x01');
+  assert.equal(data[1].type, 'raw');
+  assert.equal(data[1].format, 'image');
+  assert.equal(data[1].flavor, 'base64');
+  assert.equal(data[1].data, 'UE5HREFUQQ==');
+  assert.equal(data[2], '\n');
+  assert.ok(data[3].includes('Delivery Charges'));
+  assert.ok(data[3].includes('Customer: Restaurant Test'));
+});
+
+test('nullable subtotal and total fall back to item and delivery amounts', function () {
+  const helpers = loadQzHelpers();
+  const readable = helpers.formatEscPosPayload(helpers.buildReceiptPayload({
+    fulfillmentType: 'Delivery', subtotal: null, deliveryFee: 100, total: null,
+    paymentStatus: 'Unpaid',
+    items: [{ itemName: 'Broast', quantity: 1, price: 500, lineTotal: 500 }]
+  }));
+  assert.match(readable, /Price\s+Rs 500/);
+  assert.match(readable, /Delivery Charges\s+Rs 100/);
+  assert.match(readable, /Grand Total\s+Rs 600/);
 });
