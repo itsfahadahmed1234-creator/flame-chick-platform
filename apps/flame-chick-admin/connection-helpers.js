@@ -82,8 +82,14 @@
 
   function isAmbiguousRequestFailure(error){
     if(!error)return false;
-    if(error.name==="TimeoutError"||error.name==="TypeError")return true;
+    if(["TimeoutError","TypeError","HttpResponseParseError","CatalogResponseContractError"].includes(error.name))return true;
     return error.name==="HttpRequestError"&&[408,425,429,500,502,503,504].includes(Number(error.status));
+  }
+
+  function isDefinitelyRejected(error){
+    if(!error)return false;
+    if(["CatalogCommandRejectedError","HttpApplicationError"].includes(error.name))return true;
+    return error.name==="HttpRequestError"&&[400,403,404,409,413,415,422].includes(Number(error.status));
   }
 
   class CatalogMutationUncertainError extends Error{
@@ -139,5 +145,5 @@
     return new Response(noBody?null:text,{status:response.status,statusText:response.statusText,headers});
   }
 
-  return Object.freeze({createUuid,createPendingMutationStore,createSingleFlight,isAmbiguousRequestFailure,sendWithOneRetry,CatalogMutationUncertainError,requestText,requestResponse});
+  return Object.freeze({createUuid,createPendingMutationStore,createSingleFlight,isAmbiguousRequestFailure,isDefinitelyRejected,sendWithOneRetry,CatalogMutationUncertainError,requestText,requestResponse});
 });
