@@ -322,8 +322,11 @@ test('long delivery address and instructions stay within the 48-column ESC/POS r
     }]
   });
   const textRows = payload
-    .replace(/\x1B[\x40\x45\x61\x74\x21]/g, '')
-    .replace(/\x1D[\x56\x21]/g, '')
+    // Strip complete ESC/POS sequences, including their argument bytes.
+    .replace(/\x1B[@]/g, '')
+    .replace(/\x1B[tEa][\x00-\xFF]/g, '')
+    .replace(/\x1D![\x00-\xFF]/g, '')
+    .replace(/\x1DVB\x00/g, '')
     .split('\n')
     .filter(function (row) { return row.length > 0; });
 
