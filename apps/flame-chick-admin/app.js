@@ -22,14 +22,12 @@ async function fetchBounded(url,options={},timeoutMs=REQUEST_TIMEOUT_MS){
  finally{clearTimeout(timer);}
 }
 async function authPost(path,body){let r=await fetchBounded(C.supabaseUrl+"/auth/v1/"+path,{method:"POST",headers:{apikey:C.publishableKey,"Content-Type":"application/json"},body:JSON.stringify(body)});let d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.msg||d.message||d.error_description||"Authentication failed.");return d;}
-let refreshInFlight=null;
-async function refresh(){
- if(refreshInFlight)return refreshInFlight;
+const refresh=window.FlameChickAdminConnection.createSingleFlight(async()=>{
  if(!S.session||!S.session.refresh_token)throw Error("Session expired. Please sign in again.");
  const token=S.session.refresh_token;
- refreshInFlight=(async()=>{const x=await authPost("token?grant_type=refresh_token",{refresh_token:token});saveSession(Object.assign({},x,{expires_at:Date.now()+Number(x.expires_in||3600)*1000}));})();
- try{await refreshInFlight;}finally{refreshInFlight=null;}
-}
+ const x=await authPost("token?grant_type=refresh_token",{refresh_token:token});
+ saveSession(Object.assign({},x,{expires_at:Date.now()+Number(x.expires_in||3600)*1000}));
+});
 async function getUser(){
  if(!S.session)S.session=readSession();if(!S.session||!S.session.access_token)throw Error("Please sign in.");
  if(S.session.expires_at&&Date.now()>Number(S.session.expires_at)-60000)await refresh();
@@ -162,7 +160,6 @@ async function staffApi(method,query,body){
  if(!response.ok||data.ok===false)throw Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");
  return data;
 }
-function isAmbiguousRequestFailure(error){return !!error&&(error.name==="TimeoutError"||error.name==="TypeError");}
 async function catalogV3Request(action,payload,isMutation){
  let body;
  if(isMutation){
@@ -173,15 +170,14 @@ async function catalogV3Request(action,payload,isMutation){
   if(!pending)S.pendingCatalogMutation={fingerprint,body};
  }else body=Object.assign({action},payload||{});
  let response;
- try{response=await staffApi("POST",null,body);}
- catch(error){
-  if(!isMutation||!isAmbiguousRequestFailure(error)){if(isMutation)S.pendingCatalogMutation=null;throw error;}
-  try{response=await staffApi("POST",null,body);}
-  catch(retryError){
-   if(isAmbiguousRequestFailure(retryError))throw Error("Save result is still uncertain. Retry the same unchanged save to reconcile it; a new request ID will not be generated.");
-   S.pendingCatalogMutation=null;
-   throw retryError;
-  }
+ try{
+  response=isMutation
+   ?await window.FlameChickAdminConnection.sendWithOneRetry((sameBody)=>staffApi("POST",null,sameBody),body)
+   :await staffApi("POST",null,body);
+ }catch(error){
+  if(isMutation&&error.name==="CatalogMutationUncertainError")throw error;
+  if(isMutation)S.pendingCatalogMutation=null;
+  throw error;
  }
  const result=response&&response.result;
  if(!result||result.ok===false){if(isMutation)S.pendingCatalogMutation=null;throw Error(result&&result.error&&result.error.message||"Catalog V3 request failed.");}
