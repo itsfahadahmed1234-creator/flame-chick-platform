@@ -37,7 +37,7 @@ function fakeResponse(data,status=200){
 }
 function mockClient(options={}){
   const objects=new Map(),calls=[],tokens=[];
-  let postCount=0;
+  let postCount=0,unauthorizedUsed=false,refreshCount=0;
   const tokenProvider=async()=>{const value='token-'+(tokens.length+1);tokens.push(value);return value;};
   const fetchImpl=async(url,request)=>{
     calls.push({url,method:request.method,headers:request.headers});
@@ -61,16 +61,15 @@ function mockClient(options={}){
       return fakeResponse({size:options.reportSize??stored.size,mimetype:options.reportMime??stored.mimeType});
     }
     if(request.method==='DELETE'&&url.endsWith('/storage/v1/object/flame-chick-media')){
-      const body=JSON.parse(await request.body.text());
+      const body=JSON.parse(request.body);
       body.prefixes.forEach(path=>objects.delete(path));
       return fakeResponse([]);
     }
     return fakeResponse({message:'unexpected request'},500);
   };
-  let refreshCount=0;
   const requestResponse=async(url,request,timeout,impl)=>{
-    if(options.unauthorizedOnce&&request.method==='POST'&&refreshCount===0){
-      refreshCount++;
+    if(options.unauthorizedOnce&&request.method==='POST'&&!unauthorizedUsed){
+      unauthorizedUsed=true;
       return fakeResponse({message:'expired'},401);
     }
     return impl(url,request);
