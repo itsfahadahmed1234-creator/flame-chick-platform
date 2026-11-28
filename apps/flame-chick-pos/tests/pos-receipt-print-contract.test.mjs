@@ -66,3 +66,22 @@ test('the manual Delivery button has a synchronous re-entrancy guard, spinner an
   assert.match(source, /button-spinner/);
   assert.match(source, /finally\{[\s\S]*?btn\.disabled=wasDisabled/);
 });
+
+test('delivery receipt displays Delivery Charges and delivery details without a surcharge row', function () {
+  const start = source.indexOf('function buildReceiptHtml(order)');
+  const end = source.indexOf('function setReceiptPrintError', start);
+  const renderer = source.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(renderer, /Delivery Charges/);
+  assert.match(renderer, /Delivery Instructions/);
+  assert.match(renderer, /Locality/);
+  assert.doesNotMatch(renderer, /summary\.push\(\['Surcharge'/);
+  assert.doesNotMatch(renderer, /const surcharge=/);
+});
+
+test('QZ direct receipt loads the existing POS receipt logo as ESC/POS raw image data', function () {
+  const qzSource = fs.readFileSync(path.join(__dirname, '..', 'qz-printing.js'), 'utf8');
+  assert.match(qzSource, /const RECEIPT_LOGO_URL = '\/assets\/flame-chick-receipt-mark\.svg'/);
+  assert.match(qzSource, /format: 'image',[\s\S]*?flavor: 'base64'/);
+  assert.match(qzSource, /language: 'ESCPOS'/);
+});

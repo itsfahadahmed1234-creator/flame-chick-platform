@@ -1909,6 +1909,8 @@ function printOnlineOrderReceipt(order){
     phone:order.Phone||order.phone||'',
     address:order.Address||order.address||'',
     area:order.Area||order.area||'',
+    deliveryLocality:order.DeliveryLocality||order.deliveryLocality||order.Locality||order.locality||'',
+    deliveryInstructions:order.DeliveryInstructions||order.deliveryInstructions||order.CustomerInstructions||order.customerInstructions||'',
     fulfillmentType:order.FulfillmentType||order.fulfillmentType||'Delivery',
     tableNumber:order.TableNumber||order.tableNumber||'',
     cashierName:order.CashierName||order.cashierName||'',
@@ -1918,7 +1920,6 @@ function printOnlineOrderReceipt(order){
     paymentStatus:order.PaymentStatus||order.paymentStatus||'',
     paidAmount:Number(order.PaidAmount??order.paidAmount)||0,
     balanceDue:Number(order.BalanceDue??order.balanceDue)||0,
-    surcharge:Number(order.Surcharge??order.surcharge)||0,
     notes:order.Notes||order.notes||'',
     items:hasItems?order.items.map(function(it){
       return {itemName:it['Item Name']||it.ItemName||it.itemName||it.name||'Item',
@@ -4747,7 +4748,14 @@ function normalizeReceiptOrder(order){
     return {...it,quantity,price,lineTotal:Number(it.lineTotal??it.LineTotal??it['Line Total'])||price*quantity};
   });
   const subtotal=items.reduce((sum,it)=>sum+(Number(it.lineTotal)||0),0);
-  return {...order,items,subtotal:Number(order?.subtotal)===subtotal?Number(order.subtotal):subtotal,total:Number(order?.total)>0?Number(order.total):subtotal};
+  const storedSubtotal=Number(order?.subtotal??order?.Subtotal);
+  const receiptSubtotal=Number.isFinite(storedSubtotal)&&storedSubtotal>=0&&storedSubtotal===subtotal?storedSubtotal:subtotal;
+  const fulfillment=String(order?.fulfillmentType??order?.FulfillmentType??'').toLowerCase();
+  const deliveryFee=fulfillment.includes('delivery')?Math.max(0,Number(order?.deliveryFee??order?.DeliveryFee)||0):0;
+  const discount=Math.max(0,Number(order?.discount??order?.Discount)||0);
+  const storedTotal=Number(order?.total??order?.Total);
+  const total=Number.isFinite(storedTotal)&&storedTotal>=0?storedTotal:Math.max(0,receiptSubtotal+deliveryFee-discount);
+  return {...order,items,subtotal:receiptSubtotal,total};
 }
 
 function receiptDateText(value){
@@ -4778,6 +4786,10 @@ function buildReceiptHtml(order){
     if(order.phone||order.Phone)meta.push(['Phone',order.phone||order.Phone]);
     if(order.address||order.Address)meta.push(['Address',order.address||order.Address]);
     if(order.area||order.Area)meta.push(['Area',order.area||order.Area]);
+    const locality=order.deliveryLocality||order.DeliveryLocality||order.locality||order.Locality||'';
+    if(locality)meta.push(['Locality',locality]);
+    const instructions=order.deliveryInstructions||order.DeliveryInstructions||order.customerInstructions||order.CustomerInstructions||'';
+    if(instructions)meta.push(['Delivery Instructions',instructions]);
   }
   const metaHtml=meta.map(function(pair){return '<span>'+esc(pair[0])+'</span><strong>'+esc(pair[1])+'</strong>';}).join('');
   const itemRows=items.length?items.map(function(it){
@@ -4799,14 +4811,13 @@ function buildReceiptHtml(order){
   },0);
   const suppliedSubtotal=Number(order.subtotal??order.Subtotal);
   const priceTotal=Number.isFinite(suppliedSubtotal)&&suppliedSubtotal>=0?suppliedSubtotal:itemSubtotal;
-  const surcharge=Number(order.surcharge??order.Surcharge??order.serviceCharge??order.ServiceCharge)||0;
-  const deliveryFee=Number(order.deliveryFee??order.DeliveryFee)||0;
-  const discount=Number(order.discount??order.Discount)||0;
+  const isDeliveryOrder=type.indexOf('delivery')>=0;
+  const deliveryFee=isDeliveryOrder?Math.max(0,Number(order.deliveryFee??order.DeliveryFee)||0):0;
+  const discount=Math.max(0,Number(order.discount??order.Discount)||0);
   const suppliedTotal=Number(order.total??order.Total);
-  const total=Number.isFinite(suppliedTotal)&&suppliedTotal>0?suppliedTotal:Math.max(0,priceTotal+surcharge+deliveryFee-discount);
+  const total=Number.isFinite(suppliedTotal)&&suppliedTotal>=0?suppliedTotal:Math.max(0,priceTotal+deliveryFee-discount);
   const summary=[['Price',priceTotal]];
-  if(surcharge>0)summary.push(['Surcharge',surcharge]);
-  if(deliveryFee>0)summary.push(['Delivery',deliveryFee]);
+  if(isDeliveryOrder)summary.push(['Delivery Charges',deliveryFee]);
   if(discount>0)summary.push(['Discount',discount]);
   const summaryHtml=summary.map(function(pair){
     return '<div class="sumrow"><span>'+esc(pair[0])+'</span><strong>Rs '+money(pair[1])+'</strong></div>';
