@@ -1,24 +1,32 @@
-# 🚫 MANDATORY NEW-CHAT SAFETY DIRECTIVE — DO NOT REPEAT THE 102 GB SUPABASE LOG QUERY
+# 🚫 ABSOLUTE FLAME CHICK RESTRICTION — ZERO SUPABASE LOG QUERIES / ZERO LOG INGESTION ACCESS
 
-**This is an explicit user instruction for every new ChatGPT conversation, assistant/agent, and Flame Chick task. Read it before carrying out Supabase diagnostics.**
+**This is an explicit user instruction for every branch, new chat, assistant/agent and Flame Chick task. It overrides any older or narrower logging instructions below. Read this before carrying out any Supabase diagnostics.**
 
-The user clarified the measurements:
+- **ZERO Supabase log-query usage is permitted.** Do not run even a tiny query, sample, one-off check, test, partial scan, filtered query or minimal-volume request. Do not use a fraction of a query or try to make one cheaper.
+- Do not open or use Supabase Logs Explorer, query_logs, log-query APIs, CLI commands, connectors, dashboards, SDKs, browser tools or any alternate/indirect interface to access or retrieve Supabase logs. Do not inspect, read, search, export, sample, filter, explain, troubleshoot or verify Supabase log data.
+- **Do not access or touch Supabase Log Ingestion either.** Do not inspect ingestion usage, create/change/disable log drains, alter retention/routing/telemetry, or otherwise read or modify Log Ingestion or logging configuration.
+- Historical clarification only: the **log query** exceeded **102 GB**; separately, **Log Ingestion usage was 0.10 GB out of a 1 GB allowance**. These are different measurements. Do not conflate them or query either system to refresh the figures.
+- **No exceptions for debugging, optimization, verification, security or convenience.** Use GitHub source inspection, static analysis, local/disposable tests, narrowly scoped non-log metadata reads and browser-visible errors instead. Do not create Production traffic to produce logs.
+- Only the user can explicitly change this absolute prohibition. Until then, every new chat must obey it without asking to use even a small amount.
 
-- **The Supabase log query exceeded 102 GB.** This is the expensive query that must not be repeated.
-- **Log ingestion used 0.10 GB out of its 1 GB allowance.** Ingestion did **not** use 102 GB; these are separate measurements.
-
-**Do not rerun, edit, clone, recreate, broaden, optimize, or troubleshoot the specific 102 GB log query.** Do not use Supabase Logs Explorer, `query_logs`, a CLI/API/connector, or another interface to repeat or reproduce that expensive query. Do not run an equivalent broad log query as a workaround. If a future task appears to require new Supabase log-query activity, stop and obtain the user's explicit approval first.
-
-This restriction is specifically about the expensive log query. **Do not misstate it as a Log Ingestion overage or claim ingestion exceeded its 1 GB allowance.** The recorded ingestion usage was 0.10 GB / 1 GB. No log-ingestion configuration change is implied or authorized by these figures.
-
-For optimization and troubleshooting, prefer GitHub source inspection, static analysis, local tests, disposable test environments, and carefully scoped read-only database catalog inspection where appropriate. Avoid unnecessary Production test traffic and diagnostics that create avoidable logging volume. Never claim a check was performed if it was not. Any historical log-query observations are historical context only; do not refresh them by rerunning the expensive query.
-
-**Startup requirement:** Every new chat must read this directive in `PROJECT_HANDOFF.md` before Supabase diagnostics, and must read `docs/handoffs/2026-11-28-supabase-edge-optimization-continuation.md` when continuing Edge Function optimization.
-
+**Startup requirement:** Every new chat must read this directive in PROJECT_HANDOFF.md before Supabase diagnostics and read docs/handoffs/2026-11-28-supabase-edge-optimization-continuation.md when continuing Edge Function optimization.
 ---
 ---
 
 # CURRENT CONTINUATION — SUPABASE EDGE FUNCTION OPTIMIZATION (2026-11-28)
+
+## Latest Delivery Edge invocation investigation — 2026-11-28
+
+- Supabase Usage screenshot: 5,915 Edge Function invocations for the current billing cycle (19 Nov–19 Dec 2026), 500,000 Free allowance, 0 overage. User changed selector to Flame Chick Production and confirmed the same total. This is project-wide Edge Function usage, not Delivery API-only.
+- The 28 Nov daily figure was 170; user explicitly confirmed no orders were placed that day. Attribute the issue first to background/app traffic, not orders. Usage refreshes hourly, so this was the displayed partial-day figure.
+- Source estimate on production branch with one Rider and one POS session, healthy Realtime: Rider presence about 30 Delivery requests/hour; Rider jobs/offers refresh about 30/hour; POS refresh about 60/hour because inbox refresh already loads dispatch and current scheduler then loads dispatch again. Total about 120 Delivery API invocations/hour, before app events/login/resume. This is an estimate, not an observed per-function breakdown. 30-second fallback polling can increase it.
+- Isolated fix on feature branch: POS event-specific refreshes (orders_changed vs delivery_changed), removal of duplicate dispatch fetch, and assignment/return UI refresh coalescing. Preserves 120s healthy safety refresh and 30s Realtime fallback.
+- Regression workflow 46112617777 succeeded on commit 393f6f8625a5b84c8a3d07f63d75298b3f7ffa49, including new request-count/scheduler tests and existing POS regression checks. https://github.com/itsfahadahmed1234-creator/flame-chick-platform/actions/runs/46112617777
+- This fix is not deployed. No Production code, database, secrets/Auth, orders or customer data changed. Continue on supabase-edge-optimization-2026-11-28 only.
+- Next: design a single authenticated Rider sync request that safely reconciles presence + jobs/offers, then remove immediate post-action GETs only if the response can return a safe refreshed state. Preserve Rider-only offer isolation, 60-second offer expiry, online presence freshness and 30-second Realtime fallback. Do not simply lengthen heartbeat intervals: POS treats Rider last_seen older than 240 seconds as stale.
+- Parallel ownership remains: another ChatGPT chat owns Website/Admin. Do not edit/deploy those apps or shared Order/Catalog/Staff Admin APIs, RPCs, contracts or settings. No merge/rebase/cherry-pick/deploy without explicit approval.
+- No log queries and no Log Ingestion access under any circumstances. Free plan only; no migrations or Production traffic for this optimization.
+
 
 Continue the existing Flame Chick Production project. Do not restart, rebuild the project from assumptions, or deploy unreviewed changes.
 
