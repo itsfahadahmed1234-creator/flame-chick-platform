@@ -155,22 +155,31 @@ test("Staff Admin preview CORS allows only the exact current and branch-stable p
   }
 });
 
-test("Cloudflare Pages origins are allowed for app CORS, but invitation redirects are Cloudflare-only", () => {
+test("Cloudflare and legacy app origins remain CORS-allowed, but invitation redirects stay Cloudflare-only", () => {
   const configured = parseStaffAdminOrigins("");
-  for (const origin of [CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN, PRODUCTION_STAFF_ADMIN_ORIGIN]) {
+  for (const origin of [
+    CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN,
+    CLOUDFLARE_PRODUCTION_RIDER_ORIGIN,
+    PRODUCTION_STAFF_ADMIN_ORIGIN
+  ]) {
     assert.equal(configured.has(origin), true);
     assert.equal(isAllowedRequestOrigin(origin, configured), true);
     assert.equal(staffCorsHeaders(origin, configured)["Access-Control-Allow-Origin"], origin);
-    if (origin === CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN) assert.equal(isSafeInviteRedirect(origin + "/accept-invitation.html", configured), true);
   }
 
+  assert.equal(isSafeInviteRedirect(ADMIN_INVITATION_REDIRECT, configured), true);
+  assert.equal(isSafeInviteRedirect(RIDER_INVITATION_REDIRECT, configured), true);
+  assert.equal(isSafeInviteRedirect(PRODUCTION_STAFF_ADMIN_ORIGIN + "/accept-invitation.html", configured), false);
+  assert.equal(isSafeInviteRedirect(CLOUDFLARE_PRODUCTION_RIDER_ORIGIN + "/accept-invitation.html", configured), false);
+  assert.equal(isSafeInviteRedirect(CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN + "/", configured), false);
+
   for (const origin of [
-    PRODUCTION_STAFF_ADMIN_ORIGIN,
     "https://flamechickadmin.pages.dev.evil.test",
     "https://evil-flamechickadmin.pages.dev",
     "https://flamechickadmin.pages.dev.attacker.invalid",
     "https://flamechick.pages.dev",
-    "https://flamechickrider.pages.dev"
+    "https://flamechickrider.pages.dev.evil.test",
+    "https://evil.example.test"
   ]) {
     assert.equal(isAllowedRequestOrigin(origin, configured), false, origin);
     assert.equal(staffCorsHeaders(origin, configured)["Access-Control-Allow-Origin"], undefined);
