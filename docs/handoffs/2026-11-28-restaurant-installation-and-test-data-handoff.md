@@ -185,7 +185,7 @@ The QZ receipt changes have been merged and deployed to the existing Cloudflare 
 - Merge commit: `50eb6e40143dd8f2bf7a824001a1de50a9de7d21`.
 - Release branch: `release/pos-rider-delivery-optimization-2026-11-28`.
 - Feature branch merged: `feature/pos-qz-receipt-layout-2026-11-28`.
-- Production POS URL: https://flamechickpos.itsfahadah1234-creator.workers.dev
+- Production POS URL: https://flamechickpos.itsfahadahmed1234-creator.workers.dev
 - Active Worker version: **9** (`8b2f6ac4-0df4-4f74-84d2-c3f2b68c51d4`).
 - Deployment ID: `ca57b6b0-bcdb-4ade-9c92-657fa613dafe`.
 - Cloudflare confirms 100% traffic on version 9.
