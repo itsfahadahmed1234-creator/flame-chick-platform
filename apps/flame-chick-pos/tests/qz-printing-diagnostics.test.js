@@ -268,3 +268,63 @@ test('nullable subtotal and total fall back to item and delivery amounts', funct
   assert.match(readable, /Delivery Charges\s+Rs 100/);
   assert.match(readable, /Grand Total\s+Rs 600/);
 });
+
+test('receipt wrapping never emits a text row wider than the requested column count', function () {
+  const helpers = loadQzHelpers();
+  const cases = [
+    { value: 'Delivery instructions: ' + 'A'.repeat(70), width: 48 },
+    { value: 'House 19 Street 4 ' + 'B'.repeat(57) + ' Attock', width: 32 },
+    { value: 'A'.repeat(97), width: 48 },
+    { value: 'Short text', width: 0 }
+  ];
+
+  cases.forEach(function (entry) {
+    const rows = helpers.wrap(entry.value, entry.width);
+    const expectedWidth = Math.max(1, Math.floor(entry.width) || 1);
+    assert.ok(rows.length > 0);
+    rows.forEach(function (row) {
+      assert.ok(row.length <= expectedWidth,
+        'row must stay within ' + expectedWidth + ' columns: ' + row);
+    });
+  });
+});
+
+test('long delivery address and instructions stay within the 48-column ESC/POS receipt width', function () {
+  const helpers = loadQzHelpers();
+  const payload = helpers.buildReceiptPayload({
+    serverOrderNumber: 'FC-LONG-ADDRESS-001',
+    fulfillmentType: 'Delivery',
+    customerName: 'Customer With A Long Display Name',
+    phone: '03001234567',
+    address: 'House 19 Street 4 ' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+    area: 'Main Kamra Road',
+    deliveryInstructions: 'Please call on arrival ' + 'ABCDEFGHIJKLMN'.repeat(5),
+    paymentMethod: 'Cash',
+    paymentStatus: 'Unpaid',
+    subtotal: 500,
+    deliveryFee: 100,
+    total: 600,
+    items: [{
+      itemName: 'Extra Long Product Name ' + 'ABCDEFGHIJKLMN'.repeat(4),
+      quantity: 2,
+      price: 250,
+      lineTotal: 500,
+      contents: ['Extra long selected option ' + 'ZYXWVUTSRQPONMLK'.repeat(3)]
+    }]
+  });
+  const textRows = payload
+    .replace(/\x1B[\x40\x45\x61\x74\x21]/g, '')
+    .replace(/\x1D[\x56\x21]/g, '')
+    .split('\n')
+    .filter(function (row) { return row.length > 0; });
+
+  textRows.forEach(function (row) {
+    assert.ok(row.length <= 48, 'printable row exceeds 48 columns: ' + row);
+  });
+  const readable = helpers.formatEscPosPayload(payload);
+  assert.ok(readable.includes('Delivery Instructions'));
+  assert.ok(readable.includes('Extra Long Product Name'));
+  assert.ok(readable.includes('Grand Total'));
+  assert.equal(readable.includes('Surcharge'), false);
+  assert.equal(payload.slice(-4), '\x1D\x56\x42\x00');
+});
