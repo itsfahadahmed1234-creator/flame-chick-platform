@@ -1,5 +1,5 @@
 // Flame Chick Staff Admin API — Batch 4.
-import { isAllowedRequestOrigin, isSafeInviteRedirect, parseStaffAdminOrigins, staffCorsHeaders } from "./origin-policy.mjs";
+import { getStaffInviteRedirect, isAllowedRequestOrigin, isSafeInviteRedirect, parseStaffAdminOrigins, staffCorsHeaders } from "./origin-policy.mjs";
 import { buildCatalogRpcCall } from "./catalog-actions.mjs";
 import { buildDashboardRpcCall } from "./dashboard-actions.mjs";
 const SUPABASE_URL=(Deno.env.get("SUPABASE_URL")??"").replace(/\/+$/,"");
@@ -9,7 +9,6 @@ function readKey(jsonName:string,fallback:string[]):string{
 }
 const PUBLIC_KEY=readKey("SUPABASE_PUBLISHABLE_KEYS",["SUPABASE_PUBLISHABLE_KEY","SUPABASE_ANON_KEY"]);
 const SECRET_KEY=readKey("SUPABASE_SECRET_KEYS",["SUPABASE_SECRET_KEY","SUPABASE_SERVICE_ROLE_KEY"]);
-const REDIRECT=(Deno.env.get("FLAME_CHICK_STAFF_INVITE_REDIRECT_URL")??"").trim();
 let ORIGINS: Set<string> = new Set();
 let ORIGIN_CONFIG_VALID = false;
 try {
@@ -73,7 +72,6 @@ async function systemRpc(action:string,payload:Obj):Promise<unknown>{
  const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/flame_chick_staff_admin_system_command",{method:"POST",headers:{apikey:SECRET_KEY,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({p_action:action,p_payload:payload}),cache:"no-store"});
  const x=await body(r);if(!r.ok)throw rpcErr(x);return x;
 }
-function redirectOk():boolean{return isSafeInviteRedirect(REDIRECT,ORIGINS);}
 function duplicate(status:number,x:unknown):boolean{if(![400,409,422].includes(status))return false;const v=obj(x)?x:{};const s=[v.code,v.error,v.msg,v.message,v.error_description].filter(y=>typeof y==="string").join(" ").toLowerCase();return /already.?registered|already.?exists|user.?exists|email.?exists/.test(s);}
 async function sendInvite(email:string,name:string,phone:string|null):Promise<{kind:"sent";id:string}|{kind:"existing"}>{
  if(!SECRET_KEY||!redirectOk())throw new ApiError("STAFF_INVITE_NOT_CONFIGURED",503,"The secure invitation destination is not configured.");
@@ -96,7 +94,7 @@ async function invite(t:string,b:Obj):Promise<Obj>{
  if(status==="sent"||status==="accepted")return{ok:true,invitation_id:id,status,idempotent:true};
  if(authId)return{ok:true,invitation_id:id,status:"sent",recovered:true,result:await systemRpc("complete_invitation",{invitation_id:id,auth_user_id:authId})};
  let sent:{kind:"sent";id:string}|{kind:"existing"};
- try{sent=await sendInvite(email,name,phone);}catch(e){try{await systemRpc("fail_invitation",{invitation_id:id,failure_code:"AUTH_PROVIDER_ERROR"});}catch{}throw e;}
+ try{sent=await sendInvite(email,name,phone,role);}catch(e){try{await systemRpc("fail_invitation",{invitation_id:id,failure_code:"AUTH_PROVIDER_ERROR"});}catch{}throw e;}
  if(sent.kind==="existing")return{ok:true,invitation_id:id,status:"pending",existing_account:true,message:"This email already has an account. Its owner must sign in with the confirmed email and accept the invitation."};
  try{return{ok:true,invitation_id:id,status:"sent",result:await systemRpc("complete_invitation",{invitation_id:id,auth_user_id:sent.id})};}
  catch{try{await systemRpc("fail_invitation",{invitation_id:id,auth_user_id:sent.id,failure_code:"AUTH_FINALIZATION_FAILED"});}catch{}throw new ApiError("STAFF_INVITATION_FINALIZATION_PENDING",503,"The Auth invitation exists but needs database recovery. Use Retry Finalize before sending again.");}
