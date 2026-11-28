@@ -168,7 +168,7 @@
         <div class="surface"><div class="surface-head"><div><h3>Staff roles</h3><p class="muted">Admin and Owner are restaurant-wide. Manager, Cashier and Rider are assigned to Main automatically. Deactivation preserves accounts and order history.</p></div></div>
           <div class="table-wrap"><table><thead><tr><th>TEAM MEMBER</th><th>ROLE</th><th>BRANCH SCOPE</th><th>ACCOUNT / ROLE STATUS</th><th></th></tr></thead><tbody id="staffTable"><tr><td colspan="5" class="empty-cell">Loading staff…</td></tr></tbody></table></div>
         </div>
-        <div class="surface staff-invitation-surface"><div class="surface-head"><div><h3>Invitations</h3><p class="muted">Retry Finalize does not send a second email.</p></div></div>
+        <div class="surface staff-invitation-surface"><div class="surface-head"><div><h3>Invitations</h3><p class="muted">Retry Finalize only completes an invitation when its Auth account already exists. If a failed invite has no linked Auth user, cancel it and create a new invitation after verifying the email address.</p></div></div>
           <div class="table-wrap"><table><thead><tr><th>INVITEE</th><th>ROLE</th><th>BRANCH SCOPE</th><th>STATUS</th><th></th></tr></thead><tbody id="staffInvitations"><tr><td colspan="5" class="empty-cell">No invitations loaded.</td></tr></tbody></table></div>
         </div>
         <div class="staff-audit-wrap"><div class="section-head"><div><h3>Recent staff activity</h3><p class="muted">Role assignments, deactivations and invitation actions.</p></div></div><div id="staffAudit" class="staff-audit-list"><div class="empty-state">No staff activity loaded.</div></div></div>
