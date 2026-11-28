@@ -268,7 +268,8 @@
         '<div class="fcv3-media-actions">'+
         (previous?'<button type="button" class="fcv3-button" data-media-action="restore" data-kind="'+kind+'" data-id="'+esc(record.id)+'" '+(busy?'disabled':'')+'>Restore backup</button>':'')+
         (current?'<button type="button" class="fcv3-button fcv3-danger" data-media-action="remove" data-kind="'+kind+'" data-id="'+esc(record.id)+'" '+(busy?'disabled':'')+'>Remove current image</button>':'')+
-        '</div><small class="fcv3-media-footnote">Replacing or removing an image never deletes Storage objects automatically. Older files may still be referenced by an immutable published menu.</small></section>';
+        '</div><small class="fcv3-media-footnote">These changes update the unpublished catalog draft only. Customers see image changes after a separate catalog publication. Replacing or removing a reference never deletes Storage objects automatically; older files may still be used by an immutable published snapshot.</small>'+
+        (kind==='categories'?'<small class="fcv3-media-footnote">The current customer Website template does not yet display category artwork.</small>':'')+'</section>';
     }
     function currentMediaRecord(kind,id){
       if(kind==='products')return s.products.find(item=>item&&item.id===id)||null;
