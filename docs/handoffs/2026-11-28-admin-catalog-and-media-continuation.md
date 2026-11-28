@@ -1,3 +1,45 @@
+# PRODUCTION ADMIN RELEASE COMPLETE — 2026-11-28
+
+This checkpoint supersedes the earlier review-only/no-deployment instructions below. The Admin catalog/media application has been merged and deployed to Cloudflare Pages Production. It does **not** authorize actual menu image uploads, catalog publication, menu import, additional DB writes, or changes to other apps.
+
+## Release record
+
+- Repository: `itsfahadahmed1234-creator/flame-chick-platform`.
+- Pull request: #3 — https://github.com/itsfahadahmed1234-creator/flame-chick-platform/pull/3 (merged).
+- Production branch: `cloudflare/admin-production`.
+- Merge commit: `6950c9cd79d11d0e3db2efc0b1a06177c1b89528`.
+- Review source: `work/admin-catalog-media-review` at `f8a5d9fbe66972124fae8bac3e0f75b6a2c5e684`.
+- Admin Static Checks run `46136611989` passed on the exact review head.
+- Cloudflare Pages project: `flamechickadmin`, root `apps/flame-chick-admin`, production branch `cloudflare/admin-production`.
+- Production deployment: `aacccbb0-89c5-4999-bdd4-3d6086a5f82b`; URL https://aacccbb0.flamechickadmin.pages.dev; all queued, initialize, clone, build and deploy stages succeeded.
+- Deployment file manifest includes `catalog-v3-media.js`, `catalog-v3-admin.js`, `connection-helpers.js`, `app.js`, styles and invitation assets. Deployment source commit exactly matches the merge commit.
+- No custom domains are configured on this Pages project; the verified production URL is the Pages subdomain above.
+
+## Production authorization checks (read-only)
+
+- Production `flame-chick-media` bucket exists, public-read, 5 MiB max, MIME allowlist JPG/PNG/WebP.
+- Four actual `storage.objects` policies for upload/read/replace/delete all call `app_private.can_manage_flame_chick_media()`.
+- Helper is postgres-owned, SECURITY DEFINER, empty search_path, and only returns true for a signed-in user with active Auth user, active profile, active Flame Chick restaurant-wide Admin or Owner role.
+- Read-only execution as current Admin returned allowed; current Rider returned denied; no-user returned denied.
+- Production `flame-chick-staff-admin` Edge Function was already active v10 with JWT verification enabled. No Edge Function redeploy was necessary.
+- No Manager, Cashier, or Owner test identities are currently provisioned for the full role matrix. The helper source explicitly permits only Admin/Owner; full live role matrix remains outstanding.
+
+## Explicitly not done / remaining acceptance
+
+- No Storage object was uploaded, replaced or deleted.
+- No real image/browser upload, interrupted recovery, ambiguous commit, restore/remove, or cleanup-failure rehearsal has been performed. Do not invite real menu image uploads until these acceptance cases are tested in an isolated Storage sandbox.
+- No catalog menu import, seed, publish/rollback or publication pointer change.
+- No order/payment changes.
+- No Supabase Logs Explorer, log query, or Log Ingestion access.
+- Website, POS and Rider source/deployments were not changed. Do not touch their deployments.
+- Production Admin deployment is complete; browser-authenticated smoke verification of Catalog V3 with the user's live Admin session remains a user-side acceptance step. The browser connection available to this run was read-only and did not support navigation/reload.
+
+## Next step
+
+Ask the user to sign in at https://flamechickadmin.pages.dev and verify Catalog V3 draft reads/editing (without importing/publishing or uploading images). Separately build isolated Storage integration acceptance for Admin/Owner allow and Manager/Cashier/Rider/anonymous deny, plus upload success, interrupted resume, definite metadata rejection cleanup, ambiguous commit reconciliation, restore/remove and failed cleanup. Do not use Production Storage as a test bucket.
+
+---
+
 # ACTIVE ADMIN MEDIA IMPLEMENTATION CHECKPOINT — 2026-11-28
 
 This checkpoint supersedes older statements below that say the category/deal media editor or frontend media workflow has not yet been implemented. It does **not** authorize deployment, real-image upload, catalog publication or any additional Production DB write.
