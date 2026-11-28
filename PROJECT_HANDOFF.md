@@ -1,3 +1,14 @@
+# 🚫 MANDATORY NEW-CHAT SAFETY DIRECTIVE — DO NOT REPEAT THE 102 GB SUPABASE LOG QUERY
+
+**Explicit user clarification — applies across Flame Chick branches and new chats:**
+
+- The **Supabase log query** exceeded **102 GB**. Do not rerun, edit, clone, recreate, broaden, optimize, or troubleshoot that specific query. Do not reproduce its workload through Logs Explorer, `query_logs`, CLI, API, connector, or another interface.
+- **Log ingestion usage was 0.10 GB out of a 1 GB allowance.** It did not exceed 102 GB. Query volume and ingestion usage are separate measurements and must never be conflated.
+- This is a restriction on that expensive query, not a claim that Log Ingestion exceeded its allowance. No Log Ingestion configuration change is implied.
+- If a future task appears to require running a new Supabase log query, stop and obtain the user's explicit approval first. Prefer source inspection, static analysis, local/disposable tests, and carefully scoped read-only catalog checks. Avoid unnecessary Production traffic or diagnostics that generate avoidable log volume.
+
+---
+
 # CURRENT WEBSITE CONTINUATION — 2026-11-27
 
 **Read this first for the current Website task:** [27 November Website UI reliability handoff](docs/handoffs/2026-11-27-website-ui-reliability-next-session.md). Then read [Website context index](docs/handoffs/WEBSITE_PARALLEL_CONTEXT_INDEX.md), [current Website environment handoff](docs/operations/2026-11-26-new-vercel-website-production-handoff.md), [Website parallel-development audit](docs/handoffs/2026-11-25-website-parallel-audit.md), and [Website source/catalogue/API audit](docs/audits/FLAME_CHICK_WEBSITE_AUDIT_2026-11-27.md).
