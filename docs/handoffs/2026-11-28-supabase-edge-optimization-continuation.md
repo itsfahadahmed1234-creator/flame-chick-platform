@@ -1,24 +1,13 @@
-# 🚫 MANDATORY NEW-CHAT SAFETY DIRECTIVE — DO NOT TOUCH SUPABASE LOG INGESTION
+# 🚫 MANDATORY NEW-CHAT SAFETY DIRECTIVE — DO NOT REPEAT THE 102 GB SUPABASE LOG QUERY
 
-**This is an explicit user instruction and a hard, project-wide restriction. It applies to every new ChatGPT conversation, every assistant/agent, and every Flame Chick task unless the user explicitly changes it. Read and obey it before using any Supabase tool.**
+**This is an explicit user instruction. Read and obey it before carrying out Supabase diagnostics.**
 
-The user has expressly prohibited all further interaction with **Supabase Log Ingestion**. **Important clarification of the figures (confirmed by the user): it was the log query that exceeded 102 GB; separately, Log Ingestion usage was 0.10 GB out of a 1 GB allowance. These are different measurements and must never be conflated.** Do not investigate, inspect, query, read, retrieve, export, sample, filter, analyze, configure, enable, disable, or otherwise touch Supabase Log Ingestion again.
+- The **Supabase log query** exceeded **102 GB**. Do not rerun, edit, clone, recreate, broaden, optimize, or troubleshoot that specific query, and do not reproduce its workload through Logs Explorer, `query_logs`, an API, CLI, connector, or another interface.
+- **Log ingestion was 0.10 GB out of a 1 GB allowance.** It did not exceed 102 GB. Never conflate query volume with ingestion usage.
+- This restriction is about the expensive query, not a claim that ingestion exceeded its allowance. No ingestion configuration change is implied.
+- If a task appears to require a new Supabase log query, stop and obtain the user's explicit approval first. Prefer source inspection, static analysis, local/disposable testing, and scoped read-only catalog checks. Avoid unnecessary Production test traffic and logging volume.
 
-This prohibition includes, but is not limited to:
-
-- **Never call** Supabase `query_logs`, Logs Explorer, project log-query endpoints, log search/export APIs, or equivalent functionality through a connector, dashboard, CLI, SDK, direct API, browser, or another tool.
-- Do not read or query existing Supabase Edge Function, Postgres, Auth, API gateway, Realtime, or other project logs through the Log Ingestion system.
-- Do not create, edit, enable, disable, test, or reconfigure log drains, log ingestion, log routing, telemetry, analytics, retention, or related integrations/settings.
-- Do not generate synthetic requests, test traffic, retries, health checks, or diagnostic events against Production for the purpose of producing or examining logs.
-- Do not run monitoring or diagnostics that are likely to create substantial log-ingestion volume. Do not try another interface or indirect route to obtain the same logs.
-- Do not reset log/statistics data or make logging-related configuration changes.
-
-**No exceptions based on convenience or diagnostic value.** Do not touch Log Ingestion even if it appears useful for debugging, performance analysis, security review, or verification. Do not ask the user to repeat this instruction. Only the user can explicitly lift or narrow this restriction.
-
-For future optimization and troubleshooting, prefer GitHub source inspection, static analysis, local tests, disposable test environments, and carefully scoped read-only database catalog inspection where appropriate. Do not send test traffic to the Production project. Never claim that a check was performed if it was not. Historical observations gathered before this restriction may be treated only as historical context; do not refresh them by querying logs.
-
-**Startup requirement:** Every new chat must read this directive in `PROJECT_HANDOFF.md` before using Supabase tools, and must read `docs/handoffs/2026-11-28-supabase-edge-optimization-continuation.md` when continuing the Edge Function optimization. If a proposed task appears to require Log Ingestion, stop and explain the limitation rather than accessing it.
-
+---
 ---
 
 # CURRENT CONTINUATION — SUPABASE EDGE FUNCTION OPTIMIZATION (2026-11-28)
@@ -27,7 +16,7 @@ Continue the existing Flame Chick Production project. Do not restart, rebuild th
 
 - Repository: `itsfahadahmed1234-creator/flame-chick-platform`
 - Production branch: `work/production-source-audit`
-- Optimization working branch to inspect before relying on it: `supabase-edge-optimization-2026-11-27`
+- Current optimization feature branch: `supabase-edge-optimization-2026-11-28` (based on the latest production-source handoff; do not continue the diverged 2026-11-27 branch)
 - Production Supabase project: `adkrxfnawdiljhjaavnj` (Flame Chick Production, Mumbai `ap-south-1`, Free plan)
 - Production Edge Function versions observed during the prior source audit: Order API v12, Delivery API v4, Catalog API v4, Staff Admin v10. Re-check deployed source/version metadata only when needed; **do not inspect logs**.
 - User asked to optimize Supabase Edge Functions and related backend paths. No permission to upgrade the Supabase plan or make unrelated product/schema changes is implied.
@@ -36,7 +25,7 @@ Continue the existing Flame Chick Production project. Do not restart, rebuild th
 
 ## Important branch and test status
 
-A feature branch named `supabase-edge-optimization-2026-11-27` was created during the earlier attempt. Its exact current head and contents must be verified from GitHub before relying on it. Do not assume that its source, tests, CI or deployment state is valid.
+The earlier branch `supabase-edge-optimization-2026-11-27` diverged from the latest production-source branch and is not the active work branch. Continue on `supabase-edge-optimization-2026-11-28`, verifying its exact head and test results before relying on it.
 
 Earlier CI attempts were not fully green:
 - A source-contract assertion referenced a stale website quote error name.
