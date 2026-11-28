@@ -207,3 +207,24 @@ The Admin phase is ready for user review when:
 - No access to the expensive 102 GB log query or Log Ingestion.
 
 **The immediate next action is source/read-only audit of the current Admin release branch and a precise gap matrix—not a deployment and not a Production catalog write.**
+
+
+---
+
+## Isolated Admin review checkpoint — 2026-11-28
+
+- Work is isolated on branch `work/admin-catalog-media-review`, created from Admin release HEAD `5f17dcce76f90fab4e94ceb1830b76987f702bc9`. The production branch `cloudflare/admin-production` was not modified.
+- The only application source file changed so far is `apps/flame-chick-admin/app.js`:
+  - Added a 12-second bounded fetch wrapper for Auth and Staff Admin requests.
+  - Added single-flight refresh-token handling.
+  - Limited an expired-session retry to one attempt.
+  - Catalog mutation timeouts/network failures retry once using the exact same action, payload, expected revision and UUID request ID.
+  - If the retry remains ambiguous, the same mutation identity is retained in memory and different edits are blocked until that exact save is retried. Definite server failures clear the pending marker.
+- The Admin Static Checks workflow was explicitly enabled for this isolated review branch by adding it to the workflow's branch filter. This workflow does not deploy Admin.
+- First CI run `46115401615` failed because the pre-existing dashboard source assertion in `tests/admin-dashboard-api.test.mjs` over-escaped the dot in `S.range`. The application syntax check passed; 109/110 tests passed, with the single failure in that stale assertion. The assertion was corrected in commit `f1f489b6fb4702d802c61b87850f6faaa38db811`. A fresh CI result must be checked before treating this work as validated.
+- The Catalog V3 pagination implementation was reviewed and planned but **not committed**; no partial pagination edits were written.
+- The review-only JSON importer is still present in the source and has not been disabled yet. No menu import or catalog write occurred.
+- No migration, Production database/API/Storage change, Edge Function deployment, Cloudflare Pages deployment, website/POS/Rider change, publication, or menu import occurred.
+- The migration provenance discrepancy remains unresolved. The repository tree on the source branch does not contain `20261127090849_flame_chick_catalog_product_media_v1.sql`. Do not recreate or reapply it blindly.
+- Supabase logging restrictions remain absolute: no log-query use and no Log Ingestion access, including settings/metadata.
+- Next: verify the CI rerun for `f1f489b6fb4702d802c61b87850f6faaa38db811`; add focused tests for timeout retry/request-ID reuse and single-flight refresh; then implement explicit bounded pagination. Continue migration provenance from repository and authorized non-log source material only. Keep media backend/UI work blocked until the applied migration is recovered and the secure command contract is reviewed.
