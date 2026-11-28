@@ -202,6 +202,7 @@ const SUPABASE_URL='https://adkrxfnawdiljhjaavnj.supabase.co';
 const PUBLISHABLE_KEY='sb_publishable_89MQIj_drF15IrF05ZLt0w_txUjPMxy';
 const DELIVERY_API=SUPABASE_URL+'/functions/v1/flame-chick-delivery-api';
 const ORDER_API=SUPABASE_URL+'/functions/v1/flame-chick-order-api';
+const STAFF_ADMIN_API=SUPABASE_URL+'/functions/v1/flame-chick-staff-admin';
 const AUTH_URL=SUPABASE_URL+'/auth/v1';
 const SESSION_KEY='flame_chick_rider_session_v1';
 let session=null,user=null,rider=null,jobs=[],offers=[],busy=false,pendingAuthSession=null,pendingAuthType='invite',riderPresenceTimer=null,riderPresenceSending=false,riderSyncTimer=null,riderSyncSending=false,riderWantsOnline=true,offerExpiryTimer=null;
@@ -716,6 +717,18 @@ $('passwordForm').addEventListener('submit',async e=>{
     $('newPassword').value='';$('confirmPassword').value='';
     const next=pendingAuthSession;pendingAuthSession=null;
     const invitedUser=await getUser(next.access_token);
+    if(pendingAuthType==='invite'){
+      const acceptResponse=await fetch(STAFF_ADMIN_API,{
+        method:'POST',
+        headers:{'apikey':PUBLISHABLE_KEY,'Authorization':'Bearer '+next.access_token,'Content-Type':'application/json','Accept':'application/json'},
+        body:JSON.stringify({action:'accept_invitation'}),
+        cache:'no-store'
+      });
+      const accepted=await parseResponse(acceptResponse);
+      if(accepted.ok!==true||accepted.result?.status!=='accepted'){
+        throw new Error('Your invitation could not be activated. Ask the owner or manager to check the invitation status before requesting another email.');
+      }
+    }
     const roleRows=await getActiveAccountRoles(invitedUser.id,next.access_token);
     const assigned=roleRows.find(x=>['owner','admin','manager','cashier','rider'].includes(x.role));
     if(!assigned){
