@@ -272,7 +272,7 @@
     function currentMediaRecord(kind,id){
       if(kind==='products')return s.products.find(item=>item&&item.id===id)||null;
       if(kind==='categories')return s.categories.find(item=>item&&item.id===id)||null;
-      if(kind==='deals')return s.dealRecord&&s.dealRecord.id===id?s.dealRecord:null;
+      if(kind==='deals')return (s.dealRecord&&s.dealRecord.id===id?s.dealRecord:s.deals.find(item=>item&&item.id===id))||null;
       return null;
     }
     function syncMediaRecord(kind,id,record){
@@ -492,7 +492,7 @@
         '<label>Sort order<input name="sort_order" type="number" min="0" step="1" value="'+esc(p?p.sort_order:0)+'"></label>'+
         '<label class="fcv3-wide">Description<textarea name="description_en" maxlength="2000" rows="2">'+esc(p&&p.description_en)+'</textarea></label>'+
         '<label class="fcv3-wide">Urdu description<textarea name="description_ur" maxlength="2000" rows="2">'+esc(p&&p.description_ur)+'</textarea></label></div>'+
-        '<div class="fcv3-checks">'+checkbox('featured','Featured',!!(p&&p.featured))+checkbox('is_active','Active',p?p.is_active!==false:true)+checkbox('is_available','Available',p?p.is_available!==false:true)+'</div>'+mediaEditor('products',p)+'+
+        '<div class="fcv3-checks">'+checkbox('featured','Featured',!!(p&&p.featured))+checkbox('is_active','Active',p?p.is_active!==false:true)+checkbox('is_available','Available',p?p.is_available!==false:true)+'</div>'+mediaEditor('products',p)+
         '<div class="fcv3-subhead"><div><h4>Variants</h4><p>Standalone prices are required; deal-only variant prices may be NULL.</p></div><button type="button" class="fcv3-button" data-action="variant-add">+ Add variant</button></div>'+
         '<div class="fcv3-variants">'+variantRows(p)+'</div><div class="fcv3-editor-actions"><button type="button" class="fcv3-button fcv3-muted" data-action="editor-cancel">Cancel</button><button type="submit" class="fcv3-button fcv3-primary">Save product</button></div></form>';
     }
@@ -920,7 +920,7 @@
         }
         const b=event.target.closest('[data-action]');if(!b||b.disabled||s.saving||s.mediaBusy||s.editorLoadingDealId)return;const a=b.dataset.action;
         try{
-          if(s.error&&a!=='refresh')throw Error('Catalog data is not verified. Refresh successfully before making any changes.');
+          if(s.error&&a!=='refresh'&&a!=='media-recover')throw Error('Catalog data is not verified. Refresh successfully before making any changes.');
           if(a==='refresh')await refresh();
           else if(a==='media-recover')await recoverPendingMedia();
           else if(a==='load-more')await loadMore(b.dataset.kind,b.dataset.collectionId||null);
