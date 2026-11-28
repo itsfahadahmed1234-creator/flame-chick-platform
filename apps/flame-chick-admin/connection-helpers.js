@@ -70,5 +70,11 @@
     }
   }
 
-  return Object.freeze({createSingleFlight,isAmbiguousRequestFailure,sendWithOneRetry,CatalogMutationUncertainError,requestText});
+  async function requestResponse(url,options={},timeoutMs=12000,fetchImpl=fetch){
+    const {response,text}=await requestText(url,options,timeoutMs,fetchImpl);
+    const noBody=[204,205,304].includes(response.status);
+    return new Response(noBody?null:text,{status:response.status,statusText:response.statusText,headers:response.headers});
+  }
+
+  return Object.freeze({createSingleFlight,isAmbiguousRequestFailure,sendWithOneRetry,CatalogMutationUncertainError,requestText,requestResponse});
 });
