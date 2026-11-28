@@ -2,7 +2,7 @@
 
 **This is an explicit user instruction and a hard, project-wide restriction. It applies to every new ChatGPT conversation, every assistant/agent, and every Flame Chick task unless the user explicitly changes it. Read and obey it before using any Supabase tool.**
 
-The user has expressly prohibited all further interaction with **Supabase Log Ingestion**. The reported ingestion volume exceeded **102 GB**. Do not investigate, inspect, query, read, retrieve, export, sample, filter, analyze, configure, enable, disable, or otherwise touch Supabase Log Ingestion again.
+The user has expressly prohibited all further interaction with **Supabase Log Ingestion**. **Important clarification of the figures (confirmed by the user): it was the log query that exceeded 102 GB; separately, Log Ingestion usage was 0.10 GB out of a 1 GB allowance. These are different measurements and must never be conflated.** Do not investigate, inspect, query, read, retrieve, export, sample, filter, analyze, configure, enable, disable, or otherwise touch Supabase Log Ingestion again.
 
 This prohibition includes, but is not limited to:
 
