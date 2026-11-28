@@ -49,7 +49,7 @@ Treat these as review candidates, not approved changes. Inspect the current sour
 ## Safe working method
 
 - Read `PROJECT_HANDOFF.md`, this file, and the current source files/tests before edits.
-- Inspect the repository/branch state and deployed function source versions through GitHub/Supabase function metadata as needed, but **never use log-reading functions or logging interfaces**.
+- Inspect the repository/branch state and deployed function source versions through GitHub/Supabase function metadata as needed, but do not rerun or reproduce the specific 102 GB log query; obtain explicit approval before any new log-query activity.
 - Prefer static checks, unit/contract tests and controlled local tests using disposable fixtures. Keep test requests off Production.
 - Production SQL, if genuinely needed, must be read-only and narrowly scoped to schema/catalog/privilege/index inspection. Do not run migrations, writes, statistics resets, synthetic traffic, or heavy diagnostics as part of an optimization audit without explicit approval.
 - Keep secrets out of source, output and handoffs. Never read or print service-role credentials.
@@ -57,7 +57,20 @@ Treat these as review candidates, not approved changes. Inspect the current sour
 - Stay on the Supabase Free plan. Do not enable paid features or add infrastructure without explicit approval.
 - Do not deploy Edge Functions or apply migrations until the source review and tests pass and the user explicitly approves the rollout.
 
+## Latest optimization checkpoint — 2026-11-28
+
+- Active feature branch: `supabase-edge-optimization-2026-11-28`. The older `supabase-edge-optimization-2026-11-27` branch diverged and is not the active working branch.
+- First optimization scope is deliberately narrow: parallelize independent, read-only Order API and Delivery API requests; do not change database schema, caching, authentication strategy, or order business rules in this stage.
+- Order API change: parallelize the independent `delivery_areas` and `branch_delivery_settings` reads; in Website context, parallelize catalog publication and restaurant metadata reads, and load each branch's independent delivery configuration concurrently while preserving branch order and fail-closed errors.
+- Delivery API change: parallelize active-delivery-task and rider `accepting_jobs` reads during presence updates. The same checks still gate the single profile update. Unused `token` and `apiKey` parameters were removed from `isActiveRider`; this does not remove Auth validation.
+- Auth/CORS boundaries remain unchanged: Order API and Delivery API both remain `verify_jwt=false`; Delivery still performs `/auth/v1/user` validation internally and answers browser OPTIONS before authentication. Staff Admin remains `verify_jwt=true`.
+- Staff Admin branch parity: its `index.ts`, `origin-policy.mjs`, `catalog-actions.mjs`, and `dashboard-actions.mjs` now match deployed Staff Admin v10 exactly. The base production-source branch had stale copies of two files and lacked the dashboard helper; no Staff Admin behavior optimization is included.
+- Regression coverage added: mocked Order API concurrency/fail-closed test; Delivery Rider presence/Auth/OPTIONS/push fail-closed test; Node source-contract tests; Staff Admin dashboard RPC argument validator tests. The old DB-backed local order test is not part of the new CI job because it failed when the disposable DB had no published catalog fixture.
+- Local verification: Node 22 ran the three dashboard validator unit tests successfully (3 passed, 0 failed). Deno handler tests were authored but not run locally because Deno is not installed in the current environment. A GitHub Actions workflow was added; no confirmed Actions run result has been obtained, so do not report Deno or CI tests as passed until that result is verified.
+- Current deployed source versions checked by Edge Function metadata: Order API v12, Delivery API v4, Staff Admin v10. Order API's supporting catalog/pricing/quote modules match deployed v12 byte-for-byte; Delivery API's sole runtime difference is the described concurrency/unused-parameter change; Staff Admin's four files match deployed v10 byte-for-byte.
+- No Edge Function deployment, SQL migration, Production data write, secret/Auth change, or production request was performed. Do not deploy without completing tests and obtaining explicit user approval.
+
 ## Next concrete step
 
-Re-open the current GitHub branch heads and inspect the optimization branch diff against `work/production-source-audit`. Confirm exactly which changes and tests exist, correct only evidenced issues, and run the relevant tests locally/disposably. **Do not query or otherwise touch Supabase Log Ingestion at any stage.** Report accurately what passed, what failed, and what remains before asking for deployment approval.
+Re-open the current GitHub branch heads and inspect the optimization branch diff against `work/production-source-audit`. Confirm exactly which changes and tests exist, correct only evidenced issues, and run the relevant tests locally/disposably. **Do not rerun or reproduce the specific 102 GB log query; obtain explicit approval before any new log-query activity.** Report accurately what passed, what failed, and what remains before asking for deployment approval.
 
