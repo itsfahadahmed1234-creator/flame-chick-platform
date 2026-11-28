@@ -288,6 +288,15 @@
         Object.assign(s.editor.category,{image_current_path:record.image_current_path||null,image_previous_path:record.image_previous_path||null});
       if(kind==='deals')s.dealRecord=record;
     }
+    function mediaRecordMatchesPending(pending,record){
+      if(!pending||!record||record.id!==pending.entity_id||
+         record.image_current_path!==(pending.payload.image_current_path||null)||
+         record.image_previous_path!==(pending.payload.image_previous_path||null))return false;
+      if(pending.kind==='products')return record.image_extension===(pending.payload.image_extension||null)&&
+        record.image_previous_extension===(pending.payload.image_previous_extension||null)&&
+        record.image_published===pending.payload.image_published;
+      return true;
+    }
     async function verifyMediaRecord(kind,id,result,expectedCurrent,expectedPrevious){
       let record=null;
       if(kind==='deals'){
@@ -316,25 +325,17 @@
         if(definiteMediaRejection(error)){
           pending.stage='cleanup_required';mediaRecoveryStore.write(pending);s.pendingMedia=pending;
           try{await mediaClient.remove(pending.path);mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;}
-          catch(cleanupError){throw Error(error.message+' The unreferenced new image could not be cleaned up; recovery path: '+pending.path+'. '+cleanupError.message);}
-        }
-        throw error;
-      }
-      await verifyMediaRecord(pending.kind,pending.entity_id,result,pending.path,pending.payload.image_previous_path||null);
-      mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
-      s.notice='Image uploaded, verified and linked to the catalog draft. The previous image remains as the restore point; older Storage objects are retained until publication-safe cleanup is implemented.';
-      return true;
-    }
-    async function uploadMedia(kind,id,file){
+          catch(cleanupError){throw Error(er    async function uploadMedia(kind,id,file){
       if(!mediaClient||!mediaRecoveryStore)throw Error('Secure catalog image management is not configured.');
       if(s.error)throw Error('Catalog data is not verified. Refresh successfully before uploading an image.');
-      if(s.error)throw Error('Catalog data is not verified. Refresh successfully before changing an image reference.');
-      if(s.pendingMedia||mediaRecoveryStore&&mediaRecoveryStore.read())throw Error('Reconcile the pending image operation before changing another image.');
       if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
       const record=currentMediaRecord(kind,id);
       if(!record)throw Error('Refresh and reopen this catalog item before changing its image.');
       const existing=mediaRecoveryStore.read();
-      if(existing){s.pendingMedia=existing;render();throw Error('A previous image operation needs reconciliation first. Do not start another upload.');}
+      if(existing||s.pendingMedia){
+        s.pendingMedia=existing||s.pendingMedia;render();
+        throw Error('A previous image operation needs reconciliation first. Do not start another upload.');
+      }
       s.mediaBusy=true;s.error=null;s.notice=null;render();
       let pending=null;
       try{
@@ -381,6 +382,14 @@
           s.notice='The rejected upload was safely removed. No catalog image reference was changed.';
           return;
         }
+        await refresh();
+        if(s.error)throw Error('Catalog data could not be refreshed. The image was retained and no metadata retry or cleanup was attempted.');
+        const latest=currentMediaRecord(pending.kind,pending.entity_id);
+        if(pending.stage==='linking'&&mediaRecordMatchesPending(pending,latest)){
+          mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
+          s.notice='The image was already committed and has now been verified. No duplicate catalog update was sent.';
+          return;
+        }
         const stored=await mediaClient.info(pending.path);
         if(!stored){s.pendingMedia=pending;throw Error('Storage has not confirmed this upload yet. The recovery record remains; no catalog write or deletion was attempted.');}
         if(stored.size!==pending.size||stored.mimeType!==pending.mimeType)
@@ -391,6 +400,8 @@
       finally{s.mediaBusy=false;render();}
     }
     async function changeMediaReference(kind,id,mode){
+      if(s.error)throw Error('Catalog data is not verified. Refresh successfully before changing an image reference.');
+      if(s.pendingMedia||mediaRecoveryStore&&mediaRecoveryStore.read())throw Error('Reconcile the pending image operation before changing another image.');
       if(s.mediaBusy)throw Error('Another catalog image operation is already running.');
       const record=currentMediaRecord(kind,id);
       if(!record)throw Error('Refresh and reopen this catalog item before changing its image.');
@@ -417,10 +428,19 @@
         const record=pending.kind==='products'?reconciliation.result&&reconciliation.result.record&&reconciliation.result.record.product:
           pending.kind==='categories'?reconciliation.result&&reconciliation.result.record:
           reconciliation.result&&reconciliation.result.record&&reconciliation.result.record.deal;
-        if(record&&record.id===pending.entity_id&&record.image_current_path===pending.path&&
-           record.image_previous_path===(pending.payload.image_previous_path||null)&&
-           (pending.kind!=='products'||(record.image_extension===pending.extension&&record.image_previous_extension===(mediaExtension(pending.payload.image_previous_path)||null)&&record.image_published===true))){
+        if(mediaRecordMatchesPending(pending,record)){
           mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
+          s.notice='A previous image save was safely reconciled and verified.';
+          render();return;
+        }
+      }
+      if(pending.stage==='linking'&&mediaRecordMatchesPending(pending,currentMediaRecord(pending.kind,pending.entity_id))){
+        mediaRecoveryStore.clear(pending.path);s.pendingMedia=null;
+        s.notice='A previous image save was already committed and has been verified.';
+      }
+      render();
+    }
+Media=null;
           s.notice='A previous image save was safely reconciled and verified.';
           render();return;
         }
