@@ -102,12 +102,12 @@ The absolute Supabase Logs restriction remains unchanged: do not access, run, ed
 The QZ receipt-layout release has now been merged and deployed to the existing production POS Cloudflare Worker.
 
 - Repository: `itsfahadahmed1234-creator/flame-chick-platform`
-- PR: [#2 — POS branded QZ delivery receipt](https://github.com/itsfahadah1234-creator/flame-chick-platform/pull/2)
+- PR: [#2 — POS branded QZ delivery receipt](https://github.com/itsfahadahmed1234-creator/flame-chick-platform/pull/2)
 - Merge commit: `50eb6e40143dd8f2bf7a824001a1de50a9de7d21`
 - Isolated release branch: `release/pos-rider-delivery-optimization-2026-11-28`
 - Feature branch merged: `feature/pos-qz-receipt-layout-2026-11-28`
 - Cloudflare Worker: `flamechickpos`
-- Production URL: https://flamechickpos.itsfahadah1234-creator.workers.dev
+- Production URL: https://flamechickpos.itsfahadahmed1234-creator.workers.dev
 - Active Worker version: **9**
 - Version ID: `8b2f6ac4-0df4-4f74-84d2-c3f2b68c51d4`
 - Deployment ID: `ca57b6b0-bcdb-4ade-9c92-657fa613dafe`
@@ -147,3 +147,18 @@ Start by reading both handoffs, then inspect the current production release bran
 Use a real printed sample/photo or the user's specific observations to guide visual refinement. Keep receipt-only code changes isolated to POS printing source/tests, run the full POS regression/build/dry-run suite, and deploy only when verified. Keep the current v9 deployment available as the rollback point. Do not claim pixel-perfect layout until the user confirms the updated physical print.
 
 Other pending restaurant rehearsals and the test-order cleanup safeguards below remain unchanged.
+
+## Addendum — 2026-11-28 reference-driven QZ receipt typography revision
+
+- Work branch: `pos-qz-receipt-layout-revision-2026-11-28`, based on the previously tested receipt wrapping follow-up and current POS v9 release lineage.
+- The November 25 physical receipt is the typography/layout reference; the November 27 direct-QZ receipt remains the source for the current order fields and delivery calculations.
+- Header: existing Flame Chick logo, brand name, business address, **hanzlaawanx@gmail.com**, and phone. **P-NTN is explicitly excluded.**
+- The white logo artwork is recolored to black on a transparent temporary raster canvas for thermal-paper visibility. The source SVG asset itself is unchanged.
+- Centering uses the printer alignment command instead of manual text padding. Emphasis uses double-height (not double-width) ESC/POS text so 48-column width is retained.
+- Visual hierarchy: bold/enlarged brand, Original Bill heading, fulfillment type, dine-in table number, Grand Total, payment amount, and PAID/UNPAID marker.
+- Payment tokens such as `cash_on_delivery` are printed as cashier-readable `Cash on Delivery`.
+- Delivery fields, Delivery Charges, discounts, existing totals, payment/balance state, paper feed and partial-cut command are retained. No Surcharge row or P-NTN is added.
+- QZ connection, printer configuration, public certificate, private signing key and signer route are unchanged.
+- Preview deployments were disabled in the two legacy Vercel projects linked to the repository: `flame-chick-pos-development` and `flame-chick-website-production`. Do not use Vercel for preview or production deployment; Cloudflare is the hosting path.
+- **Verification state:** this revision's exact tests/build/dry-run are pending. No physical print job was sent and no Cloudflare deployment was made. Worker v9 remains the current production version and rollback point.
+- Next: run the isolated receipt/POS GitHub Actions checks, POS build and Wrangler dry-run. Then the user should verify one actual physical print before any separately approved deployment or final layout acceptance.

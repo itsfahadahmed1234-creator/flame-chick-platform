@@ -467,7 +467,7 @@
 
     // The existing white brand mark is recolored to black on a transparent canvas
     // before QZ emits the ESC/POS raster image.
-    addCentered('FLAME CHICK', { size: 0x11, bold: true });
+    addCentered('FLAME CHICK', { size: 0x01, bold: true });
     addCenteredBlock('Address: Flame Chick, Main Kamra Road Opposite to Zellbury, Attock');
     addCentered('Email: hanzlaawanx@gmail.com');
     addCentered('Phone: +923358044164');
@@ -483,7 +483,7 @@
     const isDelivery = fulfillment.indexOf('delivery') >= 0;
     const isDineIn = fulfillment.indexOf('dine') >= 0;
     addCentered(isDineIn ? 'DINE-IN' : (isDelivery ? 'DELIVERY' : 'TAKEAWAY'), {
-      size: 0x11,
+      size: 0x01,
       bold: true
     });
     rows.push('');
@@ -496,7 +496,7 @@
       const guests = order.guestsServed ?? order.GuestsServed ?? '';
       if (guests !== '' && guests !== null && guests !== undefined) addPair('Guests Served', guests);
       const table = order.tableNumber || order.TableNumber || '';
-      if (table) addPair('Table', table, { size: 0x11, bold: true });
+      if (table) addPair('Table', table, { size: 0x01, bold: true });
     }
 
     if (isDelivery) {
@@ -573,12 +573,12 @@
     else addPair('Payment', method || 'Not collected', { bold: true });
 
     if (isPaid) {
-      addCentered('* PAID *', { size: 0x11, bold: true });
+      addCentered('* PAID *', { size: 0x01, bold: true });
     } else if (status === 'unpaid' || status === 'pending' || paid > 0) {
       const balanceValue = Number(order.balanceDue ?? order.BalanceDue);
       const balance = Number.isFinite(balanceValue) ? balanceValue : Math.max(0, total - paid);
       addPair('Balance Due', fmt(balance), { bold: true });
-      addCentered('* UNPAID *', { size: 0x11, bold: true });
+      addCentered('* UNPAID *', { size: 0x01, bold: true });
     }
 
     const notes = order.notes || order.Notes;

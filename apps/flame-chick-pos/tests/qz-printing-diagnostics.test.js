@@ -228,7 +228,12 @@ test('receipt payload omits cashier, guest and surcharge details when not suppli
 test('QZ receipt data places the existing logo image between ESC/POS commands', async function () {
   function FakeImage() { this.naturalWidth = 33; this.naturalHeight = 38; }
   Object.defineProperty(FakeImage.prototype, 'src', { set() { this.onload(); } });
-  const context = { clearRect() {}, drawImage() {} };
+  const logoFillCalls = [];
+  const context = {
+    clearRect() {},
+    drawImage() {},
+    fillRect() { logoFillCalls.push({ composite: this.globalCompositeOperation, fill: this.fillStyle }); }
+  };
   const sandbox = {
     window: { Image: FakeImage },
     document: { createElement(name) {
@@ -255,6 +260,10 @@ test('QZ receipt data places the existing logo image between ESC/POS commands', 
   assert.equal(data[2], '\n');
   assert.ok(data[3].includes('Delivery Charges'));
   assert.ok(data[3].includes('Customer: Restaurant Test'));
+  assert.deepEqual(logoFillCalls, [{ composite: 'source-in', fill: '#000000' }]);
+  assert.ok(data[3].includes('Email: hanzlaawanx@gmail.com'));
+  assert.equal(data[3].includes('P-NTN'), false);
+  assert.equal(data[3].includes('Surcharge'), false);
 });
 
 test('nullable subtotal and total fall back to item and delivery amounts', function () {
@@ -327,4 +336,60 @@ test('long delivery address and instructions stay within the 48-column ESC/POS r
   assert.ok(readable.includes('Grand Total'));
   assert.equal(readable.includes('Surcharge'), false);
   assert.equal(payload.slice(-4), '\x1D\x56\x42\x00');
+});
+
+test('receipt typography uses centered bold double-height brand and fulfillment headings without doubling width', function () {
+  const helpers = loadQzHelpers();
+  const payload = helpers.buildReceiptPayload({
+    serverOrderNumber: 'FC-TYPE-001',
+    fulfillmentType: 'Delivery',
+    paymentMethod: 'cash_on_delivery',
+    paymentStatus: 'Unpaid',
+    subtotal: 100,
+    deliveryFee: 0,
+    total: 100,
+    items: [{ itemName: 'Test Item', quantity: 1, price: 100, lineTotal: 100 }]
+  });
+  assert.match(payload, /\x1B\x61\x01\x1D\x21\x01\x1B\x45\x01FLAME CHICK/);
+  assert.match(payload, /\x1B\x61\x01\x1D\x21\x01\x1B\x45\x01DELIVERY/);
+  assert.match(payload, /\x1B\x61\x01\x1D\x21\x01\x1B\x45\x01\* UNPAID \*/);
+  assert.ok(payload.includes('Email: hanzlaawanx@gmail.com'));
+  assert.ok(payload.includes('Cash on Delivery'));
+  assert.equal(payload.includes('cash_on_delivery'), false);
+  assert.equal(payload.includes('P-NTN'), false);
+  assert.equal(payload.includes('Surcharge'), false);
+});
+
+test('centering helper leaves alignment to ESC/POS instead of inserting manual padding', function () {
+  const helpers = loadQzHelpers();
+  assert.equal(helpers.center('FLAME CHICK', 48), 'FLAME CHICK');
+  assert.equal(helpers.center('DELIVERY', 48), 'DELIVERY');
+});
+
+test('payment-method formatter converts persisted payment tokens into readable labels', function () {
+  const helpers = loadQzHelpers();
+  assert.equal(helpers.paymentMethodText('cash_on_delivery'), 'Cash on Delivery');
+  assert.equal(helpers.paymentMethodText('jazzcash'), 'JazzCash');
+  assert.equal(helpers.paymentMethodText('easypaisa'), 'Easypaisa');
+  assert.equal(helpers.paymentMethodText('bank_transfer'), 'Bank Transfer');
+});
+
+test('dine-in table, grand total and PAID marker receive double-height bold emphasis', function () {
+  const helpers = loadQzHelpers();
+  const payload = helpers.buildReceiptPayload({
+    fulfillmentType: 'Dine-in',
+    tableNumber: 'G3',
+    guestsServed: 1,
+    subtotal: 3998,
+    total: 3998,
+    paymentMethod: 'Easypaisa',
+    paymentStatus: 'Paid',
+    paidAmount: 3998,
+    items: [{ itemName: 'Broast', quantity: 1, price: 3998, lineTotal: 3998 }]
+  });
+  assert.ok(payload.includes('Table'));
+  assert.ok(payload.includes('Grand Total'));
+  assert.ok(payload.includes('Rs 3,998'));
+  assert.match(payload, /\x1D\x21\x01\x1B\x45\x01\* PAID \*/);
+  assert.equal(payload.includes('Surcharge'), false);
 });

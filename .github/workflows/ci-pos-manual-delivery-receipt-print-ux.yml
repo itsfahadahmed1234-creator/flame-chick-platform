@@ -6,6 +6,7 @@ on:
       - fix/pos-manual-delivery-receipt-print-ux-2026-11-27
       - feature/pos-qz-receipt-layout-2026-11-28
       - feature/pos-qz-receipt-layout-followup-2026-11-28
+      - pos-qz-receipt-layout-revision-2026-11-28
     paths:
       - "apps/flame-chick-pos/**"
       - ".github/workflows/ci-pos-manual-delivery-receipt-print-ux.yml"
