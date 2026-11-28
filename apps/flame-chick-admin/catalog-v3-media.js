@@ -111,16 +111,25 @@
       if(!response.ok)throw fail(parsed.data.message||parsed.data.error||"Uploaded image cleanup failed ("+response.status+").","MediaStorageError",{status:response.status,path});
       return true;
     }
-    async function upload(kind,id,file){
+    async function prepareUpload(kind,id,file){
       if(!isTarget(kind,id))throw fail("The selected catalog item has an invalid identity.","MediaPathValidationError");
       const inspected=await inspectImageFile(file);
       const fileId=createUuid();
       if(!UUID_RE.test(String(fileId||"")))throw fail("Secure image identifiers are unavailable.","MediaPathValidationError");
       const path=kind+"/"+id+"/"+fileId+"."+inspected.extension;
-      const url=baseUrl+"/storage/v1/object/"+encodeURIComponent(bucket)+"/"+encodePath(path);
+      return Object.freeze({kind,id,path,extension:inspected.extension,mimeType:inspected.mimeType,size:inspected.size});
+    }
+    async function uploadPrepared(plan,file){
+      if(!plan||!isTarget(plan.kind,plan.id)||!isManagedPath(plan.path)||
+         !plan.path.startsWith(plan.kind+"/"+plan.id+"/"))
+        throw fail("The pending image path is invalid.","MediaPathValidationError");
+      const inspected=await inspectImageFile(file);
+      if(inspected.extension!==plan.extension||inspected.mimeType!==plan.mimeType||inspected.size!==plan.size)
+        throw fail("The selected image no longer matches the reserved upload.","MediaFileValidationError");
+      const responseUrl=baseUrl+"/storage/v1/object/"+encodeURIComponent(bucket)+"/"+encodePath(plan.path);
       let response=null,uploadFailure=null;
       try{
-        response=await send(url,{
+        response=await send(responseUrl,{
           method:"POST",
           headers:{
             "Content-Type":inspected.mimeType,
@@ -134,34 +143,38 @@
         const parsed=await readJson(response);
         const status=Number(response.status);
         if(status<500&&![408,425,429].includes(status))
-          throw fail(parsed.data.message||parsed.data.error||"Image upload was rejected ("+status+").","MediaStorageError",{status,path});
-        uploadFailure=fail("The Storage upload response was uncertain ("+status+").","MediaUploadUncertainError",{status,path,uncertain:true});
+          throw fail(parsed.data.message||parsed.data.error||"Image upload was rejected ("+status+").","MediaStorageError",{status,path:plan.path});
+        uploadFailure=fail("The Storage upload response was uncertain ("+status+").","MediaUploadUncertainError",{status,path:plan.path,uncertain:true});
       }
       let stored;
-      try{stored=await info(path);}
+      try{stored=await info(plan.path);}
       catch(error){
-        throw fail("The image upload could not be verified. It was not attached to the catalog; keep this path for safe reconciliation: "+path,
-          "MediaUploadUncertainError",{path,uncertain:true,cause:error});
+        throw fail("The image upload could not be verified. It was not attached to the catalog; retain this path for safe reconciliation: "+plan.path,
+          "MediaUploadUncertainError",{path:plan.path,uncertain:true,cause:error});
       }
       if(!stored){
-        if(uploadFailure)throw fail("The image upload did not complete; no catalog metadata was changed.","MediaStorageError",{path,cause:uploadFailure});
-        throw fail("Storage accepted the upload but the file could not be found for verification. It was not attached; retain this path for reconciliation: "+path,
-          "MediaUploadUncertainError",{path,uncertain:true});
+        if(uploadFailure)throw fail("The image upload did not complete; no catalog metadata was changed.","MediaStorageError",{path:plan.path,cause:uploadFailure});
+        throw fail("Storage accepted the upload but the file could not be found for verification. It was not attached; retain this path for reconciliation: "+plan.path,
+          "MediaUploadUncertainError",{path:plan.path,uncertain:true});
       }
       if(stored.size!==inspected.size||stored.mimeType!==inspected.mimeType){
         let cleanupError=null;
-        try{await remove(path);}catch(error){cleanupError=error;}
+        try{await remove(plan.path);}catch(error){cleanupError=error;}
         throw fail("The uploaded object did not match the original file size and MIME type."+
-          (cleanupError?" Cleanup failed; retain this orphan path: "+path:""),
-          "MediaUploadValidationError",{path,cleanupError});
+          (cleanupError?" Cleanup failed; retain this orphan path: "+plan.path:""),
+          "MediaUploadValidationError",{path:plan.path,cleanupError});
       }
-      return {path,extension:inspected.extension,mimeType:inspected.mimeType,size:inspected.size};
+      return {path:plan.path,extension:plan.extension,mimeType:plan.mimeType,size:plan.size};
+    }
+    async function upload(kind,id,file){
+      const plan=await prepareUpload(kind,id,file);
+      return uploadPrepared(plan,file);
     }
     function publicUrl(path){
       if(!isManagedPath(path))return null;
       return baseUrl+"/storage/v1/object/public/"+encodeURIComponent(bucket)+"/"+encodePath(path);
     }
-    return Object.freeze({upload,remove,publicUrl,info});
+    return Object.freeze({upload,prepareUpload,uploadPrepared,remove,publicUrl,info});
   }
 
   return Object.freeze({MAX_BYTES,TYPES,isManagedPath,isTarget,inspectImageFile,createClient});
