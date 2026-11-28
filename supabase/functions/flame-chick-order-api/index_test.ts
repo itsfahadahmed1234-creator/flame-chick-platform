@@ -479,3 +479,75 @@ Deno.test("authenticated POS Delivery sync accepts category-driven Chicken Burge
     globalThis.fetch = originalFetch;
   }
 });
+
+
+Deno.test("Website quote configuration reads overlap and remain fail-closed", async () => {
+  const savedFetch = globalThis.fetch;
+  let failAreas = false;
+  let configReadsInFlight = 0;
+  let maxConfigReadsInFlight = 0;
+  let commits = 0;
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const rawUrl = input instanceof Request ? input.url : String(input);
+    const url = new URL(rawUrl);
+    const pathName = url.pathname;
+    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+    if (pathName.endsWith("/rpc/flame_chick_catalog_public_read")) {
+      return json({
+        published: true, snapshot, publicationId, publicationNumber, schemaVersion: 3,
+        snapshotSha256, draftRevision: 92, pricingEngineVersion: "flame-chick-pricing-v1",
+        publishedAt, databaseNow
+      });
+    }
+    if (pathName.endsWith("/restaurants")) {
+      return json([{ id: restaurantId, currency_code: "PKR", timezone: "Asia/Karachi" }]);
+    }
+    if (pathName.endsWith("/branches")) {
+      return json([{
+        id: branchId, branch_code: "main", name: "Main Branch", is_active: true,
+        website_ordering_enabled: true, website_delivery_enabled: true, website_pickup_enabled: true
+      }]);
+    }
+    if (pathName.endsWith("/delivery_areas") || pathName.endsWith("/branch_delivery_settings")) {
+      const areasRequest = pathName.endsWith("/delivery_areas");
+      configReadsInFlight++;
+      maxConfigReadsInFlight = Math.max(maxConfigReadsInFlight, configReadsInFlight);
+      try {
+        await wait(10);
+        if (areasRequest && failAreas) return json({ message: "mock read failure" }, 503);
+        return areasRequest
+          ? json([{ id: areaId, name: "Synthetic Area", name_ur: null, delivery_fee: 50, sort_order: 1 }])
+          : json([{ not_listed_delivery_fee: null }]);
+      } finally {
+        configReadsInFlight--;
+      }
+    }
+    if (pathName.endsWith("/rpc/flame_chick_create_website_order")) {
+      commits++;
+      return json({ ok: true });
+    }
+    return json({ message: "Unexpected mocked request: " + pathName }, 500);
+  }) as typeof fetch;
+
+  try {
+    const success = await invoke(quoteBody("a1000000-0000-4000-8000-000000000081"));
+    if (success.status !== 200 || success.body.ok !== true) {
+      throw new Error("Quote did not succeed with valid parallel reads: " + JSON.stringify(success));
+    }
+    if (maxConfigReadsInFlight < 2) {
+      throw new Error("Delivery-area and branch-setting reads did not overlap.");
+    }
+    if (commits !== 0) throw new Error("Quote-only flow unexpectedly attempted an order commit.");
+
+    failAreas = true;
+    const failed = await invoke(quoteBody("a1000000-0000-4000-8000-000000000082"));
+    if (failed.status !== 503 || failed.body.error?.code !== "DELIVERY_CONFIGURATION_UNAVAILABLE") {
+      throw new Error("Delivery configuration failure did not remain fail-closed: " + JSON.stringify(failed));
+    }
+    if (commits !== 0) throw new Error("A failed delivery configuration read attempted an order commit.");
+  } finally {
+    globalThis.fetch = savedFetch;
+  }
+});
