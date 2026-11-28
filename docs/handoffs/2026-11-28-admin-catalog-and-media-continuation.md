@@ -246,3 +246,61 @@ The Admin phase is ready for user review when:
 - GitHub connector reads intermittently returned 404/unknown repository errors after the latest commits. Reconfirm branch HEAD and workflow file before the next write; do not infer current state from a failed lookup.
 - Continue respecting the absolute Supabase restriction: no Supabase Logs Explorer, no expensive 102 GB query, and no Log Ingestion access or configuration.
 - Next: restore reliable source reads, wire and run `node --test tests/admin-connection-helpers.test.mjs` in the Admin static workflow, update the app request wrapper so the timeout covers response-body consumption, verify exact HEAD CI, then continue with pagination. Keep the migration/media workflow blocked pending provenance and backend command review.
+
+
+---
+
+## Admin reliability, pagination and migration provenance checkpoint — 2026-11-28
+
+### Connection reliability
+
+- The Admin browser now routes bounded requests through `connection-helpers.js`. Its 12-second timeout remains active until the response body has been consumed, not merely until fetch returns headers.
+- The helper reconstructs a browser `Response` after bounded body consumption so existing `.json()` / `.text()` call sites retain their contract, including bodyless 204/205/304 responses.
+- Single-flight refresh and exact same-body mutation retry are integrated. Ambiguous retry outcomes retain the original request ID and block different edits until reconciliation; definite conflicts are not retried.
+- Added behavioral tests for concurrent refresh, refresh recovery, retry classification, exact request object reuse, uncertain outcomes, timeout during body read, response status/JSON compatibility and bodyless responses.
+- CI failure diagnosis: the first new test run failed because the browser helper is CommonJS while the Node test used ESM named imports. The test now imports the CommonJS default and destructures the exports. No application defect was found in that failure.
+- Verified green run `46121192429` for commit `f2dea919c9dc40e293579fce926ac5589bb90882`: all Admin Static Checks steps passed.
+
+### Catalog V3 pagination
+
+- Implemented bounded cursor pagination using the existing finite Staff Admin read actions and `after_id` cursor contract.
+- Categories load 100 per page; products, collections and deals load 50 per page. Deal pagination state is independent for each collection.
+- Next-page controls appear only when `has_more=true` and a non-null `next_cursor` are both present.
+- Collection pagination loads the first deal page for each newly discovered collection. Results are appended with ID de-duplication.
+- If the draft revision changes during a page fetch, the workspace refreshes and asks the user to review before editing.
+- Added source-contract tests for cursor metadata, bounded requests, collection-specific deal cursors and UI controls.
+- Verified green run `46121271285` for pagination commit `1718ea8e929c0f96a7c6759e38b2391cbc5be9bd`.
+- Verified green run `46121281939` for pagination test commit `ae35a13ece61ff7105edf633351da9dca498c05b`.
+
+### Recovered Production migration provenance
+
+- Read-only Supabase project discovery identified the existing Production project `adkrxfnawdiljhjaavnj` (Flame Chick Production, Mumbai, ACTIVE_HEALTHY).
+- Read-only `list_migrations` confirmed Production has migration version `20261127090849`, name `flame_chick_catalog_product_media_v1`.
+- Recovered the exact applied SQL from `supabase_migrations.schema_migrations.statements` using a read-only query. Restored it unchanged as `supabase/migrations/20261127090849_flame_chick_catalog_product_media_v1.sql` on this isolated review branch.
+- Independently fetched the restored file and compared its bytes/content to the migration ledger statement: exact match (6,545 bytes). This is recovery of the applied SQL, not a recreation or reapplication.
+- The recovered migration patches the existing product upsert command to validate product image paths, extension metadata and Storage object existence, preserve one previous image, and keep image changes inside the existing revision/idempotency/audit command.
+- Read-only schema inspection confirmed the Production `flame-chick-media` bucket is public for image delivery, 5 MiB max, JPEG/PNG/WebP only; Storage read/write/delete policies require the authenticated active restaurant-wide Admin/Owner and restrict object paths to the permitted folders.
+- Read-only function inspection confirmed the product draft read function includes current/previous image metadata and the product upsert function validates the referenced Storage objects. The existing category/deal read/upsert command functions do not yet expose the corresponding image metadata.
+- Added a test for the recovered migration and wired the migration/test paths into Admin CI. A fresh run for commit `0b087f64440f9c92dcca9eb7521a8156bcf0109d` must be checked before treating that latest commit as validated.
+
+### Legacy media code safety
+
+- The old `app.js` contains legacy image upload and direct PostgREST table-patch helpers. The old Menu, Categories, Deals and Website Images navigation entries remain disabled in `index.html`; Catalog V3 is a separate module using the finite Staff Admin command API.
+- Do not reuse the legacy `replaceImage()` / `storageUpload()` / `db(...PATCH)` workflow for Catalog V3. The new image editor must upload through the authenticated Storage policy and save metadata through Catalog V3 commands only.
+- Website promotional images/settings remain a separate future project.
+
+### Change boundary
+
+- All work remains on `work/admin-catalog-media-review`; no changes to `cloudflare/admin-production`.
+- No database writes, migrations, Storage writes/deletes, Edge Function deployments, Cloudflare Pages deployments, menu imports, publications or live image uploads occurred.
+- Supabase work in this checkpoint was read-only schema, migration-ledger, function-definition, bucket and policy inspection. Supabase Logs Explorer, the 102 GB query and Log Ingestion were not accessed.
+- No customer images have been uploaded; Admin is not yet ready for image upload.
+
+### Next steps
+
+1. Verify the latest CI run for `0b087f64440f9c92dcca9eb7521a8156bcf0109d`.
+2. Recover/document the exact definitions of category/deal read/upsert functions and design a new additive migration for category/deal image metadata, without executing it against Production.
+3. Add image metadata to the secure category/deal command contracts and tests.
+4. Implement Catalog V3 product/category/deal upload, preview, replace, restore and remove using authenticated Storage and the secure command API; use compensation/reconciliation for interrupted uploads and metadata failures.
+5. Add object-path validation, orphan cleanup review and complete authorization/role/revision/publication tests.
+6. Keep Website promotional images separate. Do not deploy until the review branch is fully tested and explicitly approved.
