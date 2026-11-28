@@ -153,10 +153,13 @@ async function staffApi(method,query,body){
  const send=()=>fetchBounded(C.supabaseUrl+"/functions/v1/flame-chick-staff-admin",{method,headers:{apikey:C.publishableKey,Authorization:"Bearer "+S.session.access_token,"Content-Type":"application/json"},body:method==="GET"?undefined:JSON.stringify(body||{}),cache:"no-store"});
  let response=await send();
  if(response.status===401){await refresh();response=await send();}
- const data=await response.json().catch(()=>({}));
+ let data;
+ try{data=await response.json();}
+ catch(cause){const error=new Error("The Staff Admin response was not valid JSON.");error.name="HttpResponseParseError";error.cause=cause;throw error;}
  if(response.status===401){clearSession();showAuth(true);throw Error("Your session expired. Sign in again.");}
- if(!response.ok){const failure=new Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");failure.name="HttpRequestError";failure.status=response.status;throw failure;}
- if(data.ok===false)throw Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");
+ if(!response.ok){const failure=new Error(data&&data.error&&data.error.message||"Staff request failed ("+response.status+").");failure.name="HttpRequestError";failure.status=response.status;throw failure;}
+ if(!data||typeof data!=="object"||Array.isArray(data)) {const error=new Error("The Staff Admin response has an invalid shape.");error.name="HttpResponseParseError";throw error;}
+ if(data.ok===false){const error=new Error(data.error&&data.error.message||"Staff request failed ("+response.status+").");error.name="CatalogCommandRejectedError";error.code=data.error&&data.error.code;throw error;}
  return data;
 }
 function pendingCatalogMutationForUser(){
@@ -184,15 +187,23 @@ async function catalogV3Request(action,payload,isMutation){
    ?await window.FlameChickAdminConnection.sendWithOneRetry((sameBody)=>staffApi("POST",null,sameBody),body)
    :await staffApi("POST",null,body);
  }catch(error){
-  if(isMutation&&error.name==="CatalogMutationUncertainError")throw error;
+  if(isMutation&&window.FlameChickAdminConnection.isDefinitelyRejected(error)){
+   pendingCatalogStore.clear(body.request_id);
+  }
   throw error;
  }
  const result=response&&response.result;
- if(!result||result.ok===false){
-  if(isMutation)pendingCatalogStore.clear(body.request_id);
+ if(isMutation){
+  if(!result||typeof result!=="object"||Array.isArray(result)||result.ok!==true||
+     result.request_id!==body.request_id||!Number.isSafeInteger(result.draft_revision)||result.draft_revision<0){
+   const error=new Error("The catalog save response could not be verified. Its recovery record has been retained; retry the exact save to reconcile it.");
+   error.name="CatalogResponseContractError";
+   throw error;
+  }
+  pendingCatalogStore.clear(body.request_id);
+ }else if(!result||typeof result!=="object"||Array.isArray(result)||result.ok===false){
   throw Error(result&&result.error&&result.error.message||"Catalog V3 request failed.");
  }
- if(isMutation)pendingCatalogStore.clear(body.request_id);
  if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=Math.max(S.catalogV3Revision||0,result.draft_revision);
  return result;
 }
@@ -203,9 +214,11 @@ async function reconcilePendingCatalogMutation(){
   const response=await window.FlameChickAdminConnection.sendWithOneRetry(
    sameBody=>staffApi("POST",null,sameBody),record.body);
   const result=response&&response.result;
-  if(!result||result.ok===false){
-   pendingCatalogStore.clear(record.body.request_id);
-   throw Error(result&&result.error&&result.error.message||"The previous catalog save was rejected and has been safely reconciled. Review the draft before continuing.");
+  if(!result||typeof result!=="object"||Array.isArray(result)||result.ok!==true||
+     result.request_id!==record.body.request_id||!Number.isSafeInteger(result.draft_revision)||result.draft_revision<0){
+   const error=new Error("The previous catalog save response could not be verified. Its recovery record has been retained; reopen Catalog to retry reconciliation.");
+   error.name="CatalogResponseContractError";
+   throw error;
   }
   pendingCatalogStore.clear(record.body.request_id);
   if(Number.isSafeInteger(result.draft_revision))S.catalogV3Revision=Math.max(S.catalogV3Revision||0,result.draft_revision);
