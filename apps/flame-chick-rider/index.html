@@ -559,7 +559,7 @@ async function performAction(taskId,action){
   try{
     const result=await deliveryRequest('POST',null,{action,delivery_task_id:taskId,...(reason?{reason}:{})});
     toast(action==='picked_up'?'Pickup confirmed. The order is now out for delivery.':action==='delivered'?'Delivery marked delivered. The order remains awaiting cashier payment collection.':action==='failed'?'Delivery issue saved. Keep the order and return it to the restaurant.':action==='return_reported'?'Return reported. Wait for manager confirmation.':'Delivery updated.');
-    if(!applyRiderSnapshot(result.rider_state||{}))await loadJobs(true);
+    if(result.rider_presence_refresh_required||!applyRiderSnapshot(result.rider_state||{}))await loadJobs(true);
   }catch(e){toast(e.message);buttons.forEach(b=>b.disabled=false);}
 }
 
@@ -607,7 +607,7 @@ async function respondToOffer(offerId,action,button){
       result=await deliveryRequest('POST',null,{action:'decline_offer',offer_id:offerId,reason:'Rider declined'});
       toast('Delivery offer declined.');
     }
-    if(!applyRiderSnapshot(result.rider_state||{}))await loadJobs(true);
+    if(result.rider_presence_refresh_required||!applyRiderSnapshot(result.rider_state||{}))await loadJobs(true);
   }catch(error){
     toast(error.message||'This offer is no longer available.');
     await loadJobs(false);
