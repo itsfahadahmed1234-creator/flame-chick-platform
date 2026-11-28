@@ -17,15 +17,20 @@ function schedulerSource() {
 }
 
 function makeScheduler() {
-  const timers = [];
+  const timers = new Map();
+  let nextTimerId = 1;
   const calls = { orders: 0, delivery: 0 };
   const sandbox = {
     navigator: { onLine: true },
     flameChickStaffSession: { access_token: 'mock-session' },
     flameChickRealtimeRefreshRunning: false,
     flameChickRealtimeRefreshDebounce: null,
-    clearTimeout() {},
-    setTimeout(callback) { timers.push(callback); return timers.length; },
+    clearTimeout(id) { timers.delete(id); },
+    setTimeout(callback) {
+      const id = nextTimerId++;
+      timers.set(id, callback);
+      return id;
+    },
     console: { warn() {} },
     async loadDeliveryDispatch() { calls.delivery += 1; },
     async loadInitialOnlineInbox() {
@@ -39,9 +44,10 @@ function makeScheduler() {
   return {
     calls,
     async flush() {
-      const callback = timers.shift();
-      assert.equal(typeof callback, 'function', 'a scheduled refresh callback must exist');
-      await callback();
+      const entry = timers.entries().next().value;
+      assert.ok(entry, 'a scheduled refresh callback must exist');
+      timers.delete(entry[0]);
+      await entry[1]();
     },
     schedule: (scope) => sandbox.scheduleFlameChickRealtimeRefresh(scope)
   };
@@ -68,17 +74,17 @@ test('POS coalesces order and delivery events into one inbox/dispatch refresh', 
 });
 
 test('POS Realtime listeners distinguish order changes from delivery changes', () => {
-  assert.match(source, /channel\\.on\\('broadcast',\\{event:'orders_changed'\\},\\(\\)=>scheduleFlameChickRealtimeRefresh\\('orders'\\)\\)/);
-  assert.match(source, /channel\\.on\\('broadcast',\\{event:'delivery_changed'\\},\\(\\)=>scheduleFlameChickRealtimeRefresh\\('delivery'\\)\\)/);
+  assert.match(source, /channel\.on\('broadcast',\{event:'orders_changed'\},\(\)=>scheduleFlameChickRealtimeRefresh\('orders'\)\)/);
+  assert.match(source, /channel\.on\('broadcast',\{event:'delivery_changed'\},\(\)=>scheduleFlameChickRealtimeRefresh\('delivery'\)\)/);
 });
 
 test('POS refresh scheduler does not run the inbox and dispatch loaders sequentially', () => {
   const scheduler = schedulerSource();
-  assert.doesNotMatch(scheduler, /await loadInitialOnlineInbox\\(\\);\\s*await loadDeliveryDispatch\\(\\)/);
-  assert.match(scheduler, /if\\(refreshOrders\\)await loadInitialOnlineInbox\\(\\);\\s*else if\\(refreshDelivery\\)await loadDeliveryDispatch\\(\\)/);
+  assert.doesNotMatch(scheduler, /await loadInitialOnlineInbox\(\);\s*await loadDeliveryDispatch\(\)/);
+  assert.match(scheduler, /if\(refreshOrders\)await loadInitialOnlineInbox\(\);\s*else if\(refreshDelivery\)await loadDeliveryDispatch\(\)/);
 });
 
 test('POS keeps the 120-second healthy safety refresh and 30-second Realtime fallback', () => {
-  assert.match(source, /flameChickRealtimeRefreshTimer=setInterval\\([\\s\\S]{0,220}?\\},120000\\)/);
-  assert.match(source, /flameChickRealtimeRefreshTimer=setInterval\\([\\s\\S]{0,220}?\\},30000\\)/);
+  assert.match(source, /flameChickRealtimeRefreshTimer=setInterval\([\s\S]{0,220}?\},120000\)/);
+  assert.match(source, /flameChickRealtimeRefreshTimer=setInterval\([\s\S]{0,220}?\},30000\)/);
 });
