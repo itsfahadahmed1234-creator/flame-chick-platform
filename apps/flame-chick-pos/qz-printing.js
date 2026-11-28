@@ -399,8 +399,7 @@
     const ESC = '\x1B';
     const GS = '\x1D';
     const rows = [
-      ESC + '\x40',
-      ESC + '\x74' + '\x00'
+      ESC + '\x40' + ESC + '\x74' + '\x00'
     ];
 
     function bold(enabled) {
@@ -416,12 +415,12 @@
       const textSize = Number(settings.size) || 0;
       const columns = (textSize & 0x10) ? 24 : width;
       rows.push(
-        ESC + '\x61' + '\x01',
-        size(textSize),
-        bold(Boolean(settings.bold)),
-        center(value, columns),
-        bold(false),
-        size(0),
+        ESC + '\x61' + '\x01' +
+        size(textSize) +
+        bold(Boolean(settings.bold)) +
+        center(value, columns) +
+        bold(false) +
+        size(0) +
         ESC + '\x61' + '\x00'
       );
     }
@@ -435,10 +434,10 @@
       const textSize = Number(settings.size) || 0;
       const columns = (textSize & 0x10) ? 24 : width;
       rows.push(
-        size(textSize),
-        bold(Boolean(settings.bold)),
-        rightPair(fieldLabel, value, columns),
-        bold(false),
+        size(textSize) +
+        bold(Boolean(settings.bold)) +
+        rightPair(fieldLabel, value, columns) +
+        bold(false) +
         size(0)
       );
     }
@@ -512,9 +511,7 @@
 
     rows.push(
       '-'.repeat(width),
-      bold(true),
-      rightPair('Item', 'Price', width),
-      bold(false),
+      bold(true) + rightPair('Item', 'Price', width) + bold(false),
       '-'.repeat(width)
     );
 
