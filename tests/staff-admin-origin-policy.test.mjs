@@ -6,6 +6,10 @@ import {
   parseAllowedOrigins,
   parseStaffAdminOrigins,
   CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN,
+  CLOUDFLARE_PRODUCTION_RIDER_ORIGIN,
+  ADMIN_INVITATION_REDIRECT,
+  RIDER_INVITATION_REDIRECT,
+  getStaffInviteRedirect,
   PRODUCTION_STAFF_ADMIN_ORIGIN,
   PREVIEW_STAFF_ADMIN_ORIGINS,
   staffCorsHeaders
@@ -73,7 +77,7 @@ test("the production Edge Function imports and enforces the tested origin policy
 
 test("production Admin and pinned preview origins remain allowed when optional env allowlist is unset", () => {
   const configured = parseStaffAdminOrigins("");
-  assert.deepEqual([...configured], [CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN, PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS]);
+  assert.deepEqual([...configured], [CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN, CLOUDFLARE_PRODUCTION_RIDER_ORIGIN, PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS]);
   for (const origin of [CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN, PRODUCTION_STAFF_ADMIN_ORIGIN, ...PREVIEW_STAFF_ADMIN_ORIGINS]) {
     assert.equal(isAllowedRequestOrigin(origin, configured), true);
     assert.equal(staffCorsHeaders(origin, configured)["Access-Control-Allow-Origin"], origin);
@@ -141,16 +145,17 @@ test("Staff Admin preview CORS allows only the exact current and branch-stable p
   }
 });
 
-test("Cloudflare Pages Admin production origin is allowed while Vercel fallback remains available", () => {
+test("Cloudflare Pages origins are allowed for app CORS, but invitation redirects are Cloudflare-only", () => {
   const configured = parseStaffAdminOrigins("");
   for (const origin of [CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN, PRODUCTION_STAFF_ADMIN_ORIGIN]) {
     assert.equal(configured.has(origin), true);
     assert.equal(isAllowedRequestOrigin(origin, configured), true);
     assert.equal(staffCorsHeaders(origin, configured)["Access-Control-Allow-Origin"], origin);
-    assert.equal(isSafeInviteRedirect(origin + "/accept-invitation.html", configured), true);
+    if (origin === CLOUDFLARE_PRODUCTION_STAFF_ADMIN_ORIGIN) assert.equal(isSafeInviteRedirect(origin + "/accept-invitation.html", configured), true);
   }
 
   for (const origin of [
+    PRODUCTION_STAFF_ADMIN_ORIGIN,
     "https://flamechickadmin.pages.dev.evil.test",
     "https://evil-flamechickadmin.pages.dev",
     "https://flamechickadmin.pages.dev.attacker.invalid",
@@ -161,4 +166,25 @@ test("Cloudflare Pages Admin production origin is allowed while Vercel fallback 
     assert.equal(staffCorsHeaders(origin, configured)["Access-Control-Allow-Origin"], undefined);
     assert.equal(isSafeInviteRedirect(origin + "/accept-invitation.html", configured), false);
   }
+});
+
+
+test("staff invitations route Riders to Cloudflare Rider and other staff to Cloudflare Admin", () => {
+  assert.equal(getStaffInviteRedirect("rider"), RIDER_INVITATION_REDIRECT);
+  assert.equal(getStaffInviteRedirect(" Rider "), RIDER_INVITATION_REDIRECT);
+  for (const role of ["admin", "owner", "manager", "cashier"]) {
+    assert.equal(getStaffInviteRedirect(role), ADMIN_INVITATION_REDIRECT);
+  }
+  assert.throws(() => getStaffInviteRedirect("unknown"), /Unsupported staff invitation role/);
+  const configured = parseStaffAdminOrigins("");
+  assert.equal(isSafeInviteRedirect(RIDER_INVITATION_REDIRECT, configured), true);
+  assert.equal(isSafeInviteRedirect(ADMIN_INVITATION_REDIRECT, configured), true);
+  assert.equal(isSafeInviteRedirect(PRODUCTION_STAFF_ADMIN_ORIGIN + "/accept-invitation.html", configured), false);
+});
+
+test("Rider Cloudflare origin is included in exact CORS allowlist", () => {
+  const configured = parseStaffAdminOrigins("");
+  assert.equal(configured.has(CLOUDFLARE_PRODUCTION_RIDER_ORIGIN), true);
+  assert.equal(isAllowedRequestOrigin(CLOUDFLARE_PRODUCTION_RIDER_ORIGIN, configured), true);
+  assert.equal(staffCorsHeaders(CLOUDFLARE_PRODUCTION_RIDER_ORIGIN, configured)["Access-Control-Allow-Origin"], CLOUDFLARE_PRODUCTION_RIDER_ORIGIN);
 });
