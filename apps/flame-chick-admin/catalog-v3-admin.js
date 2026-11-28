@@ -726,6 +726,7 @@
       el.onclick=async event=>{
         const b=event.target.closest('[data-action]');if(!b||b.disabled||s.saving||s.editorLoadingDealId)return;const a=b.dataset.action;
         try{
+          if(s.error&&a!=='refresh')throw Error('Catalog data is not verified. Refresh successfully before making any changes.');
           if(a==='refresh')await refresh();
           else if(a==='load-more')await loadMore(b.dataset.kind,b.dataset.collectionId||null);
           else if(a==='import-menu')await importPublishedMenuDraft();
@@ -792,6 +793,7 @@
       };
       el.onsubmit=async event=>{
         const form=event.target.closest('form[data-form]');if(!form)return;event.preventDefault();if(s.saving)return;
+        if(s.error){s.notice='Catalog data is not verified. Refresh successfully before saving.';render();return;}
         s.saving=true;s.error=null;
         const formDataSnapshot=new FormData(form);
         try{await submit(form);}catch(e){s.error=e.message||'Catalog save failed.';}
