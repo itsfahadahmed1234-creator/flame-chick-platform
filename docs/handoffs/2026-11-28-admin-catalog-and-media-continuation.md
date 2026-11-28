@@ -21,6 +21,7 @@ This checkpoint supersedes older statements below that say the category/deal med
 - Latest run summary: **144 tests passed, 0 failed**. It includes the media signature/MIME/size checks, Storage API mock tests, same-size/different-content fingerprint rejection, ambiguous upload and object verification cases, account-bound recovery record validation, static Catalog V3/Storage boundary assertions, JavaScript syntax and Admin regression suite.
 - The earlier fingerprint test run `46133082301` failed because its first mock File fixture lacked `arrayBuffer()`; fixture support was added and subsequent runs passed, including the latest run above.
 - Product/deal Website DTO consumption was source-checked; category artwork non-consumption was also source-checked.
+- Separate commit-status contexts for `Vercel – flame-chick-website-production` and `Vercel – flame-chick-pos-development` currently report `failure` with the Vercel `build-rate-limit` URL. These are external Website/POS project checks, not the Admin Static Checks; do not merge or promote these branches as part of this Admin work. No Website/POS source files were changed here.
 
 ## Still not ready for image uploads or release
 
