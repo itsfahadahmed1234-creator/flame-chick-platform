@@ -62,6 +62,6 @@ test("Admin dashboard is enabled and loaded through Staff Admin", () => {
   assert.match(app, /nav\("dashboard"\)/);
   assert.match(app, /action:"dashboard_summary",payload:body/);
   assert.match(app, /range:"today",dashboardData:null/);
-  assert.match(app, /p_include_period_history:S\\.range!=="today"/);
+  assert.match(app, /p_include_period_history:S\.range!=="today"/);
   assert.match(app, /const att=d\.attention_orders\|\|\[\],activeCount=num\(d,"attention_count"\)/);
 });
