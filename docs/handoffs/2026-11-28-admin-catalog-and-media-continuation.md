@@ -415,3 +415,45 @@ The Admin phase is ready for user review when:
 ### Boundary reaffirmation
 
 All Production database queries in this checkpoint were metadata/function-definition SELECTs only. No SQL writes, migration application, Storage object operations, Edge Function changes/deployments, Pages changes/deployments or production-branch edits occurred. Supabase Logs Explorer, the 102 GB query and Log Ingestion remain untouched.
+
+
+---
+
+## Category/deal image metadata contract draft — 2026-11-28
+
+### Completed in the isolated review branch
+
+- Added `docs/drafts/2026-11-28-flame-chick-category-deal-media-v1.sql` as a **review-only SQL draft**, not a numbered Supabase migration.
+- The draft targets only these existing internal functions:
+  - `app_private.flame_chick_catalog_command_internal(text,jsonb,bigint,uuid)` — category image metadata write.
+  - `app_private.flame_chick_catalog_draft_read_internal(text,uuid,integer)` — category image metadata read.
+  - `app_private.flame_chick_catalog_deal_upsert_internal(jsonb,bigint,uuid)` — deal image metadata write.
+  - `app_private.flame_chick_catalog_deal_list_read_internal(uuid,uuid,integer)` — deal image metadata read.
+- Existing category/deal image columns and the current Storage object policies were verified read-only. No new table, column, policy, bucket, public API action or Edge Function is proposed in this draft.
+- The draft preserves the existing function identity, `SECURITY DEFINER`, empty `search_path`, actor/restaurant authorization, revision lock, idempotency, audit flow and wrappers. Each text patch requires exactly one matching source anchor and checks the postcondition.
+- Category and deal image paths are restricted to their exact entity UUID folder and JPG/JPEG/PNG/WebP suffix; the corresponding object must exist in the `flame-chick-media` bucket. Empty/null path values are supported for removal; omitted values preserve existing metadata; current and previous paths must differ.
+- New categories/deals must first be created without media. The entity UUID is then available for the subsequent authenticated upload and metadata command.
+- Category list reads and deal list reads now have planned current/previous path fields; deal detail already serializes the complete deal row. Draft metadata remains separate from the current published snapshot.
+
+### Verification status and blockers
+
+- The current database function definitions were re-read through focused read-only `pg_get_functiondef` queries. No data, schema, function, grant, Storage object or publication was modified.
+- Supabase documentation was checked for function hardening and Storage metadata behavior. The draft only reads `storage.objects`; it does not insert, update or delete Storage metadata. Actual file operations remain Storage API operations under the existing policies.
+- A static contract test was added for the draft's four function targets, guarded anchors, path/object checks and absence of Storage policy/grant/object mutations.
+- **Not yet validated by PostgreSQL or a disposable Supabase stack.** GitHub CI can validate the static contract only; it cannot prove the dynamic function text replacement compiles or that the behavior passes live RPC/Storage failure scenarios. The SQL is deliberately marked DO NOT APPLY and must not be run against Production.
+- No Catalog V3 image upload, preview, replace, restore, remove or orphan-cleanup UI has been added. Product image metadata is still not wired into the editor. **Do not invite image uploads.**
+- No workflow run has yet validated the new commit. Record the exact CI run and source commit after GitHub Actions completes.
+
+### Required next gates
+
+1. Review the SQL draft against the exact function definitions and run it only in a disposable Supabase environment with the full migration chain; exercise valid paths, wrong entity folders, absent objects, null/omitted values, cross-restaurant IDs, idempotent replay and revision conflicts.
+2. Add RPC/Storage integration tests for replacement, restore, removal, upload interruption, ambiguous commit reconciliation and safe orphan cleanup. Never delete a current/previous path or anything referenced by a published snapshot.
+3. Only after those tests pass, implement the unified Catalog V3 product/category/deal media workflow. Keep product category and deal image changes within the existing revisioned/idempotent command model.
+4. Obtain separate approval before creating/applying a production migration, changing/deploying the Staff Admin Edge Function, modifying Storage policies, deploying Pages or uploading real menu images.
+
+### Boundaries reaffirmed
+
+- Work remains on `work/admin-catalog-media-review`; `cloudflare/admin-production` remains untouched.
+- No Production database writes, migration applications, Storage object operations, Staff Admin Edge Function changes/deployments, Cloudflare Pages deployments, publication or menu imports occurred.
+- Website promotional media remains separate.
+- Supabase Logs Explorer, the 102 GB log query and Log Ingestion remain completely untouched.
